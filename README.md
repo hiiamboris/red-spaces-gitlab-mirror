@@ -1,5 +1,4 @@
-# PRELIMINARY DOCUMENTATION FOR
-# DRAW-BASED WIDGET LIB FOR [RED](http://red-lang.org/)
+# PRELIMINARY DOCUMENTATION FOR DRAW-BASED WIDGET LIB FOR [RED](http://red-lang.org/)
 
 ## EXAMPLES (clickable)
 
@@ -39,7 +38,7 @@ host [
 host [list-view with [size: 300x400 source: list1d]]
 ```
 
-Drunken scrollbars are done via [Styling]:
+Drunken scrollbars are done via [Styling](#styling):
 ```
 set-style 'back-arrow  [rotate (angle) (size / 2)]
 set-style 'forth-arrow [rotate (angle) (size / 2)]
@@ -186,7 +185,7 @@ Why need for name?
 - possible to repurpose a generic (e.g. `rectangle`) space by giving it a name (e.g. `thumb` of a `hscroll` or `vscroll`) - such space will behave and be styled differently (e.g. `rectangle` doesn't need events, but `thumb` may react)
 
 Why `(get name) = object` rather than `object [name: ..]`?
-- it makes easy to apply styles to whole classes of spaces by their names (see [styling] below)
+- it makes easy to apply styles to whole classes of spaces by their names (see [styling](#styling) below)
 - it makes easy to visualize (dump) the face/space tree
 
 Drawback: have to call `get` an extra round sometimes. But other way would have to `select .. 'name`, so no big deal.
@@ -198,10 +197,10 @@ Style is: name -> block of Draw commands
 
 Styles definitions are separate from the space definitions.
 
-**Quirk:** Style name is a path!
-
-E.g. `paragraph [pen blue]`
+E.g. `paragraph [pen blue]`<br>
 E.g. `hscroll/thumb [fill-pen yellow]`
+
+**Quirk:** Style name is a path!
 
 Example: face/space tree listing:
 ```
@@ -234,7 +233,7 @@ screen/window/base/list-view/vscroll/forth-arrow
 screen/window/base/list-view/timer
 screen/window/text
 ```
-**Quirk:** `list` contains hundreds of `item`s, but `map` contains only visible 5 paragraphs (those we need to hittest against). Relates to [tabbing] as well.
+**Quirk:** `list` contains hundreds of `item`s, but `map` contains only visible 5 paragraphs (those we need to hittest against). Relates to [tabbing](#tabbing) as well.
 
 Here, `base` is a face that contains a tree of spaces. Only spaces are styled (not faces).
 
@@ -266,6 +265,14 @@ So it's possible to write `(self/size: new-size ())` or `(self/font: make font! 
 
 ## Events
 
+Defined similarly to styles, e.g.:
+```
+my-space [
+	on-down [space path event] [...]
+	on-key [space path event] [...]
+]
+```
+
 Event handlers are divided into 3 stacks (called in this order obviously):
 - previewers (e.g. to focus a space on clicks, and still process the click)
 - normal handlers
@@ -295,24 +302,24 @@ Previewers and finalizers have all the same spec:<br>
 - `path` has 2 formats, but anyway it's a chain of space names from the tree root down to it's inner spaces
 - `event` is what View provides us with (may be `none` for synthesized events)
 
-Normal event handlers have varying spec, depending on event type.<br>
+**Quirk:** Normal event handlers have varying spec, depending on event type.<br>
 Usually: `function [space [object!] path [block!] event [event! none!]]`
 
-`path`, like before, has 2 formats:
-- for pointer-related events, path is returned by hittest and it contains the whole history of coordinate system transformations: e.g. `[list-view 210x392 hscroll 210x8 thumb 196x8]` (word pair word pair ...). Each pair is a point in the space listed before it. Such path does not include parent *faces* for we don't hittest against them (would be extra effort to generate this info) but this may change in the future.
-- for all other events, we have no offsets, so it's words only: `[screen window base list-view]`. Keyboard events go into *focused* space (so it should be equal to `keyboard/focus`).
+**Quirk:** `path` has 2 formats:
+- for pointer-related events, path is returned by hittest and it contains the whole history of coordinate system transformations: e.g. `[list-view 210x392 hscroll 210x8 thumb 196x8]` (word pair word pair ...). Each pair is a point in the space listed before it. Such path does not include parent *faces* for we don't hittest against them (would be extra effort to generate this info) but this may change in the future. `over wheel up mid-up alt-up aux-up down mid-down alt-down aux-down click dbl-click`
+- for all other events, we have no offsets, so it's words only: `[screen window base list-view]`. Keyboard events (`key key-down key-up enter`) go into the *focused* space (so `path` should be equal to `keyboard/focus` up to index).
 
 `path` is a *block* for convenience, so it can be reduced or decomposed like `set [a: b: c:] path`.
 
 Timer event handlers have the spec:<br>
 `function [space [object!] path [block!] event [event! none!] delay [percent!]]`<br>
-See [Timers] on the meaning of delay.
+See [Timers](#timers) on the meaning of delay.
 
-**Quirk:** all paths are relative to the space that handles the event.
+**Quirk:** all `path`s are relative to the space that handles the event.
 
 E.g. for `screen/window/base/list-view/thumb`, if `list-view` handles the event then `path = skip [screen window base list-view thumb] 3`
 
-Thus, `space = get path/1` always holds true. `space` is not needed but it's a nice shortcut that saves a lot of `space: get path/1` lines.
+Thus, `space = get path/1` always holds true, `path/-1` and `path/-2` are possible parents and `path/2` and `path/3` are possible children (take care for pairs though). `space` thus is not strictly needed but it's a nice shortcut that saves a lot of `space: get path/1` lines.
 
 `self` vs `space`: `self` could have been used instead to reduce the number of arguments, but since one event handler can handle events for hundreds of spaces, we would have to `bind` it before every call, which is too slow.
 
@@ -345,7 +352,7 @@ Example: `table` (scrollable) contains 100000 `field`s inside (like mini-spreads
 
 There's no ultimately right choice that I can see. 2nd option is chosen for simplicity and better fit for the current design. But 1st option can still be implemented using a previewer, where it's required.
 
-**Tabbing order** is the order of the tree, i.e. defined by `map` order (in turn may be defined by `items` order in case of `list` space). `list-spaces` function can be used to visualize it (like the big listing in [Styling]).
+**Tabbing order** is the order of the tree, i.e. defined by `map` order (in turn may be defined by `items` order in case of `list` space). `list-spaces` function can be used to visualize it (like the big listing in [Styling](#styling)).
 
 Tree has 2 dimensions: outer/inner (depth-wise) and previous/next (sibling nodes).<br>
 Forward order (Tab key) is defined as *outer->inner and previous->next*, e.g.:
