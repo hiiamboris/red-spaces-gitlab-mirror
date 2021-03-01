@@ -96,6 +96,7 @@ This means a common design underlining all widgets.
 | [Spatial navigation](https://en.wikipedia.org/wiki/Spatial_navigation) | Not implemented |
 | Resize model | Need a powerful simple design idea, ideally that would apply to faces too |
 | Layout | Embedded into View layout seamlessly, but very basic: only accepts space names and `with` |
+| Table | Missing advanced features like cells span, columns dragging, sorting, filtering |
 
 # Goals
 
