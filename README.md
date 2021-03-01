@@ -201,6 +201,7 @@ Why need for name?
 Why `(get name) = object` rather than `object [name: ..]`?
 - it makes easy to apply styles to whole classes of spaces by their names (see [styling](#styling) below)
 - it makes easy to visualize (dump) the face/space tree
+- if you've ever tried `?? my-face` you know it is a bad idea; with spaces however, output is always fully inspectable exactly because of this choice
 
 Drawback: have to call `get` an extra round sometimes. But other way would have to `select .. 'name`, so no big deal.
 
