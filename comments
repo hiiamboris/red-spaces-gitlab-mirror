@@ -1,0 +1,848 @@
+TODOS
+event handling system - standard way to react to clicks, clicks-and-holds, keypresses, etc.
+keys binding to each UI item?
+focused items should be highlighted using styles
++ decouple styles from the objects
+demo+test of rotated scrollable space (mb rotate it with time and demo proper origin)
+smooth scrolling in chatlog demo
+scrollbar should generate page events periodically until LMB is up
+styles should be deep, e.g. paragraph! <> list-view!/paragraph!
+need to try 2 types of KB navigation: tabbed and spatial, how they apply
+	this navigation, at least tabbed, should be able to work across different *faces*
+if `map` is defined `into` should not be needed, when none is defined it is a final space (non-composite)
+	or leave `into` always there? afraid of inheritance errors
+mixed transparent tabbing across spaces and faces
+draggability of spaces (e.g. table columns) - this will require temporary offsets in the map
+disabled items, and they should not be focusable!
+if an item gets hidden, it should not receive keyboard events even if it's still in focus
+	(there will be no 'hidden', there will be 'not drawn')
++ how to decouple KB navigation from the dispatcher?
+make content: 'a-word ! make `make` return a word with a style value!
+how to compose styles from the old ones? need a clear mechanism
+handler spec validation and auto addition of typesets - to help learning, minimize mistakes
+list & doc ideas that improve over vid/view, key differences
+debug func to list handlers for this or that space (with all path variants)
+should events receive full paths (from `screen`) or relative to host (from it's `space`)??
+in event handlers `self` =? `commands` right now, should be set to `space`? and get rid of `space` arg?
+	this will be problematic as will require a `bind` before every handler call
+can I externalize list-view's rolling logic to be able to utilize it in other spaces?
+table demo with wavy animated layout: each row would slide left and right in a sine manner - will be a killer demo!
+	and it's columns should be draggable! :D
+demo templates for all useful styles, like small static table, huge table for csv, etc etc
+	so others can take those and build upon
+VID extension for spaces:
+	on-created (possible?) global event handler
+	will scan each host face's worst actor and create a space tree from it's spec
+rename host/space to host/content for consistency with scrollable?
+	or make it host a scrollable always?
+	or make separate faces for all spaces?
+decide on resize model (though ideally it should cover View wholly)
+what if I devise a standard way child sizes can be propagated into parent sizes? (headers-list dilemma)
+make multi-cell span
+	how can cell span multiple rows vertically?
+	perhaps separate grid style will be required
+	or I just make a span: field and disable clipping everywhere (except scrollable)
+
+QUIRKS
+
+`into` allows to twist coordinates in any way, e.g. meaningfully react to clicks on a rotated/flipped face
+	it's also simpler than hittest, so only carries the space's own logic, without duplicating generics
+`map` and `into-map`, as well as caching of coordinates in `map`:
+	- avoids duplication of the most widely used logic in each space
+	- makes hittesting faster because of the cached offsets/sizes
+	however `map` shouldn't be relied upon! `into` is the proper way to translate coordinates
+	(e.g. think of non-rectangular or rotated areas)
+`map` can't be of type `map!` because it should be ordered (e.g. for tab navigation) (can be a hash though!)
+map names don't have to be unique (e.g. list may have 1000s of `item`s), just traversable
+	but each of it's names has to lead to a unique object
+	(unique names help working with each map item though, using path notation)
+map/space/size <> space/size -- 1st is in parent CS, 2nd is in child CS (and may also be 3ped/translated/...)
+name (in a map) is not an identifier (unique) of a space, it's the class! e.g. `hscroll` is a class of horizontal scrollbars
+	(however since name is bound to an object it's also an identifier under the hood)
+content is a word!
+	we want 'content' to appear in styles (and consequently in 'path') so we can process events for 'content'
+	but we also want the space it refers to to appear in styles, for that style must process it's own events
+	e.g. table inside scrollable - both scrollable/content and table are focusable and handle keys differently
+	it's a bit of a special case though.. but it guarantees that inner item name won't clash in map with other names
+	(in other words, we can't just put style name into map)
+	however, can we maybe just define the events block for each space?
+	at least we won't have to look for it..
+	but if we do, we'll have to wrap generic spaces and replace events inside
+	no... content+name looks cleaner to me
+scrollable-space supports `draw/only xy1 xy2` for it's content - to minimize rendering effort by preemptive clipping
+lot of parts in space become valid only after it's drawn (couldn't be any other way), e.g. it's map
+style! could easily have been a kind of space! that wraps any other space, but it shouldn't be as:
+	- that would mix functionality with styling
+	- will be harder to change styling
+	- styles will appear in the path
+	or not??? ok bigger problem:
+	- will have to sync style size with content size all the time
+	  (can't be done from inside content, so how else? manually? or we resize style that resizes content? stupid..)
+there are 2 ways styling can be applied:
+	1) each space applies it's own name
+	2) parent space applies names from it's own map
+	2 has a drawback: e.g. scrollable-space doesn't know the type of it's content, so generic style applies
+	then if we put thing into scrollable-space this thing loses it's style, and this is shitty
+	but 2 has a benefit too: we can change inner parts without worry, styles will still apply
+	e.g. think of scrollbar's thumb - it's a rectangle under the hood but we wanna style it as thumb
+	solution? allowing a `style: 'name` field for spaces, which would override `content` generic name
+	dumb? or will work?
+funny thing about paths: example - we have 3 list-views on a window (a, b and c)
+	- from styling POV they should all be called `list-view`
+	- from focusing POV they should be `a`, `b` and `c` (i.e. unique)
+	  this distinction applies only to faces, not anything inside (yes? maps provide enough uniqueness?)
+	  also `root` should be parent to them all
+why keyboard/focus has to be a *deep* path containing focused face along with *all* of its parents:
+	tabbed navigation can be done in 2 ways:
+	- geometrically by finding nearest item along the path (but this is so called spatial navigation)
+	- by finding next/prev node in the space tree
+	  but this requires us to be able to transcend limits of one container and traverse all that is shown
+	  (even other faces, so we need a parent that holds all space-hostin faces)
+	it doesn't have to bother with names though (like content vs list, etc)
+	as we're using it to navigate the tree only, so as long as each item leads to an object it's good
+	(it could be just an object but then we won't be able to mold this path, easily)
+focus is not selection:
+	multiple lists can be shown with a selection (maybe multiple) but only one list has a focused item
+	so to minimize code duplication and simplify styles we need `focused?` and `selected?` flags in styles
+	`selected?` will be a property of `list`, while `focused?` is a global flag (func or logic)
+what is root?
+	for tabbing, we need to be able to focus both faces and spaces
+		so naturally screen is the root for windows, then faces, then spaces
+		so keyboard/focus should begin with a screen object
+		(need to wrap those objects into words as [screen window face only then spaces] for mold friendliness)
+		for styling however, we don't need screens or faces, `root` may refer to the (any) host face
+		or should we assign a name to each host face and root will be parent to them all?
+		it depends if we wish to style each host differently? no reason so far..
+		besides, when one needs it, one just creates a container space with a `style: name` and addresses as root/name/...
+		@@ rename root to host? or to face? for clarity
+		@@ describe in docs how to style each host face differently
+		for hittesting we want coordinates obviously, but what names?
+		hittest has to be forceable (repeatable) so wee choose names from maps
+		but root? screen? for compatibility with focus? probably no other point, could just start with the host
+		[host space space ...] + coordinates (besides we can't translate into screen coordinates w/o R/S, and it's unneeded work)
+	do we want tabbing across different windows of the same app?
+		I think we do
+		that means `keyboard/focusable` has to start with screen or list of screens
+	do we wanna tab and scroll to hidden items?
+		I think not
+		e.g. scrollable [ 
+			edit-box
+			..1M edit boxes..
+		]
+		if we (on Tab) show next edit box that's 1M of them to traverse to get out of the `content`
+		one will sooner die than finish this quest
+		if we just allow skipping to the scrollbar however,
+		one can just scroll one page down and tab back into edit boxes and this just works
+		partially clipped edit box is still a corner case: we may wanna show it fully
+		also, we certainly don't wanna tab to hidden panes of a tab-panel
+pros and cons of each styles layout:
+	item/subitem another/subitem [style..]       -- currently chosen
+	 - have to be traversed once for each item in the path (which is 5+ items long)
+	   because absense of 'subitem' in table doesn't guarantee absense of 'item/subitem'
+	 + allows style grouping
+	 + faster than other styles despite the extra work done
+	upper item subitem [style..]
+	 - requires another inner loop to ensure that when we look for `item` we don't also find `item subitem`
+	 - styles can't be grouped
+	 + no confusion on words vs paths, no `to path` or `as path` conversion needed
+	 + finding `subitem` automatically finds `item subitem` and upper layers, but still slow (2-5 times)
+	   parse can be used but it's even slower still (4-10 times),
+	   and parse requires escaping each word in path (as lit-word)
+event handlers are separated from space objects for:
+	- memory efficiency: one event handler can serve multiple spaces
+	- cognitive convenience: separation of code from data and structure from behavior
+	- ?unsure? ease of extension: one handler can easily pass data into another (e.g. one that's overridden)
+events are passed to the topmost layer that can handle them
+	because upper layers have the whole context of how they are using their inner spaces, but not vice versa
+	and lower layers may be used with or without upper layers, so they can not produce to the point results
+	(at best they can just provide some better abstraction over event data, but most likely it's just dead code)
+trickiness of keyboard focus and tabbing:
+	e.g. we have layout: scrollable-space [content = list [edit-box ...] hscroll vscroll]
+	we want:
+	- h/v scrolls to handle keys separately (up=left, down=right, meaning defined by each scroll bar)
+	- whole space to react to keys (page down/up, up<>left, down<>right)
+	- spaces inside the list can be focused too, e.g. edit-box would handle keys on it's own
+	so, focusable face can be a parent to another focusable face
+	and we need to consider that during tree traversal,
+	and also when assigning the focus - last space in the path is the one focused
+	also: for 'content' to be focusable it is imperative that `focus` uses proper style names
+there is not space geometry before it's drawn, no size no nothing, because what isn't drawn isn't existing
+	and it makes sense, as we want animations and space may be moving in a complex way
+	each frame of such move determines different geometry and reacts to events (like clicks) differently
+following REP#80, event handlers return values do not control event flow,
+	but their bodies are bound to commands that do
+iteration over spaces
+	there are 2 directions:
+	- top-down from the root to the leaves, or bottom-up
+	- forward from one leaf to adjacent leaf, or backward
+	for tabbing to work properly we want fully reversable order
+	i.e. if tab iteration is top-down forward, then shift-tab is bottom-up backward
+	for this, listing a tree seems like much easier approach than recursively visiting nodes
+unsolved problems of `content: 'name` design:
+	to get content/size: `cspace: get content  cspace/size` is a bit complicated
+	name changes in the map itself, which may theoretically lead to name collision (and I'm using path access)
+reasons not to define `style: ... events: ...` in every space:
+	want styles to be an isolated layer, so who defines styles does not have to poke around objects
+	want styles names to be composite, like `this-space/that-space`,
+		which is harder to map onto objects (and way harder to track after)
+	objects can be numerous (= numerous links), while style is defined only once, so it saves some RAM
+we need to use fonts in styles, as well as any other thing that may affect space's `size`
+	including setting size directly from the style..
+	this is all fine when styles are shallow, but what about deep ones?
+	we have to somehow apply the tree of styles before `size` is called
+	tricky thing: what if size is random or depends on time?
+	then whatever we do, `size` and `draw` will not align
+	unless we make `size` only available after `draw`... until the next `draw`...
+why event handlers should be referred to by paths:
+	example:
+		item/subitem has handler: sub-item/on-event: [..if path/-1 = 'item .. [do smth]]
+	this handler can't be copied into a new style,
+	because `path/-1 = 'item` will not produce anything good
+	if we however copy the whole tree of handlers, `path/-1 = 'item` is not needed at all
+	and we become able to copy handlers together with the space tree
+	as such we probably should allow simpler, literal, copying of events:
+		events/handlers/item/subitem: 'item2/subitem2
+handlers extensibility
+	we will want some handlers to control visual behavior and be embedded into the lib
+	while other handlers will be written by the user and follow user's logic
+	how do we allow both to coexist?
+	and how to simplify the extension of one style by another?
+	actors should be lists?
+	if so, what defined first should fire first
+	but how to override? do we want to override?
+	there may be levels, like lib-level and user-level, both with multiple handlers..
+dynamic size vs draw/only
+	it makes little sense to redraw possibly infinite number of invisible items of a list
+	however if their sizes change, we can't know until we draw them
+	so what to do? obviously we can't draw all the items (performance-wise)
+	so it should be advised to re-render those items which size changes, before showing the list
+	(TODO: document this limitation)
+pinning
+	list-view should support some pinned items
+	but list is who renders those
+	yet list is refilled with items from some offset, not from the head
+	so is this even worth it to make list and list-view logic so complicated?
+	vs just creating 2 lists, one pinned, one normal?
+	scrollbar will be different: will span either the whole height or only of normal items
+	2nd option is preferred: more natural
+table structure
+	2 grids with pinned rows?
+	4 grids?
+	we want pinned columns to have pinned headers and scrollable
+	we want scrolling to be synced vertically, and horizontal scrolling only for the unpinned columns
+	how to sync col/row widths?
+table column order
+	we can rearrange columns by dragging the UI
+	and we don't rearrange the data, nor we should expect user-defined data pickers to all support ordering
+	we rearrange the visual representation only
+	so we should have an order defined in the UI itself: e.g. [2 6 1 5 4 3] (indexes may or may not exist)
+	order will act as a simple filter too: what isn't present - isn't shown
+	rearranging rows OTOH should be a change in the data, so should not be covered by UI... I think
+headers - data or special value?
+	I think table should provide a generic interface,
+	and picker function should decide if row=1,2..etc is a header string or part of original data array
+funny observation about table long/infinite in both directions (x and y):
+	it will be impossible to infer row height, because we'll have to scan the whole (infinite) row every time
+	without it, rows height will depend on what items are actually shown right now (i.e. where the scrolling window is)
+	and rows height will jump around while scrolling left and right
+	so such layout is only possible for fixed-size cells, or at least fixed-size row heights
+hittest design shows that inner spaces should be named by their styles, not as generic `content`
+	though that means that map has to hold those proper names as well, otherwise `hittest/force` isn't going to work
+	proper style name is also required for `focusable` block
+map: block or hash?
+	list style has numerous `item`s which is bad for hash
+	and lookups in a map should only be useful for small maps anyway
+	so block wins
+events chain: still undecided
+	e.g.
+		list-view
+		list-view/hscroll
+		          hscroll
+		list-view/hscroll/thumb
+		          hscroll/thumb
+		                  thumb
+	if list-view/hscroll takes event, and calls `pass`, should `hscroll` also receive it or only `thumb` variants?
+	I think it should, because if specific handler didn't eat the event, generic one still can
+
+Timer design:
+- we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
+  but at the same time we don't want to lock execution in a single timer when it takes longer to process than it's period
+  so we have to be able to drop events but since this affects the animation, a warning should be printed
+  and we want to be able to disable those warnings for production code
+- on a W10 laptop in battery saving mode face timer never repeats in less than 14ms, but usually it's 14-30ms
+  but if we use `wait 0` as yield func, we never get intervals more than 15ms
+- in performance mode timers are still 65 fps, so is `wait 0` granularity
+- will need multimedia timers for anything more precise, or at least will need to set system timer to 0.5ms interval
+  (that's 2000 fps compared to current 65 fps)
+  this will increase the power consumption though (from what I read on the web)
+- so there is very little point in doing our own event loop, just to improve the fps by a negligible effect
+  and for now just using `rate 100` dispatcher should be good enough
+- yet we can improve the animation by providing the delay to timers
+  e.g. desired rate = 50fps = 20ms, if 30ms have passed that's 50% delay, if only 10 then that's -50% delay
+  (0% would mean a perfect match)
+  then one should scale the animation to that delay
+  or 100% would be perfect match, 50% for 10ms, 150% for 30ms? it's a question of `dt` vs `dt - 1`
+  depends on the argument name also, if it's `delay` then `dt - 1`, if it's `scale` then `dt`
+- this will require a table of all timers' last trigger time
+- how to determine *when* to call a timer handler?
+  e.g. host has rate 67 = 15ms, and child has rate 30 = 33 ms
+  if we only call the timer *after* the guaranteed 33 ms, we will get really 45 ms
+  so it makes sense to call the timer before it expires, like up to 7ms before? half of the host resolution
+  no that's bad.. rather we should accumulate bias and try to minimize it...
+  OK it works up to 64 fps, where timer is slower than the desired fps...
+
+MUSEUM
+this is bad because it mirrors the code from draw
+; into: function [xy] [
+; 	any [
+; 		all [within? xy 0x0 box  reduce [content xy]]
+; 		all [box/x < size/x  within? xy o: box * 1x0 vscroll/size  reduce [vscroll xy - o]]
+; 		all [box/y < size/y  within? xy o: box * 0x1 hscroll/size  reduce [hscroll xy - o]]
+; 	]
+; ]
+; into: func [xy] [
+; 	any [axis = 'x  xy: reverse xy]
+; 	all [
+; 		within? xy 0x0 size
+; 		any [
+; 			all [xy/x < back-btn/size/x  reduce [back-btn xy]]
+; 			all [xy/x >= (size/x - forth-btn/size/x)  reduce [forth-btn xy - (size - forth-btn/size * 1x0)]]
+; 			all [xy: xy - (1x0 * size * offset)  xy/x >= 0  xy/x < (size/x * amount)  reduce [thumb xy]]
+; 		]
+; 	]
+; ]
+
+this is bad because it doesn't build a map, and consequently we can't hittest against the map
+; (back-btn/draw)
+; ; (put items 'back-btn 0x0  back-btn/draw)
+; translate (map/thumb/offset: o: back-btn/size + (stripe * offset) * 1x0) [
+; 	(thumb/draw)
+; ]
+; translate (map/forth-btn/offset: back-btn/size + stripe * 1x0) [
+; 	(forth-btn/draw)
+; ]
+
+this can't work because of #4788
+; cached-length: none				;-- set to none when it's out of date
+; on-deep-change*: function [owner word target action new index part /extern cached-length] [
+; 	;@@ TODO: more actions
+; 	;@@ BUG: on-deep-change is a mess, totally useless
+; 	;@@ e.g. take/last - reports index=0 and series at head, so how to figure out the changed part?
+; 	nitems: length? items
+; 	case [
+; 		none? cached-length [exit]				;-- nothing to modify
+; 		word <> 'items      [exit]				;-- it's not items that changed
+; 		any [
+; 			'cleared = action 
+; 			all [part * 3 > nitems  nitems > 10]	;-- part is too big: better recalculate size normally
+; 		][
+; 			cached-length: none  exit
+; 		]
+; 		find [appended poke poked] action [
+; 			target: skip target index
+; 			+-: :+
+; 		]
+; 		find [inserted remove take cleared change changed] action [
+; 			+-: :-
+; 		]
+; 		'else [do make error! "TODO: unsupported-action"]
+; 	]
+; 	partlen: 0
+; 	repeat i part [
+; 		item: get target/:i
+; 		item-size: item/size
+; 		partlen: partlen + item-size/:axis
+; 	]
+; 	partlen: partlen + (part * spacing/:axis)
+; 	if part = nitems [partlen: partlen - spacing/:axis + (2 * margin/:axis)]
+; 	+-: either find [inserted appended changed] action [:+][:-]
+; 	cached-length: cached-length +- partlen
+; ]
+
+consequently this becomes too slow...
+; cut-items: function [
+; 	"remove items until list size is within constraints"
+; 	where [word!] "head or tail"
+; 	limit [integer!] "enforce min number of items to keep"
+; ][
+; 	items: content/items
+; 	len1: get-length
+; 	num1: length? items
+; 	cut-one: select [head [take items] tail [take/last items]] where
+; 	while [all [limit > 0  not within-limits?]] [
+; 		limit: limit - 1
+; 		do cut-one
+; 	]
+; 	len2: get-length
+; 	num2: length? items
+; 	reduce [num1 - num2  len1 - len2]
+; ]
+; within-limits?: function [] [
+; 	len: get-length
+; 	num: length? content/items
+; 	all [len <= max-length  num <= max-items]
+; ]
+; get-length: has [size] [
+; 	size: content/size
+; 	size/(content/axis)
+; ]
+
+on-deep-change is no place for list refill, cause such thing becomes hard to control & predict
+; if all [word = 'origin  source  content/items] [
+; 	if case [
+; 		;@@ TODO: where to hold this 200ms delay? where to enforce it?
+; 		;-- one can click 'page-down' faster than 200ms and get to the end unnoticed, but 100ms - unlikely
+; 		;@@ TODO: this means this delay has to be ONLY in on-over, but how?
+; 		;@@ also it's bad to have origin auto changed (breaks code continuity) - better to have it on demand
+; 		0:0:0.100 >= difference t: now/precise last-refill-time [no]
+; 		origin/y >= (0 - look-around) [
+; 			;@@ TODO: add-items/cut-items should happen inside draw, only planned here
+; 			set [add-n: add-len:] add-items 'head jump-length
+; 			cut-items 'tail add-n
+; 			set-quiet 'source skip source 0 - add-n
+; 			origin/y: origin/y - add-len
+; 		]
+; 		(csize: content/size clen: csize/:axis) - (map/content/size/:axis) + origin/y <= look-around [
+; 			set [added:] add-items 'tail jump-length
+; 			set [cut-n: cut-len:] cut-items 'head added
+; 			set-quiet 'source skip source cut-n
+; 			origin/y: origin/y + cut-len
+; 		]
+; 	] [set-quiet 'last-refill-time now/precise]
+; ]
+
+scaled triangle doesn't play well with styles including an outline
+; triangle!: make space! [
+; 	size: 16x10
+; 	dir: 'n
+; 	; need `into` here? or triangle will be a box from the clicking perspective?
+; 	draw: function [] [
+; 		set [p1: p2: p3:] select [
+; 			n [0x2 1x0 2x2]								;--   n
+; 			e [0x0 2x1 0x2]								;-- w   e
+; 			w [2x0 0x1 2x2]								;--   s
+; 			s [0x0 1x2 2x0]
+; 		] dir
+; 		compose/deep [
+; 			push [
+; 				scale (size/x / 2) (size/y / 2) [
+; 					triangle (p1) (p2) (p3)
+; 				]
+; 			]
+; 		]
+; 	]
+; ]
+
+items in list's map do not have to have different names, as this requires too many words
+and it also messes the map up when moving items around (e.g. in add-items 'head)
+still, we need each `item` to refer to a unique object so we need context to wrap it (unless we drop names)
+sadly (#4165) find/same word doesn't work, but there doesn't seem to be a need for it anyway
+; add-item: function [] [
+; 	p: make paragraph! []
+; 	o: object compose [(to set-word! rejoin ["item" 1 + length? content/items]) (p)]
+; 	append content/items w: first words-of o
+; 	w
+; ]
+
+slower 2-3 times on error than the all [] approach
+; focused?: function ["Check if current style is the one in focus"] [
+;	attempt [(get last path) =? (get last keyboard/focus)]
+
+version for styles like [item subitem [style]] - slower 5x
+; get-style: function [
+; 	"Fetch styling code for the current space being drawn"
+; 	/named path [path! block!] "Path to look for (defaults to current-style)"
+; 	/closing "Fetch a closure instead"
+; ][
+; 	path: tail as [] either named [path][current-style]
+; 	#assert [not head? path]
+; 	; if head? path [return []]							;-- empty path
+; 	c: [
+; 	table: either closing [closures][styles]
+; 	; table: find table path: back path
+; 	; unless table [return []]							;-- no such style
+; 	attempt [			;-- stops when find/tail fails
+; 		until [												;-- look for the most specific fitting style
+; 			;-- search order here: from the space name (most common) to it's full path (most uncommon)
+; 			;-- to eliminate the number of failed lookups (performance)
+; 			p: back path
+; 			t: back table
+; 			until [block? first t: find/tail t p]
+; 			style: t/1
+; 			table: skip t 0 - length? p
+; 			head? path: p
+; 		]
+; 	]
+; 	]
+; 	either 'hscroll = last head path [clock/times c 100000][do c]
+; 	unless style [return []]
+; 	; style: select table path
+; 	#assert [block? style]
+; 	space: get last path								;-- need to expose it's context to the style
+; 	; print ["style for " head path "is" style]
+; 	compose/deep bind style space			;@@ how slow this bind will be? any way not to bind?
+; ]
+
+version for styles like [item subitem [style]] but using parse - slower 10x
+; get-style: function [
+; 	"Fetch styling code for the current space being drawn"
+; 	/named path [path! block!] "Path to look for (defaults to current-style)"
+; 	/closing "Fetch a closure instead"
+; 	/local style
+; ][
+; 	table: either closing [closures][styles]
+; 	path1: as [] either named [path][current-style]
+; 	#assert [not tail? path1]
+; 	space: last path1
+; 	c: [
+; 	path: clear []
+; 	parse path1 [collect into path any [set w word! keep (to lit-word! w)]]
+; 	append path: tail path [set style block!]
+; 	until [
+; 		path: back path
+; 		any [
+; 			not parse table [to path to end]
+; 			head? path
+; 		]
+; 	]
+; 	]
+; 	; #assert [block? style]
+; 	either 'hscroll = space [clock/times c 100000][do c]
+; 	unless block? style [return []]
+; 	space: get space								;-- need to expose it's context to the style
+; 	; print ["style for " head path "is" style]
+; 	compose/deep bind style space			;@@ how slow this bind will be? any way not to bind?
+; ]
+
+looks much less obfuscated using `with` and `map-each`
+; context [
+; 	w: table: none
+; 	foreach table [styles closures] [						;-- replace words with paths
+; 		parse get table [any [change only set w word! (to path! w) | skip]]
+; 	]
+; ]
+
+update command should not exit from the event handler
+; update: does [throw/name 'update 'event-command]
+
+doesn't work because of #4802
+; actors: [
+; 	;-- using lightweight wrapper instead of the direct link to :event/dispatch
+; 	;-- for actors will be copied at some point and we want as little footprint as possible
+; 	on-down: on-up: on-mid-down: on-mid-up:
+; 	on-alt-down: on-alt-up: on-aux-down: on-aux-up:
+; 	on-dbl-click: on-over: on-wheel:
+; 	on-key: on-key-down: on-key-up: on-enter:
+; 	on-focus: on-unfocus: func [face event] [events/dispatch face event]
+; ]
+
+moved this into the proper event handlers, became less messy
+; on-down [
+; 	; events/dispatch face event
+; 	set-focus face
+; 	path: hittest test event/offset
+; 	?? path
+; 	;-- keyboard support
+; 	path2: parse path [collect any [keep word! | skip]]
+; 	while [not empty? path2] [
+; 		either find keyboard/focusable last path2 [break] [take/last path2]
+; 	]
+; 	unless empty? path2 [keyboard/focus: path2]
+; 	?? keyboard/focus
+; 	;-- scrolling support
+; 	either where: any [
+; 		find path 'hscroll
+; 		find path 'vscroll
+; 	][
+; 		axis: select [hscroll x vscroll y] where/1
+; 		ss: get where/-2
+; 		drag-in: none
+; 		move-by: :scrollable-space/move-by
+; 		switch where/3 [
+; 			forth-arrow [move-by ss 'line 'forth axis  ss/refill]
+; 			back-arrow  [move-by ss 'line 'back  axis  ss/refill]
+; 			forth-page  [move-by ss 'page 'forth axis  ss/refill]
+; 			back-page   [move-by ss 'page 'back  axis  ss/refill]
+; 			thumb       [drag-in: reduce [where axis ss/origin]]
+; 		]
+; 		face/draw: render test 'root
+; 	][
+; 		;-- not on a scrollbar
+; 		if where: find path 'content [
+; 			ss: get where/-2
+; 			drag-in: reduce [where 'list ss/origin]
+; 		]
+; 	]
+; ]
+; on-up [
+; 	events/dispatch face event
+; 	drag-in: none
+; ]
+
+this design is too hard to reverse properly (for tabbing), and is also tricky to get right & to follow
+I'm not using an iterator for this is time critical code and iterator would at least double the 'select' count
+if we don't do it recursive, we'll have to find where we are on the map every time we wanna get one level up
+so it is recursive
+no return value for simplicity & speed
+`continue` can be used but not break (too much overhead to support it)
+; foreach-space*: function [spec [block!] path [path! block!] "(modified)" dir [word!] "forth or back" code [block!]] [
+; 	space: get name: path/1
+; 	if map: select space 'map [
+; 		path: next path
+; 		either dir = 'forth [
+; 			if name: path/1 [map: find/skip map name 2]
+; 			end?: [tail? map: skip map 2]
+; 		][
+; 			map: either name: path/1 [find/skip map name 2][at tail map -2]
+; 			end?: [head? also map map: skip map -2]
+; 		]
+; 		until [
+; 			change path map/1			;@@ do we want to expose geometry to code?
+; 			foreach-space* spec path dir code
+; 			clear path
+; 			do end?
+; 		]
+; 	]
+; 	set spec head change change/only [] head path space
+; 	loop 1 code
+; 	; clear path
+; ]
+
+first space in the `path` determines the root (upmost space in the tree)
+foreach-space will jump to other branches but can't go behind it
+thus `path = to path! host/space` designates the whole tree as iteration range
+`path = some window or panel` designates a root face, iterating only over hosts inside it ;@@ TODO
+to limit the scope just shorten the path
+iteration starts with the root path (no way around it), then to the first child or first neighbor
+/back affects only neighbor iteration direction, but it's still top down always
+; foreach-space: func [
+; 	'spec [word! block!] "path or [path space]"
+; 	path [word! path! block!] "Starting path"
+; 	code [block!]
+; 	/back "Traverse in the opposite direction"
+; ][
+; 	foreach-space*
+; 		to block! spec
+; 		to path! path		;-- makes a copy (will be modified), also forces index to 1 (so `head` will be relative to it)
+; 		pick [back forth] back
+; 		code
+; ]
+
+; scrap design where style name was overridden from the /style facet
+; 	it caused too much complexity but was limited:
+; 	it required every space to define it's name
+; 	but that didn't help, as then every 'back-arrow' and shit would become just 'triangle'
+;   background: we don't want events for 'triangle' but may want them for 'back-arrow', so we use map names.
+;     but we don't want event for 'content' (generic), we want them to what style 'content' points to.
+;     for this to work /style override needs to be defined for every space but this kills the map names; doesn't work
+
+; scrap design where 'content' was pointing to an object
+; 	because that required the object to provide it's name somehow
+; 	while all we have to do is say `content: 'name` and that solves it all
+
+; scrap design where map had 'content' word that pointed to another word and we would lay out e.g. `content/list` in map
+; 	caused too much complexity in `into` functions
+
+now generalized as an event previewer
+; refocus: function ["internal use only" face [object!] path [block! path!] "words only (modified)"] [
+; 	while [name: take/last path] [			;-- reverse order to focus the innermost space possible
+; 		if find keyboard/focusable name [	;-- pairs are not found so skipped automatically
+; 			f: face
+; 			until [
+; 				insert path anonymize f/type f
+; 				none? f: f/parent
+; 			]
+; 			focus: append path name
+; 			unless keyboard/focus = focus [
+; 				#debug [print ["Moving focus to" as path! focus]]
+; 				if all [
+; 					old-name: last old-path: keyboard/focus
+; 					handler: find-handler old-name 'on-unfocus
+; 				][
+; 					do-event old-name 'on-unfocus [handler keyboard/focus none]	;-- pass none as 'event'
+; 				]
+; 				set-focus face
+; 				keyboard/focus: focus
+; 				if handler: find-handler name 'on-focus [
+; 					focus: append clear [] focus					;-- copy it in case user modifies/reduces
+; 					do-event name 'on-focus [handler focus none]
+; 				]
+; 				commands/update
+; 			]
+; 			break
+; 		]
+; 	]
+; ]
+
+turns out scrollbars don't get focus in all programs I have around..
+somehow I think in old versions of Windows it was the case, but apparently not anymore
+; focusable: make hash! [scrollable hscroll vscroll]
+; scrollable/on-key-down [path event] [
+; 	set [ss: scroll:] reduce path
+; 	;@@ TODO: keys for the ss itself
+; 	unless scroll [pass exit]				;-- let the inner spaces take it
+; 	axis: scroll/axis
+; 	move-by: :scrollable-space/move-by
+; 	code: switch event/key [
+; 		down right [[move-by ss 'line 'forth axis]]
+; 		up left    [[move-by ss 'line 'back  axis]]
+; 		page-down  [[move-by ss 'page 'forth axis]]
+; 		page-up    [[move-by ss 'page 'back  axis]]
+; 	]
+; 	either code [
+; 		do code
+; 		update
+; 	][
+; 		pass								;-- key was not handled (useful for tabbing)
+; 	]
+; ]
+
+it's unwise to prepare the whole data array for display (can be huge)
+instead, pickers should be defined to prep lines of data when needed
+; spaces/table: [
+; 	...
+; 	prep-data: function [] [						;-- preps data for display, independent of `source` format
+; 		pin: min pinned dim: data/size
+; 		prep-into  1x1                  pin                  pinned-headers/source
+; 		prep-into  as-pair pin/x + 1 1  as-pair dim/x pin/y  normal-headers/source
+; 		prep-into  as-pair 1 pin/y + 1  as-pair pin/x dim/y  pinned-columns/source
+; 		prep-into  pin + 1x1            dim                  normal-columns/source
+; 	]
+; 	prep-into: function [xy1 xy2 tgt] [
+; 		if any [xy1/x < xy2/x  xy1/y < xy2/y] [clear tgt  exit]
+; 		w: xy2/x - xy1/x + 1
+; 		for y: xy1/y xy2/y [
+; 			either row: tgt/:y [clear row][append/only tgt row: make [] w]
+; 			for x: xy1/x xy2/x [
+; 				append/only row data/pick x y
+; 			]
+; 		]
+; 		clear at tgt y
+; 	]
+; ]
+
+balancing row heights between 2 list-views is just too much effort:
+- will have to pre-render to produce list items
+- will have to change height constraints of each item in list (can be huge), then render again
+- will have to reset those constraints post-render, so next render is not affected
+instead, a single list-view should be made with each row supporting pinned columns
+; spaces/table: [
+; 	...
+; 	draw: function [] [
+; 		maybe pinned-columns/index: normal-columns/index	;-- sync indexes
+; 		maybe pinned-columns/origin: as-pair pinned-columns/origin/x normal-columns/origin/y	;-- sync origin
+; 		maybe normal-headers/origin: as-pair normal-columns/origin/x normal-headers/origin/y
+; 		; can we get rid of extra render??? need better pipeline
+; 		foreach [name _] map [render name]			;-- prerender lists to ensure they all have enough `items`
+; 		;-- balance row heights and cell widths
+; 		foreach [left right] reduce [
+; 			pinned-headers normal-headers
+; 			pinned-columns normal-columns
+; 		] [
+; 			repeat y length? right/list/items [
+; 				litem:  left/list/items/:y
+; 				ritem: right/list/items/:y
+; 				unless all [litem ritem] [continue]		;-- one of the lists is shorter
+; 				litem: get litem  ritem: get ritem
+; 				case [
+; 					litem/
+; 				]
+; 			]
+; 		]
+; 		; reset constraints so they won't affect the next render; any better idea????
+; 	]
+
+unused
+; list-ctx/item-box: function [list i [integer!]] [
+; 	if word? list [list: get list]
+; 	ofs: list/margin
+; 	if i > 1 [
+; 		guide: select [x 1x0 y 0x1] list/axis
+; 		ofs: ofs + (guide * list/size/only 1 i - 1)
+; 	]
+; 	reduce [ofs list/size/only i i]
+; ]
+
+this doesn't work if word = 'value, silly mistake
+; anonymize: func [
+; 	"Return WORD bound in an anonymous context and set to VALUE"
+; 	word [word!] value [any-type!]
+; ][
+; 	bind word object compose [(to set-word! word) :value]
+; ]
+
+doesn't work if value is a set-word
+; anonymize: func [
+; 	"Return WORD bound in an anonymous context and set to VALUE"
+; 	word [word!] value [any-type!]
+; ][
+; 	bind word construct/only compose/only/into [(to set-word! word) (:value)] clear []
+; ]
+
+didn't use it
+; grid-ctx: context [
+; 	;-- grid is like list - simply arranges spaces given to it
+; 	;@@ should grid/list be called grid/row or not? technically it may be grid/column as well...
+; 	spaces/grid: make-space/block 'list [
+; 		;-- `items` should contain lists to display, though these lists are not exposed in the map
+; 		axis: 'y			;-- items = rows by default
+; 		pinned: 0x0			;-- how many rows/columns to pin (move data to the head to make it pinned)
+
+; 		draw: function [/only xy1 xy2] [
+; 			;@@ keep this in sync with `list/draw`
+; 			r: make [] 10
+; 			guide: select [x 1x0 y 0x1] axis
+; 			clear map
+; 			max-size: 0x0									;-- size of the biggest item in a column/row
+; 			i-item: 1										;-- item (column by default) index
+; 			p: margin
+; ;@@@ SHIT so much useless low level code here! how to generalize? how not to write grid-view after list-view? how to lay out items in one expression?
+; 			while [max-size/x >= 0] [						;-- becomes <0 when no more items
+; 				max-size: -1x-1
+; 				foreach list-name items [
+; 					list: get list-name
+; 					item-name: pick list/items i-item
+; 					item: get item-name
+; 					drawn: none
+; 					skip?: if only [
+; 						unless item/size [drawn: render item-name]	;-- prerender to get the size
+; 						max-size: max max-size item/size
+; 						p2: p + item/size
+; 						isec: (min p2 xy2) - (max p xy1)			;-- intersection size
+; 						isec <> max isec 1x1						;-- optimized `any [isec/x <= 0 isec/y <= 0]`
+; 					]
+; 					unless skip? [
+; 						;@@ TODO: style selected-item?
+; 						compose/only/into [translate (p) (any [drawn  render item-name])] r
+; 						compose/deep/into [(item-name) [offset (p) size (item/size)]] tail map
+; 					]
+; 				p: p + (spacing + item/size * guide)
+; 				p: max p item/size
+; 			]
+; 			self/size: p + margin
+; 			r
+
+; 		]
+
+; 		on-change*: function [word old [any-type!] new [any-type!]] [
+; 			if word = 'axis [
+; 				if :old = :new [exit]
+; 				normal: select [x y x] axis
+; 				foreach item items [		;-- dynamically switch each list's direction
+; 					spc: get item
+; 					spc/axis: normal
+; 				]
+; 			]
+; 		]
+; 	]
+; ]
+
+tabbing is trickier than expected:
+when I move focus in `key-down` to another face (e.g. field)
+next `key` event goes to that face instead
+so I need to delay focus change until `key` event fires
+cannot use `key-up` since it does not repeat
+can use `key` directly but will miss Ctrl-Tab, used by field/area
+option: use `key`, miss Ctrl-Tab, but let area/field have some 'unfocused' state changed by Esc/Enter
+(this will help spatial navigation as well)
+; register-finalizer [key-down] function [space [object!] path [block!] event [event!]] [
