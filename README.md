@@ -59,6 +59,19 @@ Such power can be held in just 2-3 lines! :D
 
 Spiral Field demo reuses the normal rectangular `field` space (that contains all the keyboard logic and everything) by transforming hittest coordinates in a spiral way. Rendering logic of course had to be rewritten because such complex transformations are far beyond Draw capabilities. That's why it's a bit laggy: it renders each character individually.
 
+## How to try it out?
+
+Setup, in your favorite directory:
+```
+git clone https://gitlab.com/hiiamboris/red-mezz-warehouse common
+git clone https://gitlab.com/hiiamboris/red-spaces
+```
+To run e.g. `spiral-test` demo:
+```
+cd red-spaces
+red spiral-test.red
+```
+
 
 ## Preface
 
