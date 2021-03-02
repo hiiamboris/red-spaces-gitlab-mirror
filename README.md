@@ -115,6 +115,17 @@ This means a common design underlining all widgets.
 
 This lists what is mostly cast in stone. Still many design questions need answering (see [comments](comments) file).
 
+In essence, what is a UI? A dialogue.<br>
+Program communicates info to the human by drawing things on display.<br>
+Human traditionally answers (interacts) via keyboard or any pointing device (voice recognition left alone for simplicity). That's why UI is interactive.
+
+This design provides 3 basic needs:
+- Spaces (how to display things)
+- Hittesting via `into` and `map` (how to interpret clicks, gestures, etc)
+- Focus model (how to interpret keyboard input)
+
+Everything else is an implementation detail, with the aim of making programmer's and user's lives easier.
+
 ## Space
 
 Draw-based widget I call SPACE.
