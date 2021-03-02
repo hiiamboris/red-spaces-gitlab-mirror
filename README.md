@@ -2,7 +2,7 @@
 
 ## EXAMPLES (clickable)
 
-| Spiral editable field | Table | Infinite list |
+| Spiral editable field | Table | Infinite list of items *of varying size* |
 |---|---|---|
 | ![](https://i.gyazo.com/74d4e22f7480bda9f5c2df8e11c6bfb5.gif) | ![](https://i.gyazo.com/5f16371407967a41e16bb6f601201a70.gif) | ![](https://i.gyazo.com/856724cebae6a5967a9eb96142dd35de.gif) |
 
@@ -58,6 +58,10 @@ set-style 'row [(phase: phase + 60  margin/x: to 1 5 * sine phase ())]          
 Such power can be held in just 2-3 lines! :D
 
 Spiral Field demo reuses the normal rectangular `field` space (that contains all the keyboard logic and everything) by transforming hittest coordinates in a spiral way. Rendering logic of course had to be rewritten because such complex transformations are far beyond Draw capabilities. That's why it's a bit laggy: it renders each character individually.
+
+Table is far from being complete, but also demonstrates how events are handled naturally even on rotated layout.
+
+Infinite List's trick is that when items vary in height, it's hard to provide uniform scrolling (naive desings would scroll at item granularity) and at the same time make it respond in real time to user actions.
 
 ## How to try it out?
 
