@@ -324,7 +324,7 @@ Compared to *View actors*, there's no risk of accidentally returning something w
 
 **Quirk:** handlers bodies are `function`s, so they leak no words.
 
-**Spec**
+### Spec
 
 Previewers and finalizers have all the same spec:<br>
 `function [space [object!] path [block!] event [event! none!]]`
@@ -353,6 +353,8 @@ Thus, `space = get path/1` always holds true, `path/-1` and `path/-2` are possib
 
 `self` vs `space`: `self` could have been used instead to reduce the number of arguments, but since one event handler can handle events for hundreds of spaces, we would have to `bind` it before every call, which is too slow.
 
+### Event order
+
 **Quirk:** event handler lookup order is two-dimensional. *Outer before inner*, then *specific before generic*
 
 E.g. if hittest returns `[list-view 210x392 hscroll 210x8 thumb 196x8]`, and we reduce that to `list-view/hscroll/thumb` then the order would be:
@@ -370,6 +372,13 @@ In this example, if `list-view/hscroll` handler calls `pass`, the event gets int
 
 I don't know yet if this O(n^2) will pose a threat, but presumably it'll be too short for that.
 
+Keyboard events are also dispatched in `path` order, but instead of hittest path is defined by `keyboard/focus`.
+
+**Quirk:** Timer events do not follow a path
+
+If a child space sets a timer, parent has nothing to do with it. There is no tree, so there is no path.<br>
+So while other events go from outer space to the inner, timer events reach their target directly.<br>
+If previewers and/or finalizers are set up for timer events, they will fire once for each event, so care should be taken to not overload the event pipeline. Previewers can filter timer events by calling `stop` command, but in normal timer event handlers `stop` will have no effect.
 
 
 ## Focus & Tabbing
