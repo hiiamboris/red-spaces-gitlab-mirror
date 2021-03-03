@@ -201,7 +201,8 @@ Map is only good for rectangular geometry (in this case `into` is not needed and
 
 If `into` is provided, `map` is still required if space wants to support iteration over it's inner spaces (e.g. for tabbing). In this case `map` can contain any geometry or even only names of inner spaces: `[word! word! ...]`
 
-Names in a `map` may repeat, but each should refer to a unique object.
+Names in a `map` may repeat, but each should refer to a unique object.<br>
+`map/child/size` <> `child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates.
 
 **Quirk:** space always has a name (word)!
 
