@@ -374,7 +374,7 @@ I don't know yet if this O(n^2) will pose a threat, but presumably it'll be too 
 
 Keyboard events are also dispatched in `path` order, but instead of hittest path is defined by `keyboard/focus`.
 
-**Tip:** define events for paths to ensure hierarchy. E.g. if event is defined for `list-view/hscroll/thumb`, `thumb` space that receives it will be able to access `hscroll` as `path/-1` and `list-view` as `path/-2` and never worry that it might have been used inside another space.
+**Tip:** define events for paths to ensure hierarchy. E.g. if event is defined for `list-view/hscroll/thumb`, `thumb` space that receives it will be able to access `hscroll` as `path/-1` and `list-view` as `path/-2` and never worry that it might have been used inside another space. Another way to do that is define events for `list-view` and inspect if `path/2 = 'hscroll` and `path/3 = 'thumb`.
 
 **Quirk:** Timer events do not follow a path
 
