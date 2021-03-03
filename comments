@@ -3,15 +3,15 @@ event handling system - standard way to react to clicks, clicks-and-holds, keypr
 keys binding to each UI item?
 focused items should be highlighted using styles
 + decouple styles from the objects
-demo+test of rotated scrollable space (mb rotate it with time and demo proper origin)
++ demo+test of rotated scrollable space (mb rotate it with time and demo proper origin)
 smooth scrolling in chatlog demo
-scrollbar should generate page events periodically until LMB is up
-styles should be deep, e.g. paragraph! <> list-view!/paragraph!
++ scrollbar should generate page events periodically until LMB is up
++ styles should be deep, e.g. paragraph! <> list-view!/paragraph!
 need to try 2 types of KB navigation: tabbed and spatial, how they apply
 	this navigation, at least tabbed, should be able to work across different *faces*
+	so: mixed transparent tabbing across spaces and faces
 if `map` is defined `into` should not be needed, when none is defined it is a final space (non-composite)
 	or leave `into` always there? afraid of inheritance errors
-mixed transparent tabbing across spaces and faces
 draggability of spaces (e.g. table columns) - this will require temporary offsets in the map
 disabled items, and they should not be focusable!
 if an item gets hidden, it should not receive keyboard events even if it's still in focus
@@ -28,20 +28,36 @@ in event handlers `self` =? `commands` right now, should be set to `space`? and 
 can I externalize list-view's rolling logic to be able to utilize it in other spaces?
 table demo with wavy animated layout: each row would slide left and right in a sine manner - will be a killer demo!
 	and it's columns should be draggable! :D
+high-level table that would extend minimal table with advanced features
+maybe a plugin mechanism:
+	each space would list possible features and each of them would be a separate code, that can be turned on/off
+	or it's not worth it, even for the table?
 demo templates for all useful styles, like small static table, huge table for csv, etc etc
 	so others can take those and build upon
+separate space for an icon+text combo -- very common thing nowadays
+	or `list` will be enough?
 VID extension for spaces:
 	on-created (possible?) global event handler
 	will scan each host face's worst actor and create a space tree from it's spec
 rename host/space to host/content for consistency with scrollable?
 	or make it host a scrollable always?
-	or make separate faces for all spaces?
+	or make separate faces for all spaces? - best idea to keep layout clean.. e.g. host.list, host.scrollable ..
 decide on resize model (though ideally it should cover View wholly)
 what if I devise a standard way child sizes can be propagated into parent sizes? (headers-list dilemma)
 make multi-cell span
 	how can cell span multiple rows vertically?
 	perhaps separate grid style will be required
 	or I just make a span: field and disable clipping everywhere (except scrollable)
+styles should be able to rearrange UI items 
+	maybe by changing the map before it's rendered? but that's a bit limited
+	e.g. we split `draw` into `draw` and `prep`, style would apply after prep, draw will read the map
+	that complicates `space` design
+	OTOH it will be possible to get the `size` without actually composing draw blocks
+	like this!: if `prep` exists, it's called, if not then `draw` will do it's work
+				and styles will be limited in their rearrange ability
++ click event should only be produced when pointer didn't travel long (i.e. it's not a drag event)
+
+key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
 
 QUIRKS
 
@@ -56,7 +72,7 @@ QUIRKS
 map names don't have to be unique (e.g. list may have 1000s of `item`s), just traversable
 	but each of it's names has to lead to a unique object
 	(unique names help working with each map item though, using path notation)
-map/space/size <> space/size -- 1st is in parent CS, 2nd is in child CS (and may also be 3ped/translated/...)
+map/space/size <> space/size -- 1st is in parent CS, 2nd is in child CS (and may also be rotated/translated/...)
 name (in a map) is not an identifier (unique) of a space, it's the class! e.g. `hscroll` is a class of horizontal scrollbars
 	(however since name is bound to an object it's also an identifier under the hood)
 content is a word!
