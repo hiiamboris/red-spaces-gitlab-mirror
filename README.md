@@ -323,7 +323,13 @@ stop?               -- true if we should not propagate it further into normal ev
 
 Compared to *View actors*, there's no risk of accidentally returning something we didn't want to and wreaking havoc upon the whole program and then making it freeze.
 
-**Quirk:** handlers bodies are `function`s, so they leak no words.
+**Quirk:** handlers bodies are `function`s by default, so they leak no words.
+
+**Quirk:** event handlers are defined not as just one function per event, but as a list of sequentially evaluated functions.
+
+In View we have all the underlying magic done in R/S or by the OS. But here, with spaces, this magic is done by event handlers plugged in by default. This dictates a need for easy extensibility, and this need is met with such handler lists: extension happens by adding a handler on top of the currently existing ones.
+
+I haven't decided yet if `stop` command should exit the event loop after any of the handlers in the list or after whole list is evaluated.
 
 ### Spec
 
