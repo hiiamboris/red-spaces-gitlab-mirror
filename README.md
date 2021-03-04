@@ -327,9 +327,12 @@ Compared to *View actors*, there's no risk of accidentally returning something w
 
 **Quirk:** event handlers are defined not as just one function per event, but as a list of sequentially evaluated functions.
 
-In View we have all the underlying magic done in R/S or by the OS. But here, with spaces, this magic is done by event handlers plugged in by default. This dictates a need for easy extensibility, and this need is met with such handler lists: extension happens by adding a handler on top of the currently existing ones.
+Faces: single actor works on top of magic done in R/S or by the OS.<br>
+Spaces: all magic is done by default event handlers.<br>
+So then: ease of extensibility is a must.<br>
+How? Per-event handler lists: default handler -> user handler -> other user handler...
 
-I haven't decided yet if `stop` command should exit the event loop after any of the handlers in the list or after whole list is evaluated.
+I haven't decided yet if `stop` command should exit the event loop after *any* handler in the list or after *whole* list is evaluated.
 
 ### Spec
 
