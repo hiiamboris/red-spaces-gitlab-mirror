@@ -1,21 +1,33 @@
 Red []
 
 #include %../common/debug.red
+#debug on
+; #debug set focus
+; #debug set grid-view
+
+#debug [
+	#macro [#include file!] func [s e] [compose/deep [print ["#including" (mold s/2)] do (s/2)]]
+]
 #include %../common/assert.red
+#include %../common/expect.red
 #include %../common/setters.red
-#include %../common/composite.red
+; #include %../common/composite.red
+#include %../common/print-macro.red
 #include %../common/error-macro.red
 #include %../common/clock.red
 #include %../common/clock-each.red
+#include %../common/extremi.red
 #include %../common/map-each.red
-; #include %../common/xyloop.red
+#include %../common/xyloop.red
 #include %../common/with.red
+#include %../common/catchers.red
 #include %../common/is-face.red
 #include %../common/keep-type.red
 ; #include %../common/selective-catch.red
 #include %../common/reshape.red
 #include %../common/do-queued-events.red
-#debug on
+#include %../common/show-trace.red
+#include %../common/do-atomic.red
 
 #include %auxi.red
 #include %styles.red

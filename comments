@@ -4,7 +4,9 @@ keys binding to each UI item?
 focused items should be highlighted using styles
 + decouple styles from the objects
 + demo+test of rotated scrollable space (mb rotate it with time and demo proper origin)
-smooth scrolling in chatlog demo
+demo: chatlog with smooth scrolling and an interactive bot
+	needs reversal of list items and a custom wrapper (sender/time+paragraph)
+	also buttons to remove & edit messages
 + scrollbar should generate page events periodically until LMB is up
 + styles should be deep, e.g. paragraph! <> list-view!/paragraph!
 need to try 2 types of KB navigation: tabbed and spatial, how they apply
@@ -48,6 +50,9 @@ make multi-cell span
 	how can cell span multiple rows vertically?
 	perhaps separate grid style will be required
 	or I just make a span: field and disable clipping everywhere (except scrollable)
+	no, disabled clipping won't work as we need hittest to deliver events
+	however disabled clipping may be useful for a different thing: casting wide outside shadows, but be able to click thru them
+table cells should know their coordinate, to be able to modify original data
 styles should be able to rearrange UI items 
 	maybe by changing the map before it's rendered? but that's a bit limited
 	e.g. we split `draw` into `draw` and `prep`, style would apply after prep, draw will read the map
@@ -55,7 +60,36 @@ styles should be able to rearrange UI items
 	OTOH it will be possible to get the `size` without actually composing draw blocks
 	like this!: if `prep` exists, it's called, if not then `draw` will do it's work
 				and styles will be limited in their rearrange ability
+	though then one will be unable to call prep to get the size.. maybe default prep will call draw?
 + click event should only be produced when pointer didn't travel long (i.e. it's not a drag event)
+will it be possible to minimize style/event lookup time if I detect changes to the tree and to style/event tables
+	and then just cache the lookup results?
+optional scrollbars for infinite space:
+	logarithmic, linear near the current offset
+	cyclic, inertial, wheel-like in appearance
+trooper-like zooming into infinite canvas? although it may take quite a time to prerender it... useless unless realtime
+demo: interactive plot of some downloadable btc price
+	will require a color picker (Red doesn't have one) - to edit colors, and also need to edit labels, width..
+demo: neon text
+demo: fractal explorer on infinite canvas
+describe a set of challenges to invite other to play with it and learn
+maybe scrollable should be the default container for everything layout creates? or at least for lists?
+add inertia to scrollable to easier hunt the spider (maybe as a separate style or pluggable trick)
+	otherwise it demonstrates how inefficient scrollbars are, as a UI element
+this is a good idea though: easy way to make every scrollable area draggable with inertia
+demo: jedi librarians betting game (assisted), to see how this all works in 2D games, and as a template
+optimize `translate 0x0`
+hints (tooltips) for everything, pluggable
+demo: better console, extensible, paragraph-oriented
+scrollbar should work as a separate space too (e.g. influence some external value)
+demo: infinitely zoomable table, each cell is the table itself
+	will require limiting rendering depth (or < 1 pixel size), so it won't stackoverflow
+	and resetting the zoom, else we'll hit that depth sooner or later
+	and rotating slowly, for total mind blow - gonna need `clip [circle ..]` to be the clipping region of rotor
+truly rich text widget - where text is mixed with other (interactive) spaces
+rename grid-view to data-grid?
+demo: debugger, need to mark functions, store values of all words during last iteration or 2-3 last iterations,
+	and be able to explore those (where spaces come to help)
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
 
@@ -85,6 +119,7 @@ content is a word!
 	at least we won't have to look for it..
 	but if we do, we'll have to wrap generic spaces and replace events inside
 	no... content+name looks cleaner to me
+since no space knows it's parent, same space can be used multiple times in the tree
 scrollable-space supports `draw/only xy1 xy2` for it's content - to minimize rendering effort by preemptive clipping
 lot of parts in space become valid only after it's drawn (couldn't be any other way), e.g. it's map
 style! could easily have been a kind of space! that wraps any other space, but it shouldn't be as:
@@ -279,6 +314,168 @@ events chain: still undecided
 		                  thumb
 	if list-view/hscroll takes event, and calls `pass`, should `hscroll` also receive it or only `thumb` variants?
 	I think it should, because if specific handler didn't eat the event, generic one still can
+logarithmic scroller
+	problem of infinite space is that to know it's size we need to render it fully at least once
+	otherwise scrollbars won't know how big the current viewport is within the whole
+	but since it's infinite, we can't render it
+	this is solved by list-view which makes itself a finite view on an infinite space
+	and list-view's scrollbar doesn't map to infinity because of that
+	but can scrollbar map to infinity? is this possible?
+window inside scrollable: how generic it has to be
+	one of the applications (apart from chatlog & table) is plot f(t), e.g. timeline of some exchange rate
+	it can be huge and instead of rendering it fully (and making scrollbar uselessly imprecise)
+	it makes sense to render only a window
+	it remains to be seen how to make the plot interactive though
+how to contain infinite-scrollable within content limits?
+	ideally should be animated: e.g. scroll up, show some empty space, then realign during 0.5sec
+	suggestion: let window have some empty space, but scrollable will contain itself using some replaceable algorithm
+	however, then scrollbars will not look like they're at the head..
+	`available? <direction> <max-lookup>` query func before offsetting?
+	then window stays within available limits, but scrollable can optionally scroll itself out then animate
+in grid layout, should row/columns sizes be a map or a vector?
+	map makes sense because human can only configure a limited set of sizes manually (and prefers it to be less)
+	so if one resizes 100000-th row only, map is tiny
+	OTOH, if we want fast access to any i-th size, map is a hash lookup, while vector is a direct access
+	benchmarks to the rescue: vector access is 90ns, map - 110ns (map miss is 90ns), so given map's other benefits, it wins
+	in the future when we have native `sum`, vectors may still win when we want to get continuous sum of sizes
+is it possible to auto infer row height in grid mode?
+	clearly this case is a problem:
+		|  |  |  |  |
+		|  |  |  |  |       <- what height is this row? (if all it's cells have vertical span)
+		|__|  |  |  |
+		|  |__|  |__|
+		|  |  |__|  |       <- this row is bound by one cell's span ending at it
+	the idea for the 1st is to either:
+	- make such row 1/N if it's 1st cell span is MxN
+	- use smallest span cell instead of 1st (but why?)
+	so, inspecting row cells from left to right:
+	- if a cell has Nx1 span - skip next N-1 cells, and add it's height to constraints list
+	- if a cell has NxM span, but doesn't end vertically after this row - ignore it, and skip N-1 cells
+	- if it does end vertically on this row - subtract all previous rows from it's height and add result to constraints
+	- if constraint list is empty, use 1/R of the 1st cell, where R - cell vspan minus rows above
+	  (not sure, 1st or the closest rowspan below..)
+	  still an issue: can lead to 0-height rows if below cells are empty (content ended)
+	- so instead of 1/R it would be better to have a min-height constraint (and simpler)
+another problem with span
+	how to know which cell occupies XxY row/col?
+	have to traverse the whole span map to ensure no other cell above has span big enough to include this cell
+	so spanned cells should have span=0x0 if they belong to other cells above or to the left
+	or better if they have a link to the starting coordinate
+	idea: use negative span to point to the beginning of the multi-cell
+	it aligns with the rule that any cell can only be occupied by a single multi-cell
+	and then we can occupy & deoccupy it using some helper functions
+yet one more gotcha about height cache
+	calling `draw/only xy1 xy2` it makes sense to leave rows out of the viewport cached
+	that is - to only calculate the size of rows we're actually about to show
+	yet, to locate on which row xy1 point maps, we have to use the cached height of that row (and all those before it)
+	we could invalidate caches of visible rows in advance if we knew what their numbers are, but we don't
+	so the only reasonable solution (not considering full cache invalidation) is..
+	to not invalidate the cache at all and let data modifying functions take care of it
+	this means that if styles affect the size of the cell on each render,
+	it won't be reflected unless those styles also clear the cache
+	(such inertia is still a lesser evil than the absence of caching)
+	render cache OTOH should be always invalidated as cells are likely going to be animated
+how big is the grid layout? is it infinite?
+	it'll be easy to limit it with integers
+	but is it possible to infer the size from `cells`?
+	if it's like 10 items long - easily, if it's 100k - a problem
+	should show a warning in this case
+	another issue: if it's infinite, how to `draw` it?
+	ok so it HAS to be finite, and limit can't be none (but can be auto)
+	then inf-scrollable can make it infinite.. but...
+	in case row height is 'auto - it may resize itself while scrolling
+should grid space contain origin and implement pinned row/col logic?
+	normally I would let origin be handled by scrollable
+	however, scrollable cannot pin cells without rewrite of the draw func
+	so it seems more work.. although we'll see
+layout of styles
+	1. style: [prefix draw commands] closure: [postfix draw commands]
+	this is limited! example: space created during draw of it's parent (one-off space)
+	if style gets called before `draw` - it cannot know it's size because it's not rendered
+	if it gets called after - then it can't influence draw (set font, rearrange stuff, etc)
+	oops... but then it's 2 renders: one to get the size, another to let style influence it
+	and then there's a discrepancy: style may have influenced the size, so it wasn't valid on the 1st call
+	2. new idea - object:
+	style: [
+		init: [prefix draw commands]
+		done: [postfix draw commands]
+		render: function [] [compose [(init) (draw) (done)]]	;-- full pipeline that controls the order of style application
+		font: ...
+		other words to set in the space
+	]
+	with an alternative form - single block: style: [[prefix draw commands]] (as it's the most useful)
+	an object will be created out of it, space set to it, then ??
+	what about `self`? it should be bound to the space, not style
+	has a problem! while bind body-of style binds blocks, it can't bind the function!
+	if we make function a block - it will leak words...
+	recreating an object with functions - too heavy, not acceptable
+	3. collect words of style, set them to words of space, then bind is not needed
+	but then if we call `draw` for example, draw drags some words from the space
+	and bigger problem: some words are global but will be overridden..
+	won't work
+	4. let style contain only blocks, but compose them in the order they were defined
+	then we have binding, ordering, and it's not heavy
+	drawback is that styles will have no defaults, and will have to define everything they are using
+	another: dynamic assignments are ugly: `before: [(font: ... ())]`
+	instead of just `font: ...`
+	@@ perhaps paren should be reserved for this.. e.g. `font: (...)`
+	but then it requires custom constructor, not just `object`, and thus limits styles in it's own way
+	why not just single styling function? it will be given space as an argument
+	access to draw - check, custom eval order - check, minimum allocations - check, simplicity - check
+	win!
+grid cell background - how to draw?
+	1) draw grid background => each cell background => each cell contents
+	problem: when row height = auto, we don't know the cell/row size in advance
+	so we need to render the cell first, but we can't draw it's background not knowing the size of it
+	catch 22
+	2) draw grid background => each cell contents => draw grid lines
+	this way when drawing grid lines we already know the size of each row, so it's ok
+	and actually less drawing commands.. M + N rather than M * N
+	drawback(?): cells without content look like cells with empty spaces, no distinction
+	huge drawback: grid lines will be drawn atop the multi-cell content - inacceptable
+	3) so, we need to render cell content first, then estimate row size, then render cell itself
+	how? grid lines are a way to hell here..
+	maybe.. we cache the cell contents drawn cmds, to eliminate double render
+	then: grid bgnd => each cell content => each cell bgnd => each cell content (cached, box sized, alignment applied)
+focus has to consider sameness of each path item
+	e.g. grid/cell -> other grid/cell look the same but differ in pointed to objects
+grid/cell/space vs grid/space - which is better?
+	initially cell style was introduced to draw cell background and see it's bounds
+	but cells are volatile, and it's better to include them into map
+	but do we always want that?
+	grid may be used to position other spaces on the layout, not just data, and in that case no need to draw cell boxes
+	* cells may help with alignment - global sizing system will work out of the box
+	  without cells I would have to do alignment in the grid code, which is bad
+	* one of the questions - if the grid is huge, do we want `cell` space for every empty cell?
+	  although, most likely if the grid is huge - we either have the data, or *want* to draw cells (like spreadsheet does)
+	  will have to ensure only visible cells are in the map - but this may still be a lot, to cover whole `window` of scrolling
+	* cells may help with interactivity - in case one wants provide events for cells even if they have no data
+	* maybe I could make an option controlling whether to wrap into cells or not..
+data & cell wrappers: wrap-data & wrap-space
+	are incompatible with the focus model that expects focusable spaces to remain the `same?`
+	we can spawn spaces on the fly only if we cache and reuse them for the same visual UI element
+	that applies to list items and grid cells
+	so cache is the only solution, but it may become huge
+	although to keep it small - we could destroy items that were hidden by scrolling
+	scrolling out of the sliding window or out of the view?
+	defocusing items on scroll is bad UX, so the answer is out of the window
+	;@@ TODO: update list-view with window-local cache
+	so there's a cached space per each cell - should it be removed when span changes?
+	if cell gets eaten by a multicell it automatically disappears from view, so doesn't matter there
+	if cell becomes a multicell, it may retain focus, why not
+	so no need to destroy cells, but only mark them for full redraw (if that is required)
+grid cells array models
+	1) cells = map
+		supports limits=auto:
+		possible to just add cells into the map and limits are inferred
+		when mapping data into grid, cells must be filled with a space for each data point
+		(if data is truly infinite, will be impossible to fill it)
+	2) cells = picker func [/pick xy /size] (that picks from a map by default)
+		/size has to infer it from the map itself
+		possible to pick from an infinite data array
+		no need to pre-fill cells spaces, can be done as they are rendered (but should be cached)
+		works for truly infinite data - best argument in favor of it
+
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
@@ -287,7 +484,7 @@ Timer design:
   and we want to be able to disable those warnings for production code
 - on a W10 laptop in battery saving mode face timer never repeats in less than 14ms, but usually it's 14-30ms
   but if we use `wait 0` as yield func, we never get intervals more than 15ms
-- in performance mode timers are still 65 fps, so is `wait 0` granularity
+- in performance mode timers are still 65 fps, so are `wait 0` granularity
 - will need multimedia timers for anything more precise, or at least will need to set system timer to 0.5ms interval
   (that's 2000 fps compared to current 65 fps)
   this will increase the power consumption though (from what I read on the web)
@@ -862,3 +1059,545 @@ can use `key` directly but will miss Ctrl-Tab, used by field/area
 option: use `key`, miss Ctrl-Tab, but let area/field have some 'unfocused' state changed by Esc/Enter
 (this will help spatial navigation as well)
 ; register-finalizer [key-down] function [space [object!] path [block!] event [event!]] [
+
+this didnt scale:
+in the end I had to include style name into the definition block,
+else define-handlers doesn't have the name and thus can't accept inner styles
+also error reporting was inferior
+; extend-handlers: function [
+; 	"Extend event handlers of STYLE"
+; 	style [path! word! map!] "Style name, path or a map of it's event handlers"
+; 	def [block!] "A block of: on-event-name [spec..] [code..]"
+; ][
+; 	all [
+; 		not map? map: style
+; 		none? map: get as path! compose [handlers (style)]
+; 		map: #()
+; 	]
+; 	#assert [map? map]
+; 	r: copy-deep-map map							;@@ BUG: copy/deep does not copy inner maps unfortunately
+; 	while [not tail? def] [
+; 		either word? :def/1 [						;-- on-event [spec] [body] case
+; 			set [name: spec: body:] def
+; 			def: skip def 3
+; 			list: any [r/:name r/:name: copy []]
+; 			#assert [								;-- validate the spec to help detect bugs
+; 				any [
+; 					parse spec [
+; 						word! opt quote [object!]
+; 						word! opt quote [block!]
+; 						word! opt [quote [event!] | quote [event! none!] | quote [none! event!]]
+; 						opt [if (name = 'on-time) word! opt quote [percent!]]
+; 						opt [/local to end]
+; 					]
+; 					(?? handler  none)				;-- display handler to clarify what error is
+; 				]
+; 				"invalid handler spec"
+; 			]
+; 			append list function spec bind body commands
+; 		][											;-- substyle: [handlers..] case
+; 			#assert [not map? style]				;-- cannot be used without named style
+; 			#assert [set-word? :def/1]
+; 			set [name: spec:] def
+; 			def: skip def 2
+; 			unless r/:name [r/:name: copy #()]
+; 			; name: to word! name
+; 			substyle: as path! compose [(style) (to word! name)]
+; 			r/:name: extend-handlers substyle spec
+; 		]
+; 	]
+; 	r
+; ]
+
+
+list-view's infinite space logic is now decoupled from the list logic
+; ;@@ TODO: chat will need reverse indexing... though how about `source` function gets -1 -2 -3 ... ?
+; ;-- there's a lot of logic in this space only to make it fast
+; ;-- list items may vary in size, and not knowing the size of each item
+; ;-- we can't just multiply the index by some number, we have to traverse the whole list
+; ;-- but list can be huge, and all these functions try to minimize the size estimation effort
+; list-view-ctx: context [
+; 	spaces/list-view: make-space/block 'scrollable [
+; 		source: []		;@@ or a function [index]? or support both?
+; 		data: function [/pick i [integer!] /length] [
+; 			either pick [source/:i][length? source]
+; 		]
+; 		index: 1										;-- index of the first item within source
+; 		;-- geometric constraints:
+; 		;-- * it will display at least 1 item but no more than max-items
+; 		;-- * it will drop items starting after max-length along the axis
+; 		;-- setting max-length to big enough value makes list size constant = max-items
+; 		;-- big enough max-items makes list always show all of the items
+; 		max-items:   200
+; 		max-length:  10000
+; 		jump-length: 100								;-- how much more to show when rolling (px)
+; 		look-around: 50									;-- zone after begin and before tail that triggers roll-edge (px)
+; 		roll-timer: make-space 'space [rate: 4]			;-- how often to call roll-edge when dragging (can't override scrollable/rate)
+; 		list:  make-space 'list [axis: 'y]				;-- list/axis can be changed to get a horizontal list
+; 		content: 'list
+; 		;@@ TODO: on-change or assertions should ensure max-items >= 1, and sane values for the rest
+
+; 		append map [roll-timer [offset 0x0 size 0x0]]		;@@ any better way to have a separate rate?
+
+; 		filled?: no										;-- true when items are cached
+; 		invalidate: does [set-quiet 'filled? no]		;-- call this to force items update
+
+; 		wrap-data: function [item-data [any-type!]][
+; 			spc: make-space 'data-view []
+; 			set/any 'spc/data :item-data
+; 			if list/axis = 'y [spc/width: size/x - (list/margin/x * 2)]		;@@ what data width to use for horizontal lists?
+; 			anonymize 'item spc
+; 		]
+
+; 		scrollable-draw: :draw
+; 		draw: function [] [
+; 			any [filled? fill-items]
+; 			scrollable-draw
+; 		]
+		
+; 		add-items: function [
+; 			"Insert items into list from position WHERE"
+; 			where [word!] "head, tail or over"
+; 			ext-len [integer!] "Min extension length in pixels (if enough available)"
+; 			/local idata
+; 		][
+; 			x:         list/axis
+; 			spc:       list/spacing/:x
+; 			items:     list/items
+; 			new:       clear []
+; 			target:    either where = 'over [items][new]
+; 			offset:    switch where [tail [index - 1 + length? items] over [index - 1] head [index]]
+; 			available: either where = 'head [index - 1][data/length - offset]
+; 			if 0 = available [return [0 0]]						;-- optimization
+; 			;@@ it should not know list's internal spacing logic (in case we change the list).. but how?
+; 			added-len: either empty? items [list/margin/:x * 2 - spc][0]
+; 			+-:        either where = 'head [:-][:+]
+; 			repeat i min max-items available [
+; 				set/any 'idata data/pick offset +- i
+; 				either item: target/:i [
+; 					#assert [in get item 'data  "item should have a /data facet to be used in list-view"]
+; 					set/any in get item 'data :idata
+; 				][
+; 					change at target i item: wrap-data :idata
+; 				]
+; 				item: get item
+; 				unless item/size [render 'item]					;-- render it to get the size
+; 				added-len: added-len + spc + item/size/:x
+; 				if added-len >= ext-len [break]
+; 			]
+; 			added-num: any [i 0]
+; 			switch where [
+; 				head [insert items reverse new]
+; 				tail [append items new]
+; 				over [clear skip items added-num]
+; 			]
+; 			reduce [added-num added-len]
+; 		]
+
+; 		cut-items: function [
+; 			"Remove items until list size is within constraints"
+; 			where [word!] "head or tail"
+; 			limit [integer!] "Enforce min number of items to keep"
+; 		][
+; 			items: list/items
+; 			num1: length? items
+; 			size: list/size
+; 			x: list/axis
+; 			len2: len1: size/:x
+; 			; #assert [max-items >= limit]		;-- min shouldn't be bigger than max
+; 			min-rem: num1 - max-items					;-- num items over max-items
+; 			pick-item: select [head [first items] tail [last items]] where
+; 			rem-item:  select [head [take items]  tail [take/last items]] where
+; 			repeat i num1 - limit [
+; 				item: get do pick-item
+; 				item-size: item/size
+; 				len3: len2 - item-size/:x - (list/spacing/:x)
+; 				all [len3 < max-length  i >= min-rem  break]	;-- check if after removal list will be too short
+; 				do rem-item
+; 				len2: len3
+; 			]
+; 			num2: length? items
+; 			reduce [num1 - num2  len1 - len2]
+; 		]
+
+; 		at-head?: does [(0 - origin/(list/axis)) <= look-around]
+; 		at-tail?: function [] [
+; 			x:     list/axis
+; 			csize: list/size
+; 			max-origin: csize/:x - map/list/size/:x
+; 			(0 - origin/:x) >= (max-origin - look-around)
+; 		]
+
+; 		roll-edge: function [
+; 			"Move position of ITEMS within DATA if origin has approached one of the edges"
+; 			/head "Force adding items at the head"
+; 			/tail "Force adding items at the tail"
+; 			; return: [logic!]							;-- whether actually refilled or not
+; 		][
+; 			unless any [head tail] [head: at-head?  tail: at-tail?]
+; 			if all [tail head] [return no]				;-- empty list or less than the viewport
+; 			case [
+; 				head [
+; 					set [add-n: add-len:] add-items 'head jump-length
+; 					cut-items 'tail add-n
+; 					self/origin: origin - (add-len * 0x1)
+; 					set-quiet 'index index - add-n
+; 				]
+; 				tail [
+; 					set [added:] add-items 'tail jump-length
+; 					set [cut-n: cut-len:] cut-items 'head added
+; 					self/origin: origin + (cut-len * 0x1)
+; 					;@@ BUG: we should trigger on-change/index so it can be detected by other spaces
+; 					;@@ OTOH if we do, we cause another add-items/over call and lose the added items
+; 					;@@ so how to solve this?
+; 					set-quiet 'index index + cut-n
+; 				]
+; 				'else [return no]
+; 			]
+; 			yes
+; 		]
+
+; 		fill-items: does [
+; 			add-items 'over max-length
+; 			set-quiet 'filled? yes
+; 		]
+
+; 		;-- when to fill?
+; 		;-- - width changes => new length
+; 		;-- - text of one of the items changes => new length -- can't track this automatically
+; 		;-- - source index changes => new content for each item
+; 		scrollable-on-change*: :on-change*
+; 		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
+; 			scrollable-on-change* word :old :new
+; 			if find [source width index] word [invalidate]
+; 		]
+; 	]
+; ]
+
+development (non-reduced) version of extend-layout in case I break it later
+; extend-layout: function [dir [word!] amount [integer!] /keep where [block!]] [
+; 	; print ["extend" dir amount]
+; 	lt: list/make-layout
+; 	unless empty? list/items [amount: amount - lt/spacing/(list/axis)]
+; 	switch dir [
+; 		n w [+-: :-  n-max: (base: index) - 1]
+; 		s e [+-: :+  n-max: data/length - base: index - 1 + length? list/items]
+; 	]
+; 	#assert [(select [n y s y e x w x] dir) = list/axis]
+; 	repeat i n-max [
+; 		name: wrap-data data/pick base +- i		;-- guarantee at least 1 item (else spacing could be bigger than the requested amount)
+; 		#assert [not find/same list/items name]
+; 		render name
+; 		lt/place select get name 'size
+; 		if keep [append where name]
+; 		if lt/content-size/(list/axis) >= amount [break]
+; 	]
+; 	lt
+; ]
+
+; window/fill: function [xy1 [pair!] xy2 [pair!]] [
+; print ["fill" xy1 xy2]
+; 	;@@ TODO: e / w support
+; 	#assert [0 = xy1/x]
+; 	#assert [window/size/x = xy2/x]
+; 	#assert [any [xy1/y = 0  xy2/y = window/size/y]]
+
+; 	initial?: window/map/list/offset = 0x0				;-- on first fill, do not align with the lowest/rightmost edge
+; 	x: list/axis
+; 	dir: select
+; 		pick [ [x e y s] [x w y n] ] xy2/:x = window/size/:x	;-- s/e = tail fill (or head to tail), n/w = head fill
+; 		x
+; 	switch dir [				;-- get already rendered parts out of the requested window
+; 		n w [xy2/:x: xy2/:x - extra? dir]
+; 		s e [xy1/:x: xy1/:x + extra? dir]
+; 	]
+; 	;-- window now lies purely outside of the list
+; 	req-size: xy2 - xy1
+; 	?? req-size
+; 	lt: extend-layout/keep dir req-size/:x clear new: []
+; 	#assert [not empty? lt/items]
+
+; 	ext-size: lt/content-size/:x + either empty? list/items [0][lt/spacing/:x]
+
+; 	offset: window/map/list/offset				;-- we can count invisibles right now from list/offset
+; print [dir offset "new:" length? new "lt/size:" lt/content-size]
+; 	rem: 0
+; 	foreach': switch dir [n w [:foreach-reverse] s e [:foreach]]	 ;@@ should be for-each/reverse
+; 	foreach' [name: geom:] list/map [			;-- count the number of invisible spaces
+; 		o: geom/offset + offset
+; 		visible?: bbox-overlap?  0x0 window/size  o o + geom/size
+; 		either visible? [break][rem: rem + 1]
+; 	]
+
+; 	switch dir [										;-- add items
+; 		n w [
+; 			#assert [not empty? new]
+; 			insert list/items reverse new
+; 			self/index: self/index - length? new
+; 		]
+; 		s e [
+; 			append list/items new
+; 			maybe self/index: self/index + rem			;-- rem can be 0
+; 		]
+; 	]
+
+; 	rem-size: 0
+; 	if rem > 0 [
+; 		removed: switch dir [								;-- add items, remove invisibles from `items` & `map`
+; 			n w [
+; 				take/last/part list/items rem
+; 				take/last/part list/map rem * 2
+; 			]
+; 			s e [
+; 				remove/part list/items rem
+; 				take/part list/map rem * 2
+; 			]
+; 		]
+
+; 		rem-1st: removed/2
+; 		rem-last: last removed
+; 		rem-size: rem-last/offset + rem-last/size - rem-1st/offset + lt/spacing
+; 		rem-size: rem-size/:x
+; 	]
+; 	;-- now that we know removed size we can calculate the new list offset
+; 	offset: switch dir [
+; 		n w [
+; 			ext-size * select [n 0x1 w 1x0] dir
+; 		]
+; 		s e [
+; 			rem-size * -1 * select [s 0x1 e 1x0] dir
+; 		]
+; 	]
+
+; 	foreach [name geom] list/map [					;-- relocate the visible spaces now that we know the offset
+; 		geom/offset: geom/offset - offset
+; 		;-- impossible to verify visibility here because we don't know list/offset until we get the size
+; 		;-- and don't know the size until we render it and we can't render it until we relocate the items
+; 		; o: window/map/list/offset + geom/offset: geom/offset - offset
+; 		; expect [bbox-overlap?  0x0 window/size  o o + geom/size]
+; 		; #assert [bbox-overlap?  0x0 window/size  o o + geom/size]
+; 	]
+
+; 	; unless list/size [render/only 'list xy1 xy2]	;-- refreshes list/size after removal ;@@ TODO: possible to get rid of it and use `lt`?
+; 	; render/only 'list xy1 xy2		;-- refreshes list/size after removal ;@@ TODO: possible to get rid of it and use `lt`?
+; 	either new-size: list/size [
+; 		;-- update the size, without re-rendering anything
+; 		new-size/:x: new-size/:x - rem-size + ext-size
+; 		maybe list/size: new-size
+; 		; render/only 'list xy1 xy2
+; 	][
+; 		;-- render the list to get it's size - should only be needed first time it's shown
+; 		render/only 'list xy1 xy2
+; 	]
+
+; 	#assert [list/size]
+; 	; lgeom: window/map/list
+; 	window/map/list/size: list/size
+; 	window/map/list/offset: switch dir [
+; 		n w [0x0]
+; 		s e [
+; 			either initial? [0x0][
+; 				window/size - list/size * select [s 0x1 e 1x0] dir
+; 			]
+; 		]
+; 	]
+; ]
+
+got rid of this; now map name = style name
+; get-style-name: function [
+; 	"Transform MAP name into STYLE name"
+; 	name [word!]
+; ][
+; 	space: get name
+; 	all [
+; 		new-name: select space 'style 					;-- allow space to enforce it's style
+; 		name <> new-name
+; 		;-- enforced name has to not to leak into globals and should have the same value as the name in map
+; 		return anonymize new-name space					;@@ any easier way?
+; 	]
+; 	name
+; ]
+
+closures are now style/after
+; get-style: function [
+; 	"Fetch styling code for the current space being drawn"
+; 	/named path [path! block!] "Path to look for (defaults to current-style)"
+; 	/closing "Fetch a closure instead"
+; ][
+; 	table: either closing [closures][styles]
+; 	path: tail as path! either named [path][current-style]
+; 	#assert [not head? path]
+; 	until [												;-- look for the most specific fitting style
+; 		p: back path
+; 		style: any [find/only table p  style]
+; 		head? path: p
+; 	]
+; 	unless style [return []]
+; 	style: first find style block!
+; 	#assert [block? style]
+; 	space: get last path								;-- need to expose it's context to the style
+; 	; print ["style for " head path "is" mold style]
+; 	compose/deep bind style space			;@@ how slow this bind will be? any way not to bind?
+; ]
+
+now powered by trap mezz, simpler
+; do-handler: function [spc-name [path!] handler [function!] path [block!] args [block!] /local result] [
+; 	path: cache/hold path							;-- copy in case user modifies/reduces it, preserve index
+; 	space: get path/1
+; 	code: compose/into [handler space path (args)] clear []
+; 	error: try/all [set/any 'result do code  'ok]
+; 	cache/put path
+; 	unless 'ok == error [
+; 		msg: form/part error 400					;@@ should be formed immediately - see #4538
+; 		print #composite "*** Failed to evaluate (spc-name)!"
+; 		print msg
+; 	]
+; 	:result
+; ]
+; do-global: function [map [map!] path [block!] event [event! none!] type [word!]] [
+; 	unless list: map/:type [exit]
+; 	kind: either map =? previewers ["previewer"]["finalizer"]
+; 	foreach fn list [
+; 		pcopy: cache/hold path					;-- copy in case user modifies/reduces it, preserve index
+; 		error: try/all [(fn get path/1 pcopy event)  'ok]
+; 		cache/put pcopy
+; 		unless 'ok == error [
+; 			print #composite "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!"
+; 			print form/part error 400
+; 		]
+; 	]
+; ]
+
+this style design can't be bound - didn't work
+; cell [
+; 	bgnd: [
+; 		fill-pen (svmc/panel)
+; 		box 0x0 (size)
+; 	]
+; 	render: function [] [
+; 		before: compose/deep self/before
+; 		?? draw
+; 		drawn:  draw
+; 		bgnd:   compose/deep self/bgnd
+; 		after:  compose/deep self/after
+; 		compose [(bgnd) (before) (drawn) (after)]	;-- composed order differs from evaluation order
+; 	]
+; ]
+
+render now can accept a host face directly, and split into parts
+; set 'render function [
+; 	space [word! object!] "Space name; or host face as object"
+; 	; /as style [word!]
+; 	/only xy1 [pair! none!] xy2 [pair! none!]
+; 	; /draw cmds [block! function!]
+; 	; /root "Apply the styles/root as well (for topmost spaces)"
+; ][
+; 	either word? space [
+; 		unset 'prefix
+; 	][
+; 		prefix: bind get-style 'host		;-- apply styles/root for topmost spaces
+; 	]
+
+; 	space: get name: space
+; 	append current-style name			;-- used by get-style
+; 	#assert [space? space]
+; 	style: get-style					;-- call it before calling draw or draw/only, in case it modifies smth
+	
+; 	trap/all/catch [					;-- traps compose and draw calls errors
+; 		if value? 'prefix [prefix: compose/deep prefix]
+; 		either block? :style [
+; 			style: compose/deep bind style space		;@@ how slow this bind will be? any way not to bind? maybe construct a func?
+; 			draw: select space 'draw
+; 			all [
+; 				only
+; 				function? :draw
+; 				find spec-of :draw /only
+; 				draw: draw/only xy1 xy2
+; 			]
+; 			render: compose [(style) (draw)]			;-- call the function if not called yet, inline blocks
+; 		][
+; 			#assert [function? :style]
+; 			render: (style space)						;@@ TODO: /only support for it?
+; 		]
+; 	][
+; 		msg: form/part thrown 400						;@@ should be formed immediately - see #4538
+; 		print #composite "*** Failed to compose the style of (name)!^/(msg)"
+; 		render: copy []
+; 	]
+; 	take/last current-style									;-- draw should be called before take/last, in case `draw` relies on current-style
+; 	compose/only [(:prefix) push (render)]					;-- push should shield from style propagation
+; ]
+
+this fails because it considers context of the word, but we don't care about it
+; same-paths?: function [p1 [block! path!] p2 [block! path!]] [
+; 	to logic! all [
+; 		(length? p1) = length? p2
+; 		find/match/same p1 p2							;@@ won't work in master branch yet (#4165)
+; 	]
+; ]
+
+this is too naive
+; same-paths?: function [p1 [block! path!] p2 [block! path!]] [
+; 	to logic! all [
+; 		p1 == as p1 p2									;-- spelling & length match
+; 		(
+; 			repeat i n: length? p1 [					;-- values sameness
+; 				unless same? get/any p1/:i get/any p2/:i [return no]
+; 			]
+; 			yes
+; 		)
+; 	]
+; ]
+
+REP #104 experiments, have no use for them anyway
+; same-scalar?: function [v1 [any-type!] v2 [any-type!]] [
+; 	to logic! any [
+; 		:v1 =? :v2
+; 		all [
+; 			series? :v1
+; 			(type? :v1) = type? :v2
+; 			(length? :v1) = n: length? :v2
+; 			(repeat i n [unless same-scalar? :v1/:i :v2/:i [return false]]  true)
+; 		]
+; 	]
+; ]
+; ;-- `find/match` using `same-scalar?` comparator
+; find-match-same-scalar: function [series [series!] match [any-type!]] [
+; 	if series? :match [
+; 		repeat i n: length? match [
+; 			unless same-scalar? :series/:i :match/:i [return none]
+; 		]
+; 		return skip series n
+; 	]
+; 	all [same-scalar? :series/1 :match  next series]
+; ]
+; ;-- `find` using `same-scalar?` comparator
+; find-same-scalar: function [series [series!] value [any-type!]] [
+; 	; while [series: find/case series :value] [		can't be used because find will never match nans
+; 	while [not tail? series] [
+; 		if find-match-same-scalar series :value [return series]
+; 		series: next series
+; 	]
+; 	none
+; ]
+; #assert [same-scalar? 1.#nan 1.#nan]
+; #assert [same-scalar? reduce [1.#nan] reduce [1.#nan]]
+; #assert [r: find-match-same-scalar reduce [0.0 / 0.0 1.0 * 1.#inf] 0.0 / 0.0  'r]
+; #assert [r: find-match-same-scalar b: reduce [0.0 / 0.0 1.0 * 1.#inf] copy b  'r]
+; #assert [r: find-match-same-scalar b: reduce [0.0 / 0.0 reduce [1.0 * 1.#inf]] copy/deep b  'r]
+; #assert [2 = index? r: find-same-scalar reduce [0.0 / 0.0 1.0 * 1.#inf] 1.0 * 1.#inf  'r]
+; #assert [2 = index? r: find-same-scalar b: reduce [0 0.0 / 0.0 reduce [1.0 * 1.#inf]] copy next b  'r]
+
+from grid/draw: this broke tabbing because cell objects were replaced after redraw
+thus making keyboard/focus point to invalid object
+of course it couldn't have a clue - replaced objects must be treated as different ones
+;@@ TODO: this should be documented in the widget builders guide
+; unless mcspace [
+; 	render mcspace: rcache/:mcell: wrap-space mcell-content-name
+; ]
+
+from events/dispatch - causes stack overflow and crashes as expected (when UI lags a bit)
+; if commands/update? [
+; 	face/draw: render face
+; 	do-events/no-wait
+; ]

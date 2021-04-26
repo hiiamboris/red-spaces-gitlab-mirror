@@ -1,5 +1,5 @@
 Red [
-	title:   "List test script"
+	title:   "Table test script"
 	author:  @hiiamboris
 	license: BSD-3
 	needs:   view
@@ -9,12 +9,6 @@ recycle/off
 #include %everything.red
 
 
-lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
-
-list1d: map-each i 100 [
-	rejoin ["message " i ": " copy/part lorem random length? lorem]
-]
-
 ;-- drunken scrollbars animation
 angle: 0
 set-style 'back-arrow  [rotate (angle) (size / 2)]
@@ -22,12 +16,22 @@ set-style 'forth-arrow [rotate (angle) (size / 2)]
 set-style 'thumb [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
 ; render/as 'test 'root
 
-counter: 0
 ; system/view/capturing?: yes
+counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list-view with [size: 300x400 source: list1d]
+		list with [axis: 'y] [
+			scrollbar with [size: 400x20 amount: 0.5 axis: 'x]
+			scrollbar with [size: 200x20 amount: 0.5 axis: 'x]
+			scrollbar with [size: 100x20 amount: 0.5 axis: 'x]
+			scrollbar with [size: 75x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: 50x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: 40x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: 30x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: 20x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: 10x20  amount: 0.5 axis: 'x]
+		]
 	] with [color: system/view/metrics/colors/panel]
 	on-over [
 		status/text: form hittest face/space event/offset

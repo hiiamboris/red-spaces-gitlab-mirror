@@ -46,8 +46,8 @@ keyboard: object [
 
 	;-- automatic focus history collection
 	on-change*: func [word old [any-type!] new [any-type!]] [
-		if any [word <> 'focus  old = new][exit]
-		insert/only history new
+		if any [word <> 'focus  same-paths? old new][exit]
+		insert/only history copy new
 		clear skip history 10							;@@ 10 spaces should be enough?
 	]
 ]
@@ -56,14 +56,15 @@ keyboard: object [
 
 ;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
 find-next-focal-space: function [dir "forth or back"] [
-; find-next-focal-space: function [focus [path! block!] "aka keyboard/focus" dir "forth or back"] [
 	focus: keyboard/last-valid-focus
+	#debug focus [#print "last valid focus: (as path! focus)"]
 	foreach: pick [										;@@ use apply
 		foreach-*ace/next
 		foreach-*ace/next/reverse
 	] dir = 'forth 
 	do compose/only [
 		(foreach) path next: focus [			;-- default to already focused item (e.g. it's the only focusable)
+			#debug focus [#print "find-next-focal-space @(path)"]
 			if find keyboard/focusable last path [next: path break]
 		]
 	]
@@ -81,7 +82,7 @@ focus-space: function [
 	while [name: take/last path] [						;-- reverse order to focus the innermost space possible
 		unless find keyboard/focusable name [continue]
 		append path new-name: name
-		if keyboard/focus = path [break]					;-- no refocusing into the same target
+		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug [print ["Moving focus to" as path! path]]
 
 		unless empty? old-path: keyboard/focus [
@@ -116,5 +117,6 @@ register-previewer
 			none? f: f/parent
 		]
 
+		#debug focus [#print "Attempting to focus (as path! path)"]
 		if focus-space path [update]
 	]

@@ -65,8 +65,10 @@ init-spaces-tree: function [face [object!]] [
 	tree: tree-from spec
 	#assert [any [1 >= length? tree]]
 	face/space: tree/1
-	render face/space			;@@ required to populate `map`s & get the size
-	face/size: select get face/space 'size
+	render face					;@@ required to populate `map`s & get the size
+	new-size: select get face/space 'size
+	#assert [new-size]			;-- `size: none` blows up `layout`
+	face/size: new-size
 ]
 
 
@@ -197,12 +199,11 @@ events: context [
 		kind: either map =? previewers ["previewer"]["finalizer"]
 		foreach fn list [
 			pcopy: cache/hold path					;-- copy in case user modifies/reduces it, preserve index
-			error: try/all [set/any 'result (fn get path/1 pcopy event)  'ok]
-			cache/put pcopy
-			unless 'ok == error [
-				print #composite "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!"
-				print form/part error 400
+			trap/all/catch [fn get path/1 pcopy event] [
+				msg: form/part thrown 400			;@@ should be formed immediately - see #4538
+				#print "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!^/(msg)"
 			]
+			cache/put pcopy
 		]
 	]
 
@@ -228,65 +229,100 @@ events: context [
 	; 	r
 	; ]
 
-	define-handlers: function [
-		"Define event handlers"
-		spec [block!] "A block of: event-name [spec..] [code..]"
-	][
-		extend-handlers #() spec
-	]
-
+	;@@ copy/deep does not copy inner maps unfortunately, so have to use this
 	copy-deep-map: function [m [map!]] [
 		m: copy/deep m
 		foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
 		m
 	]
 
-	extend-handlers: function [
-		"Extend event handlers of STYLE"
-		style [path! word! map!] "Style name, path or a map of it's event handlers"
-		def [block!] "A block of: on-event-name [spec..] [code..]"
+	;-- it's own DSL:
+	;-- new-style: [                              
+	;--   OR                                      
+	;-- new-style: extends 'other-style [         
+	;--     on-down [space path event] [...]      
+	;--     on-time [space path event delay] [...]
+	;--     inner-style: [                        
+	;--         ...                               
+	;--     ]                                     
+	;-- ]                                         
+	;@@ TODO: doc this DSL
+	define-handlers: do with [
+		expected: function ['rule] [
+			reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
+		]
 	][
-		all [
-			not map? map: style
-			none? map: get as path! compose [handlers (style)]
-			map: #()
-		]
-		#assert [map? map]
-		r: copy-deep-map map							;@@ BUG: copy/deep does not copy inner maps unfortunately
-		while [not tail? def] [
-			either word? :def/1 [						;-- on-event [spec] [body] case
-				set [name: spec: body:] def
-				def: skip def 3
-				list: any [r/:name r/:name: copy []]
-				#assert [								;-- validate the spec to help detect bugs
-					any [
-						parse spec [
-							word! opt quote [object!]
-							word! opt quote [block!]
-							word! opt [quote [event!] | quote [event! none!] | quote [none! event!]]
-							opt [if (name = 'on-time) word! opt quote [percent!]]
-							opt [/local to end]
-						]
-						(?? handler  none)				;-- display handler to clarify what error is
-					]
-					"invalid handler spec"
+		function [
+			"Define event handlers for any number of spaces"
+			def [block!] "[name: [on-event [space path event] [...]] ...]"
+		] reshape [
+			prefix: copy [handlers]
+
+			=style-def=: [
+				set name set-word! (name: to word! name)
+				['extends
+					;@@ TODO: allow paths here too
+					set base !(expected [lit-word! | word!]) (base: to word! base)
+				|	(base: none)
 				]
-				append list function spec bind body commands
-			][											;-- substyle: [handlers..] case
-				#assert [not map? style]				;-- cannot be used without named style
-				#assert [set-word? :def/1]
-				set [name: spec:] def
-				def: skip def 2
-				unless r/:name [r/:name: copy #()]
-				; name: to word! name
-				substyle: as path! compose [(style) (to word! name)]
-				r/:name: extend-handlers substyle spec
+				set body !(expected block!)
+				(add-style/from name body base)
 			]
+			add-style: function [name body /from base] [
+				append prefix name
+				#debug events [print ["Defining" mold as path! prefix when base ["from"] when base [base]]]
+				path: as path! prefix
+				map: either base [
+					copy-deep-map get as path! compose [handlers (to [] base)]
+				][	copy #()
+				]
+				set path map
+				fill-body body map
+				take/last prefix
+			]
+
+			fill-body: function [body map] [
+				parse body =style-body=
+			]
+			=style-body=: [
+				any [
+					not end
+					ahead !(expected [word! | set-word!])
+					=style-def= | =hndlr-def=
+				]
+			]
+
+			=hndlr-def=: [
+				set name word!
+				set spec [ahead !(expected block!) into =spec-def=]
+				set body !(expected block!)
+				(add-handler name spec body)
+			]
+			add-handler: function [name spec body] [
+				#debug events [print ["-" name]]
+				path: as path! compose [(prefix) (name)]
+				list: any [get path  set path copy []]
+				append list function spec bind body commands
+			]
+
+			=spec-def=: [								;-- just validation, to protect from errors
+				!(expected word!) opt [ahead block! [quote @(expected [object!])] ]
+				!(expected word!) opt [ahead block! [quote @(expected [block!]) ] ]
+				!(expected word!) opt [ahead block!
+					!(expected [quote [event!] | quote [event! none!] | quote [none! event!]])
+				]
+				opt [if (name = 'on-time) not [refinement! | end]
+					!(expected word!) opt [ahead block! [quote @(expected [percent!])]]
+				]
+				opt [not end !(expected /local) to end]
+			]
+
+			ok?: parse def [any [not end ahead !(expected set-word!) =style-def=]]		;-- no handlers in the topmost block allowed
+			#assert [ok?]
 		]
-		r
 	]
 
-	export [define-handlers extend-handlers]
+	export [define-handlers]
 	; export [copy-handlers define-handlers extend-handlers]
 
 
@@ -311,7 +347,7 @@ events: context [
 	dispatch: function [face event /local result /extern resolution last-on-time] [
 		focused?: no
 		with-commands [
-			; #debug [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
+			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
 			buf: cache/get
 			path: switch/default event/type [
 				over wheel up mid-up alt-up aux-up
@@ -327,7 +363,7 @@ events: context [
 					focused?: yes							;-- event should not be detected by parent spaces
 					keyboard/focus
 				]
-				; focus unfocus ;-- generated internally
+				; focus unfocus ;-- generated internally by focus.red
 				time [
 					on-time face event						;-- handled by timers.red
 					none
@@ -338,16 +374,19 @@ events: context [
 				;@@ select change  -- make these?
 				; drag-start drag drop move moving resize resizing close  -- no need
 				; zoom pan rotate two-tap press-tap   -- android-only?
+				; create created  -- simulate these? (they're still undocumented mostly in View)
 			] [exit]										;-- ignore unsupported events
-			; #debug [print ["dispatch path:" path]]
+			#debug events [print ["dispatch path:" path]]
 			if path [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
 				process-event path event focused?
 			]
 			if commands/update? [
-				face/draw: render/as face/space 'root
-				do-events/no-wait				;@@ is it OK to drop it here? or in the handlers? gonna stack overflow?
-												;@@ or maybe use reactivity to unroll the recursion?
+				face/draw: render face
+				;@@ TODO: fix the lag once #4881 gets a solution
+				; do-atomic [									;-- uses reactivity to unroll the recursion and prevent stack overflow
+				; 	do-events/no-wait						;@@ this still does not prevent GUI huge lags :(
+				; ]
 			]
 		]
 	]
@@ -357,13 +396,11 @@ events: context [
 		path: cache/hold path							;-- copy in case user modifies/reduces it, preserve index
 		space: get path/1
 		code: compose/into [handler space path (args)] clear []
-		error: try/all [set/any 'result do code  'ok]
-		cache/put path
-		unless 'ok == error [
-			msg: form/part error 400					;@@ should be formed immediately - see #4538
-			print #composite "*** Failed to evaluate (spc-name)!"
-			print msg
+		trap/all/catch code [
+			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
+			#print "*** Failed to evaluate (spc-name)!^/(msg)"
 		]
+		cache/put path
 	]
 
 	do-handlers: function [
@@ -432,6 +469,9 @@ events: context [
 		path [path! block!]
 		/with param [any-type!] "Attach any data to the dragging state"
 	][
+		#debug events [if dragging? #print "WARNING: Dragging override detected: (drag-path)->(path)"]
+		#debug events [#print "Starting drag on [(copy/part path -99) | (path)] with (:param)"]
+		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]
 		append clear drag-in/head head path				;-- make a copy in place, saving original offsets
 		drag-in/path: at drag-in/head index? path		;-- drag-path will return it at the same index

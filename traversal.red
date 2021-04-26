@@ -89,7 +89,7 @@ context [
 
 	;-- break & continue will work!
 	foreach*: function [					;-- tree iterator
-		spec     [word! block!]
+		spec     [word! set-word! block!]
 		path     [word! path! block!]
 		code     [block!]
 		lister   [function!]
@@ -97,19 +97,29 @@ context [
 		next?    [logic!]
 		;@@ any point in not making it cyclic?
 	][
-		if word? spec [spec: to [] spec]
+		if any-word? spec [spec: to [] to word! spec]
 		path: either word? path [to path! path][as path! path]
 
 		buf: cache/get										;-- so we can call foreach-*ace from itself
 		list: lister/into path/1 buf
 		if reverse? [reverse list]
 
-		either pos: find/only list path [
+		either pos: find-same-path list path [
+			#debug focus [
+				if attempt [get bind 'dir :find-next-focal-space] [
+					#print "Found (as path! path) at index (index? pos)"
+				]
+			]
 			if next? [remove pos]
 			unless head? pos [
 				move/part  head pos  tail pos  -1 + index? pos	;-- rearrange to cover the whole tree
 			]
 		][
+			#debug focus [
+				if attempt [get bind 'dir :find-next-focal-space] [
+					#print "NOT found (as path! path) in spaces tree"
+				]
+			]
 			pos: list										;-- if empty path or path is invalid: go from head
 		]
 
@@ -124,7 +134,7 @@ context [
 
 	set 'foreach-space function [
 		"Evaluate CODE for each space starting with PATH"
-		'spec [word! block!] "path or [path space]"
+		'spec [word! set-word! block!] "path or [path space]"
 		path  [word! path! block!] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
@@ -135,7 +145,7 @@ context [
 
 	set 'foreach-*ace function [
 		"Evaluate CODE for each face & space starting with PATH"
-		'spec [word! block!] "path or [path *ace]"
+		'spec [word! set-word! block!] "path or [path *ace]"
 		path  [word! path! block! object!] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"

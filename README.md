@@ -101,6 +101,7 @@ This means a common design underlining all widgets.
 | Resize model | Need a powerful simple design idea, ideally that would apply to faces too |
 | Layout | Embedded into View layout seamlessly, but very basic: only accepts space names and `with` |
 | Table | Missing advanced features like cells span, columns dragging, sorting, filtering |
+| User guide | Not even started |
 
 # Goals
 
@@ -150,6 +151,8 @@ For other spaces (e.g. `list`) size is determined by it's content (e.g. items in
 However for most practical tasks we can think of `size` on the last rendered frame.<br>
 When we click on any point, it's the last frame geometry that decides where that click lands to: what user sees (what was rendered) determines the behavior.
 
+**Quirk:** space object doesn't know it's parent or offset/shape within it => same space can be used multiple times in the space tree.
+
 To make spaces more lightweight, optimal **definition model** is like this:
 ```
 my-space-ctx: context [
@@ -182,7 +185,8 @@ map: [
 ]
 ```
 
-**`into`:**
+### into
+
 - takes a point in it's space's coordinate system
 - determines which *inner* space this point maps to
 - returns name of the inner space and a point in inner space's coordinate system
@@ -190,7 +194,7 @@ map: [
 
 This allows for rotation, compression, reflection, anything. Can we make a "mirror" space that reflects another space along some axis? Easily.
 
-**`map`:**
+### map
 
 Is a block that tells which inner face occupies which region (offset & size) of this space.<br>
 Order: first items get precedence in case of overlap.
@@ -201,8 +205,11 @@ Map is only good for rectangular geometry (in this case `into` is not needed and
 
 If `into` is provided, `map` is still required if space wants to support iteration over it's inner spaces (e.g. for tabbing). In this case `map` can contain any geometry or even only names of inner spaces: `[word! word! ...]`
 
-Names in a `map` may repeat, but each should refer to a unique object.<br>
-`map/child/size` <> `child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates.
+Names in a `map` may repeat, but each should refer to a unique object.
+
+**Quirk**: `map/child/size <> child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates.
+
+### names
 
 **Quirk:** space always has a name (word)!
 
@@ -217,7 +224,7 @@ Why need for name?
 Why `(get name) = object` rather than `object [name: ..]`?
 - it makes easy to apply styles to whole classes of spaces by their names (see [styling](#styling) below)
 - it makes easy to visualize (dump) the face/space tree
-- if you've ever tried `?? my-face` you know it is a bad idea; with spaces however, output is always fully inspectable exactly because of this choice
+- if you've ever tried `?? my-face` you know it is a bad idea that will force you to kill the console; spaces however are always fully inspectable
 
 Drawback: have to call `get` an extra round sometimes. But other way would have to `select .. 'name`, so no big deal.
 
@@ -343,7 +350,7 @@ Previewers and finalizers have all the same spec:<br>
 - `event` is what View provides us with (may be `none` for synthesized events)
 
 **Quirk:** Normal event handlers have varying spec, depending on event type.<br>
-Usually: `function [space [object!] path [block!] event [event! none!]]`
+The basic minimum is: `function [space [object!] path [block!] event [event! none!]]`, but...
 
 **Quirk:** `path` has 2 formats:
 - for pointer-related events, path is returned by hittest and it contains the whole history of coordinate system transformations: e.g. `[list-view 210x392 hscroll 210x8 thumb 196x8]` (word pair word pair ...). Each pair is a point in the space listed before it. Such path does not include parent *faces* for we don't hittest against them (would be extra effort to generate this info) but this may change in the future. `over wheel up mid-up alt-up aux-up down mid-down alt-down aux-down click dbl-click`

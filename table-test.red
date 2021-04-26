@@ -30,7 +30,7 @@ list2d: map-each/only i 50 [
 angle: 0
 set-style 'back-arrow  [rotate (angle) (size / 2)]
 set-style 'forth-arrow [rotate (angle) (size / 2)]
-set-style 'thumb [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
+; set-style 'thumb [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
 ; render/as 'test 'root
 
 ;-- waving table rows animation
@@ -39,21 +39,32 @@ set-style 'table/headers [(t: now/time/precise phase: (to float! t) % 12 * 30 ()
 set-style 'row [(phase: phase + 60  margin/x: to 1 5 * sine phase ())]
 
 counter: 0
+; view [host [grid]]
+; quit
 ; system/view/capturing?: yes
 view/no-wait/options [
 	below
 	b: host [
 		rotor [
-			list with [axis: 'y] [
-				field with [text: "field"]
+			; list with [axis: 'y] [
+				; field with [text: "field"]
 				; spiral with [
 				; 	field/text: lorem10
 				; 	size: 300x300
 				; ]
-				list-view with [size: 200x100 source: list1d] ;["1" "2" "3" "4" "5" "6" "7"]]
-				button with [data: "button"]
-				table with [size: 200x200 source: list2d] ;[ ["1" "2"] ["3" "4"] ["5" "6"] ["7" "8"] ["9" "A"] ["B" "C"] ["D" "E"] ["F" "G"]]]
-			]
+				; list-view with [size: 200x100 source: list1d] ;["1" "2" "3" "4" "5" "6" "7"]]
+				; button with [data: "button"]
+				; table with [size: 200x70 source: list2d] ;[ ["1" "2"] ["3" "4"] ["5" "6"] ["7" "8"] ["9" "A"] ["B" "C"] ["D" "E"] ["F" "G"]]]
+				grid with [;[size: 200x200]
+					cells/(1x2): make-space/name 'button [data: "button1"]
+					cells/(3x3): make-space/name 'space [draw: [] size: 80x80]
+					cells/(3x1): make-space/name 'button [data: "button2"]
+					set-span 2x2 2x2
+					set-span/force 1x2 2x2
+					;@@ need a bunch of table demos to test against - then refactor it
+					heights/default: 'auto
+				]
+			; ]
 		]
 	] with [color: system/view/metrics/colors/panel]
 	on-over [
@@ -66,6 +77,6 @@ view/no-wait/options [
 		b/draw: render/as b/space 'root
 	]
 ] [offset: 10x10]
-foreach-*ace/next path system/view/screens/1 [probe path]
-either system/build/config/gui-console? [halt][do-events]
+; foreach-*ace/next path system/view/screens/1 [probe path]
+either system/build/config/gui-console? [print "---"][do-events]
 

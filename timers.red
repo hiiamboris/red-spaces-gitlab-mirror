@@ -54,6 +54,7 @@ context [
 		handlers: events/handlers
 		foreach-space [path space] face/space [
 			unless rate: select space 'rate [continue]					;-- no rate facet
+			if rate <= 0 [continue]										;-- disabled
 			path: as [] path
 			forall path [
 				hpath: as path! compose/into [handlers (path) on-time] clear []	;-- not allocated
