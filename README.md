@@ -6,7 +6,7 @@
 |---|---|
 | ![](https://i.gyazo.com/74d4e22f7480bda9f5c2df8e11c6bfb5.gif) | ![](https://i.gyazo.com/5f16371407967a41e16bb6f601201a70.gif) |
 |  **Infinite list of items *of varying size*** | **Self-containing grid** |
-| ![](https://i.gyazo.com/856724cebae6a5967a9eb96142dd35de.gif) | ![](https://i.gyazo.com/288716f3afecef834a9b1b0b75e47b5d.gif) |
+| ![](https://i.gyazo.com/856724cebae6a5967a9eb96142dd35de.gif) | ![](https://i.gyazo.com/4a2557024a80ac54e890fbf665e1cf7a.gif) |
 
 \>\> [MORE DEMOS IN /TESTS](tests/) <<
 
