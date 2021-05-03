@@ -82,34 +82,57 @@ do with [
 				; [pattern 4x4 [pen off fill-pen black box 0x0 2x2 box 2x2 4x4]]	;@@ not working, #4828
 			]
 		]
-		table [[
-			; fill-pen (svmc/text + 0.0.0.120)
-			box 0x0 (size)
-		]]
-		table/headers/list [[
-			fill-pen (svmc/text + 0.0.0.120)
-			pen off
-			box 0x0 (size)
-		]]
-		table/columns/list [[
-			fill-pen (svmc/text + 0.0.0.200)
-			pen off
-			box 0x0 (size)
-		]]
-		table/headers/list/row/item
-		table/columns/list/row/item [[
-			fill-pen (svmc/panel)
-			pen off
-			box 0x0 (size)
-		]]
-		grid [[
-			fill-pen (svmc/text + 0.0.0.120)
-			pen off
-			box 0x0 (size)
-		]]
+		; table [[
+		; 	; fill-pen (svmc/text + 0.0.0.120)
+		; 	box 0x0 (size)
+		; ]]
+		; table/headers/list [[
+		; 	fill-pen !(svmc/text + 0.0.0.120)
+		; 	pen off
+		; 	box 0x0 (size)
+		; ]]
+		; table/columns/list [[
+		; 	fill-pen !(svmc/text + 0.0.0.200)
+		; 	pen off
+		; 	box 0x0 (size)
+		; ]]
+		; table/headers/list/row/item
+		; table/columns/list/row/item [[
+		; 	fill-pen !(svmc/panel)
+		; 	pen off
+		; 	box 0x0 (size)
+		; ]]
+
+		;@@ this here is a bit tricky: dunno how to better solve it
+		;@@ finite grid is not wrapped into a grid-view, but it also doesn't have the size
+		;@@ problem with this is that both styles apply and the color is too dark
+		;@@ but then maybe they shouldn't have the same style anyway... need to think
+		; grid [[
+		; 	fill-pen !(svmc/text + 0.0.0.120)
+		; 	pen off
+		; 	box 0x0 (any [size 0x0])		;-- size=none if infinite
+		; ]]
+		; grid-view/window [[		;@@ this is too lazy to update itself: draws box of size that's no longer valid
+		; 	fill-pen !(svmc/text + 0.0.0.120)
+		; 	pen off
+		; 	box 0x0 (size)
+		; ]]
+		grid-view/window [
+			function [window /only xy1 xy2] [
+				drawn: window/draw/only xy1 xy2
+				bgnd: compose [
+					fill-pen !(svmc/text + 0.0.0.120)
+					pen off
+					box 0x0 (window/size)
+				]
+				compose [(bgnd) (drawn)]
+			]
+		]
+
 		cell [[
-			fill-pen (svmc/panel)
+			fill-pen !(svmc/panel)
 			box 0x0 (size)
+			pen      !(svmc/text)			;-- restore pen after `pen off` in grid
 		]]
 		; cell [
 		; 	function [cell] [
@@ -217,9 +240,9 @@ context [
 		#assert [empty? current-style]
 
 		with-style 'host [
-			host-style: compose/deep bind get-style face	;-- host style can only be a block
-			space-style: render-space/only face/space xy1 xy2
-			render: reduce [host-style space-style]
+			host-drawn: compose/deep bind get-style face	;-- host style can only be a block
+			space-drawn: render-space/only face/space xy1 xy2
+			render: reduce [host-drawn space-drawn]
 		]
 		any [render []]
 	]
@@ -240,14 +263,29 @@ context [
 					only
 					function? :draw
 					find spec-of :draw /only
-					draw: draw/only xy1 xy2
+					do copy/deep [draw: draw/only xy1 xy2]	;@@ workaround for #4854 - remove me!!
+					; draw: draw/only xy1 xy2
 				]
 				render: reduce [style draw]				;-- call the draw function if not called yet
 			][
 				#assert [function? :style]
-				render: (style space)					;@@ TODO: /only support for it?
+				render: either all [
+					only
+					find spec-of :style /only
+				][
+					do copy/deep [style/only space xy1 xy2]	;@@ workaround for #4854 - remove me!!
+					; draw: draw/only xy1 xy2
+				][
+					style space
+				]
+				; render: (style space)					;@@ TODO: /only support for it?
 			]
 		]
+		; either render [
+		; 	reduce ['push render]						;-- don't carry styles over
+		; ][
+		; 	copy []
+		; ]
 		any [render copy []]
 	]
 
@@ -256,6 +294,8 @@ context [
 		/only xy1 [pair! none!] xy2 [pair! none!]
 	][
 		render: either word? space [:render-space][:render-face]
-		render/only space xy1 xy2
+		do copy/deep [									;@@ workaround for #4854 - remove me!!
+			render/only space xy1 xy2
+		]
 	]
 ]

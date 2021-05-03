@@ -10,6 +10,9 @@ into-map: function [map [block!] xy [pair!] name [none! word!]] [
 		reduce [name  xy - map/:name/offset]
 	][
 		foreach [name box] map [
+			; #assert [box/offset]
+			; #assert [box/size]
+			; #assert [xy]
 			if within? xy o: box/offset box/size [
 				space: get name
 				return reduce [name  xy - o]
@@ -54,7 +57,10 @@ hittest: function [
 			all [
 				name
 				space: get name
-				within? xy 0x0 space/size
+				any [
+					none? space/size			;-- infinite spaces include any point
+					within? xy 0x0 space/size
+				]
 			]
 		][
 			repend path [name xy]

@@ -60,9 +60,12 @@ spaces: #()												;-- map for extensibility
 spaces/space: [											;-- minimum basis to build upon
 	draw: []
 	size: 0x0
-	rate: none											;@@ not sure about it, but it's the only way user can set rate:
+	;@@ TODO: layout constructor should be able to add fields like rate into space templates that do not have it
+	; rate: none
 ]
 space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
+
+spaces/timer: make-space/block 'space [rate: none]		;-- template space for timers
 
 spaces/rectangle: make-space/block 'space [
 	size: 20x10
@@ -197,7 +200,7 @@ scrollable-space: context [
 		content: make-space/name 'space []			;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
-		scroll-timer: make-space 'space [rate: 16]	;-- how often it scrolls when user presses & holds one of the arrows
+		scroll-timer: make-space 'timer [rate: 16]	;-- how often it scrolls when user presses & holds one of the arrows
 
 		map: compose [
 			(content) [offset 0x0 size 0x0]
@@ -220,6 +223,7 @@ scrollable-space: context [
 		draw: function [] [
 			box: size					;-- area of 'size' unobstructed by scrollbars
 			cspace: get map/1: content
+			#debug grid-view [#print "scrollable/draw: renders content from (max 0x0 0x0 - origin) to (box - origin); box=(box)"]
 			cdraw:
 				render/only content		;-- render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 					max 0x0 0x0 - origin
@@ -246,6 +250,7 @@ scrollable-space: context [
 			vscroll/size/y: either vdraw? [box/y][0]
 			map/hscroll/size: hscroll/size
 			map/vscroll/size: vscroll/size
+			#debug grid-view [#print "origin in scrollable/draw: (origin)"]
 			compose/deep/only [
 				translate (origin) [						;-- special geometry for content
 					clip (0x0 - origin) (box - origin)
@@ -261,9 +266,11 @@ scrollable-space: context [
 				;@@ problem: changing origin requires up to date content (no sync guarantee)
 				;@@ maybe we shouldn't clip it right here?
 				origin [
+					#debug grid-view [#print "on-change origin: (mold :old) -> (mold :new)"]
 					if all [pair? :new  word? content] [
 						cspace: get content
-						set-quiet 'origin min 0x0 max (map/:content/size - cspace/size) new
+						set-quiet 'origin clip [(map/:content/size - cspace/size) 0x0] new
+						#debug grid-view [#print "on-change clipped to: (origin)"]
 					]
 				]
 				content [map/1: new]
@@ -513,127 +520,103 @@ spaces/data-view: make-space/block 'space [
 ]
 
 
-
-; 	{
-; 		plan:
-; 		2 origins: offset of viewport within a cache window or how to call it
-; 			viewport-origin and window-origin
-; 		I detect changes in viewport-origin, see when content gets out of window size
-; 		when that happens,
-; 		either move visible items in the window, or discard them all (when not caching)
-; 		window-origin gets offset by jump size
-; 		request to draw either part that's freed or all visible items again (request for window to fill the map)
-
-; 		viewport is a part of scrollable
-; 		scrollable can be fully reused
-; 		it's content will be a data-window that does all the magic
-; 	}
-
-;@@ TODO: this is a template space, should it be exposed into global spaces list at all?
 window-ctx: context [
-	spaces/window-template: make-space/block 'space [
-		;-- offset of "content" within the window, or `(absolute 0x0 of content) - (absolute 0x0 of window)`
-		;-- <0 if window moves to the right/bottom of it's original position (normal spaces)
-		;-- >0 - to the left/top (infinite spaces or generally those that aren't clipped by 0x0 point)
-		;-- only affected by `roll`
-		origin: 0x0
+	spaces/window: make-space/block 'space [
+		;-- when drawn auto adjusts it's `size` up to `max-size` (otherwise scrollbars will always be visible)
+		max-size: 1000x1000
 
-		caching?: yes					;-- when origin gets moved, can visible content be cached? or has to be redrawn
-		map: []
-		max-size: 1000x1000				;-- when drawn auto adjusts it's `size` up to max-size (otherwise scrollbars will always be visible)
+		;-- window does not require content's size, so content can be an infinite space!
+		content: make-space/name 'space []
+		map: [space [offset 0x0 size 0x0]]				;-- 'space' will be replaced by space content refers to
 
-		;-- should add to the map missing spaces that happen to intersect box xy1-xy2 of window
-		fill: func [xy1 [pair!] xy2 [pair!]] []			;-- template; to be provided by the user
-
+		;-- should be defined in content
 		;-- should return how much more window can be scrolled in specified direction (from it's edge, not current origin!)
 		;-- if it returns more than requested, returned value is added
-		available?: func [dir [word!] "n/e/s/w" requested [integer!]] [requested]		;-- template; by default infinite
-
-		invalidate: does [last-origin: last-size: none]
-		last-origin: last-size: none							;-- geometry during previous call to `renew`
-		renew: function [] [
-			unless all [last-origin last-size = max-size] [		;-- first ever invocation or size changed
-				self/last-origin: origin
-				self/last-size: max-size
-				fill 0x0 max-size
-				exit
-			]
-			if 0x0 = offset: origin - last-origin [exit]		;-- has not been moved
-			self/last-origin: origin
-			unless caching? [
-				clear map
-				fill 0x0 max-size
-				exit
-			]
-
-			remove-each [name geom] map [				;-- clear the map of invisible spaces
-				o: geom/offset: geom/offset + offset	;-- and relocate visible ones
-				not bbox-overlap?  0x0 max-size  o o + geom/size
-			]
-			case [										;-- fill top/bottom before left/right (random decision)
-				offset/y > 0 [fill  0x0  as-pair max-size/x top: offset/y]
-				offset/y < 0 [fill  as-pair 0 btm: max-size/y + offset/y  max-size]
-			]
-			default top: 0
-			default btm: max-size/y
-			case [										;-- left/right excludes already drawn top/bottom regions
-				offset/x > 0 [fill  as-pair 0 top  as-pair offset/x btm]
-				offset/x < 0 [fill  as-pair max-size/x + offset/x top  as-pair max-size/x btm]
+		available?: function [
+			axis      [word!]    "x/y"
+			dir       [integer!] "-1/1"
+			from      [integer!] "axis coordinate to look ahead from"
+			requested [integer!] "max look-ahead required"
+		][
+			cspace: get content
+			either function? cavail?: select cspace 'available? [	;-- use content/available? when defined
+				cavail? axis dir from requested
+			][														;-- otherwise deduce from content/size
+				csize: any [cspace/size 0x0]						;@@ or assume infinity if no /size in content?
+				clip [0 requested] either dir < 0 [from][csize/:axis - from]
 			]
 		]
 
 		draw: function [/only xy1 [pair!] xy2 [pair!]] [
-			old-origin: origin							;-- renew may change origin, in which case we don't wanna miss the viewport
-			renew
-			either only [
-				visible: []
-				foreach [name geom] map [				;@@ should be map-each
-					if bbox-overlap? 0x0 max-size xy1 xy2 [append visible name]
-				]
-				r: compose-map/only/limits map visible xy1 - old-origin xy2 - old-origin
-				clear visible							;-- let GC free it up
-			][
-				r: compose-map map
-			]
-			self/size: either empty? map [
-				0x0
-			][
-				item-last: last map
-				min max-size item-last/offset + item-last/size
-			]
-			r
+			#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
+			#assert [word? content]
+			map/1: content								;-- rename it properly
+			cspace: get content
+			geom: map/:content
+			o: geom/offset
+			;-- there's no size for infinite spaces so we use `available?` to get the drawing size
+			s: max-size
+			foreach x [x y] [s/:x: available? x 1 (0 - o/:x) s/:x]
+			default xy1: 0x0
+			default xy2: s
+			geom/size: s - o
+			self/size: s							;-- limit window size by content size
+			cdraw: render/only content xy1 - o xy2 - o
+			compose/only [translate (o) (cdraw)]
 		]
-
-		; on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
-		; ]
 	]
 ]
 
-;@@ make it a template too??
 inf-scrollable-ctx: context [
 	spaces/inf-scrollable: make-space/block 'scrollable [	;-- `infinite-scrollable` is too long for a name
-		jump-length: 100						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
+		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 
 		content: 'window
-		window: make-space 'window-template []			;-- should be overridden or `fill` & `available?` defined
+		window: make-space 'window [size: none]
+		#assert [map/1 = 'space]
+		map/1: 'window
+
+		roll-timer: make-space 'timer [rate: 4]			;-- how often to call `roll` when dragging
+		append map [roll-timer [offset 0x0 size 0x0]]
 
 		roll: function [] [
-			win-org: window/origin  org: origin
-			foreach [x fwd bck] [x e w  y s n] [
-				if dir: case [
-					(0 - org/:x) <= look-around [bck]
-					(0 - org/:x) >= (window/max-size/:x - size/:x - look-around) [fwd]
-				][
-					if 0 < avail: window/available? dir jump-length [
-						if bck = dir [avail: 0 - avail]
-						win-org/:x: win-org/:x - avail		;-- transfer offset from scrollable into window
-						org/:x: org/:x + avail
+			#debug grid-view [#print "origin in inf-scrollable/roll: (origin)"]
+			wo: wo0: 0x0 - window/map/(window/content)/offset	;-- (positive) offset of window within it's content
+			#assert [window/size]
+			ws: window/size
+			before: 0x0 - origin
+			after:  ws - (before + map/window/size)
+			foreach x [x y] [
+				any [		;-- prioritizes left/up jump over right/down
+					all [
+						before/:x <= look-around
+						0 < avail: window/available? x -1 wo/:x jump-length
+						wo/:x: wo/:x - avail
+					]
+					all [
+						after/:x  <= look-around
+						0 < avail: window/available? x  1 wo/:x + ws/:x jump-length
+						wo/:x: wo/:x + avail
 					]
 				]
 			]
-			maybe self/origin: org						;-- commit changed origins in a way detectable by on-change
-			maybe window/origin: win-org
+			maybe self/origin: origin + (wo - wo0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
+			maybe window/map/(window/content)/offset: 0x0 - wo
+			wo <> wo0								;-- should return true when updates origin - used by event handlers
+		]
+
+
+		autosize-window: function [] [
+			#assert [all [size size/x > 0 size/y > 0]]
+			pages: 10x10
+			maybe window/max-size: pages * self/size
+		]
+
+		scrollable-draw: :draw
+		draw: function [] [
+			unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
+			scrollable-draw
 		]
 	]
 ]
@@ -643,56 +626,51 @@ inf-scrollable-ctx: context [
 ;@@ TODO: explore fractals this way :D
 spaces/web: make-space/block 'inf-scrollable [
 	canvas: make-space 'space [
-		draw: function [] [
-			center: (ws: window/max-size) / 2 + window/origin
-			x-axis: when all [0 <= center/y center/y <= ws/y] [
-				compose [line (center * 0x1) (as-pair ws/x center/y)]
-			]
-			y-axis: when all [0 <= center/x  center/x <= ws/x] [
-				compose [line (center * 1x0) (as-pair center/x ws/y)]
-			]
-			xy1: center - (center/x * 1x1)
-			xy2: center - (center/x - ws/x * 1x1)
-			l-diag: when all [xy2/y >= 0  xy1/y <= ws/y] [
-				compose [line (xy1) (xy2)]
-			]
-			xy1: center - (center/x * 1x-1)
-			xy2: center - (center/x - ws/x * 1x-1)
-			r-diag: when all [xy1/y >= 0  xy2/y <= ws/y] [
-				compose [line (xy1) (xy2)]
-			]
-			r: compose [(x-axis) (y-axis) (l-diag) (r-diag)]
-			nearest: either within? center 0x0 ws [
-				0x0
+		available?: function [axis dir from requested] [requested]
+	
+		draw: function [/only xy1 xy2] [
+			#assert [only]
+			center: 100x100
+			sectors: 12
+			t: tangent (sec: 360 / sectors) / 2
+			size: xy2 - xy1
+			corners: map-each corner 2x2 [corner - 1x1 * size + xy1 - center]
+			radii: minmax-of map-each/eval c corners [vec-length? c]
+			either within? 0x0 corners/1 size + 1 [
+				angles: [0 360]
+				radii/1: 0
 			][
-				min absolute center absolute (center - ws)
-			]
-			min-rad: vec-length? nearest
-			min-rad: max 0 round/to/floor min-rad 30
-			max-rad: min-rad + vec-length? ws
-			rad: min-rad
-			append r compose [translate (center)]
-			while [rad < max-rad] [
-				loop 8 [
-					append r compose [
-						line (rad * 0x1) (rad * 1x1 * (sqrt 2) / 2)
-						rotate 45
-					]
+				angles: minmax-of map-each c corners [
+					(arctangent2 c/y c/x) // 360
 				]
-				rad: rad + 30
+				;-- try to determine the closest radius approximately
+				reserve: max size/x / 2 size/y / 2		;-- for when center gets out of the viewport
+				radii/1: sqrt max 0 radii/1 ** 2 - (reserve ** 2)
+				radii/1: radii/1 * cosine sec / 2		;-- for when looking at distant web joint points
 			]
-			r
+			sec-draw: map-each i sectors [
+				a: i - 1 * sec
+				unless all [angles/1 <= (a + sec) a <= angles/2] [continue]
+				lvl1: round/to/floor   sqrt radii/1 1
+				lvl2: round/to/ceiling sqrt radii/2 1
+				levels: map-each/eval lvl lvl2 - lvl1 + 1 [
+					r: lvl + lvl1 ** 2
+					p: as-pair r r * t
+					['line p p * 1x-1]
+				]
+				compose/deep/only [
+					rotate (a) [line (radii/1 * 1x0) (radii/2 * 1x0)]
+					rotate (a + (sec / 2)) (levels)
+				]
+			]
+			compose/only [translate (center) (sec-draw)]
 		]
 	]
 
-	window/max-size: 1000x1000
-	; window/available?: func [dir req] [0]
-	window/fill: function [xy1 xy2] [
-		if empty? window/map [append window/map [canvas [offset 0x0 size 0x0]]]
-		geom: window/map/canvas
-		maybe geom/offset: 0x0
-		maybe geom/size: window/max-size
-	]
+	window/content: 'canvas
+
+
+	; window/max-size: 1000x1000
 ]
 
 list-view-ctx: context [
@@ -710,9 +688,6 @@ list-view-ctx: context [
 			anonymize 'item spc
 		]
 
-		roll-timer: make-space 'space [rate: 4]			;-- how often to call `roll` when dragging
-		append map [roll-timer [offset 0x0 size 0x0]]
-		
 		list: make-space 'list [axis: 'y]				;-- list/axis can be changed to get a horizontal list ;@@ but then setup becomes wrong
 		window/map: [list [offset 0x0 size 0x0]]
 
@@ -900,6 +875,7 @@ list-view-ctx: context [
 grid-ctx: context [
 	spaces/cell: make-space/block 'space [
 		map: [space [offset 0x0 size 0x0]]
+		; map/1: make-space/name 'space []
 		cdrawn: none			;-- cached draw block of content to eliminate double redraw - used by row-height? and during draw when extending cell size
 		draw: function [] [
 			unless cdrawn [self/cdrawn: render map/1]
@@ -953,6 +929,7 @@ grid-ctx: context [
 
 		calc-limits: function [] [
 			unless any ['auto = limits/x  'auto = limits/y] [	;-- no auto limit set (but can be none)
+				#debug grid-view [#print "grid/calc-limits [no auto] -> (limits)"]
 				return limits
 			]
 			lim: copy limits
@@ -965,6 +942,8 @@ grid-ctx: context [
 			]
 			if 'auto = lim/x [lim/x: xymax/x]
 			if 'auto = lim/y [lim/y: xymax/y]
+			#assert [all [lim/x lim/y]]
+			#debug grid-view [#print "grid/calc-limits [auto] -> (lim)"]
 			lim
 		]
 
@@ -1092,20 +1071,19 @@ grid-ctx: context [
 			sub-def: func [from n /local r j] [
 				#debug grid-view [#print "sub-def (from) (n) def: (def)"]
 				either integer? def [
-					if n <> sub n sp + def [size: def throw 1]
+					if n <> sub n sp + def [size: def throw 1]	;-- point is within a row/col of default size
 				][											;-- `default: auto` case where each row size is different
 					#assert [array =? heights]
 					repeat j n [
 						size: row-height? from + j
-						if 0 = sub 1 sp + size [size: def throw 1]
+						if 0 = sub 1 sp + size [throw 1]	;-- point is within the last considered row (size is valid)
 					]
 				]
 			]
 
-			size: 0
+			size: none
 			either 1 = len: length? array [					;-- 1 = special case - all cells are of their default size
 				catch [sub-def 0 level]						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
-				size: row-height? whole + 1
 			][
 				keys: sort keys-of array
 				remove find keys 'default
@@ -1129,6 +1107,9 @@ grid-ctx: context [
 					]
 					sub-def key level						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
 				]
+			]
+			unless size [
+				size: either axis = 'x [col-width? 1 + whole][row-height? 1 + whole]	;@@ optimize this?
 			]
 			reduce case [
 				level < size              [['cell   1 + whole level]]
@@ -1191,8 +1172,8 @@ grid-ctx: context [
 				first: get-first-cell xy
 				height1: 0
 				if content: cells/pick first [
-					unless draw-ctx/ccache/:first [			;-- only render if not cached
-						render wrap-space first content		;-- caches drawn content itself
+					unless draw-ctx/ccache/:first [					;-- only render if not cached
+						render wrap-space first content		;-- cell caches drawn content by itself
 					]
 					cspace: get content
 					height1: cspace/size/y
@@ -1229,39 +1210,38 @@ grid-ctx: context [
 		]
 
 		is-cell-pinned?: func [xy [pair!]] [
-			xy = min xy pinned
+			1x1 <> min 1x1 xy - pinned
 		]
 
+		infinite?: does [not all [limits/x limits/y]]
+
 		calc-size: function [] [
-			limits: draw-ctx/limits
-			unless all [limits/x limits/y] [
-				#assert [size]						;-- should be defined before rendering an infinite grid
-				return size - origin		;@@ is this gonna work?
-			]
-			; #assert [all [limits/x limits/y]]		;-- if limits aren't defined - size is infinite
+			#assert [not infinite?]
+			limits: any [draw-ctx/limits cells/size]	;@@ optimize this? cache limits?
 			limits: as-pair limits/x limits/y
 			r: margin * 2 + (spacing * max 0x0 limits - 1)
 			repeat x limits/x [r/x: r/x + col-width?  x]
 			repeat y limits/y [r/y: r/y + row-height? y]
+			#debug grid-view [#print "grid/calc-size -> (r)"]
 			r
 		]
 
 		;-- due to the number of parameters this space has,
 		;-- a special context is required to minimize the number of wasted calculations
+		;-- however a care should be taken so that grid can contain itself (draw has to be reentrant)
 		draw-ctx: context [
-			ccache: make map! 100			;-- cached `cell` spaces (persistency required by the focus model)
-			rcache: make map! 100			;-- marks already rendered multicells, so we don't rerender them every time
+			ccache: make map! []		;-- cached `cell` spaces (persistency required by the focus model: cells must retain sameness)
 			limits: none
 			size:   none
 			cleanup: function [] [
-				self/limits: self/size: none
-				clear rcache
+				self/size: self/limits: none
 				foreach [xy name] ccache [
-					cell-space: get name
-					cell-space/cdrawn: none
+					cspace: get name
+					cspace/cdrawn: none
 					;@@ TODO: clean up cell-spaces themselves that go out of the window
 				]
 			]
+
 		]
 
 		;@@ need to think more about this.. I don't like it
@@ -1269,58 +1249,117 @@ grid-ctx: context [
 			either only [remove/key hcache row][clear hcache]	;-- clear should never be called on big datasets
 			;@@ ccache?
 		]
-; f: does [foreach x [1 2 3] [continue]]
 
+		;@@ TODO: at least for the chosen range, cell/drawn should be invalidated and cell/size recalculated
+		draw-range: function [
+			"Used internally by DRAW. Returns map slice & draw code for a range of cells"
+			cell1 [pair!] cell2 [pair!] start [pair!] "Offset from origin to cell1"
+		][
+			size:  cell2 - cell1 + 1
+			drawn: make [] size: size/x * size/y
+			map:   make [] size * 2
+			done:  make map! size						;-- local to this range of cells
+														;-- sometimes the same mcell may appear in pinned & normal part
+			for cell: cell1 cell2 [
+				cell1-to-cell: either cell/x = cell1/x [	;-- pixels from cell1 to this cell
+					get-offset-from cell1 cell
+				][
+					cell1-to-cell + get-offset-from cell - 1x0 cell		;-- faster to get offset from the previous cell
+				]
+
+				mcell: get-first-cell cell					;-- row/col of multicell this cell belongs to
+				unless mcell-name: cells/pick mcell [continue]	;-- cell is not defined? skip the draw
+				if done/:mcell [continue]					;-- skip mcells that were drawn for this group
+				done/:mcell: true							;-- mark it as drawn
+				
+				pinned?: is-cell-pinned? cell
+				mcell-to-cell: get-offset-from mcell cell	;-- pixels from multicell to this cell
+				draw-ofs: origin + start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
+				
+				mcname: wrap-space mcell mcell-name
+				mcspace: get mcname
+				mcspace/cdrawn: none						;@@ allows grid to contain itself, but may be a resource waste?
+				render mcname								;-- render cell content before getting it's size
+															;-- cell caches it's rendered content by itself
+															;@@ TODO: invalidate this cache in dc/cleanup or somewhere
+				mcsize: cell-size? mcell					;-- size of all rows/cols it spans
+				mcspace/size: mcsize						;-- update cell's size to cover it's rows/cols fully,
+															;-- not just the size of it's content
+				mcdraw: render mcname						;-- re-render (cached) to draw the full background
+				;@@ TODO: if grid contains itself, map should only contain each cell once - how?
+				compose/deep/into [							;-- map may contain the same space if it's both pinned & normal
+					(anonymize 'cell mcspace) [offset (draw-ofs) size (mcsize)]
+				] tail map
+				compose/only/into [							;-- compose-map calls extra render, so let's not use it here
+					translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
+				] tail drawn
+			]
+			reduce [map drawn]
+		]
+
+		;@@ remove origin and infer it from xy1
 		draw: function [/only xy1 xy2] [
+			#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
 			;@@ keep this in sync with `list/draw`
-			; #assert [only]			;@@ TODO: full render mode 
+			#assert [any [not infinite?  all [xy1 xy2]]]	;-- limits must be defined for an infinite grid
+
 			dc: draw-ctx
+			;@@ TODO: only clear dc & map for the outermost draw (in case grid contains itself)
 			dc/cleanup
+			; clear map
+			new-map: make [] 100
+
 			dc/limits: cells/size
 			;-- locate-point calls row-height which may render cells when needed to determine the height
 			default xy1: 0x0
 			unless xy2 [dc/size: xy2: calc-size]
+
+			if 0x0 <> max 0x0 pinned [
+				set [map: drawn-common-header:] draw-range 1x1 pinned (margin + xy1)
+				xy1: (xy0: xy1 + margin) + get-offset-from 1x1 (pinned + 1x1)
+				append new-map map
+			]
+			#debug grid-view [#print "drawing grid from (xy1) to (xy2)"]
+
 			set [cell1: offs1:] locate-point xy1
 			set [cell2: offs2:] locate-point xy2
-			dc/size: any [dc/size  calc-size]
-			unless self/size [maybe self/size: dc/size]
-			clear map
-			r-normal: make [] 100
-			r-pinned: make [] 100
-			rcache: dc/rcache
-			origin-to-cell1: xy1 - offs1
-			xyloop cofs: cell2 - cell1 + 1 [
-				cell: cell1 - 1 + cofs
-				cell1-to-cell: either cofs/x = 1 [			;-- pixels from left top cell to this cell
-					get-offset-from cell1 cell
-				][	cell1-to-cell + get-offset-from cell - 1x0 cell
-				]
+			all [none? dc/size  not infinite?  dc/size: calc-size]
+			; unless self/size [maybe self/size: dc/size]
+			maybe self/size: dc/size
 
-				mcell: get-first-cell cell					;-- row/col of multicell this cell belongs to
-				unless mcell-content-name: cells/pick mcell [continue]	;-- cell is not defined? skip the draw
-				if rcache/:mcell [continue]					;-- don't redraw already drawn multi-cells (marked as true below)
-				mcell-to-cell: get-offset-from mcell cell	;-- pixels from multicell to this cell
-				pinned?: is-cell-pinned? cell
-				start: origin-to-cell1 + either pinned? [0x0][origin]
-				draw-ofs: start + cell1-to-cell - mcell-to-cell		;-- pixels from 0x0 to the draw box of this cell
-				render mcname: wrap-space mcell mcell-content-name	;-- render cell content before getting it's size
-				mcspace: get mcname
-				mcsize: cell-size? mcell					;-- size of all rows/cols it spans
-				mcspace/size: mcsize						;-- update cell's size to cover rows/cols fully
-				mcdraw: render mcname						;-- re-render (cached) to draw the full background
-				compose/deep/into [
-					(anonymize 'cell mcspace) [offset (draw-ofs) size (mcsize)]
-					; (cells/pick mcell) [offset (draw-ofs) size (mcsize)]	;-- version without cell/
-				] tail map
-				compose/only/into [							;-- compose-map calls extra render, so let's not use it here
-					translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
-				] tail either pinned? [r-pinned][r-normal]
-				rcache/:mcell: true							;-- mark it as drawn (so the same multi-cell won't be drawn again)
+			if pinned/x > 0 [
+				set [map: drawn-row-header:] draw-range
+					(1 by cell1/y) (pinned/x by cell2/y)
+					xy0/x by (xy1/y - offs1/y)
+				append new-map map
 			]
-			normal-ofs: origin + margin + get-offset-from 1x1 1x1 + pinned
- 			compose/only/deep [
-				(r-pinned)
-				clip (normal-ofs) (xy2) (r-normal)
+			if pinned/y > 0 [
+				set [map: drawn-col-header:] draw-range
+					(cell1/x by 1) (cell2/x by pinned/y)
+					(xy1/x - offs1/x) by xy0/y
+				append new-map map
+			]
+
+			set [map: drawn-normal:] draw-range cell1 cell2 (xy1 - offs1)
+			append new-map map
+			;-- note: draw order (common -> headers -> normal) is important
+			;-- because map will contain intersections and first listed spaces are those "on top" from hittest's POV
+			;-- as such, map doesn't need clipping, but draw code does
+
+			append clear self/map new-map				;-- this trick allows grid to contain itself
+ 			reshape [
+				;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
+				clip  0x0         !(xy1)            !(drawn-common-header)	/if drawn-common-header
+				clip !(xy1 * 1x0) !(xy2/x by xy1/y) !(drawn-col-header)		/if drawn-col-header
+				clip !(xy1 * 0x1) !(xy1/x by xy2/y) !(drawn-row-header)		/if drawn-row-header
+				clip !(xy1)       !(xy2)            !(drawn-normal)
+			]
+		]
+
+		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
+			switch to word! word [
+				;@@ TODO: think on what other words incur cache invalidation
+				cells [draw-ctx/cleanup]			;-- cache becomes invalid
 			]
 		]
 	]
@@ -1343,7 +1382,21 @@ grid-view-ctx: context [
 			]
 		]
 
-		grid: make-space 'grid []
+		grid: make-space 'grid [
+			available?: function [axis dir from [integer!] requested [integer!]] [	;@@ should `available?` be in *every* grid? (as a placeholder word)
+				r: case [
+					dir < 0 [from]
+					limits/:axis [
+						size: calc-size		;@@ optimize calc-size?
+						size/:axis - from
+					]
+					'infinite [requested]
+				]
+				r: clip [0 r] requested
+				#debug grid-view [#print "avail?/(axis) (dir) = (r) of (requested)"]
+				r
+			]
+		]
 		grid-cells: :grid/cells
 		grid/cells: func [/pick xy [pair!] /size] [
 			either pick [
@@ -1361,47 +1414,12 @@ grid-view-ctx: context [
 			anonymize 'item spc
 		]
 
-		roll-timer: make-space 'space [rate: 4]			;-- how often to call `roll` when dragging
-		append map [roll-timer [offset 0x0 size 0x0]]
-		
-		window/map: [grid [offset 0x0 size 0x0]]
-
-		window/max-size: 10000x10000		;@@ this is where sizing strategy would be cool to have
-
-		window/available?: function [dir [word!] requested [integer!]] [
-			x: select [n y s y e x w x] dir
-			r: switch dir [
-				n w [max 0 negate grid/origin/:x]
-				s e [
-					either grid/limits/:x [
-						r: grid/origin - window/size + grid/calc-size	;@@ optimize calc-size?
-						r/:x
-					][
-						requested
-					]
-				]
-			]
-			r: min r requested
-			#debug grid-view [#print "avail? (dir) = (r) of (requested)"]
-			r
-		]
-
-		window/fill: function [xy1 [pair!] xy2 [pair!]] [
-			#debug grid-view [#print "grid window fill (xy1) - (xy2)"]
-			geom: window/map/grid
-			jump: geom/offset
-			grid/origin: grid/origin + jump
-			geom/offset: 0x0
-			unless grid/size [render 'grid]
-			geom/size: min window/max-size grid/size
-			render/only 'grid xy1 xy2			;-- should be rendered after(!) origin is set
-		]
+		window/content: 'grid
 
 		setup: function [] [
-			if size [									;-- if size is defined, adjust the window
-				pages: 10x10							;@@ make this configurable?
-				; pages: 3x3							;@@ make this configurable?
-				maybe window/max-size: size * pages
+			if size [
+				;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
+				;@@ situation when jump clears a part of a viewport should never happen at runtime
 				maybe self/jump-length: min size/x size/y
 			]
 		]
@@ -1409,6 +1427,7 @@ grid-view-ctx: context [
 		inf-scrollable-draw: :draw
 		draw: function [] [
 			setup
+			; grid/origin: self/origin		;@@ maybe remove grid/origin and make it inferred from /only xy1 ?
 			inf-scrollable-draw
 		]
 	]
@@ -1443,133 +1462,6 @@ button-ctx: context [
 ]
 
 
-table-ctx: context [
-	;@@ TODO: func to automatically balance column widths to minimize table height
-	; balance: function [] 
-
-	spaces/table-row: make-space/block 'list [
-		spacing: 4x3
-		margin: 0x0
-		data: none
-		table: none				;-- should be set by the table
-
-		make-layout: has [r] [
-			r: make row-layout [
-				pinned: table/pinned/x
-				widths: table/widths
-				axis: 'x
-			]
-			r/axis:    axis
-			r/margin:  margin
-			r/spacing: spacing
-			r
-		]
-
-		;@@ TODO: unify this with data-view block variant somehow
-		fill: function [] [
-			#assert [block? data]
-			n: length? data
-			repeat i n [
-				value: :data/:i
-				unless item: items/:i [
-					append items item: anonymize 'item make-space 'data-view []
-				]
-				item: get item
-				maybe item/width: table/widths/:i
-				set/any 'item/data :value
-				item/set-content
-			]
-			clear skip items n
-		]
-
-		list-draw: :draw
-		draw: function [] [
-			fill		;@@ TODO: caching
-			list-draw
-		]
-	]
-
-	;@@ TODO: spacers between pinned and not pinned data
-	spaces/table: make-space/block 'list [
-		pinned: 0x1							;-- pinned columns x rows (headers)
-		margin: 0x0	
-		data-columns: [1 2]					;-- indexes of visible DATA columns in the order of appearance
-		;-- NOTE: don't use #() here because it's ignored by copy/deep
-		widths: make map! [1 100 2 100]		;-- data column index -> it's visible width
-		axis: 'y
-
-		source: []										;-- block of blocks or a function returning one
-		;-- user can override `data` for more complex `source` layouts support
-		data: function [/pick x [integer!] y [integer!] /size] [
-			s: source									;-- eval in case it's a function
-			case [
-				pick [if row: s/:y [row/:x]]			;-- s/:y can be `none`
-				empty? s [0x0]
-				'else [
-					#assert [block? s/1]
-					as-pair  length? s/1  length? s
-				]
-			]
-		]
-
-		prep-data-row: function [
-			"preps data row for display, independent of `source` format"
-			y [integer!]
-		][
-			dsize: data/size
-			if any [y <= 0  y > dsize/y] [return none]	;-- out of data limits case
-			ncol: length? data-columns
-			if 0 = ncol [return []]						;-- empty row case (no allocation needed)
-
-			;@@ TODO: make a free list of blocks for this
-			r: make [] ncol
-			repeat x ncol [append/only r data/pick data-columns/:x y]	;@@ should be map-each, but it's slow
-			r
-		]
-
-		headers: make-space 'list-view [hscroll/size/y: 0]
-		columns: make-space 'list-view []
-		headers/data: func [/pick i /length] [
-			either pick
-				[prep-data-row i]
-				[min pinned/y second data/size]
-		]
-		columns/data: func [/pick i /length] [
-			either pick
-				[prep-data-row i + pinned/y]
-				[max 0 (second data/size) - pinned/y]
-		]
-		headers/wrap-data:
-		columns/wrap-data: function [item-data [block!]] [
-			anonymize 'row make-space 'table-row compose/only [table: (self) data: (item-data)]
-		]
-
-		items: [headers columns]
-
-		list-draw: :draw
-		draw: function [] [
-			maybe headers/origin: as-pair columns/origin/x headers/origin/y	;-- sync origin/x
-			; headers/invalidate
-			; columns/invalidate
-			render 'headers
-			render 'columns
-			;-- don't let headers occupy more than half of height
-			maybe headers/size: min headers/list/size size / 1x2 - (margin * 2x1)
-			maybe columns/size: size - (headers/size * 0x1) - (margin * 2x2) - (spacing * 0x1)
-			list-draw
-		]
-
-		;@@ do this as a function called inside draw!
-		; on-change*: function [word old [any-type!] new [any-type!]] [
-		; 	if word = 'dimensions [						;-- automatically show just added columns
-		; 		#assert [pair? :old]
-		; 		#assert [pair? :new]
-		; 		set-quiet 'columns union columns rng: range old/x new/x
-		; 		foreach i rng [widths/:i: 100]			;@@ externalize the default width?
-		; 	]
-		; ]
-	]
-]
 
 spaces/rotor: make-space/block 'space [
 	content: none
@@ -1668,7 +1560,7 @@ spaces/spiral: make-space/block 'space [
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
 
-	into: func [xy [pair!] /force name] [
+	into: function [xy [pair!] /force name] [
 		;@@ TODO: unify this with `draw` code somehow
 		r: field/para/layout
 		#assert [r]
@@ -1712,27 +1604,27 @@ spaces/spiral: make-space/block 'space [
 		rmid: full/y / -2 + absolute p/y	;-- radius of the middle line of the string
 		wavg: full/x / len					;-- average char width
 		p: p - (wavg / 2)					;-- offset the typesetter to center the average char
-		collect/into [
-			;@@ TODO: initial angle
-			keep compose [translate (size / 2)]
-			repeat i len [			;@@ should be for-each [/i c]
-				c: text/:i
-				bgn: caret-to-offset r i
-				cycles: bgn/x / 2 / pi / rmid
-				scale: decay ** cycles
-				box: []
-				if all [field/active?  i - 1 = field/caret-index] [
-					box: compose [box (p) (p + as-pair field/caret-width full/y)]
-				]
-				keep compose/deep [
-					push [
-						rotate (cycles * 360)
-						scale (scale) (scale)
-						(box)
-						text (p) (form c)
-					]
-				]
+		render: clear []		;@@ this is a bug, really
+		;@@ TODO: initial angle
+		append render compose [translate (size / 2)]
+		repeat i len [			;@@ should be for-each [/i c]
+			c: text/:i
+			bgn: caret-to-offset r i
+			cycles: bgn/x / 2 / pi / rmid
+			scale: decay ** cycles
+			box: []
+			if all [field/active?  i - 1 = field/caret-index] [
+				box: compose [box (p) (p + as-pair field/caret-width full/y)]
 			]
-		] clear []		;@@ this is a bug, really
+			compose/deep/into [
+				push [
+					rotate (cycles * 360)
+					scale (scale) (scale)
+					(box)
+					text (p) (form c)
+				]
+			] tail render
+		]
+		render
 	]
 ]

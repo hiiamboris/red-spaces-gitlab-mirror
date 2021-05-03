@@ -6,6 +6,8 @@ Red [
 
 #include %../common/assert.red
 
+by: make op! :as-pair
+
 ;-- we need this to be able to call event functions recursively with minimum allocations
 ;-- we can't use a static block but we can use one block per recursion level
 block-stack: object [
@@ -24,11 +26,28 @@ range: func [a [integer!] b [integer!]] [
 	collect [while [a <= b] [keep a  a: a + 1]]
 ]
 
+;-- `clip [a b] v` is far easier to understand than `max a min b v`
+clip: func [range [block!] value [scalar!]] [
+	range: reduce range
+	#assert [any [not number? range/1  range/1 <= range/2]]
+	min range/2 max range/1 value
+]
 
-for: func ['word [word! set-word!] i1 [integer!] i2 [integer!] code [block!]] [
-	if i2 < i1 [exit]			;@@ return none or unset? `while` return value is buggy anyway
-	set word i1 - 1
-	while [i2 >= set word 1 + get word] code
+
+for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code [block!]] [
+	either all [integer? i1 integer? i2] [
+		if i2 < i1 [exit]			;@@ return none or unset? `while` return value is buggy anyway
+		set word i1 - 1
+		while [i2 >= set word 1 + get word] code
+	][
+		#assert [all [pair? i1 pair? i2]]
+		range: i2 - i1 + 1
+		if 1x1 <> min 1x1 range [exit]
+		xyloop i: range [
+			set word i - 1 + i1		;@@ does not allow index changes within the code, but allows in integer part above
+			do code
+		]
+	]
 ]
 
 ;-- debug func
@@ -47,6 +66,10 @@ dump-event: function [event] [
 	            -1x-1 = max -1x-1 b - a <=> B is in Q3 to A, axis-exclusive <=> A is in Q1 to B, axis-exclusive
 	a = min a b <=> b = max a b   
 }
+
+;@@ need good names to use these 'shortcuts' :(
+; down-right-from?: make op! func [b [pair!] a [pair!]] [1x1 = min 1x1 b - a]
+; down-right-inclusive-from?: 
 
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs

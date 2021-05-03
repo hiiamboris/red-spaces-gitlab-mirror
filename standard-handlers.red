@@ -110,16 +110,22 @@ define-handlers [
 	]
 
 	;-- *************************************************************************************
-	;@@ this should be inf-scrollable and list-view extend it
-	list-view: extends 'scrollable [
-		on-down     [space path event] [if update? [space/roll]]
-		on-key-down [space path event] [if update? [space/roll]]
+	;@@ TODO: when dragging and roll succeeds, the canvas jumps
+	;@@       need to update drag-parameter from `roll` or something..
+	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
+		on-down     [space path event] [if update? [space/roll]]	;-- after button clicks
+		on-key-down [space path event] [if update? [space/roll]]	;-- during key holding
 		roll-timer: [
-			on-time [space path event delay] [
+			on-time [space path event delay] [			;-- during scroller dragging
 				space: get path/-1
-				space/roll
+				if space/roll [update]
 			]
 		]
+	]
+
+	;-- *************************************************************************************
+	list-view: extends 'inf-scrollable [
+		;@@ just a temporary collapsing test - remove it later!
 		list: [
 			item: [
 				on-click [space path event] [
@@ -135,7 +141,8 @@ define-handlers [
 		columns: extends 'list-view []
 	]
 
-	grid-view: extends 'list-view []
+	;-- *************************************************************************************
+	grid-view: extends 'inf-scrollable []
 
 	;-- *************************************************************************************
 	button: [

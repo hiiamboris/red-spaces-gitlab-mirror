@@ -2,7 +2,7 @@ Red []
 
 #include %../common/debug.red
 #debug on
-; #debug set focus
+; #debug set events
 ; #debug set grid-view
 
 #debug [
@@ -12,13 +12,15 @@ Red []
 #include %../common/expect.red
 #include %../common/setters.red
 ; #include %../common/composite.red
+#include %../common/relativity.red
 #include %../common/print-macro.red
 #include %../common/error-macro.red
 #include %../common/clock.red
-#include %../common/clock-each.red
+#include %../common/profiling.red
 #include %../common/extremi.red
 #include %../common/map-each.red
 #include %../common/xyloop.red
+#include %../common/modulo.red
 #include %../common/with.red
 #include %../common/catchers.red
 #include %../common/is-face.red

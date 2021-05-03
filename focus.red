@@ -6,7 +6,7 @@ Red [
 
 
 ;-- provides focusing by clicking
-;-- requires: is-face?
+;-- requires: is-face? and window-of
 
 ;@@ rename this!? e.g. focus/current instead of keyboard/focus?
 ;@@ `focus` itself should be somewhere else, as it is used by dispatch and who knows what
@@ -94,7 +94,12 @@ focus-space: function [
 		foreach name path [								;-- if faces are provided, find the innermost one
 			either is-face? f: get name [face: f][break]
 		]
-		if face [set-focus face]						;-- ..and focus it
+		if face [										;-- ..and focus it
+			set-focus face
+			unless system/view/auto-sync? [
+				show window-of face						;-- otherwise keys won't be detected
+			]
+		]
 		keyboard/focus: copy path						;-- copy since the path is static
 
 		events/do-previewers path none 'on-focus				;-- pass none as 'event' since we don't have any

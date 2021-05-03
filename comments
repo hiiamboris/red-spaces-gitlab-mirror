@@ -475,6 +475,10 @@ grid cells array models
 		possible to pick from an infinite data array
 		no need to pre-fill cells spaces, can be done as they are rendered (but should be cached)
 		works for truly infinite data - best argument in favor of it
+tricks of grid containing itself in each cell
+	draw-ctx and ccache can (and should) be shared between inner and outer renders
+	and should only be invalidated before the outermost render
+	no static lists should be used in draw
 
 
 Timer design:
@@ -1600,4 +1604,195 @@ from events/dispatch - causes stack overflow and crashes as expected (when UI la
 ; if commands/update? [
 ; 	face/draw: render face
 ; 	do-events/no-wait
+; ]
+
+this window model was too convoluted to work with
+; last-origin: last-size: none							;-- geometry during previous call to `renew`
+; renew: function [] [
+; 	unless all [last-origin last-size = max-size] [		;-- first ever invocation or size changed
+; 		self/last-origin: origin
+; 		self/last-size: max-size
+; 		fill 0x0 max-size
+; 		exit
+; 	]
+; 	if 0x0 = offset: origin - last-origin [exit]		;-- has not been moved
+; 	self/last-origin: origin
+; 	unless caching? [
+; 		clear map
+; 		fill 0x0 max-size
+; 		exit
+; 	]
+
+; 	remove-each [name geom] map [				;-- clear the map of invisible spaces
+; 		o: geom/offset: geom/offset + offset	;-- and relocate visible ones
+; 		not bbox-overlap?  0x0 max-size  o o + geom/size
+; 	]
+; 	case [										;-- fill top/bottom before left/right (random decision)
+; 		offset/y > 0 [fill  0x0  as-pair max-size/x top: offset/y]
+; 		offset/y < 0 [fill  as-pair 0 btm: max-size/y + offset/y  max-size]
+; 	]
+; 	default top: 0
+; 	default btm: max-size/y
+; 	case [										;-- left/right excludes already drawn top/bottom regions
+; 		offset/x > 0 [fill  as-pair 0 top  as-pair offset/x btm]
+; 		offset/x < 0 [fill  as-pair max-size/x + offset/x top  as-pair max-size/x btm]
+; 	]
+; ]
+; draw: function [/only xy1 [pair!] xy2 [pair!]] [
+; 	old-origin: origin							;-- renew may change origin, in which case we don't wanna miss the viewport
+; 	renew
+; 	either only [
+; 		visible: []
+; 		foreach [name geom] map [				;@@ should be map-each
+; 			if bbox-overlap? 0x0 max-size xy1 xy2 [append visible name]
+; 		]
+; 		r: compose-map/only/limits map visible xy1 - old-origin xy2 - old-origin
+; 		clear visible							;-- let GC free it up
+; 	][
+; 		r: compose-map map
+; 	]
+; 	self/size: either empty? map [
+; 		0x0
+; 	][
+; 		item-last: last map
+; 		min max-size item-last/offset + item-last/size
+; 	]
+; 	r
+
+(dispatch) this was supposed to provide real time updates but due to #4881 totally blocked the UI
+; if commands/update? [
+; 	face/draw: render face
+; 	;@@ TODO: fix the lag once #4881 gets a solution
+; 	do-atomic [									;-- uses reactivity to unroll the recursion and prevent stack overflow
+; 		do-events/no-wait						;@@ this still does not prevent GUI huge lags :(
+; 	]
+; ]
+
+now that there's proper grid-view, this list of lists hack is not needed anymore
+; table-ctx: context [
+; 	;@@ TODO: func to automatically balance column widths to minimize table height
+; 	; balance: function [] 
+
+; 	spaces/table-row: make-space/block 'list [
+; 		spacing: 4x3
+; 		margin: 0x0
+; 		data: none
+; 		table: none				;-- should be set by the table
+
+; 		make-layout: has [r] [
+; 			r: make row-layout [
+; 				pinned: table/pinned/x
+; 				widths: table/widths
+; 				axis: 'x
+; 			]
+; 			r/axis:    axis
+; 			r/margin:  margin
+; 			r/spacing: spacing
+; 			r
+; 		]
+
+; 		;@@ TODO: unify this with data-view block variant somehow
+; 		fill: function [] [
+; 			#assert [block? data]
+; 			n: length? data
+; 			repeat i n [
+; 				value: :data/:i
+; 				unless item: items/:i [
+; 					append items item: anonymize 'item make-space 'data-view []
+; 				]
+; 				item: get item
+; 				maybe item/width: table/widths/:i
+; 				set/any 'item/data :value
+; 				item/set-content
+; 			]
+; 			clear skip items n
+; 		]
+
+; 		list-draw: :draw
+; 		draw: function [] [
+; 			fill		;@@ TODO: caching
+; 			list-draw
+; 		]
+; 	]
+
+; 	;@@ TODO: spacers between pinned and not pinned data
+; 	spaces/table: make-space/block 'list [
+; 		pinned: 0x1							;-- pinned columns x rows (headers)
+; 		margin: 0x0	
+; 		data-columns: [1 2]					;-- indexes of visible DATA columns in the order of appearance
+; 		;-- NOTE: don't use #() here because it's ignored by copy/deep
+; 		widths: make map! [1 100 2 100]		;-- data column index -> it's visible width
+; 		axis: 'y
+
+; 		source: []										;-- block of blocks or a function returning one
+; 		;-- user can override `data` for more complex `source` layouts support
+; 		data: function [/pick x [integer!] y [integer!] /size] [
+; 			s: source									;-- eval in case it's a function
+; 			case [
+; 				pick [if row: s/:y [row/:x]]			;-- s/:y can be `none`
+; 				empty? s [0x0]
+; 				'else [
+; 					#assert [block? s/1]
+; 					as-pair  length? s/1  length? s
+; 				]
+; 			]
+; 		]
+
+; 		prep-data-row: function [
+; 			"preps data row for display, independent of `source` format"
+; 			y [integer!]
+; 		][
+; 			dsize: data/size
+; 			if any [y <= 0  y > dsize/y] [return none]	;-- out of data limits case
+; 			ncol: length? data-columns
+; 			if 0 = ncol [return []]						;-- empty row case (no allocation needed)
+
+; 			;@@ TODO: make a free list of blocks for this
+; 			r: make [] ncol
+; 			repeat x ncol [append/only r data/pick data-columns/:x y]	;@@ should be map-each, but it's slow
+; 			r
+; 		]
+
+; 		headers: make-space 'list-view [hscroll/size/y: 0]
+; 		columns: make-space 'list-view []
+; 		headers/data: func [/pick i /length] [
+; 			either pick
+; 				[prep-data-row i]
+; 				[min pinned/y second data/size]
+; 		]
+; 		columns/data: func [/pick i /length] [
+; 			either pick
+; 				[prep-data-row i + pinned/y]
+; 				[max 0 (second data/size) - pinned/y]
+; 		]
+; 		headers/wrap-data:
+; 		columns/wrap-data: function [item-data [block!]] [
+; 			anonymize 'row make-space 'table-row compose/only [table: (self) data: (item-data)]
+; 		]
+
+; 		items: [headers columns]
+
+; 		list-draw: :draw
+; 		draw: function [] [
+; 			maybe headers/origin: as-pair columns/origin/x headers/origin/y	;-- sync origin/x
+; 			; headers/invalidate
+; 			; columns/invalidate
+; 			render 'headers
+; 			render 'columns
+; 			;-- don't let headers occupy more than half of height
+; 			maybe headers/size: min headers/list/size size / 1x2 - (margin * 2x1)
+; 			maybe columns/size: size - (headers/size * 0x1) - (margin * 2x2) - (spacing * 0x1)
+; 			list-draw
+; 		]
+
+; 		;@@ do this as a function called inside draw!
+; 		; on-change*: function [word old [any-type!] new [any-type!]] [
+; 		; 	if word = 'dimensions [						;-- automatically show just added columns
+; 		; 		#assert [pair? :old]
+; 		; 		#assert [pair? :new]
+; 		; 		set-quiet 'columns union columns rng: range old/x new/x
+; 		; 		foreach i rng [widths/:i: 100]			;@@ externalize the default width?
+; 		; 	]
+; 		; ]
+; 	]
 ; ]

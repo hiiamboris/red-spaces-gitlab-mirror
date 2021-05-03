@@ -21,6 +21,7 @@ system/view/VID/styles/host: [
 		space: none
 		flags: 'all-over							;-- else 'over' events won't make sense over spaces
 		rate: 100									;-- for space timers to work
+		dirty?: no
 	]
 	init: [init-spaces-tree face]
 ]
@@ -133,7 +134,7 @@ events: context [
 					;@@ does not receive delay [percent!] - but should it?
 					opt [/local to end]
 				]
-				(?? handler  none)
+				(source handler  none)
 			]
 			"invalid handler spec"
 		]
@@ -366,7 +367,14 @@ events: context [
 				; focus unfocus ;-- generated internally by focus.red
 				time [
 					on-time face event						;-- handled by timers.red
-					none
+					if commands/update? [face/dirty?: yes]
+					if face/dirty? [						;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
+						face/dirty?: no
+						face/draw: render face
+						unless system/view/auto-sync? [show face]
+					]
+					; none
+					exit									;-- timer does not need further processing
 				]
 				;@@ TODO: simulated hover-in and hover-out events to highlight items when hovering
 				;@@ TODO: `enter` should be simulated because base face does not support it
@@ -381,13 +389,7 @@ events: context [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
 				process-event path event focused?
 			]
-			if commands/update? [
-				face/draw: render face
-				;@@ TODO: fix the lag once #4881 gets a solution
-				; do-atomic [									;-- uses reactivity to unroll the recursion and prevent stack overflow
-				; 	do-events/no-wait						;@@ this still does not prevent GUI huge lags :(
-				; ]
-			]
+			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
 		]
 	]
 
@@ -469,7 +471,7 @@ events: context [
 		path [path! block!]
 		/with param [any-type!] "Attach any data to the dragging state"
 	][
-		#debug events [if dragging? #print "WARNING: Dragging override detected: (drag-path)->(path)"]
+		#debug events [if dragging? [#print "WARNING: Dragging override detected: (drag-path)->(path)"]]
 		#debug events [#print "Starting drag on [(copy/part path -99) | (path)] with (:param)"]
 		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]

@@ -8,7 +8,9 @@ Red [
 ;-- requires auxi.red (block-stack)
 
 ;-- tree iteration support
-context [
+traversal: context [
+	depth-limit: 100									;-- used to prevent stack from overflowing in recursive layouts
+
 	reuse-path: function ['target [word!]][
 		blk: get target
 		set target either path? :blk/1 [				;-- reuse existing paths to minimize allocations
@@ -34,7 +36,10 @@ context [
 	list-spaces*: function [root [path!] "will be modified" target [block!]] [
 		path: reuse-path target
 		append path head root								;-- insert current path
-		if map: select get root/1 'map [					;-- insert child paths
+		if all [
+			map: select get root/1 'map						;-- insert child paths
+			depth-limit > length? head root
+		][
 			root: next root
 			foreach [name _] map [
 				change root name
