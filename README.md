@@ -6,7 +6,7 @@
 |---|---|---|
 | ![](https://i.gyazo.com/74d4e22f7480bda9f5c2df8e11c6bfb5.gif) | ![](https://i.gyazo.com/5f16371407967a41e16bb6f601201a70.gif) | ![](https://i.gyazo.com/856724cebae6a5967a9eb96142dd35de.gif) |
 
->> [MORE DEMOS IN /TESTS](tests/) <<
+\>\> [MORE DEMOS IN /TESTS](tests/) <<
 
 Layouts currently look like this (needs more design & Parse work to make it on par with View layout):
 
