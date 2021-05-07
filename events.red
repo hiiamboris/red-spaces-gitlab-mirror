@@ -5,7 +5,7 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack), error-macro.red
+;-- requires auxi.red (block-stack), error-macro.red, layout.red
 
 
 
@@ -25,56 +25,6 @@ system/view/VID/styles/host: [
 	]
 	init: [init-spaces-tree face]
 ]
-
-
-;@@ make it internal?
-init-spaces-tree: function [face [object!]] [
-	unless spec: select face/actors 'worst-actor-ever [exit]
-	face/actors/worst-actor-ever: none
-	#assert [function? :spec]
-	spec: body-of :spec
-	if empty? spec [exit]
-	tree-from: function [spec [block!]] [
-		r: copy []
-		while [not empty? spec] [
-			name: spec/1  spec: next spec
-			#assert [word? name]		;@@ TODO: normal error handling here
-			#assert [spaces/:name  'name]
-			name: make-space/name name []
-			append r name
-			space: get name
-			if spec/1 = 'with [		;-- reserved keyword
-				blk: spec/2
-				#assert [block? blk]
-				spec: skip spec 2
-				do bind blk space
-			]
-			if block? blk: spec/1 [		;@@ TODO: sizes data and whatever else to make this on par with `layout`
-				spec: next spec
-				inner: tree-from blk
-				unless empty? inner [
-					case [		;@@ this is all awkward adhoc crap - need to generalize it!
-						t: in space 'content [space/content: inner/1]
-						t: in space 'items   [append space/items inner]
-						'else [ERROR "do not know how to add spaces to (name)"]
-					]
-				]
-			]
-		]
-		r
-	]
-	tree: tree-from spec
-	#assert [any [1 >= length? tree]]
-	face/space: tree/1
-	render face					;@@ required to populate `map`s & get the size
-	new-size: select get face/space 'size
-	#assert [new-size]			;-- `size: none` blows up `layout`
-	face/size: new-size
-]
-
-
-;@@ TODO: a separate host-based style for each high level space
-;@@ also combine them faces and spaces in one object! or not? `draw` will prove difficult, but we can rename it to render
 
 
 ;-- event function that pushes events over to each space
@@ -362,16 +312,18 @@ events: context [
 				]
 				key key-down key-up enter [
 					focused?: yes							;-- event should not be detected by parent spaces
-					keyboard/focus
+					if empty? f: keyboard/focus [			;-- when focused by `set-focus`, keyboard/focus is not set, also see #3808 numerous bugs
+						keyboard/focus: f: as f path-from-face face
+					]
+					f
 				]
 				; focus unfocus ;-- generated internally by focus.red
 				time [
 					on-time face event						;-- handled by timers.red
-					if commands/update? [face/dirty?: yes]
-					if face/dirty? [						;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
-						face/dirty?: no
+					if any [commands/update? face/dirty?] [	;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
 						face/draw: render face
-						unless system/view/auto-sync? [show face]
+						face/dirty?: no
+						unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 					]
 					; none
 					exit									;-- timer does not need further processing
@@ -387,6 +339,7 @@ events: context [
 			#debug events [print ["dispatch path:" path]]
 			if path [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
+				#assert [any [not empty? path  event/away?]]	;-- empty when hovering out of the host (away = true)
 				process-event path event focused?
 			]
 			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer

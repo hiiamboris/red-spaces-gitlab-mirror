@@ -4,7 +4,19 @@ During development, I've created a number of test scripts, which help me debug t
 
 These scripts are not meant to be templates you can just grab and extend, but until I make templates it will be the closest thing.
 
-Screenshots show the expected result.
+Screenshots show the expected behavior.
+
+To try out any of the tests:
+1. clone the repository:
+```
+git clone https://gitlab.com/hiiamboris/red-mezz-warehouse common
+git clone https://gitlab.com/hiiamboris/red-spaces
+```
+2. run any test:
+```
+cd red-spaces/tests
+red <test-name.red>
+```
 
 ## Common tests
 
