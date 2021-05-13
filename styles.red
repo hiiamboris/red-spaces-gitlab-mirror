@@ -9,6 +9,7 @@ Red [
 current-style: as path! []	;-- used as a stack during draw composition
 
 do with [
+	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
 	svmc: system/view/metrics/colors
 	svf:  system/view/fonts
 	serif-12: make font! [name: svf/serif size: 12]
@@ -34,36 +35,27 @@ do with [
 	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
 	set 'styles reshape [		;-- styles come before the main drawing code
 		host [[
-			pen      !(svmc/text)
+			pen off
 			fill-pen !(svmc/panel)
 			font !(make font! [name: svf/system size: svf/size])
 			line-width 2
+			box 0x0 (size)		;-- makes host background opaque otherwise it loses mouse clicks on most of it's part
+			pen !(svmc/text)
 		]]
-		; paragraph [pen green]
-		; list [pen green]
-		; thumb [(probe self/size/x: 30 ()) pen blue]
-		; back-arrow [(self/size: 30x30)]
-		; hscroll [(self/size/y: 30 ())]
-		; vscroll [(self/size/x: 30 ())]
-		paragraph [[
-			;-- font can be set in the style!:
-			;-- but impossible to debug it, as probe draw lists font with thousands of parents
-			; (self/font: serif-12 ())			;@@ #3804 - requires self/ or won't work
-			pen blue
-		]]
-		; list-view/item/paragraph [pen blue]
-		list/item [[pen cyan]]
-		; button [[
-		; 	; fill-pen (pushed? | (svmc/text + 0.0.0.120) | 'off)
-		; 	; fill-pen (pushed? |y (svmc/text + 0.0.0.120) |n 'off)
-		; 	fill-pen (either pushed? [svmc/text + 0.0.0.120]['off])
-		; 		; [pattern 4x4 [pen off fill-pen black box 0x0 2x2 box 2x2 4x4]]	;@@ not working, #4828
+
+		; paragraph [[
+		; 	;-- font can be set in the style!:
+		; 	;-- but impossible to debug it, as probe draw lists font with thousands of parents
+		; 	; (self/font: serif-12 ())			;@@ #3804 - requires self/ or won't work
+		; 	pen blue
 		; ]]
+
+		; list/item [[pen cyan]]
+
 		button [
 			function [btn] [
 				drawn: btn/draw
 				bgnd: either btn/pushed? [svmc/text + 0.0.0.120]['off]
-				unset 'focus
 				if focused? [
 					focus: compose/deep [
 						line-width 1
@@ -71,52 +63,18 @@ do with [
 				        ; pen pattern 6x6 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0 12x12 fill-pen (svmc/panel) box 3x0 9x3 box 3x9 9x12 box 0x3 3x9 box 9x3 12x9]
 				        pen pattern 4x4 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0  8x8  fill-pen (svmc/panel) box 1x0 5x1 box 1x5 5x8  box 0x1 1x5 box 5x1  8x5]
 				        ; pen pattern 2x2 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0  4x4  fill-pen (svmc/panel) box 1x0 3x1 box 1x3 3x4  box 0x1 1x3 box 3x1  4x3]
-						box 3x3 (btn/size - 3)
+						box 4x4 (btn/size - 4) (max 0 btn/rounding - 2)
 					]
 				]
 				compose/only [
+					; shadow 2x4 5 0 (green)			;@@ not working - see #4895; not portable (Windows only)
 					fill-pen (bgnd)
 					push (drawn)
-					(:focus)
+					(any [focus ()])
 				]
-				; [pattern 4x4 [pen off fill-pen black box 0x0 2x2 box 2x2 4x4]]	;@@ not working, #4828
 			]
 		]
-		; table [[
-		; 	; fill-pen (svmc/text + 0.0.0.120)
-		; 	box 0x0 (size)
-		; ]]
-		; table/headers/list [[
-		; 	fill-pen !(svmc/text + 0.0.0.120)
-		; 	pen off
-		; 	box 0x0 (size)
-		; ]]
-		; table/columns/list [[
-		; 	fill-pen !(svmc/text + 0.0.0.200)
-		; 	pen off
-		; 	box 0x0 (size)
-		; ]]
-		; table/headers/list/row/item
-		; table/columns/list/row/item [[
-		; 	fill-pen !(svmc/panel)
-		; 	pen off
-		; 	box 0x0 (size)
-		; ]]
 
-		;@@ this here is a bit tricky: dunno how to better solve it
-		;@@ finite grid is not wrapped into a grid-view, but it also doesn't have the size
-		;@@ problem with this is that both styles apply and the color is too dark
-		;@@ but then maybe they shouldn't have the same style anyway... need to think
-		; grid [[
-		; 	fill-pen !(svmc/text + 0.0.0.120)
-		; 	pen off
-		; 	box 0x0 (any [size 0x0])		;-- size=none if infinite
-		; ]]
-		; grid-view/window [[		;@@ this is too lazy to update itself: draws box of size that's no longer valid
-		; 	fill-pen !(svmc/text + 0.0.0.120)
-		; 	pen off
-		; 	box 0x0 (size)
-		; ]]
 		grid-view/window [
 			function [window /only xy1 xy2] [
 				drawn: window/draw/only xy1 xy2
@@ -134,57 +92,14 @@ do with [
 			box 0x0 (size)
 			pen      !(svmc/text)			;-- restore pen after `pen off` in grid
 		]]
-		; cell [
-		; 	function [cell] [
-		; 		drawn: cell/draw			;-- should come before (size) gets known
-		; 		bgnd: compose [
-		; 			fill-pen (svmc/panel)
-		; 			box 0x0 (cell/size)
-		; 		]
-		; 		compose [(bgnd) (drawn)]	;-- composed order differs from evaluation order!
-		; 	]
-		; ]
 	]
 	
-	; set 'closures reshape [		;-- closures come after the main drawing code
-	; 	; hscroll/thumb vscroll/thumb [
-	; 	; 	(when focused?/parent [compose/deep [
-	; 	; 		push [
-	; 	; 			;@@ MEH DOESNT WORK YET -- CHECK PATTERN PEN WHEN IT"S FIXED
-	; 	; 			; pen pattern 4x4 [line-width 0 fill-pen black box 0x0 2x2 box 2x2 4x4]
-	; 	; 			; fill-pen 0.100.200.200
-	; 	; 			; line-width 0
-	; 	; 			; box 0x0 (size)
-	; 	; 			; line-width 2
-	; 	; 			line-width 0
-	; 	; 			fill-pen !(svmc/text + 0.0.0.100)
-	; 	; 			box 4x3 (size - 4x3)
-	; 	; 			line-width 2
-	; 	; 		]
-	; 	; 	]])
-	; 	; ]	
-	; ]
 
 	map-each/only/self [w [word! ]] styles [to path! w]	;-- replace words with paths
 	map-each/only/self [b [block!]] styles [do b]		;-- extract blocks, construct functions
 
 ]
 
-
-set 'focused? function [
-	"Check if current style is the one in focus"
-	/parent "Rather check if parent style is the one in focus"
-	;@@ will /parent be enough or need more levels?
-][
-	all [
-		name1: last keyboard/focus						;-- order here: from likely empty..
-		name2: either parent [							;-- ..to rarely empty (performance)
-			pick tail current-style -2
-		][	last current-style
-		]
-		(get name1) =? get name2
-	]													;-- result: true or none
-]
 
 style-typeset!: make typeset! [block! function!]	;@@ hide this
 
@@ -217,6 +132,7 @@ set-style: function [name [word! path!] style [block!]] [
 ]
 
 ;-- draw code has to be evaluated after current-style changes, for inner calls to render to succeed
+n: 0
 context [
 	with-style: function [
 		"Draw calls should be wrapped with this to apply styles properly"
@@ -224,7 +140,7 @@ context [
 	][
 		append current-style name
 		trap/all/catch code [
-			msg: form/part thrown 400						;@@ should be formed immediately - see #4538
+			msg: form/part thrown 1000						;@@ should be formed immediately - see #4538
 			#print "^/*** Failed to render (name)!^/(msg)"
 		]
 		take/last current-style
@@ -234,6 +150,7 @@ context [
 		face [object!] "Host face"
 		/only xy1 [pair! none!] xy2 [pair! none!]
 	][
+		#debug styles [#print "render-face on (face/type) with current-style: (mold current-style)"]
 		#assert [is-face? :face]
 		#assert [face/type = 'base]
 		#assert [in face 'space]
@@ -244,7 +161,7 @@ context [
 			space-drawn: render-space/only face/space xy1 xy2
 			render: reduce [host-drawn space-drawn]
 		]
-		any [render []]
+		any [render copy []]
 	]
 
 	render-space: function [
@@ -253,6 +170,7 @@ context [
 	][
 		space: get name
 		#assert [space? :space]
+		#assert [not is-face? :space]					;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 
 		with-style name [
 			style: get-style							;-- call it before calling draw or draw/only, in case it modifies smth
@@ -266,7 +184,8 @@ context [
 					do copy/deep [draw: draw/only xy1 xy2]	;@@ workaround for #4854 - remove me!!
 					; draw: draw/only xy1 xy2
 				]
-				render: reduce [style draw]				;-- call the draw function if not called yet
+				if empty? style [unset 'style]
+				render: compose/only [(:style) (draw)]	;-- call the draw function if not called yet; compose removes `unset`
 			][
 				#assert [function? :style]
 				render: either all [
@@ -278,20 +197,20 @@ context [
 				][
 					style space
 				]
-				; render: (style space)					;@@ TODO: /only support for it?
 			]
 		]
-		; either render [
-		; 	reduce ['push render]						;-- don't carry styles over
-		; ][
-		; 	copy []
-		; ]
-		any [render copy []]
+		either render [
+			reduce ['push render]						;-- don't carry styles over to next spaces
+		][
+			copy []
+		]
 	]
 
 	set 'render function [
-		space [word! object!] "Space name; or host face as object"
-		/only xy1 [pair! none!] xy2 [pair! none!]
+		"Return Draw code to draw a space or host face, after applying styles"
+		space [word! object!] "Space name, or host face as object"
+		/only "Limit rendering area to [XY1,XY2] if space supports it"
+			xy1 [pair! none!] xy2 [pair! none!]
 	][
 		render: either word? space [:render-space][:render-face]
 		do copy/deep [									;@@ workaround for #4854 - remove me!!

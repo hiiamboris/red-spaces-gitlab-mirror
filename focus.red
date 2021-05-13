@@ -39,6 +39,7 @@ keyboard: object [
 		yes
 	]
 
+	;@@ TODO: maybe instead of this, scanning should continue from last valid outer space
 	last-valid-focus: function [] [
 		foreach path history [if valid-path? path [return path]]
 		none
@@ -53,11 +54,28 @@ keyboard: object [
 ]
 
 
+;-- for use within styles
+set 'focused? function [
+	"Check if current style is the one in focus"
+	/parent "Rather check if parent style is the one in focus"
+	;@@ will /parent be enough or need more levels?
+][
+	all [
+		name1: last keyboard/focus						;-- order here: from likely empty..
+		name2: either parent [							;-- ..to rarely empty (performance)
+			pick tail current-style -2
+		][	last current-style
+		]
+		(get name1) =? get name2
+	]													;-- result: true or none
+]
+
 
 ;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
 find-next-focal-space: function [dir "forth or back"] [
 	focus: keyboard/last-valid-focus
 	#debug focus [#print "last valid focus: (as path! focus)"]
+	; #assert [focus]										;@@ TODO: cover the case when it's none
 	foreach: pick [										;@@ use apply
 		foreach-*ace/next
 		foreach-*ace/next/reverse

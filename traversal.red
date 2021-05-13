@@ -56,9 +56,9 @@ traversal: context [
 	][
 		path: reuse-path target	
 		append path head root								;-- insert current path
-		face: get root/1
+		root-face: get root/1
 		root: next root
-		unless empty? pane: select face 'pane [				;-- insert child paths
+		unless empty? pane: select root-face 'pane [		;-- insert child paths
 			foreach face pane [
 				name: anonymize face/type face
 				change root name
@@ -66,7 +66,7 @@ traversal: context [
 			]
 			clear root
 		]
-		if name: select face 'space [						;-- insert spaces if any
+		if name: select root-face 'space [					;-- insert spaces if any
 			#assert [word? name]
 			change root name
 			target: list-spaces* root target
@@ -81,10 +81,22 @@ traversal: context [
 		/into target [block!] "Existing content is overwritten"
 	][
 		target: any [target  make [] 100]
-		#assert [is-face? any [attempt [get :face] :face] "face! object expected"]
+		#assert [is-face? any [all [word? face  get face] face] "face! object expected"]
 		if object? :face [face: anonymize face/type face]
 		clear list-*aces* to path! face target
 		new-line/all target yes
+	]
+
+	set 'path-from-face function [
+		"Return FACE's path from the screen"
+		face [object!]		;@@ no need in spaces support here?
+	][
+		r: make path! 10
+		until [
+			insert r anonymize face/type face
+			none? face: face/parent
+		]
+		r
 	]
 ]
 

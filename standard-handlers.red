@@ -8,16 +8,6 @@ Red [
 ;-- requires events.red (on load)
 
 
-
-		;@@ on-key-up should rule enter & space keys (buttons)
-		; vscroll [
-		; 	on-over [path event] [
-		; 		print ["^/over vscroll:" path]
-		; 		; dump-event event
-		; 		probe drag-offset path
-		; 	]
-		; ]
-
 define-handlers [
 
 	;-- *************************************************************************************
@@ -65,6 +55,7 @@ define-handlers [
 			update
 		]
 		on-key-down [space path event] [
+			; unless single? path [pass exit]
 			move-by: :scrollable-space/move-by
 			move-to: :scrollable-space/move-to
 			code: switch event/key [
@@ -126,14 +117,14 @@ define-handlers [
 	;-- *************************************************************************************
 	list-view: extends 'inf-scrollable [
 		;@@ just a temporary collapsing test - remove it later!
-		list: [
-			item: [
-				on-click [space path event] [
-					space/limits/max/y: unless space/limits/max/y [20]
-					update
-				]
-			]
-		]
+		; list: [
+		; 	item: [
+		; 		on-click [space path event] [
+		; 			space/limits/max/y: unless space/limits/max/y [20]
+		; 			update
+		; 		]
+		; 	]
+		; ]
 	]
 
 	;-- *************************************************************************************
@@ -156,8 +147,26 @@ define-handlers [
 			space/pushed?: no
 			update
 		]
-		on-click [space path event] [
-			do space/command
+		; on-click [space path event] [
+		; 	do space/command
+		; ]
+		on-key [space path event] [
+			if all [
+				find " ^M" event/key
+				not space/pushed?
+			][
+				space/pushed?: yes
+				update
+			]
+		]
+		on-key-up [space path event] [
+			if all [
+				find " ^M" event/key
+				space/pushed?
+			][
+				space/pushed?: no
+				update
+			]
 		]
 	]
 

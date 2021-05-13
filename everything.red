@@ -3,7 +3,9 @@ Red []
 #include %../common/debug.red
 #debug on
 ; #debug set events
+; #debug set styles
 ; #debug set grid-view
+; #debug set list-view
 
 #debug [
 	#macro [#include file!] func [s e] [compose/deep [print ["#including" (mold s/2)] do (s/2)]]
@@ -33,7 +35,9 @@ Red []
 
 #include %auxi.red
 #include %styles.red
+#include %layouts.red
 #include %spaces.red
+#include %VID.red
 #include %events.red
 #include %traversal.red
 #include %focus.red

@@ -106,7 +106,7 @@ events: context [
 	register-previewer: func [
 		"Register a previewer in the event chain; remove previous instances"
 		types [block!] "List of event/type words that this HANDLER supports"
-		handler [function!] "func [path event]"
+		handler [function!] "func [space path event]"
 	][
 		register-as previewers types :handler
 	]
@@ -114,7 +114,7 @@ events: context [
 	register-finalizer: func [
 		"Register a finalizer in the event chain; remove previous instances"
 		types [block!] "List of event/type words that this HANDLER supports"
-		handler [function!] "func [path event]"
+		handler [function!] "func [space path event]"
 	][
 		register-as finalizers types :handler
 	]
@@ -151,7 +151,7 @@ events: context [
 		foreach fn list [
 			pcopy: cache/hold path					;-- copy in case user modifies/reduces it, preserve index
 			trap/all/catch [fn get path/1 pcopy event] [
-				msg: form/part thrown 400			;@@ should be formed immediately - see #4538
+				msg: form/part thrown 1000			;@@ should be formed immediately - see #4538
 				#print "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!^/(msg)"
 			]
 			cache/put pcopy
@@ -339,7 +339,7 @@ events: context [
 			#debug events [print ["dispatch path:" path]]
 			if path [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
-				#assert [any [not empty? path  event/away?]]	;-- empty when hovering out of the host (away = true)
+				#assert [any [not empty? path  event/type = 'over]]	;-- empty when hovering out of the host or over empty area of it
 				process-event path event focused?
 			]
 			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
@@ -359,13 +359,13 @@ events: context [
 	]
 
 	do-handlers: function [
-		"Evaluates normal event handlers applicable to PATH"
+		"Evaluate normal event handlers applicable to PATH"
 		path [block!] event [event! none!] type [word!] focused? [logic!]
 	][
 		if commands/stop? [exit]
 		hnd-name: to word! head clear change skip "on-" 3 type		;-- don't allocate
 		wpath: path  unit: 1										;-- word-only path
-		if pair! = type? second path [
+		if pair? second path [
 			wpath: extract/into path unit: 2 clear []				;-- remove pairs
 		]
 		#assert [not find wpath pair!]
@@ -394,7 +394,12 @@ events: context [
 		]
 	]
 
-	process-event: function [path [block!] event [event!] focused? [logic!]] [
+	process-event: function [
+		"Process the EVENT calling all respective event handlers"
+		path [block!] "Path on the space tree to lookup handlers in"
+		event [event!] "View event"
+		focused? [logic!] "Skip parents and go right into the innermost space"
+	][
 		do-previewers path event event/type
 		unless commands/stop? [do-handlers path event event/type focused?]
 		do-finalizers path event event/type
@@ -453,6 +458,8 @@ events: context [
 		#assert [word? spc]  #assert [pair? ofs]  #assert [pair? ofs']
 		ofs - ofs'
 	]
+
+	;@@ export dragging functions or not? (they're available to event handlers anyway)
 
 ]
 

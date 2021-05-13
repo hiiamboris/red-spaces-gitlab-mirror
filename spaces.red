@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires `for` loop from auxi.red
+;-- requires `for` loop from auxi.red, layouts.red
 
 
 ;@@ TODO: also a `spaces` context to wrap everything, to save it from being overridden (or other name, or under system/)
@@ -34,7 +34,7 @@ compose-map: function [
 	/only list [block!] "Select which spaces to include"
 	/limits xy1 [pair!] xy2 [pair!] "Specify viewport"
 ][
-	r: make [] 10
+	r: make [] round/ceiling/to (1.5 * length? map) 1
 	foreach [name box] map [
 		all [list  not find list name  continue]		;-- skip names not in the list if it's provided
 		; all [limits  not bbox-overlap? xy1 xy2 o: box/offset o + box/size  continue]	;-- skip invisibles ;@@ buggy - requires origin
@@ -44,10 +44,9 @@ compose-map: function [
 		][	render      name
 		]
 		unless empty? cmds [							;-- don't spawn empty translate/clip structures
-			compose/deep/only/into [
-				translate (box/offset) [
-					clip 0x0 (box/size) (cmds)			;@@ TODO: remove `clip`
-				]
+			compose/only/into [
+				translate (box/offset) (cmds)
+				; clip 0x0 (box/size) (cmds)			;@@ TODO: remove `clip`
 			] tail r
 		]
 	]
@@ -60,7 +59,6 @@ spaces: #()												;-- map for extensibility
 spaces/space: [											;-- minimum basis to build upon
 	draw: []
 	size: 0x0
-	;@@ TODO: layout constructor should be able to add fields like rate into space templates that do not have it
 	; rate: none
 ]
 space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
@@ -93,7 +91,20 @@ spaces/triangle: make-space/block 'space [
 	]
 ]
 
+spaces/image: make-space/block 'space [
+	size: none											;-- set automatically unless `autosize?` = off
+	autosize?: true										;-- if off, `size` should be defined
+	margin: 0
+	data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
+	draw: function [] [
+		if autosize? [self/size: 2x2 * margin + data/size]
+		#assert [size]
+		compose [image (data) (1x1 * margin) (size - margin)]
+	]
+]
+
 ;@@ TODO: externalize all functions, make them shared rather than per-object
+;@@ TODO: automatic axis inferrence from size?
 scrollbar: context [
 	spaces/scrollbar: make-space/block 'space [
 		size: 100x16										;-- opposite axis defines thickness
@@ -299,6 +310,7 @@ paragraph-ctx: context [
 			layout/font: font							;@@ careful: fonts are not collected by GC, may run out of them easily
 			either width [								;-- wrap
 				layout/size/x: width						;-- width has to be set to determine height
+				#assert [0 < width]							;-- else crashes - see #4897
 				; layout/size: size-text layout		;@@ BUG #4783		;-- 'size-text' is slow, has to be cached (by setting size)
 				layout/size/y: second size-text layout		;-- 'size-text' is slow, has to be cached (by using on-change)
 			][											;-- no wrap
@@ -309,8 +321,8 @@ paragraph-ctx: context [
 
 		draw: function [] [
 			unless layout [lay-out]
-			self/size: margin * 2 + layout/size
-			compose [text (margin) (layout)]
+			self/size: margin * 2x2 + layout/size
+			compose [text (1x1 * margin) (layout)]
 		]
 
 		on-change*: func [word old [any-type!] new [any-type!]] [
@@ -324,113 +336,67 @@ paragraph-ctx: context [
 ]
 
 
-;@@ TODO: free list of these
-list-layout-ctx: context [
-	place: function [layout [object!] item [pair!]] [
-		guide: select [x 1x0 y 0x1] layout/axis
-		cs: layout/content-size
-		if 0x0 <> cs [cs: cs + (layout/spacing * guide)]
-		ofs: cs * guide + layout/margin
-		cs: cs + (item * guide)
-		cs: max cs item
-		layout/content-size: cs
-		reduce/into [ofs item 0x0] tail layout/items
-	]
-
-	set 'list-layout object [
-		margin: 0x0
-		spacing: 0x0
-		axis: 'x
-
-		content-size: 0x0
-		size: does [margin * 2 + content-size]
-		items: []			;-- list of: [offset size origin] for each item
-		place: function [item [pair!]] [list-layout-ctx/place self item]
-	]
-]
-
-row-layout-ctx: context [
-	place: function [layout [object!] item [pair!]] [
-		set [ofs: siz: org:] list-layout-ctx/place layout item
-		guide: select [x 1x0 y 0x1] x: layout/axis
-		index: (length? layout/items) / 3
-		if w: layout/widths/:index  [siz/x: w]			;-- enforce size if provided
-		if h: layout/heights/:index [siz/y: h]
-		if index > pinned: layout/pinned [				;-- offset and clip unpinned items
-			either pinned > 0 [
-				plim: skip items pinned - 1 * 3
-				lim: plim/1 + plim/2 + layout/spacing * guide
-			][
-				lim: 0x0
-			]
-			ofs: ofs + (layout/origin * guide)
-			if ofs/:x < lim/:x [
-				org: org - dx: (lim - ofs) * guide
-				siz: max 0x0 siz - dx
-				ofs/:x: lim/:x
-			]
-		]
-		layout/content-size/:x: ofs/:x + siz/:x - layout/margin/:x
-		;-- content-size height accounts for all items, even clipped (by design)
-		reduce/into [ofs siz org] clear skip tail layout/items -3
-	]
-
-	set 'row-layout make list-layout [
-		origin: 0
-		pinned: 0
-		widths: []				;-- can be a map: index -> integer width
-		heights: []				;-- same
-
-		place: function [item [pair!]] [row-layout-ctx/place self item]
-	]
-]
-
-;@@ `list` is too common name - easily get overridden and bugs ahoy
-list-ctx: context [
-	spaces/list: make-space/block 'space [
+;-- layout-agnostic template for list, ring & other layout using space collections
+container-ctx: context [
+	spaces/container: make-space/block 'space [
 		size: none				;-- only available after `draw` because it applies styles
-		items: []				;-- user-controlled ;@@ TODO: maybe rename to `pane`?
+		item-list: []
+		items: function [/pick i [integer!] /size] [
+			either pick [item-list/:i][length? item-list]
+		]
+		map: []
+
+		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /layout lobj [object!]] [
+			#assert [layout]							;-- has to be provided by the wrapping space
+			#assert [(none? xy1) = none? xy2]			;-- /only is ignored to simplify call in absence of `apply`
+			r: make [] 4 * len: items/size
+			clear map
+			repeat i len [
+				item: get name: items/pick i
+				drawn: unless item/size [render name]	;-- prerender to get the size, for layout
+														;-- this allows to not render skipped items
+														;@@ TODO: think on such caching applicability
+														;@@ TODO: a cache of sizes to faster skip to the first visible item, or in layout?
+				placed: lobj/place name
+				set [_: pos: _: siz: _: org:] placed/2
+				skip?: all [xy2  not bbox-overlap?  pos pos + sz  xy1 xy2]
+				unless skip? [
+					drawn: any [drawn  render name]
+					; append map placed
+					; compose/only/into [translate (pos + org) (drawn)] tail r
+					compose/deep/only/into [
+						clip (pos) (pos + siz) [		;-- clip is required to support origin ;@@ but do we need origin?
+							translate (pos + any [org 0]) (drawn)
+						]
+					] tail r
+				]
+			]
+			append map lobj/map							;-- compose-map cannot be used because it calls render an extra time
+			self/size: lobj/size
+			r
+		]
+	]
+]
+
+;@@ `list` is too common a name - easily get overridden and bugs ahoy
+;@@ need to stash all these contexts somewhere for external access
+list-ctx: context [
+	spaces/list: make-space/block 'container [
 		axis: 'x
 		margin: 5x5
 		spacing: 5x5
 		;@@ TODO: alignment?
 		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
-		;@@ TODO: margin & spacing - in style??
-		;@@ TODO: appendable-list? smth that caches items' size so append is fast
-		map: []
 
 		make-layout: has [r] [
-			r: make list-layout []
-			r/axis:    axis
-			r/margin:  margin
-			r/spacing: spacing
-			r
+			also r: make list-layout []
+			foreach w [axis margin spacing] [r/:w: self/:w]
 		]
 
-		; measure: func [i [integer!]] [
-		; 	render name: items/:i
-		; 	select get name 'size
-		; ]
-
-		draw: function [/only xy1 xy2 /layout lobj [object!]] [
-			;@@ keep this in sync with `grid/draw`
-			r: make [] 10
-			layout: any [lobj make-layout]
-			clear map
-			foreach name items [
-				item: get name
-				drawn: unless item/size [render name]		;-- prerender to get the size, caching previously drawn items
-				set [p1: siz: org:] layout/place item/size
-				skip?: all [only  not bbox-overlap?  p1 p1 + siz  xy1 xy2]
-				unless skip? [
-					;@@ TODO: style selected-item?
-					compose/deep/only/into [clip (p1) (p1 + siz) [translate (p1 + org) (any [drawn  render name])]] r
-					compose/deep/into [(name) [offset (p1) size (siz)]] tail map
-				]
-			]
-			self/size: layout/size
-			r
+		container-draw: :draw
+		draw: function [/only xy1 [pair! none!] xy2 [pair! none!]] [
+			container-draw/layout/only make-layout xy1 xy2
 		]
 	]
 ]
@@ -444,7 +410,8 @@ spaces/data-view: make-space/block 'space [
 	data:    none					;-- ANY red value
 	width:   none					;-- when set, forces output to have fixed width (can be a list)
 	margin:  0x0
-	spacing: 2x2					;-- used only when data is a block
+	spacing: 5x5					;-- used only when data is a block
+	;@@ TODO: add `/font`?
 	limits:  [						;-- min/max size that this space can span
 		min [x #[none] y #[none]]	;-- x/y are split so one can be enforced, while another can be free
 		max [x #[none] y #[none]]
@@ -457,27 +424,33 @@ spaces/data-view: make-space/block 'space [
 
 	set-content: function [] [
 		case [
-			; image! []	;@@ TODO - need image type
 			block? :data [								;-- only recreates item spaces as necessary
 				unless content = 'list [set-quiet 'content make-space/name 'list []]
 				list: get content
 				maybe list/margin: 0x0					;-- fit the list contents tightly, as we already have a margin
-				maybe list/spacing: spacing
+				maybe list/spacing: spc: spacing * 1x1	;-- ensure a pair value
+				mrg: margin * 1x1
 				n: length? data
 				;-- evenly distribute the items	only when width is fixed:  ;@@ any better idea??
 				;@@ also how to or should we apply width to images?
-				item-width: all [width  to 1 width - (n - 1 * spacing/x) - (2 * margin/x) / n]
+				item-width: all [width  to 1 width - (n - 1 * spc/x) - (2 * mrg/x) / n]
 				repeat i n [
 					value: :data/:i
-					unless item: list/items/:i [
-						append list/items item: anonymize 'item make-space 'data-view []
+					unless item: list/item-list/:i [
+						append list/item-list item: anonymize 'item make-space 'data-view []
 					]
 					item: get item
 					maybe item/width: item-width
 					set/any 'item/data :value
 					item/set-content
 				]
-				clear skip list/items n
+				clear skip list/item-list n
+			]
+			image? :data [
+				unless content = 'image [set-quiet 'content make-space/name 'image []]
+				img: get content
+				img/data: data			;@@ copy or not? images consume RAM easily; need them at least GC-able to copy
+				; img/data: copy data
 			]
 			'else [
 				text: either string? :data [copy data][mold :data]		;@@ limit it or not?
@@ -494,7 +467,7 @@ spaces/data-view: make-space/block 'space [
 		unless valid? [set-content]
 		obj: get content
 		cdraw: render content				;-- apply style to get the size
-		sz: margin * 2 + obj/size
+		sz: (mrg: margin * 1x1) * 2 + obj/size
 		case/all [
 			lim: limits/min/x [sz/x: max lim sz/x]
 			lim: limits/min/y [sz/y: max lim sz/y]
@@ -502,10 +475,10 @@ spaces/data-view: make-space/block 'space [
 			lim: limits/max/y [sz/y: min lim sz/y]
 		]
 		self/size: sz
-		change/only change map content compose [offset: (margin) size: (sz - margin)]
+		change/only change map content compose [offset: (mrg) size: (sz - mrg)]
 		compose/deep/only [
 			clip 0x0 (sz) [				;@@ clipping should be done automatically somewhere for all spaces
-				translate (margin) (cdraw)
+				translate (mrg) (cdraw)
 			]
 		]
 	]
@@ -528,11 +501,13 @@ window-ctx: context [
 		;-- window does not require content's size, so content can be an infinite space!
 		content: make-space/name 'space []
 		map: [space [offset 0x0 size 0x0]]				;-- 'space' will be replaced by space content refers to
+		map/1: content
 
 		;-- should be defined in content
 		;-- should return how much more window can be scrolled in specified direction (from it's edge, not current origin!)
 		;-- if it returns more than requested, returned value is added
 		available?: function [
+			"Should return number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
 			axis      [word!]    "x/y"
 			dir       [integer!] "-1/1"
 			from      [integer!] "axis coordinate to look ahead from"
@@ -556,11 +531,16 @@ window-ctx: context [
 			o: geom/offset
 			;-- there's no size for infinite spaces so we use `available?` to get the drawing size
 			s: max-size
-			foreach x [x y] [s/:x: available? x 1 (0 - o/:x) s/:x]
+			o': first cache: []							;-- geom/offset during previous draw
+			if o <> o' [								;-- don't resize window unless it was moved
+				foreach x [x y] [s/:x: available? x 1 (0 - o/:x) s/:x]
+				self/size: s							;-- limit window size by content size
+				#debug list-view [#print "window resized to (s)"]
+				change cache o
+			]
 			default xy1: 0x0
 			default xy2: s
-			geom/size: s - o
-			self/size: s							;-- limit window size by content size
+			geom/size: xy2 - o							;-- enough to cover the visible area
 			cdraw: render/only content xy1 - o xy2 - o
 			compose/only [translate (o) (cdraw)]
 		]
@@ -571,9 +551,10 @@ inf-scrollable-ctx: context [
 	spaces/inf-scrollable: make-space/block 'scrollable [	;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
+		pages: 10x10							;-- window size multiplier in sizes of inf-scrollable
 
 		content: 'window
-		window: make-space 'window [size: none]
+		window: make-space 'window [size: none]			;-- size is set by window/draw
 		#assert [map/1 = 'space]
 		map/1: 'window
 
@@ -606,11 +587,10 @@ inf-scrollable-ctx: context [
 			wo <> wo0								;-- should return true when updates origin - used by event handlers
 		]
 
-
 		autosize-window: function [] [
 			#assert [all [size size/x > 0 size/y > 0]]
-			pages: 10x10
 			maybe window/max-size: pages * self/size
+			#debug list-view [#print "autosized window to (window/max-size)"]
 		]
 
 		scrollable-draw: :draw
@@ -668,194 +648,219 @@ spaces/web: make-space/block 'inf-scrollable [
 	]
 
 	window/content: 'canvas
-
-
-	; window/max-size: 1000x1000
 ]
 
 list-view-ctx: context [
 	spaces/list-view: make-space/block 'inf-scrollable [
-		source: []		;@@ or a function [index]? or support both?
-		data: function [/pick i [integer!] /length] [
-			either pick [source/:i][length? source]
+		; reversed?: no		;@@ TODO - for chat log, map auto reverse
+		; cached?: no			;@@ TODO - cache of rendered code of items, to make it more realtime (will need invalidation after resize)
+		pages: 10
+		source: []
+		data: function [/pick i [integer!] /size] [		;-- can be overridden
+			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
 		]
-		index: 1										;-- index of the first item within source
 		
 		wrap-data: function [item-data [any-type!]][
 			spc: make-space 'data-view []
 			set/any 'spc/data :item-data
-			if list/axis = 'y [spc/width: window/max-size/x - (list/margin/x * 2)]		;@@ what data width to use for horizontal lists?
+			if list/axis = 'y [							;@@ what data width to use for horizontal lists?
+				spc/width: max 1 window/max-size/x - (list/margin/x * 2)	;-- has to be positive
+			]
 			anonymize 'item spc
 		]
 
-		list: make-space 'list [axis: 'y]				;-- list/axis can be changed to get a horizontal list ;@@ but then setup becomes wrong
-		window/map: [list [offset 0x0 size 0x0]]
+		list: make-space 'list [
+			axis: 'y
+			icache: make map! []	;-- cache of last rendered item spaces (persistency required by the focus model: items must retain sameness)
+									;-- an int->word map! - for flexibility in caching strategies (which items to free and when)
+									;@@ when to forget these?
+			rcache: make map! []	;-- cache of rendering code saved by locate-line
 
-		window/max-size: 1000x1000		;@@ this is where sizing strategy would be cool to have
-
-		extra?: function [dir [word!]] [			;-- measure dangling extra size along any direction
-			if empty? map: window/map [return 0]
-			#assert [2 = length? map]
-			r: max 0x0
-				switch dir [
-					w n [negate map/2/offset]
-					e s [map/2/offset + map/2/size - window/max-size]
-				]
-			r/x + r/y
-		]
-
-		window/available?: function [dir [word!] requested [integer!]] [
-			#assert [0 < requested]
-			if any [
-				all [list/axis = 'y  find [e w] dir]
-				all [list/axis = 'x  find [n s] dir]		;@@ not sure about this yet, /width doesn't guarantee it
-			] [return 0]
-			reserve: extra? dir
-			requested: requested - reserve
-
-			r: 0
-			if requested > 0 [
-				lt: extend-layout dir requested
-				r: lt/content-size/(list/axis)
-				unless empty? lt/items [r: r + lt/spacing/(list/axis)]
-			]
-			r: max 0 r + reserve
-			; print ["avail?" dir "=" r "of" requested "(reserve:" reserve ")"]
-			r
-		]
-
-		;@@ ensure this one is called only from inf-scrollable/draw
-		extend-layout: function [dir [word!] amount [integer!] /keep where [block!]] [
-			; print ["extend" dir amount]
-			lt: list/make-layout
-			unless empty? list/items [amount: amount - lt/spacing/(list/axis)]
-			switch dir [
-				n w [+-: :-  n-max: (base: index) - 1]
-				s e [+-: :+  n-max: data/length - base: index - 1 + length? list/items]
-			]
-			#assert [(select [n y s y e x w x] dir) = list/axis]
-			repeat i n-max [
-				name: wrap-data data/pick base +- i		;-- guarantee at least 1 item (else spacing could be bigger than the requested amount)
-				#assert [not find/same list/items name]
-				render name
-				lt/place select get name 'size
-				if keep [append where name]
-				if lt/content-size/(list/axis) >= amount [break]
-			]
-			lt
-		]
-
-		;-- this func is quite hard to get right, many aspects to consider
-		;-- * window moves list within it's map before calling `fill`,
-		;--   but we'll have to move list back and move all items within list accordingly
-		;-- * move offset can be used right away to know what spaces will be hidden
-		;-- * list may have extra dangling items partially clipped by window (before the move), which now become visible
-		;--   i.e. list/size may be > window/max-size because it contains whole items, not necessarily aligning to window borders
-		;-- * these hidden parts should be subtracted from the xy1-xy2 area to know how much to extend the list itself
-		;-- * there may be no new items to add, just the hidden area to show
-		;-- * list may initially be empty (spacing to consider), or not rendered (undefined size)
-		;-- * when filling from above, list should be aligned with the top border, when from below - the opposite
-		;@@ and I haven't considered the case where window/max-size <= list-view/size (it isn't working)
-		window/fill: function [xy1 [pair!] xy2 [pair!]] [
-			; ?? size print ["fill" xy1 xy2]
-			;@@ TODO: remove these or add x=opposite support
-			#assert [0 = xy1/x]
-			#assert [window/max-size/x = xy2/x]
-			#assert [any [xy1/y = 0  xy2/y = window/max-size/y]]
-
-			unit: select [x 1x0 y 0x1] x: list/axis
-			dir: select
-				pick [ [x e y s] [x w y n] ] xy2/:x = window/max-size/:x	;-- s/e = tail fill (or head to tail), n/w = head fill (partial)
-				x
-			negative?: none <> find [n w] dir
-			either negative? [											;-- get already rendered parts out of the requested area
-				xy2/:x: xy2/:x - extra? dir
-			][	xy1/:x: xy1/:x + extra? dir
-			]
-			lgeom: window/map/list
-
-			;-- xy area now lies purely outside the list, so we can fill it
-			lt: extend-layout/keep dir (xy2/:x - xy1/:x) clear new: []
-
-			;-- sometimes it's possible that `new` is empty and `fill` should only move the list to show `extra?` (hidden) area
-			unless empty? new [
-				;@@ TODO: some automatic extension calculation? right now it won't work for arbitrary layout
-				pixels-added: lt/content-size/:x + either empty? list/items [0][lt/spacing/:x]
-
-				offset: lgeom/offset						;-- we can count invisibles right now from list/offset
-				initial-fill?: offset = 0x0					;-- on first fill, do not align with the lowest/rightmost edge
-				
-				n-remove: 0									;-- count how many invisible spaces to remove
-				foreach': switch dir [n w [:foreach-reverse] s e [:foreach]]	 ;@@ should be for-each/reverse
-				;@@ list should have no timer in the map, else we'll have to check names for `item`
-				foreach' [_: geom:] list/map [
-					o: geom/offset + offset
-					visible?: bbox-overlap?  0x0 window/max-size  o o + geom/size
-					either visible? [break][n-remove: n-remove + 1]
-				]
-
-				either negative? [									;-- insert new items
-					insert list/items reverse new
-					self/index: self/index - length? new
-				][
-					append list/items new
-					maybe self/index: self/index + n-remove			;-- n-remove can be 0
-				]
-
-				pixels-removed: 0									;-- along the list/axis
-				if n-remove > 0 [
-					removed: either negative? [						;-- remove invisibles from `items` & `map`
-						take/last/part list/items n-remove
-						take/last/part list/map n-remove * 2
-					][
-						remove/part list/items n-remove
-						take/part list/map n-remove * 2
+			items: function [/pick i [integer!] /size] [
+				either pick [
+					any [
+						icache/:i
+						icache/:i: wrap-data data/pick i
 					]
+				][data/size]
+			]
 
-					rem-1st: removed/2
-					rem-last: last removed
-					pixels-removed: rem-last/offset + rem-last/size - rem-1st/offset + lt/spacing		;@@ TODO: automatic calculation if possible?
-					pixels-removed: pixels-removed/:x
+			available?: function [axis dir from [integer!] requested [integer!]] [
+				if axis <> self/axis [
+					return either dir < 0 [from][window/max-size/:axis - from]
 				]
-
-				;-- now that we know removed size we can calculate how much to shift the list in window/map
-				offset: unit * either negative? [pixels-added][pixels-removed * -1]
-
-				foreach [_ geom] list/map [					;-- relocate visible spaces now that we know the offset
-					geom/offset: geom/offset - offset
+				set [item: idx: ofs:] locate-line from + (requested * dir)
+				r: max 0 requested - switch item [
+					space item [0]
+					margin [either idx = 1 [0 - ofs][ofs - margin/:axis]]
 				]
+				#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
+				r
+			]
 
-				either new-size: list/size [
-					;-- update the size, without re-rendering anything
-					new-size/:x: new-size/:x - pixels-removed + pixels-added
-					maybe list/size: new-size
+			;-- returns any of:
+			;--   [margin 1 offset] - within the left margin (or if point is negative, then to the left of it)
+			;--   [item   1 offset] - within 1st cell
+			;--   [space  1 offset] - within space between 1st and 2nd cells
+			;--   [item   2 offset] - within 2nd cell
+			;--   [space  2 offset]
+			;--   ...
+			;--   [item   N offset]
+			;--   [margin 2 offset] - within the right margin
+			;--                       offset can be bigger(!) than right margin if point is outside the space's size
+			;-- location is done from the first item in the map, not from the beginning
+			;-- so eventually if previous items change size, list origin may drift from 0x0
+			;@@ will this cause problems?
+			locate-line: function [level [integer!] "pixels from 0"] [
+				x: axis
+				if level < margin/:x [return compose [margin 1 (level)]]
+				#debug list-view [level0: level]		;-- for later output
+
+				either empty? map [
+					i: 1
+					level: level - margin/:x
 				][
-					;-- render the list to get it's size - should only be needed first time it's shown
-					render/only 'list xy1 xy2
+					#assert [not empty? icache]
+					#assert ['item = map/1]
+					item-spaces: reduce values-of icache
+					i: pick keys-of icache j: index? find/same item-spaces get map/1
+					level: level - map/2/offset/:x
+				]
+				imax: data/size
+				space: spacing							;-- return value is named "space"
+				;@@ should this func use layout at all or it will only complicate things?
+				sub: function [name idx] [		;@@ move these funcs out
+					size: get name
+					if level < size/:x [throw reduce [name idx level]]
+					set 'level level - size/:x
+				]
+				add: function [name idx] [
+					size: get name
+					set 'level level + size/:x
+					if level >= 0 [throw reduce [name idx level]]
+				]
+				render-item: [
+					rcache/:i: render name: items/pick i
+					item: select get name 'size
+				]
+				r: catch [
+					either level >= 0 [
+						imax: any [imax 1.#inf]			;-- if undefined
+						forever [
+							do render-item
+							sub 'item i
+							if i >= imax [throw compose [margin 2 (level)]]
+							sub 'space i
+							i: i + 1
+						]
+					][
+						forever [
+							i: i - 1
+							#assert [0 < i]
+							add 'space i
+							do render-item
+							add 'item i
+						]
+					]
+				]
+				#debug list-view [#print "locate-line (level0) -> (mold r)"]
+				#assert [0 < r/2]
+				r
+			]
+
+			item-length?: function [i [integer!]] [
+				#assert [0 < i]
+				#assert [icache/:i]
+				item: get icache/:i							;-- must be cached by previous locate-line call
+				r: item/size/:axis
+				#debug list-view [#print "item-length? (i) -> (r)"]
+				r
+			]
+
+			locate-range: function [low-level [integer!] high-level [integer!]] [
+				set [l-item: l-idx: l-ofs:] locate-line  low-level
+				set [h-item: h-idx: h-ofs:] locate-line high-level
+				sp: spacing/:axis
+				mg: margin/:axis
+				switch l-item [
+					space  [l-idx: l-idx + 1  l-ofs: l-ofs - sp]
+					margin [
+						l-ofs: l-ofs - mg
+						if l-idx = 2 [l-idx: none]
+					]
+				]
+				switch h-item [
+					space [h-ofs: h-ofs + item-length? h-idx]
+					margin [
+						either h-idx = 1 [
+							h-idx: none
+						][
+							h-idx: data/size				;-- can't be none since right margin is present
+							either h-idx <= 0 [				;-- data/size can be 0, then there's no item to draw
+								h-idx: none
+							][
+								h-ofs: h-ofs + item-length? h-idx
+							]
+						]
+					]
+				]
+				r: reduce [l-idx l-ofs h-idx h-ofs]
+				#debug list-view [#print "locate-range (low-level),(high-level) -> (mold r)"]
+				r
+			]
+
+			;-- leverages certain list properties as an optimization, so is not based on container/draw
+			draw: function [/only xy1 [pair!] xy2 [pair!]] [
+				#assert [all [xy1 xy2]]
+				clear rcache								;-- may be filled by locate-range
+				set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
+				unless all [i1 i2] [return []]				;-- no visible items (see locate-range)
+				#assert [i1 <= i2]
+
+				layout: make-layout
+				guide: select [x 1x0 y 0x1] axis
+				layout/origin: guide * (xy1 - o1 - margin)
+				r: make [] 4 * (i2 - i1 + 1)
+				clear map
+				for i: i1 i2 [
+					item: get name: items/pick i
+					drawn: any [rcache/:i  render name]		;-- render to get the size, for layout
+					placed: layout/place name
+					compose/only/into [translate (placed/2/2) (drawn)] tail r
+				]
+				append map layout/map						;-- compose-map cannot be used because it calls render an extra time
+				self/size: xy1 - margin - o1 + layout/size	;@@ do we even care about the size of the list itself here?
+															;@@ should size/x be that of list-view/size/x ?
+				r
+			]
+		]
+
+		window/content: 'list
+
+		autosize-window: function [] [						;-- initially, adjust the window (paragraphs adjust to it then)
+			unit: select [x 1x0 y 0x1] list/axis
+			#assert [0x0 <> size]
+			maybe window/max-size: size + (pages - 1 * size * unit)
+			#assert [0x0 <> window/max-size]
+			#debug list-view [#print "autosized window to (window/max-size)"]
+		]
+
+		; inf-scrollable-draw: :draw
+		; draw: function [] [
+		; 	inf-scrollable-draw							;-- calls list/draw/only eventually
+		; ]
+
+		inf-scrollable-on-change: :on-change*
+		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
+			switch to word! word [
+				axis [
+					if :old <> :new [
+						#assert [find [x y] :new]
+						clear list/map					;-- see `setup`: this changes window/max-size
+					]
 				]
 			]
-			#assert [list/size]
-
-			;-- update list geometry inside the window
-			lgeom/size: list/size
-			lgeom/offset: either any [negative? initial-fill?] [
-				0x0												;-- align to top-left corner of the window
-			][	min 0x0 window/max-size - list/size * unit		;-- to bottom-left, but only if list > window(!)
-			]
-		]
-
-		setup: function [] [
-			if size [									;-- if size is defined, adjust the window (paragraphs adjust to window then)
-				pages: 10								;@@ make this configurable?
-				unit: select [x 1x0 y 0x1] list/axis
-				maybe window/max-size: size + (pages - 1 * size * unit)
-			]
-		]
-
-		inf-scrollable-draw: :draw
-		draw: function [] [
-			setup
-			inf-scrollable-draw
+			inf-scrollable-on-change word :old :new
 		]
 	]
 ]
@@ -928,6 +933,7 @@ grid-ctx: context [
 		]
 
 		calc-limits: function [] [
+			limits: self/limits								;-- call it in case it's a function
 			unless any ['auto = limits/x  'auto = limits/y] [	;-- no auto limit set (but can be none)
 				#debug grid-view [#print "grid/calc-limits [no auto] -> (limits)"]
 				return limits
@@ -960,14 +966,20 @@ grid-ctx: context [
 		;-- they are required to be able to get any particular cell's multi-cell without full `spans` traversal
 		;@@ TODO: maybe mark all internal funcs & structures with *
 		;@@ TODO: docstrings
-		get-span: function [cell [pair!]] [
-			any [spans/:cell  1x1]
+		get-span: function [
+			"Get the span value of a cell at XY"
+			xy [pair!] "Column (x) and row (y)"
+		][
+			any [spans/:xy  1x1]
 		]
 
-		get-first-cell: function [cell [pair!]] [
-			span: get-span cell
-			if 0x0 = max 0x0 span [cell: cell + span]
-			cell
+		get-first-cell: function [
+			"Get the starting row & column of a multicell that occupies cell at XY"
+			xy [pair!] "Column (x) and row (y); returns XY unchanged if no such multicell"
+		][
+			span: get-span xy
+			if 0x0 = max 0x0 span [xy: xy + span]
+			xy
 		]
 
 		break-cell: function [first [pair!]] [
@@ -1046,6 +1058,7 @@ grid-ctx: context [
 		;--   [cell   N offset]
 		;--   [margin 2 offset] - within the right margin (only when limit is defined),
 		;--                       offset can be bigger(!) than right margin if point is outside the space's size
+		;@@ TODO: maybe cache offsets for faster navigation on bigger data
 		locate-line: function [
 			level [integer!] "pixels from 0"
 			array [map!] "widths or heights"
@@ -1087,7 +1100,7 @@ grid-ctx: context [
 			][
 				keys: sort keys-of array
 				remove find keys 'default
-				#assert [keys/1 > 0]						;-- no zero or negative row/col numbers expected
+				#assert [0 < keys/1]						;-- no zero or negative row/col numbers expected
 				key: 0
 
 				catch [
@@ -1180,7 +1193,7 @@ grid-ctx: context [
 				]
 				case [
 					span/y = 1 [
-						#assert [span/x > 0]
+						#assert [0 < span/x]
 						append hmin height1
 					]
 					span/y + y = first/y [				;-- multi-cell vertically ends after this row
@@ -1213,7 +1226,10 @@ grid-ctx: context [
 			1x1 <> min 1x1 xy - pinned
 		]
 
-		infinite?: does [not all [limits/x limits/y]]
+		infinite?: function [] [
+			limits: self/limits							;-- call it in case it's a function
+			not all [limits/x limits/y]
+		]
 
 		calc-size: function [] [
 			#assert [not infinite?]
@@ -1384,6 +1400,7 @@ grid-view-ctx: context [
 
 		grid: make-space 'grid [
 			available?: function [axis dir from [integer!] requested [integer!]] [	;@@ should `available?` be in *every* grid? (as a placeholder word)
+				limits: self/limits
 				r: case [
 					dir < 0 [from]
 					limits/:axis [
@@ -1400,12 +1417,13 @@ grid-view-ctx: context [
 		grid-cells: :grid/cells
 		grid/cells: func [/pick xy [pair!] /size] [
 			either pick [
-				unless grid/cell-map/:xy [
+				unless grid/cell-map/:xy [			;@@ need to think when to free this up, maybe when cells get hidden
 					grid/cell-map/:xy: wrap-data xy data/pick xy
 				]
 				grid-cells/pick xy
 			][data/size]
 		]
+		grid/calc-limits: grid/limits: does [data/size]
 		
 		wrap-data: function [xy [pair!] item-data [any-type!]] [
 			spc: make-space 'data-view []
@@ -1441,22 +1459,32 @@ grid-view-ctx: context [
 
 button-ctx: context [
 	spaces/button: make-space/block 'data-view [
+		; width: none								;-- when not 'none', forces button width in pixels - defined by data-view
 		margin: 4x4								;-- change data-view's default
-		pushed?: no								;-- becomes true when user pushes it
-		rounding: 0								;-- box rounding radius in px
-		command: []								;-- code to run on click (on up)
+		pushed?: no								;-- becomes true when user pushes it; triggers `command`
+		rounding: 5								;-- box rounding radius in px
+		command: []								;-- code to run on click (on up: when `pushed?` becomes false)
+		;@@ TODO: shadow? or in styles? and for what other spaces?
 
 		data-view-draw: :draw
 		draw: function [] [
 			drawn: data-view-draw				;-- draw content before we know it's size
-			self/size: margin * 2 + size
+			new: margin * 2 + size
+			self/size: as-pair any [width new/x] new/y
 			;-- box has to come before the content, so whatever fill-pen is used by style it won't override the text
 			compose/deep/only [
-				; clip 0x0 (size) [				;@@ NOT WORKING - #4824
-					box 0x0 (size) (rounding)
-				; ]
+				box 1x1 (size - 1) (rounding)
 				translate (margin) (drawn)
 			]
+		]
+
+		data-view-on-change: :on-change*
+		on-change*: function [word [word!] old [any-type!] new [any-type!]] [
+			switch to word! word [
+				;-- special handling to prevent command from being evaluated multiple times on key press & hold:
+				pushed? [if all [:old not :new] [do command]]
+			]
+			data-view-on-change word :old :new
 		]
 	]
 ]

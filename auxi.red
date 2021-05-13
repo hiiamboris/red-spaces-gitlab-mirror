@@ -50,11 +50,28 @@ for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code 
 	]
 ]
 
+closest-number: function [n [number!] list [block!]] [
+	p: remove find/case (sort append list n) n
+	case [
+		head? p [p/1]
+		tail? p [p/-1]
+		(n - p/-1) < (p/1 - n) [p/-1]
+		'else   [p/1]
+	]
+]
+
+#assert [3 = closest-number 3 [1 2 3]]
+#assert [3 = closest-number 3 [3 4 5]]
+#assert [3 = closest-number 1 [3 4 5]]
+#assert [3 = closest-number 3 [1 4 5 3 2]]
+#assert [4 = closest-number 3 [1 4 5 0]]
+
 ;-- debug func
 dump-event: function [event] [
-	foreach w system/catalog/accessors/event! [
-		print [w mold/flat/part event/:w 60]
+	event: object map-each/eval w system/catalog/accessors/event! [
+		[to set-word! w 'quote event/:w]
 	]
+	help event
 ]
 
 {

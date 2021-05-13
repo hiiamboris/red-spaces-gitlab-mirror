@@ -78,7 +78,7 @@ view/no-wait/options [
 								(r)
 							]
 						]
-						22
+						27
 				][
 					zx: cell-size/x / size/x
 					zy: cell-size/y / size/y
@@ -90,7 +90,6 @@ view/no-wait/options [
 		]
 	] with [color: system/view/metrics/colors/panel]
 	rate 50 on-time [b/draw: render b]
-	on-created [b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

@@ -28,7 +28,6 @@ view/no-wait/options [
 	]
 	; rate 3 on-time [b/draw: render b]
 	status: text 300x40
-	do [b/draw: render b]
 ] [offset: 10x10]
 ; foreach-*ace/next path system/view/screens/1 [probe path]
 either system/build/config/gui-console? [halt][do-events]

@@ -14,8 +14,9 @@ register-finalizer [key] function [space [object!] path [block!] event [event!]]
 		not stop?										;-- was not eaten by any control
 	][
 		new-focus: find-next-focal-space (pick [back forth] event/shift?)
-		unless same-paths? new-focus keyboard/focus [
-			#debug [#print "Moving focus from (as path! keyboard/focus) to (as path! new-focus)"]
+		old-focus: keyboard/focus
+		unless same-paths? new-focus old-focus [
+			#debug [#print "Moving focus from (as path! old-focus) to (as path! new-focus)"]
 			; probe index? find-same-path list-*aces anonymize 'screen system/view/screens/1 as path! new-focus
 			keyboard/focus: new-focus
 			update

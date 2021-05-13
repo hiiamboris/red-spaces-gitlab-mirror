@@ -90,6 +90,8 @@ truly rich text widget - where text is mixed with other (interactive) spaces
 rename grid-view to data-grid?
 demo: debugger, need to mark functions, store values of all words during last iteration or 2-3 last iterations,
 	and be able to explore those (where spaces come to help)
+demo: round lists (like in games or sketchbook) - showing the power of container/layout
+
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
 
@@ -479,6 +481,13 @@ tricks of grid containing itself in each cell
 	draw-ctx and ccache can (and should) be shared between inner and outer renders
 	and should only be invalidated before the outermost render
 	no static lists should be used in draw
+list-view's list width - how to infer it?
+	let it be fixed, locked to the width of list-view?
+	there's no width for an infinite list
+	and adjusting width to a range of visible items is not great UX-wise
+	(scrollbars will show and hide while scrolling)
+	but it needs more thought.. esp. when I decide on sizing system
+	maybe this will help autosize items' content
 
 
 Timer design:
@@ -1795,4 +1804,231 @@ now that there's proper grid-view, this list of lists hack is not needed anymore
 ; 		; 	]
 ; 		; ]
 ; 	]
+; ]
+
+this was crazy complex
+; list-view-ctx: context [
+; 	spaces/list-view: make-space/block 'inf-scrollable [
+; 		source: []		;@@ or a function [index]? or support both?
+; 		data: function [/pick i [integer!] /length] [
+; 			either pick [source/:i][length? source]
+; 		]
+; 		index: 1										;-- index of the first item within source
+		
+; 		wrap-data: function [item-data [any-type!]][
+; 			spc: make-space 'data-view []
+; 			set/any 'spc/data :item-data
+; 			if list/axis = 'y [spc/width: window/max-size/x - (list/margin/x * 2)]		;@@ what data width to use for horizontal lists?
+; 			anonymize 'item spc
+; 		]
+
+; 		list: make-space 'list [axis: 'y]				;-- list/axis can be changed to get a horizontal list ;@@ but then setup becomes wrong
+; 		window/map: [list [offset 0x0 size 0x0]]
+
+; 		window/max-size: 1000x1000		;@@ this is where sizing strategy would be cool to have
+
+; 		extra?: function [dir [word!]] [			;-- measure dangling extra size along any direction
+; 			if empty? map: window/map [return 0]
+; 			#assert [2 = length? map]
+; 			r: max 0x0
+; 				switch dir [
+; 					w n [negate map/2/offset]
+; 					e s [map/2/offset + map/2/size - window/max-size]
+; 				]
+; 			r/x + r/y
+; 		]
+
+; 		window/available?: function [dir [word!] requested [integer!]] [
+; 			#assert [0 < requested]
+; 			if any [
+; 				all [list/axis = 'y  find [e w] dir]
+; 				all [list/axis = 'x  find [n s] dir]		;@@ not sure about this yet, /width doesn't guarantee it
+; 			] [return 0]
+; 			reserve: extra? dir
+; 			requested: requested - reserve
+
+; 			r: 0
+; 			if requested > 0 [
+; 				lt: extend-layout dir requested
+; 				r: lt/content-size/(list/axis)
+; 				unless empty? lt/items [r: r + lt/spacing/(list/axis)]
+; 			]
+; 			r: max 0 r + reserve
+; 			; print ["avail?" dir "=" r "of" requested "(reserve:" reserve ")"]
+; 			r
+; 		]
+
+; 		;@@ ensure this one is called only from inf-scrollable/draw
+; 		extend-layout: function [dir [word!] amount [integer!] /keep where [block!]] [
+; 			; print ["extend" dir amount]
+; 			lt: list/make-layout
+; 			unless empty? list/items [amount: amount - lt/spacing/(list/axis)]
+; 			switch dir [
+; 				n w [+-: :-  n-max: (base: index) - 1]
+; 				s e [+-: :+  n-max: data/length - base: index - 1 + length? list/items]
+; 			]
+; 			#assert [(select [n y s y e x w x] dir) = list/axis]
+; 			repeat i n-max [
+; 				name: wrap-data data/pick base +- i		;-- guarantee at least 1 item (else spacing could be bigger than the requested amount)
+; 				#assert [not find/same list/items name]
+; 				render name
+; 				lt/place select get name 'size
+; 				if keep [append where name]
+; 				if lt/content-size/(list/axis) >= amount [break]
+; 			]
+; 			lt
+; 		]
+
+; 		;-- this func is quite hard to get right, many aspects to consider
+; 		;-- * window moves list within it's map before calling `fill`,
+; 		;--   but we'll have to move list back and move all items within list accordingly
+; 		;-- * move offset can be used right away to know what spaces will be hidden
+; 		;-- * list may have extra dangling items partially clipped by window (before the move), which now become visible
+; 		;--   i.e. list/size may be > window/max-size because it contains whole items, not necessarily aligning to window borders
+; 		;-- * these hidden parts should be subtracted from the xy1-xy2 area to know how much to extend the list itself
+; 		;-- * there may be no new items to add, just the hidden area to show
+; 		;-- * list may initially be empty (spacing to consider), or not rendered (undefined size)
+; 		;-- * when filling from above, list should be aligned with the top border, when from below - the opposite
+; 		;@@ and I haven't considered the case where window/max-size <= list-view/size (it isn't working)
+; 		window/fill: function [xy1 [pair!] xy2 [pair!]] [
+; 			; ?? size print ["fill" xy1 xy2]
+; 			;@@ TODO: remove these or add x=opposite support
+; 			#assert [0 = xy1/x]
+; 			#assert [window/max-size/x = xy2/x]
+; 			#assert [any [xy1/y = 0  xy2/y = window/max-size/y]]
+
+; 			unit: select [x 1x0 y 0x1] x: list/axis
+; 			dir: select
+; 				pick [ [x e y s] [x w y n] ] xy2/:x = window/max-size/:x	;-- s/e = tail fill (or head to tail), n/w = head fill (partial)
+; 				x
+; 			negative?: none <> find [n w] dir
+; 			either negative? [											;-- get already rendered parts out of the requested area
+; 				xy2/:x: xy2/:x - extra? dir
+; 			][	xy1/:x: xy1/:x + extra? dir
+; 			]
+; 			lgeom: window/map/list
+
+; 			;-- xy area now lies purely outside the list, so we can fill it
+; 			lt: extend-layout/keep dir (xy2/:x - xy1/:x) clear new: []
+
+; 			;-- sometimes it's possible that `new` is empty and `fill` should only move the list to show `extra?` (hidden) area
+; 			unless empty? new [
+; 				;@@ TODO: some automatic extension calculation? right now it won't work for arbitrary layout
+; 				pixels-added: lt/content-size/:x + either empty? list/items [0][lt/spacing/:x]
+
+; 				offset: lgeom/offset						;-- we can count invisibles right now from list/offset
+; 				initial-fill?: offset = 0x0					;-- on first fill, do not align with the lowest/rightmost edge
+				
+; 				n-remove: 0									;-- count how many invisible spaces to remove
+; 				foreach': switch dir [n w [:foreach-reverse] s e [:foreach]]	 ;@@ should be for-each/reverse
+; 				;@@ list should have no timer in the map, else we'll have to check names for `item`
+; 				foreach' [_: geom:] list/map [
+; 					o: geom/offset + offset
+; 					visible?: bbox-overlap?  0x0 window/max-size  o o + geom/size
+; 					either visible? [break][n-remove: n-remove + 1]
+; 				]
+
+; 				either negative? [									;-- insert new items
+; 					insert list/items reverse new
+; 					self/index: self/index - length? new
+; 				][
+; 					append list/items new
+; 					maybe self/index: self/index + n-remove			;-- n-remove can be 0
+; 				]
+
+; 				pixels-removed: 0									;-- along the list/axis
+; 				if n-remove > 0 [
+; 					removed: either negative? [						;-- remove invisibles from `items` & `map`
+; 						take/last/part list/items n-remove
+; 						take/last/part list/map n-remove * 2
+; 					][
+; 						remove/part list/items n-remove
+; 						take/part list/map n-remove * 2
+; 					]
+
+; 					rem-1st: removed/2
+; 					rem-last: last removed
+; 					pixels-removed: rem-last/offset + rem-last/size - rem-1st/offset + lt/spacing		;@@ TODO: automatic calculation if possible?
+; 					pixels-removed: pixels-removed/:x
+; 				]
+
+; 				;-- now that we know removed size we can calculate how much to shift the list in window/map
+; 				offset: unit * either negative? [pixels-added][pixels-removed * -1]
+
+; 				foreach [_ geom] list/map [					;-- relocate visible spaces now that we know the offset
+; 					geom/offset: geom/offset - offset
+; 				]
+
+; 				either new-size: list/size [
+; 					;-- update the size, without re-rendering anything
+; 					new-size/:x: new-size/:x - pixels-removed + pixels-added
+; 					maybe list/size: new-size
+; 				][
+; 					;-- render the list to get it's size - should only be needed first time it's shown
+; 					render/only 'list xy1 xy2
+; 				]
+; 			]
+; 			#assert [list/size]
+
+; 			;-- update list geometry inside the window
+; 			lgeom/size: list/size
+; 			lgeom/offset: either any [negative? initial-fill?] [
+; 				0x0												;-- align to top-left corner of the window
+; 			][	min 0x0 window/max-size - list/size * unit		;-- to bottom-left, but only if list > window(!)
+; 			]
+; 		]
+
+; 		setup: function [] [
+; 			if size [									;-- if size is defined, adjust the window (paragraphs adjust to window then)
+; 				pages: 10								;@@ make this configurable?
+; 				unit: select [x 1x0 y 0x1] list/axis
+; 				maybe window/max-size: size + (pages - 1 * size * unit)
+; 			]
+; 		]
+
+; 		inf-scrollable-draw: :draw
+; 		draw: function [] [
+; 			setup
+; 			inf-scrollable-draw
+; 		]
+; 	]
+; ]
+
+call to `available?` to window's limits is very expensive - renders whole window
+; window/draw: function [/only xy1 [pair!] xy2 [pair!]] [
+; 	#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
+; 	#assert [word? content]
+; 	map/1: content								;-- rename it properly
+; 	cspace: get content
+; 	geom: map/:content
+; 	o: geom/offset
+; 	;-- there's no size for infinite spaces so we use `available?` to get the drawing size
+; 	s: max-size
+; 	foreach x [x y] [s/:x: available? x 1 (0 - o/:x) s/:x]
+; 	default xy1: 0x0
+; 	default xy2: s
+; 	geom/size: s - o
+; 	self/size: s							;-- limit window size by content size
+; 	cdraw: render/only content xy1 - o xy2 - o
+; 	compose/only [translate (o) (cdraw)]
+; ]
+
+no longer relevant in the new styles design
+; set 'closures reshape [		;-- closures come after the main drawing code
+; 	; hscroll/thumb vscroll/thumb [
+; 	; 	(when focused?/parent [compose/deep [
+; 	; 		push [
+; 	; 			;@@ MEH DOESNT WORK YET -- CHECK PATTERN PEN WHEN IT"S FIXED
+; 	; 			; pen pattern 4x4 [line-width 0 fill-pen black box 0x0 2x2 box 2x2 4x4]
+; 	; 			; fill-pen 0.100.200.200
+; 	; 			; line-width 0
+; 	; 			; box 0x0 (size)
+; 	; 			; line-width 2
+; 	; 			line-width 0
+; 	; 			fill-pen !(svmc/text + 0.0.0.100)
+; 	; 			box 4x3 (size - 4x3)
+; 	; 			line-width 2
+; 	; 		]
+; 	; 	]])
+; 	; ]	
 ; ]

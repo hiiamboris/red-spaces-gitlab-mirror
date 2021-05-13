@@ -77,7 +77,6 @@ view/no-wait/options [
 		]
 	] with [color: system/view/metrics/colors/panel]
 	; rate 50 on-time [b/draw: render b]
-	on-created [b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

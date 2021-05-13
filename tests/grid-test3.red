@@ -29,7 +29,6 @@ view/no-wait/options [
 			; grid/heights/default: 300
 		]
 	] with [color: system/view/metrics/colors/panel]
-	on-created [b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

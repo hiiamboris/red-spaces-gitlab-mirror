@@ -20,8 +20,6 @@ red <test-name.red>
 
 ## Common tests
 
----
-
 [**web-test.red**](web-test.red)
 
 <img width=400 src=https://s3.gifyu.com/images/GIF-03-May-21-19-05-28.gif></img>
@@ -30,6 +28,16 @@ Simplest infinite canvas test, with a spider web.
 
 ---
 
+[**scrollbars-test.red**](scrollbars-test.red)
+
+<img width=400 src=https://i.gyazo.com/036a55dd9ea18d2ebf1ff8ba80dde9fd.gif></img>
+
+Tests of how scrollbars adapt their look to various sizes.\
+Not interactive yet, as scrollbars events are undefined outside of `scrollable` space's use.
+
+
+
+
 ## Text tests
 
 [**spiral-test.red**](spiral-test.red)
@@ -37,6 +45,35 @@ Simplest infinite canvas test, with a spider web.
 <img width=400 src=https://i.gyazo.com/74d4e22f7480bda9f5c2df8e11c6bfb5.gif></img>
 
 Stress test. Huge editable field curled spirally. Very slow, because renders each glyph separately :)
+
+
+
+
+## List tests
+
+[**list-test1.red**](list-test1.red)
+
+![](https://i.gyazo.com/04e3d14159f4a7406993b152c9320963.png)
+
+Simplest `list` of 3 `button` spaces.
+
+---
+
+[**list-test2.red**](list-test2.red)
+
+<img width=300 src=https://i.gyazo.com/fdc869193e270fb70946049ccd300b31.gif></img>
+
+`list-view` test: a scrollable window moving over a big but finite content.
+
+---
+
+[**list-test3.red**](list-test3.red)
+
+<img width=300 src=https://i.gyazo.com/8bc05c44d0ad23434900416d70868469.gif></img>
+
+`list-view` test: a scrollable window moving over an *infinite* content. No matter how far scrolled down, it should be responsive.
+
+
 
 ## Grid tests
 

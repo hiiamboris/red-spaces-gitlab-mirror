@@ -106,7 +106,6 @@ view/no-wait/options [
 		]
 	] with [color: system/view/metrics/colors/panel]
 	rate 50 on-time [b/draw: render b]
-	on-created [b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
@@ -120,32 +119,3 @@ view/no-wait/options [
 
 ; foreach-*ace/next path system/view/screens/1 [probe path]
 either system/build/config/gui-console? [print "---"][do-events]
-
-{
-			draw: function [] [
-				r: []
-				set 'depth 1 + old: depth
-				;-- this gets quite slow to render :)
-				;-- depth<=7 even if 4 cells are visible means 4**7=16384 cells! and about ~1G of RAM
-				if depth <= 2 [r: old-draw]
-				set 'depth old
-				either old = 0 [
-					; elapsed: 0
-					elapsed: to float! difference now/precise t0
-					zx: zy: exp (0.5 * elapsed) // log-e ratio
-					compose/only/deep [
-						translate (size / 2) [
-							scale (zx) (zy) [
-								translate (size / -2)
-								(r)
-							]
-						]
-					]
-				][
-					zx: cell-size/x / size/x
-					zy: cell-size/y / size/y
-					compose/only [scale (zx) (zy) (r)]
-				]
-			]
-
-}
