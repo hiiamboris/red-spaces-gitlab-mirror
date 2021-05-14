@@ -151,7 +151,7 @@ view [
 	host [								;) create a Host face that can contain spaces
 		list with [axis: 'y] [			;) draw a vertical list on the Host
 			paragraph with [text: "Hello, space!"]
-			button with [data: "OK" command: [quit]]
+			button with [data: "OK" width: 80 command: [quit]]
 		]
 	]
 ]
@@ -188,7 +188,9 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
 		make-space/name 'button [
-			data: "OK" command: [quit]
+			data: "OK"					;) data can be any Red type
+			width: 80					;) width makes the button bigger than it's data
+			command: [quit]				;) code that is evaluated when button is released
 		]
 	]
 ]

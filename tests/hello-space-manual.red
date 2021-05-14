@@ -13,7 +13,9 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
 		make-space/name 'button [
-			data: "OK" command: [quit]
+			data: "OK"					;) data can be any Red type
+			width: 80					;) width makes the button bigger than it's data
+			command: [quit]				;) code that is evaluated when button is released
 		]
 	]
 ]

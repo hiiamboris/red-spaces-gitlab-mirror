@@ -6,7 +6,7 @@ view [
 	host focus [						;) create a Host face that can contain spaces
 		list with [axis: 'y] [			;) draw a vertical list on the Host
 			paragraph with [text: "Hello, space!"]
-			button with [data: "OK" command: [quit]]
+			button with [data: "OK" width: 80 command: [quit]]
 		]
 	]
 ]
