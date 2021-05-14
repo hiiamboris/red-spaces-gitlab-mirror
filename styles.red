@@ -11,10 +11,10 @@ current-style: as path! []	;-- used as a stack during draw composition
 do with [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
 	svmc: copy system/view/metrics/colors
-	unless svmc/text [svmc/text: black]					;@@ GTK fix
-	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix
+	unless svmc/text [svmc/text: black]					;@@ GTK fix for #4740
+	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
-	serif-12: make font! [name: svf/serif size: 12]
+	serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
 
 	;-- very experimental `either` shortener: logic | true-result | false-result
 	|: make op! func [a b] [
@@ -45,12 +45,14 @@ do with [
 			pen !(svmc/text)
 		]]
 
-		; paragraph [[
-		; 	;-- font can be set in the style!:
-		; 	;-- but impossible to debug it, as probe draw lists font with thousands of parents
-		; 	; (self/font: serif-12 ())			;@@ #3804 - requires self/ or won't work
-		; 	pen blue
-		; ]]
+		#if system/platform = 'Linux [			;@@ GTK fix for #4901
+			paragraph [[
+				;-- font can be set in the style!:
+				;-- but impossible to debug it, as probe draw lists font with thousands of parents
+				(self/font: serif-12 ())			;@@ #3804 - requires self/ or won't work
+				; pen blue
+			]]
+		]
 
 		; list/item [[pen cyan]]
 
