@@ -10,8 +10,8 @@ A dialogue.\
 Program communicates info to the human by drawing things on display.\
 Human traditionally answers (interacts) via keyboard or any pointing device (voice recognition left alone for simplicity). That's why UI is interactive.
 
-This design provides 3 basic needs:
-- Spaces (how to display things)
+Spaces design provides for 3 basic needs:
+- Spaces themselves (how to display things)
 - Hittesting via `into` and `map` (how to interpret clicks, gestures, etc)
 - Focus model (how to interpret keyboard input)
 
@@ -81,9 +81,10 @@ Automatic sizing strategy is not implemented yet, but will only affect the fixed
 
 <details>
 	<summary>
-How does hittest work if `size` is volatile and may even depend on time itself?
+How does hittest work if <pre>size</pre> is volatile and may even depend on time itself?
 </summary>
 
+<br>
 `size` for the last rendered frame determines the geometry for all pointer events land. New frame - new geometry. Layout can be moving, rotating, distorting, but what one sees is what one interacts with.
 
 </details>
@@ -108,7 +109,7 @@ map: [
 
 <details>
 	<summary>
-There is no `parent` facet. *Same* space object can be shared between various parents, or it can even be it's own child.
+There is no <pre>parent</pre> facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
 	</summary>
 
 A tree nonetheless exists:
@@ -135,9 +136,10 @@ This allows for rotation, compression, reflection, anything. Can we make a "mirr
 
 <details>
 	<summary>
-`into` does not provide tree iteration (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then `map` should also be provided.
+<pre>into</pre> does not provide tree iteration capability (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then <pre>map</pre> should also be provided.
 </summary>
 
+<br>
 Geometries in such `map` are ignored and can be absent or contain invalid/dummy/empty values, e.g.:
 - `[inner-space [] ...]` (no offset or size)
 - `[inner-space [offset 0x0 size 0x0] ...]` (dummy geometry)
@@ -156,9 +158,10 @@ Map is only good for rectangular geometry (which is the majority of use cases an
 
 <details>
 	<summary>
-Names in the `map` may repeat (by spelling), but each should refer to a unique object.
+Names in the <pre>map</pre> may repeat (by spelling), but each should refer to a unique object.
 	</summary>
 
+<br>
 Examples of that are `list` and `grid` styles that can contain hundreds of `item` or `cell` occurrences in their `map`. Each `item`/`cell` is styled using the same style, and shares same event handlers, but objects (`get item`/`get cell`) are not the same.
 
 </details>
@@ -173,7 +176,7 @@ Names are used everywhere in place of objects: in `map`, in `items-list` and `ce
 
 Space can only be rendered by it's name (`render` won't accept a space object), because this name tells it which style to use. Event dispatcher uses names to decide what event handlers to call.
 
-Why need for name?
+Why a name is needed?
 - styles are based on names
 - events are dispatched by names
 - what is focusable or not depends on it's name
@@ -181,7 +184,7 @@ Why need for name?
 
 <details>
 	<summary>
-Why `(get name) = object` rather than `object [name: ..]`?
+Why <pre>(get name) = object</pre> rather than <pre>object [name: ..]</pre>?
 </summary>
 
 - listing the tree of spaces
@@ -247,8 +250,8 @@ Key concepts:
 
 ### Function lists
 
-Faces: single actor works on top of magic done in R/S or by the OS. It cannot override this magic and render the widget useless.\
-Spaces: all magic is done by default event handlers, so they should not be overridden.
+*Faces:* single actor works on top of magic done in R/S or by the OS. It cannot override this magic and render the widget useless.\
+*Spaces:* all magic is done by default event handlers, so they should not be overridden.
 
 Every space/event combo is associated with a function list: default handler -> extension handler -> user handler... Handlers of extending spaces do not override handlers of spaces they are based on.
 
@@ -275,7 +278,7 @@ Key concepts:
 
 <details>
 	<summary>
-`events/process-event` is the function that can be called to pass emulated events into event handlers.
+<pre>events/process-event</pre> is the function that can be called to pass emulated events into event handlers.
 </summary>
 
 ```
@@ -311,9 +314,10 @@ Only *visible* spaces can be focused by tabbing or clicking, i.e. they must be p
 
 <details>
 	<summary>
-*Tabbing order* is the order of the tree, i.e. defined by `map` order (in turn may be defined by `items` order in case of `list` space, etc.). `list-spaces` function can be used to visualize it.
+<i>Tabbing order</i> is the order of the tree, i.e. defined by <pre>map</pre> order (in turn may be defined by <pre>items</pre> order in case of <pre>list</pre> space, etc.). <pre>list-spaces</pre> function can be used to visualize it.
 	</summary>
 
+<br>
 Space tree has 2 dimensions: outer/inner (depth-wise) and previous/next (sibling nodes).\
 Forward order (Tab key) is defined as *outer->inner and previous->next*, e.g.:
 ```

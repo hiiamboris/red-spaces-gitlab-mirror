@@ -24,7 +24,7 @@ red <test-name.red>
 
 <img width=400 src=https://s3.gifyu.com/images/GIF-03-May-21-19-05-28.gif></img>
 
-Simplest infinite canvas test, with a spider web. 
+Simplest infinite canvas test, with a spider web. I use it to check if `inf-scrollable` works at all.
 
 ---
 
@@ -71,7 +71,7 @@ Simplest `list` of 3 `button` spaces.
 
 <img width=300 src=https://i.gyazo.com/8bc05c44d0ad23434900416d70868469.gif></img>
 
-`list-view` test: a scrollable window moving over an *infinite* content. No matter how far scrolled down, it should be responsive.
+`list-view` test: a scrollable window moving over *infinite* content. No matter how far scrolled down, it should be responsive.
 
 
 

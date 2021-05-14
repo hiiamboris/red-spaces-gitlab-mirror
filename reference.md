@@ -10,7 +10,9 @@ Explains how each Space works.
 
 A core concept in spaces is that each space object must be named. Name is what makes it possible to look up styles and choose proper event handlers, because there is no other connection between styles/events and the space object.
 
-`anonymize` function is used in a lot of places:
+However all these names (words) have to belong to different contexts as they share spelling.
+
+For this `anonymize` function is used:
 ```
 >> ? anonymize
 USAGE:
@@ -25,7 +27,7 @@ ARGUMENTS:
      value        [any-type!] 
 ```
 
-You'll notice words created by this function in a lot of facets: `map`, `content`, `item-list`, `cell-map`, etc.
+Words created by this function in a lot of facets: `map`, `content`, `item-list`, `cell-map`, etc.
 
 ### Make-space
 
@@ -51,9 +53,11 @@ REFINEMENTS:
 
 Forms:
 - `make-space 'type [...]` - returns instantiated space object. Good when you have a named facet and want it to refer to a space object. Similar to the native `make`, `spec` of `make-space` can add new facets to the spaces it creates.
-- `make-space/block 'type [...]' - returns spec block used to create a space object. Good for defining new space types (they're all blocks). To create new templates, they should be placed into the `spaces` map: `spaces/new-type: make-space/block 'template [...]`.
-- `make-space/name 'type [...]' - returns word `type` in an anonymous context, referring to an instantiated space object. Good for putting this name into `scrollable/content`, `list/item-list` or `grid/cell-map` facets.
+- `make-space/block 'type [...]` - returns spec block used to create a space object. Good for defining new space types (they're all blocks). To create new templates, they should be placed into the `spaces` map: `spaces/new-type: make-space/block 'template [...]`.
+- `make-space/name 'type [...]` - returns word `type` in an anonymous context, referring to an instantiated space object. Good for putting this name into `scrollable/content`, `list/item-list` or `grid/cell-map` facets.
 
+
+### Testing
 
 All examples of code in this reference can be tested like this:
 ```
@@ -80,7 +84,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 | `draw` | `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` of composite spaces.<br> May support `/only xy1 xy2` refinement - to draw only a selected region. |
 | `rate` | `time!` `integer!` `float!` `none!` | Specifies rate of the `on-time` event. `time!` sets period, numbers set rate (1 / period).<br> Not usually present in most spaces by default, but can be added using `make-space` or `with [rate: ..]` keyword in VID.<br> If `none` or absent, no `on-time` event is generated. |
 | `map` | `block!` | Only for container spaces: describes the inner spaces geometry in this space's coordinate system.<br> Has format: `[name [offset: pair! size: pair!] name ...]`.<br> `name` is the name (word) of inner space that should refer to it's object.<br> Used for hittesting and tree iteration. |
-| `into` | `func [xy [pair!]] -> [name xy']` | Only for container spaces: more general variant of `map`: takes a pair in this space's coordinate system and returns name (word) of an inner space it maps to and the coordinate in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force name` refinement that determines the inner space. |
+| `into` | `func [xy [pair!]] -> [name xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns name (word) of an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force name` refinement that determines the inner space. |
 | `on-change*` | `func [word old new]` | Used internally to help enforce consistency, reset cache, etc. |
 
 Some facets are not reserved or prescribed but are **recommended** as a guideline for consistency:
@@ -93,14 +97,16 @@ Some facets are not reserved or prescribed but are **recommended** as a guidelin
 | `font`   | `object!` | An instance of `font!` object. Preferably should be set from styles. |
 
 <details>
-	<summary>Note on `map` vs `into`</summary>
+	<summary>Note on <pre>map</pre> vs <pre>into</pre></summary>
 
-- hittesting is done with any of them, `into` is preferred (this makes it possible to pass pointer events to inner spaces)
+<br>
+- hittesting is done with any of them, `into` takes precedence (this makes it possible to pass pointer events to inner spaces)
 - tree iteration (e.g. when tabbing) uses `map` only, but it uses only names from the map (not the geometry)
 
   So if `into` is supported, then `map` can contain spaces of empty/invalid geometry to simplify the code:
   ```
   map: [inner1 [] inner2 [] ...]
+  map: [inner1 inner2 ...]
   ```
 
 </details>
@@ -129,7 +135,7 @@ Template used to create timers:
 ```
 spaces/timer: make-space/block 'space [rate: none]
 ```
-Timer is not required for `on-time` event handler to receive events. Any space that has a `rate` facet set will receive these. In fact `make-space 'space [rate: 1]` produces identical space to `make-space 'timer [rate: 1]`.\
+Timer is not required for `on-time` event handler to receive events. Any space that has a `rate` facet set will receive these. In fact `make-space 'space [rate: 1]` produces a space identical to `make-space 'timer [rate: 1]`.\
 However `timer` makes the intent of code a tiny bit clearer. So it is advised to base timers on this space.
 
 
@@ -168,7 +174,7 @@ Draws an [isosceles triangle](https://en.wikipedia.org/wiki/Isosceles_triangle).
 
 Basic image renderer that has 2 modes: size adjusts to image / image adjusts to size.
 
-| ![]https://i.gyazo.com/95bfc0e8c6ba133f244315d9619fedcd.png | <pre>image with [<br>    p: [translate 50x50 pen red line-width 2 spline -40x-28 0x-46]<br>    loop 20 [append p -1x1 * (reverse last p) * 0.9]<br>    data: system/words/draw size: 100x100 p<br>    margin: 5<br>]</pre> |
+| ![](https://i.gyazo.com/95bfc0e8c6ba133f244315d9619fedcd.png) | <pre>image with [<br>    p: [translate 50x50 pen red line-width 2 spline -40x-28 0x-46]<br>    loop 20 [append p -1x1 * (reverse last p) * 0.9]<br>    data: system/words/draw size: 100x100 p<br>    margin: 5<br>]</pre> |
 |-|-|
 
 | facet  | type  | description |
@@ -184,7 +190,7 @@ Basic image renderer that has 2 modes: size adjusts to image / image adjusts to 
 
 Basic text renderer.
 
-| ![](https://i.gyazo.com/bae37d89c0d89f05136daecf3bcb7cc4.png) | <pre>paragraph with [<br> margin: 20x10<br>   width: 100<br>  text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
+| ![](https://i.gyazo.com/bae37d89c0d89f05136daecf3bcb7cc4.png) | <pre>paragraph with [<br>    margin: 20x10<br>    width: 100<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
 |-|-|
 
 | facet  | type  | description |
@@ -204,6 +210,8 @@ Renderer of arbitrary data:
 - given `image!` uses [`image`](#image)
 - given `block!` uses [`list`](#list)
 - otherwise molds the data and uses `paragraph`
+
+Used in `button`, `list`, `grid` - in every space that displays data.
 
 | facet  | type  | description |
 |-|-|-|
@@ -282,7 +290,7 @@ Obvious. To be used in other spaces, as by itself it's not interactive. Used in 
 | `offset` | float! percent! | 0 to 1 (100%) - area before the thumb |
 | `amount` | float! percent! | 0 to 1 (100%) - thumb area |
 
-Scrollbar will try it's best to adapt it's appearance to remain usable (visible, clickable) even with extreme values of it's facets.
+Scrollbar will try it's best to adapt it's appearance to remain useable (visible, clickable) even with extreme values of it's facets.
 
 
 ## Scrollable
@@ -354,8 +362,8 @@ Wrapper for infinite spaces: `scrollable` with it's `content` set to `window`. A
 | `origin` | pair! | point in inf-scrollable's coordinate system at which `window` is placed: <0 to left above, >0 to right below; combined with `window/map/(get window/content)/offset` can be used to translate coordinates into `content`'s coordinate system |
 | `content` | word! = `'window` | inherited from `scrollable` and should not be changed, set to `'window` |
 | `window/content` | word! | space to wrap, possibly infinite or half-infinite along any of X/Y axes |
-| `jump-length` | integer! >= 0 | maximum jump the window makes when it comes near it's borders |
-| `look-around` | integer! >= 0 | determines how near is "near it's borders", in pixels |
+| `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
+| `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 | `pages` | pair! | used to automatically adjust window/max-size from `self/size * pages` |
 | `roll-timer/rate` | integer! float! time! | how often window can jump e.g. if user drags the thumb or holds a PageDown key |
 
@@ -466,13 +474,8 @@ Note that list-view:
 
 A composite style to arrange spaces in a grid.
 
-- <details>
-    <summary>Grid's columns have fixed width, while rows can be fixed or auto-sized.</summary>
-
-Both width and height components cannot be inferred automatically as it's an equation with 2 unknowns.
-
-</details>
-- Grid can either have infinite width, or automatically infer row height, but not both.
+- Grid's columns have fixed width, while rows can be fixed or auto-sized.
+- Grid can either have infinite width, or automatically infer row height, but not both (it would be an equation with 2 unknowns).
 - Grid can have infinite height.
 - Grid cells can span multiple rows and/or columns.
 
@@ -502,7 +505,7 @@ Default `cells` just acts as a wrapper around `cell-map`, picking spaces from it
 
 <details>
 <summary>
-To work with cell span the following API is used: `get-span`, `set-span`, `get-first-cell`
+To work with cell span the following API is used: <pre>get-span</pre>, <pre>set-span</pre>, <pre>get-first-cell</pre>
 </summary>
 
 ```
@@ -566,8 +569,8 @@ Some facets are inherited from [`inf-scrollable`](#inf-scrollable):
 |-|-|-|
 | `size` | pair! | size is fixed and should be defined |
 | `origin` | pair! | point in inf-scrollable's coordinate system at which `window` is placed: <0 to left above, >0 to right below; combined with `window/map/(get window/content)/offset` can be used to translate coordinates into `content`'s coordinate system |
-| `jump-length` | integer! >= 0 | maximum jump the window makes when it comes near it's borders |
-| `look-around` | integer! >= 0 | determines how near is "near it's borders", in pixels |
+| `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
+| `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 | `pages` | pair! | used to automatically adjust window/max-size from `self/size * pages` |
 | `roll-timer/rate` | integer! float! time! | how often window can jump e.g. if user drags the thumb or holds a PageDown key |
 
