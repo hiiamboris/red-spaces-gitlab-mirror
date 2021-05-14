@@ -48,7 +48,7 @@ Good enough to experiment with, and to propose design enhancements and feature r
 | Reactivity | Model undecided yet, not reactive right now |
 | User's guide | Written |
 | Widget reference | Written |
-| Creator's guide | Not written |
+| Creator's guide | Written |
 | Templates | None made so far |
 
 
