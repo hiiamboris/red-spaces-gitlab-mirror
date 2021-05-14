@@ -27,9 +27,11 @@ copy-deep-limit: function [b n] [
 ; system/view/auto-sync?: no
 traversal/depth-limit: 4
 depth: 0
+max-depth: 1
 t0: now/precise
 view/no-wait/options [
 	below
+	text 500 center white red font-size 20 "Rendering this should take a while..."
 	b: host [
 		grid-view with [
 			size: 500x300
@@ -47,7 +49,7 @@ view/no-wait/options [
 			cell-size: size - 5 / ratio - 5		;-- considers margins/spacing
 			grid/widths/default:  cell-size/x
 			grid/heights/default: cell-size/y
-			old-cleanup: :grid/draw-ctx/cleanup
+			; old-cleanup: :grid/draw-ctx/cleanup
 			; grid/draw-ctx/cleanup: does [
 			; 	if depth <= 2 [old-cleanup]
 			; ]
@@ -55,16 +57,13 @@ view/no-wait/options [
 			grid/cells: func [/pick xy /size] [
 				either pick ['grid-view][1x1 * ratio + 1]
 			]
-			; grid/cells: func [/pick xy /size] [
-			; 	either pick ['grid-view][1x1 * ratio + 1]
-			; ]
 			old-draw: :draw
 			draw: function [] [
 				r: []
 				set 'depth 1 + old: depth
 				;-- this gets quite slow to render :)
 				;-- depth<=7 even if 4 cells are visible means 4**7=16384 cells! and about ~1G of RAM
-				if depth <= 6 [r: old-draw]
+				if depth <= max-depth [r: old-draw]
 				set 'depth old
 				either old = 0 [
 					r
@@ -76,11 +75,11 @@ view/no-wait/options [
 			]
 		]
 	] with [color: system/view/metrics/colors/panel]
-	; rate 50 on-time [b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
 	status: text 300x100
+	rate 50 on-time [face/rate: none max-depth: 6 b/draw: render b]
 ] [offset: 10x10]
 
 ; gv/grid/draw-ctx/cleanup
