@@ -37,7 +37,7 @@ Red []
 #include %styles.red
 #include %layouts.red
 #include %spaces.red
-#include %VID.red
+#include %vid.red
 #include %events.red
 #include %traversal.red
 #include %focus.red

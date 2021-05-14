@@ -10,7 +10,9 @@ current-style: as path! []	;-- used as a stack during draw composition
 
 do with [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
-	svmc: system/view/metrics/colors
+	svmc: copy system/view/metrics/colors
+	unless svmc/text [svmc/text: black]					;@@ GTK fix
+	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix
 	svf:  system/view/fonts
 	serif-12: make font! [name: svf/serif size: 12]
 
