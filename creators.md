@@ -81,7 +81,7 @@ Automatic sizing strategy is not implemented yet, but will only affect the fixed
 
 <details>
 	<summary>
-How does hittest work if <pre>size</pre> is volatile and may even depend on time itself?
+How does hittest work if `size` is volatile and may even depend on time itself?
 </summary>
 
 <br>
@@ -109,7 +109,7 @@ map: [
 
 <details>
 	<summary>
-There is no <pre>parent</pre> facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
+There is no `parent` facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
 	</summary>
 
 A tree nonetheless exists:
@@ -136,7 +136,7 @@ This allows for rotation, compression, reflection, anything. Can we make a "mirr
 
 <details>
 	<summary>
-<pre>into</pre> does not provide tree iteration capability (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then <pre>map</pre> should also be provided.
+`into` does not provide tree iteration capability (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then `map` should also be provided.
 </summary>
 
 <br>
@@ -158,7 +158,7 @@ Map is only good for rectangular geometry (which is the majority of use cases an
 
 <details>
 	<summary>
-Names in the <pre>map</pre> may repeat (by spelling), but each should refer to a unique object.
+Names in the `map` may repeat (by spelling), but each should refer to a unique object.
 	</summary>
 
 <br>
@@ -184,7 +184,7 @@ Why a name is needed?
 
 <details>
 	<summary>
-Why <pre>(get name) = object</pre> rather than <pre>object [name: ..]</pre>?
+Why `(get name) = object` rather than `object [name: ..]`?
 </summary>
 
 - listing the tree of spaces
@@ -278,7 +278,7 @@ Key concepts:
 
 <details>
 	<summary>
-<pre>events/process-event</pre> is the function that can be called to pass emulated events into event handlers.
+`events/process-event` is the function that can be called to pass emulated events into event handlers.
 </summary>
 
 ```
@@ -314,7 +314,7 @@ Only *visible* spaces can be focused by tabbing or clicking, i.e. they must be p
 
 <details>
 	<summary>
-<i>Tabbing order</i> is the order of the tree, i.e. defined by <pre>map</pre> order (in turn may be defined by <pre>items</pre> order in case of <pre>list</pre> space, etc.). <pre>list-spaces</pre> function can be used to visualize it.
+<i>Tabbing order</i> is the order of the tree, i.e. defined by `map` order (in turn may be defined by `items` order in case of `list` space, etc.). `list-spaces` function can be used to visualize it.
 	</summary>
 
 <br>

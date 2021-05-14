@@ -97,7 +97,7 @@ Some facets are not reserved or prescribed but are **recommended** as a guidelin
 | `font`   | `object!` | An instance of `font!` object. Preferably should be set from styles. |
 
 <details>
-	<summary>Note on <pre>map</pre> vs <pre>into</pre></summary>
+	<summary>Note on `map` vs `into`</summary>
 
 <br>
 - hittesting is done with any of them, `into` takes precedence (this makes it possible to pass pointer events to inner spaces)
@@ -505,7 +505,7 @@ Default `cells` just acts as a wrapper around `cell-map`, picking spaces from it
 
 <details>
 <summary>
-To work with cell span the following API is used: <pre>get-span</pre>, <pre>set-span</pre>, <pre>get-first-cell</pre>
+To work with cell span the following API is used: `get-span`, `set-span`, `get-first-cell`
 </summary>
 
 ```

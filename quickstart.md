@@ -253,7 +253,7 @@ After the scope, a block with style description should follow.
 
 <details>
 	<summary>
-		Hierarchical path usually looks like this: <pre>host/list/item</pre>. You can discover those paths for any given host face using the <pre>probe list-*aces anonymize 'host host-face</pre> command.
+		Hierarchical path usually looks like this: `host/list/item`. You can discover those paths for any given host face using the `probe list-*aces anonymize 'host host-face` command.
 	</summary>
 
 ```
@@ -347,7 +347,7 @@ Such power can be held in just 2-3 lines! :D
 
 <details>
 	<summary>
-	At first I tried a simpler model: <pre>[(style prefix) (space's draw commands) (style suffix)]</pre>. But it turned out to be too limited.
+	At first I tried a simpler model: `[(style prefix) (space's draw commands) (style suffix)]`. But it turned out to be too limited.
 	</summary>
 
 <br>
@@ -388,7 +388,7 @@ This function's output is used unmodified to draw the space.
 
 <details>
 	<summary>
-When it makes sense to draw only a portion of a space (e.g. it's big), styling function should support the <pre>/only</pre> refinement.
+When it makes sense to draw only a portion of a space (e.g. it's big), styling function should support the `/only` refinement.
 </summary>
 
 <br>
@@ -479,7 +479,7 @@ Path received by the handler is relative to the space that defined it. E.g. for 
 
 <details>
 	<summary>
-	In the same way child spaces in the path tell the parent handler that interaction is made with one of it's children. E.g. <pre>scrollable</pre> space's handlers know if interaction is made with a scroller's thumb or one of the arrows.
+	In the same way child spaces in the path tell the parent handler that interaction is made with one of it's children. E.g. `scrollable` space's handlers know if interaction is made with a scroller's thumb or one of the arrows.
 	</summary>
 
 <br>
@@ -585,7 +585,7 @@ A set of commands is available to each event handler, implementing the idea of [
 
 <details>
 	<summary>
-		<pre>stop?</pre> pipeline deserves special mention
+		`stop?` pipeline deserves special mention
 	</summary>
 
 <br>
@@ -650,7 +650,7 @@ Previewers however can use the `stop` command to stop the event from reaching al
 
 <details>
 	<summary>
-Current API (not yet mature enough) - <pre>start-drag</pre>, <pre>stop-drag</pre>, <pre>dragging?</pre>, <pre>drag-offset</pre>, <pre>drag-parameter</pre>, <pre>drag-path</pre>
+Current API (not yet mature enough) - `start-drag`, `stop-drag`, `dragging?`, `drag-offset`, `drag-parameter`, `drag-path`
 </summary>
 
 ```
