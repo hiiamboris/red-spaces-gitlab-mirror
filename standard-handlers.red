@@ -144,7 +144,7 @@ define-handlers [
 		]
 		on-up [space path event] [
 			stop-drag
-			space/pushed?: no
+			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
 			update
 		]
 		; on-click [space path event] [
@@ -243,7 +243,7 @@ define-handlers [
 				#"^H"  [remove skip t ci: ci - 1]	;-- backspace
 				#"^["  [maybe space/active?: no]	;-- Esc = deactivate
 			][exit]									;-- not supported yet key
-			maybe space/caret-index: max 0 min length? t ci
+			maybe space/caret-index: clip reduce [0 length? t] ci		;-- length may have changed, <> len
 			space/invalidate						;@@ TODO: should be caught maybe automatically?
 			update
 		]

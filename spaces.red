@@ -978,13 +978,13 @@ grid-ctx: context [
 			xy [pair!] "Column (x) and row (y); returns XY unchanged if no such multicell"
 		][
 			span: get-span xy
-			if 0x0 = max 0x0 span [xy: xy + span]
+			if span ◄ 1x1 [xy: xy + span]
 			xy
 		]
 
 		break-cell: function [first [pair!]] [
 			if 1x1 <> span: get-span first [
-				#assert [1x1 = min 1x1 span]			;-- ensure it's a first cell of multicell
+				#assert [1x1 ◄= span]					;-- ensure it's a first cell of multicell
 				xyloop xy span [
 					remove/key spans xy': first + xy - 1x1
 					;@@ invalidate content within ccache?
@@ -994,7 +994,7 @@ grid-ctx: context [
 
 		unify-cells: function [first [pair!] span [pair!]] [
 			if 1x1 <> old: get-span first [
-				if 0x0 = max 0x0 old [
+				if old ◄ 1x1 [
 					ERROR "Cell (first + old) should be broken before (first)"	;@@ or break silently? probably unexpected move..
 				]
 				break-cell first
@@ -1014,14 +1014,14 @@ grid-ctx: context [
 			/force "Also break all multicells that intersect with the given area"
 		][
 			if span = get-span first [exit]
-			#assert [1x1 = min 1x1 span]				;-- forbid setting to span to non-positives
+			#assert [1x1 ◄= span]						;-- forbid setting to span to non-positives
 			xyloop xy span [							;-- break all multicells within the area
 				cell: first + xy - 1
 				old-span: get-span cell
 				if old-span <> 1x1 [
 					all [
 						not force
-						any [cell <> first  1x1 <> min 1x1 old-span]	;-- only `first` is broken silently if it's a multicell
+						any [cell <> first  1x1 ◄= old-span]	;-- only `first` is broken silently if it's a multicell
 						ERROR "Cell (first + old-span) should be broken before (first)"
 					]
 					break-cell cell + min 0x0 old-span
@@ -1223,7 +1223,7 @@ grid-ctx: context [
 		]
 
 		is-cell-pinned?: func [xy [pair!]] [
-			1x1 <> min 1x1 xy - pinned
+			not pinned ◄ xy
 		]
 
 		infinite?: function [] [
@@ -1330,7 +1330,7 @@ grid-ctx: context [
 			default xy1: 0x0
 			unless xy2 [dc/size: xy2: calc-size]
 
-			if 0x0 <> max 0x0 pinned [
+			unless pinned ◄= 0x0 [
 				set [map: drawn-common-header:] draw-range 1x1 pinned (margin + xy1)
 				xy1: (xy0: xy1 + margin) + get-offset-from 1x1 (pinned + 1x1)
 				append new-map map

@@ -42,7 +42,7 @@ for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code 
 	][
 		#assert [all [pair? i1 pair? i2]]
 		range: i2 - i1 + 1
-		if 1x1 <> min 1x1 range [exit]
+		unless 1x1 ◄= range [exit]	;-- empty range
 		xyloop i: range [
 			set word i - 1 + i1		;@@ does not allow index changes within the code, but allows in integer part above
 			do code
@@ -84,18 +84,32 @@ dump-event: function [event] [
 	a = min a b <=> b = max a b   
 }
 
-;@@ need good names to use these 'shortcuts' :(
-; down-right-from?: make op! func [b [pair!] a [pair!]] [1x1 = min 1x1 b - a]
-; down-right-inclusive-from?: 
+;-- chainable pair comparison - instead of `within?` monstrosity
+; >> 1x1 ◄ 2x2 ◄= 3x3 ◄ 4x4
+; == 4x4
+◄=: make op! func [
+	"Chainable pair comparison (non-strict)"
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b  b]
+]
+◄:  make op! func [
+	"Chainable pair comparison (strict)"    
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b - 1  b]
+]
+; ►:  make op! func [a b] [a = max a b + 1]
+; ►=: make op! func [a b] [a = max a b]
 
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
 bbox-overlap?: function [
-	"True if bounding boxes A1-A2 and B1-B2 intersect"
-	A1 [pair!] A2 [pair!] B1 [pair!] B2 [pair!]
+	"Get intersection size of bounding boxes A1-A2 and B1-B2, or none if they do not intersect"
+	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
+	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
 ][
-	i: (min A2 B2) - max A1 B1							;-- intersection size
-	1x1 == min 1x1 i									;-- optimized `all [i/x > 0 i/y > 0]`
+	0x0 ◄ ((min A2 B2) - max A1 B1)							;-- 0x0 ◄ intersection size
 ]
 
 vec-length?: function [v [pair!]] [
