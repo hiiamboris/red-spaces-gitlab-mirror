@@ -308,6 +308,8 @@ Focus allows to direct keyboard events (`key key-down key-up enter`) into a part
 - clicking (`down mid-down alt-down aux-down dbl-click`) on a point that intersects with a *focusable* space
 - [tabbing (module)](tabbing.red)
 
+Focused space is a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus).
+
 Focusable space types are listed in `keyboard/focusable` block (new types can be added there at will).
 
 Only *visible* spaces can be focused by tabbing or clicking, i.e. they must be present in the `map`s of their parents. `focus-space` doesn't have this limitation. If tabbing into a space outside of viewport is desired, spaces near the edge of the viewport should be put into the `map`.
