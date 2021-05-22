@@ -207,7 +207,11 @@ define-handlers [
 				] [exit]
 				;@@ allow new-line char only when multiline?
 				;@@ TODO: input validation / filtering
-				insert at space/text  space/caret-index: space/caret-index + 1  k
+				t: space/text
+				ci: space/caret-index:
+					1 + clip reduce [0 length? t]		;-- caret-index may be >len if text was changed
+						space/caret-index
+				insert at t ci  k
 				space/invalidate						;@@ TODO: should be caught maybe automatically?
 				update
 			][									;-- has to handle Enter, or both key-down and key will handle it, twice
@@ -232,8 +236,8 @@ define-handlers [
 				]
 			] [exit]
 
-			ci: space/caret-index
 			len: length? t: space/text
+			ci: clip [0 len] space/caret-index	;-- may be >len if text was changed
 			switch/default k: event/key [
 				left   [ci: ci - 1]			;@@ TODO: ctrl-arrow etc logic
 				right  [ci: ci + 1]
