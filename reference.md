@@ -622,7 +622,7 @@ Supports direction and alignment.
 
 Tube layout has 2 *orthogonal* axes:
 
-![](https://i.gyazo.com/5fd8f0caaaa9312bbfa05baf8b12e9f5.png)
+<img width=300 src=https://i.gyazo.com/5fd8f0caaaa9312bbfa05baf8b12e9f5.png></img>
 
 Rows are stacked along *primary axis*, it's size is extended to fit all items.\
 Items within row are stacked along *secondary axis*, it's size equals `width` and is fixed, items that do not fit go to next row (but no less than 1 item per row).\
