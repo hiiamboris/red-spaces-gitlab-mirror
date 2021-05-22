@@ -42,9 +42,12 @@ hittest: function [
 			set [name: _: name2:] template
 			repend path [name xy]
 			space: get name
+			#assert [xy]
+			; #assert [name2]							;-- can be none!
 			case [
 				into: select space 'into [
-					set [_ xy] into/force xy name2
+					set [_ xy] do copy/deep [into/force xy name2]	;@@ workaround for #4854 - remove me
+					; set [_ xy] into/force xy name2
 				]
 				map: select space 'map [
 					set [_ xy] into-map map xy name2
@@ -64,6 +67,7 @@ hittest: function [
 			]
 		][
 			repend path [name xy]
+			#assert [xy]
 			case [
 				into: select space 'into [
 					set [name xy] into xy
