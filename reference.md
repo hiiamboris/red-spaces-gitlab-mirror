@@ -396,14 +396,19 @@ Layout's interface is defined as follows:
 | facet  | type  | description |
 |-|-|-|
 | `margin` | `pair!` (in) | horizontal and vertical space between the items and the bounding box |
-| `place` | `func [item [word!]]` (in) | should be called to place a space on the layout; returns modified portion of it's `map` |
-| `map` | `block!` (out) | in the same format as `/map` facet of spaces; is built up by `place` calls |
+| `place` | `func [item [word!]]` (in) | should be called to place a space on the layout |
+| `map` | `block!` or `func [] -> block!` (out) | in the same format as `/map` facet of spaces; is built up by `place` calls and should be called to obtain the final result |
 | `size` | `pair!` (out) | full size of the layout with items placed so far |
 | `content-size` | `pair!` (out) | size of layout's content with items placed so far (not including margins) |
 
-Currently only `list-layout` is available. It simply stacks given items along given axis, adding spacing.
+Tip: every item added into a layout may move the previously placed items, so `map` should only be accessed after all of the items were added.
 
-Later more layouts will be added.
+Implemented layouts so far:
+
+| name | description |
+|-|-|
+| `list-layout` | Simply stacks given items along given axis, adding spacing. Supports same facets as `list` space: `axis`, `origin`, `margin`, `spacing` |
+| `tube-layout` | Arranges items into rows and fits rows into a tube of fixed width. See [`tube` space](#tube) for details. |
 
 
 
@@ -593,3 +598,59 @@ Additionally it supports:
 Default `data` just acts as a wrapper around `source`, picking from it and returning it's `source/size` value. But can be redefined to use any other source. In this case `source` will be unused.
 
 Note that `grid-view` contains *data*, which it transforms into spaces automatically.
+
+
+# Tube
+
+Container that places items into rows of fixed width, and stacks rows on top of each other. Unlike grid, has no columns and no support for big number of items. Similar to VID's standard flow layout.
+
+Supports direction and alignment.
+
+| ![](https://i.gyazo.com/ac67631a29d0d84f75f92de372125ff9.png) | <pre>tube with [width: 130] [<br>	button with [data: "button 1"]<br>	button with [data: "..2.."]<br>	button with [data: "3"]<br>	button with [data: "button 4"]<br>]</pre> |
+|-|-|
+
+
+| facet  | type | description |
+|-|-|-|
+| `item-list` | block! of word!s | contains names of spaces to arrange and render (see [container](#container)) |
+| `items` | function! | more generic item selector (see [container](#container)) |
+| `margin` | pair! | horizontal and vertical space between the items and the bounding box |
+| `spacing` | pair! | horizontal or vertical space between adjacent items, depending on chosen axis |
+| `axes`  | block! = `[word! word!]` | primary and secondary flow directions: each word is one of `n w s e`; default = `[s e]` |
+| `align` | block! = `[integer! integer!]` | row and item alignment: each integer is one of `-1 0 1`; default = `[-1 -1]` |
+| `width` | integer! > 0 | max extent along secondary direction (tube width); should be no less than max item size or that item will stick out |
+
+Tube layout has 2 *orthogonal* axes:
+
+![](https://i.gyazo.com/5fd8f0caaaa9312bbfa05baf8b12e9f5.png)
+
+Rows are stacked along *primary axis*, it's size is extended to fit all items.\
+Items within row are stacked along *secondary axis*, it's size equals `width` and is fixed, items that do not fit go to next row (but no less than 1 item per row).\
+Axes are specified as `n` (north = 0x-1), `s` (south = 0x1), `w` (west = -1x0), `e` (east = 1x0).
+
+Finished rows get aligned along secondary axis using `align/1`:
+- `-1` to align towards primary axis
+- `1` to align outwards from primary axis
+- `0` to center in `width`
+
+Items within finished rows get aligned along primary axis using `align/2`:
+- `-1` to align towards secondary axis
+- `1` to align outwards from secondary axis
+- `0` to center in row height
+
+Margin and spacing are expressed in space coordinates and do not rotate with the axes.
+
+<details>
+  <summary>
+Expand to see all supported axes/align combinations.
+  </summary>
+
+<br>
+Generated using [`tube-test.red`](tests/tube-test.red):
+
+![](https://i.gyazo.com/d2bb4c569b7b796fe77bc5f572570dde.png)
+
+</details>
+
+
+

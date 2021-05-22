@@ -35,6 +35,17 @@ Simplest infinite canvas test, with a spider web. I use it to check if `inf-scro
 Tests of how scrollbars adapt their look to various sizes.\
 Not interactive yet, as scrollbars events are undefined outside of `scrollable` space's use.
 
+---
+
+[**tube-test.red**](tube-test.red)
+
+<img width=400 src=https://i.gyazo.com/d026792ae3541a46326f299506e963b8.gif></img>
+
+Tests all axes/align combinations of `tube` layout.
+
+
+
+
 
 
 
