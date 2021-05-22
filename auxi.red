@@ -7,6 +7,7 @@ Red [
 #include %../common/assert.red
 
 by: make op! :as-pair
+abs: :absolute
 
 ;-- we need this to be able to call event functions recursively with minimum allocations
 ;-- we can't use a static block but we can use one block per recursion level
@@ -65,6 +66,25 @@ closest-number: function [n [number!] list [block!]] [
 #assert [3 = closest-number 1 [3 4 5]]
 #assert [3 = closest-number 3 [1 4 5 3 2]]
 #assert [4 = closest-number 3 [1 4 5 0]]
+
+
+swap: func ['a [word!] 'b [word!]] [
+	set a also get b set b get a
+]
+
+
+axis2pair: func [xy [word!]] [
+	switch xy [x [1x0] y [0x1]]
+]
+
+anchor2axis: func [nesw [word!]] [
+	switch nesw [n s ['y] w e ['x]]
+]
+
+anchor2pair: func [nesw [word!]] [
+	switch nesw [n [0x-1] s [0x1] w [-1x0] e [1x0]]
+]
+
 
 ;-- debug func
 dump-event: function [event] [
