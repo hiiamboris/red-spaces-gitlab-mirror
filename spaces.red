@@ -125,7 +125,7 @@ scrollbar: context [
 		thumb:       make-space 'rectangle [margin: 2x1]
 		forth-page:  make-space 'rectangle [draw: []]
 		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e]
-		into: func [xy [pair!] /force name] [
+		into: func [xy [pair!] /force name [word! none!]] [
 			any [axis = 'x  xy: reverse xy]
 			into-map map xy name
 		]
@@ -220,7 +220,7 @@ scrollable-space: context [
 			scroll-timer [offset 0x0 size 0x0]		;-- timer currently has to be in the map to fire, else can't have a path
 		]
 
-		into: function [xy [pair!] /force name [word!]] [
+		into: function [xy [pair!] /force name [word! none!]] [
 			if r: into-map map xy name [
 				if r/1 =? content [
 					cspace: get content
@@ -338,6 +338,41 @@ paragraph-ctx: context [
 
 ;-- layout-agnostic template for list, ring & other layout using space collections
 container-ctx: context [
+	~: self
+
+	draw: function [cont [object!] layout [object!] xy1 [pair! none!] xy2 [pair! none!]] [
+		#assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
+		r: make [] 4 * len: cont/items/size
+		;-- to support layouts that reposition previous items we have to fill the layout first, collect it later
+		drawn: make [] len
+		repeat i len [
+			item: get name: cont/items/pick i
+			append/only drawn unless item/size [render name]	;-- prerender to get the size, for layout
+														;-- this allows to not render skipped items
+														;@@ TODO: think on such caching applicability
+														;@@ TODO: a cache of sizes to faster skip to the first visible item, or in layout?
+			layout/place name
+		]
+		map: layout/map									;-- call if it's a function
+		i: 0 foreach [name geom] map [					;@@ should be for-each [/i name geom] but it's slower
+			i: i + 1
+			set [_: pos: _: siz: _: org:] geom
+			skip?: all [xy2  not bbox-overlap?  pos pos + siz  xy1 xy2]
+			unless skip? [
+				; compose/only/into [translate (pos + org) (idrawn)] tail r
+				compose/deep/only/into [
+					clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
+						translate (pos + any [org 0]) 
+						(any [drawn/:i  render name])
+					]
+				] tail r
+			]
+		]
+		append clear cont/map map						;-- compose-map cannot be used because it calls render an extra time
+		maybe cont/size: layout/size
+		r
+	]
+
 	spaces/container: make-space/block 'space [
 		size: none				;-- only available after `draw` because it applies styles
 		item-list: []
@@ -348,32 +383,7 @@ container-ctx: context [
 
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /layout lobj [object!]] [
 			#assert [layout]							;-- has to be provided by the wrapping space
-			#assert [(none? xy1) = none? xy2]			;-- /only is ignored to simplify call in absence of `apply`
-			r: make [] 4 * len: items/size
-			clear map
-			repeat i len [
-				item: get name: items/pick i
-				drawn: unless item/size [render name]	;-- prerender to get the size, for layout
-														;-- this allows to not render skipped items
-														;@@ TODO: think on such caching applicability
-														;@@ TODO: a cache of sizes to faster skip to the first visible item, or in layout?
-				placed: lobj/place name
-				set [_: pos: _: siz: _: org:] placed/2
-				skip?: all [xy2  not bbox-overlap?  pos pos + sz  xy1 xy2]
-				unless skip? [
-					drawn: any [drawn  render name]
-					; append map placed
-					; compose/only/into [translate (pos + org) (drawn)] tail r
-					compose/deep/only/into [
-						clip (pos) (pos + siz) [		;-- clip is required to support origin ;@@ but do we need origin?
-							translate (pos + any [org 0]) (drawn)
-						]
-					] tail r
-				]
-			]
-			append map lobj/map							;-- compose-map cannot be used because it calls render an extra time
-			self/size: lobj/size
-			r
+			~/draw self lobj xy1 xy2
 		]
 	]
 ]
@@ -389,9 +399,30 @@ list-ctx: context [
 		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
 
-		make-layout: has [r] [
+		make-layout: function [] [
 			also r: make list-layout []
 			foreach w [axis margin spacing] [r/:w: self/:w]
+		]
+
+		container-draw: :draw
+		draw: function [/only xy1 [pair! none!] xy2 [pair! none!]] [
+			container-draw/layout/only make-layout xy1 xy2
+		]
+	]
+]
+
+
+tube-ctx: context [
+	spaces/tube: make-space/block 'container [
+		width:   100
+		margin:  5x5
+		spacing: 5x5
+		align:   [-1 -1]
+		axes:    [s e]
+
+		make-layout: function [] [
+			also r: make tube-layout []
+			foreach w [width margin spacing align axes] [r/:w: self/:w]
 		]
 
 		container-draw: :draw
@@ -1571,13 +1602,13 @@ spaces/field: make-space/block 'scrollable [
 	draw: function [] [
 		maybe para/width: if wrap? [size/x]
 		maybe para/text: text
-		pdrawn: para/draw
+		pdrawn: para/draw								;-- no `render` to not start a new style
 		xy1: caret-to-offset       para/layout caret-index + 1
 		xy2: caret-to-offset/lower para/layout caret-index + 1
 		caret/size: as-pair caret-width xy2/y - xy1/y
 		cdrawn: []
 		if active? [
-			cdrawn: compose/only [translate (xy1) (caret/draw)]
+			cdrawn: compose/only [translate (xy1) (render 'caret)]
 		]
 		compose [(cdrawn) (pdrawn)]
 	]
@@ -1588,7 +1619,7 @@ spaces/spiral: make-space/block 'space [
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
 
-	into: function [xy [pair!] /force name] [
+	into: function [xy [pair!] /force name [word! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
 		r: field/para/layout
 		#assert [r]
