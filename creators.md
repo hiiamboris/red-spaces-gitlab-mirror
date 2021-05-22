@@ -99,7 +99,7 @@ Just painting inner spaces is not enough. Need interactivity (e.g. for [hittesti
 
 Composite space (that "contains" other spaces) should be extended with any or both of:
 ```
-into: func [xy [pair!] /force name [word!]] -> [word! pair!]
+into: func [xy [pair!] /force name [word! none!]] -> [word! pair!]
 map: [
 	word! [offset pair! size pair!]		;) e.g.: inner-name [offset 10x10 size 100x100]
 	word! [offset pair! size pair!]
@@ -128,7 +128,7 @@ Function that is used in hittesting only.
 - takes a point in it's space's coordinate system
 - determines which *inner* space this point lands to
 - returns *name* of the inner space and a point in inner space's coordinate system
-- when `/force` is true, it should return provided (by name) inner space even if the point is outside it (only required if this space wants to support dragging)
+- when `name` argument is not `none`, it should return provided (by name) inner space even if the point lies outside it (only required if this space wants to support dragging). `/force` value should be ignored.
 
 This allows for rotation, compression, reflection, anything. Can we make a "mirror" space that reflects another space along some axis? Easily.
 
