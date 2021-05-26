@@ -5,7 +5,14 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack)
+;-- requires auxi.red (block-stack), export
+
+list-spaces:    none									;-- reserve names in the spaces/ctx context
+list-*aces:     none
+foreach-space:  none
+foreach-*ace:   none
+path-from-face: none
+exports: [list-spaces list-*aces foreach-space foreach-*ace path-from-face]		;-- make them globally available too
 
 ;-- tree iteration support
 traversal: context [
@@ -173,5 +180,5 @@ context [
 	]
 ]
 
-
+export exports	;-- make them globally available too
 

@@ -621,7 +621,7 @@ In this example, if `list-view/hscroll` handler calls `pass` command, the event 
 
 Path along the spaces tree comes:
 - for pointer events from `hittest` function (called internally by `host`)
-- for keyboard events and focus/unfocus - from `keyboard/focus` value (but only space types listed in `keyboard/focusable` can receive keyboard events)
+- for keyboard events and focus/unfocus - from `spaces/keyboard/focus` value (but only space types listed in `spaces/keyboard/focusable` can receive keyboard events)
 - for timer events - from tree iteration using `list-spaces`
 
 <details>

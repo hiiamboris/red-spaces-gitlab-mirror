@@ -7,9 +7,11 @@ Red []
 ; #debug set grid-view
 ; #debug set list-view
 
+;-- this macro is super helpful to determine in what file the error happens (Red is not so)
 #debug [
 	#macro [#include file!] func [s e] [compose/deep [print ["#including" (mold s/2)] do (s/2)]]
 ]
+
 #include %../common/assert.red
 #include %../common/expect.red
 #include %../common/setters.red
@@ -33,17 +35,41 @@ Red []
 #include %../common/show-trace.red
 #include %../common/do-atomic.red
 
-#include %auxi.red
-#include %styles.red
-#include %layouts.red
-#include %spaces.red
-#include %vid.red
-#include %events.red
-#include %traversal.red
-#include %focus.red
-#include %tabbing.red
-#include %single-click.red
-#include %timers.red
-#include %standard-handlers.red
-#include %hittest.red
-#include %debug-helpers.red
+;-- below trickery is used to put all space things into a single context...
+spaces: #()
+context [
+	; joined: clear []
+	set 'joined clear []
+	include: function [file [file!]] [
+		#debug [print ["loading" mold file]]
+		#debug [append joined compose/deep [print ["#including" (mold file)]]]
+		append joined load/all file
+		; print ["loaded" mold file]
+	]
+
+	include %auxi.red
+	include %styles.red
+	include %layouts.red
+	include %spaces.red
+	include %vid.red
+	include %events.red
+	include %traversal.red
+	include %focus.red
+	include %tabbing.red
+	include %single-click.red
+	include %timers.red
+	include %standard-handlers.red
+	include %hittest.red
+	include %debug-helpers.red
+
+	spaces/ctx: do/expand compose/only [context (joined)]
+
+	;-- makes some things readily available:
+	spaces/events:    spaces/ctx/events
+	spaces/templates: spaces/ctx/spaces
+	spaces/styles:    spaces/ctx/styles
+	spaces/layouts:   spaces/ctx/layouts
+	spaces/keyboard:  spaces/ctx/keyboard
+]
+
+

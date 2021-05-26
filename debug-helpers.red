@@ -4,6 +4,10 @@ Red [
 	license: BSD-3
 ]
 
+;-- requires export
+
+exports: [dump-tree get-space ?s ??s sdo]
+
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
 		spc: get last path
@@ -93,3 +97,5 @@ context [
 		]
 	]
 ]
+
+export exports

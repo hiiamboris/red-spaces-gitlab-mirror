@@ -36,7 +36,7 @@ my-space-context [									;) context for functions shared by all spaces of this
 		...lots of code...
 	]
 
-	spaces/my-space: make-space/block 'space [
+	spaces/templates/my-space: make-space/block 'space [
 		my-fun: function [...] [
 			~/my-fun self ...						;) in-space function should delegate it's task to the shared function
 		]
@@ -53,13 +53,14 @@ new-space-context [
 		...lots of code...
 	]
 
-	spaces/new-space: make-space/block 'my-space [	;) extends previously defined 'my-space' type
-		my-space-my-fun: :my-fun					;) old `my-fun` can be saved by prefixing it with a prototype name `my-space-`
-		my-fun: function [...] [
-			~/myfun self ...
-			my-space-my-fun ...						;) new `my-fun` now can call the old one when it needs to
+	spaces/templates/new-space:
+		make-space/block 'my-space [				;) extends previously defined 'my-space' type
+			my-space-my-fun: :my-fun				;) old `my-fun` can be saved by prefixing it with a prototype name `my-space-`
+			my-fun: function [...] [
+				~/myfun self ...
+				my-space-my-fun ...					;) new `my-fun` now can call the old one when it needs to
+			]
 		]
-	]
 ]
 ```
 
@@ -88,6 +89,26 @@ How does hittest work if `size` is volatile and may even depend on time itself?
 `size` for the last rendered frame determines the geometry for all pointer events land. New frame - new geometry. Layout can be moving, rotating, distorting, but what one sees is what one interacts with.
 
 </details>
+
+
+## Umbrella namespace
+
+To minimize the risk of clashing with the user names, an umbrella namespace is used to access common features:
+```
+>> ? spaces
+SPACES is a map! with the following words and values:
+     ctx        object!       [by abs block-stack when range clip for clo...
+     events     object!       [cache on-time previewers finalizers handle...
+     templates  map!          [space timer rectangle triangle image scrol...
+     styles     block!        length: 8  [host [pen off fill-pen 255.252....
+     layouts    object!       [list tube list-layout-ctx tube-layout-ctx]
+     keyboard   object!       [focusable focus history valid-path? last-v.
+```
+`spaces/ctx` contains every function and context defined, and it is the context under which all spaces code operates internally. By binding your code to it you get access to all the features.
+
+For convenience, a few names are duplicated from `spaces/ctx` into `spaces` map: `events`, `templates`, etc.
+
+Also some functions are exported into global namespace, e.g. `make-space`, `space?`, `focused?`, etc.
 
 
 ## Hierarchy
@@ -303,14 +324,14 @@ However this design is still in question (the `focused?` part). On one hand it h
 
 Focus allows to direct keyboard events (`key key-down key-up enter`) into a particular "focused" space.
 
-`keyboard/focus` holds the currently focused space. Focused space can be changed via:
+`spaces/keyboard/focus` holds the currently focused space. Focused space can be changed via:
 - calling `focus-space` function directly (it accepts a tree path)
 - clicking (`down mid-down alt-down aux-down dbl-click`) on a point that intersects with a *focusable* space
 - [tabbing (module)](tabbing.red)
 
 Focused space is a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus).
 
-Focusable space types are listed in `keyboard/focusable` block (new types can be added there at will).
+Focusable space types are listed in `spaces/keyboard/focusable` block (new types can be added there at will).
 
 Only *visible* spaces can be focused by tabbing or clicking, i.e. they must be present in the `map`s of their parents. `focus-space` doesn't have this limitation. If tabbing into a space outside of viewport is desired, spaces near the edge of the viewport should be put into the `map`.
 
@@ -342,11 +363,11 @@ Example code with a new focusable space:
 ```
 #include %red-spaces/everything.red
 
-spaces/my-space: make-space/block 'space [
+spaces/templates/my-space: make-space/block 'space [
 	size: 50x50
 	draw: [box 1x1 49x49]
 ]
-append keyboard/focusable 'my-space
+append spaces/keyboard/focusable 'my-space
 
 define-handlers [
 	my-space: [on-key [space path event] [print event/key]]

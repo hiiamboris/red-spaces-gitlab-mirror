@@ -4,9 +4,14 @@ Red [
 	license: BSD-3
 ]
 
-;@@ needs: map-each, anonymize, reshape
+;@@ needs: map-each, anonymize, reshape, export
 
 current-style: as path! []	;-- used as a stack during draw composition
+
+styles: none											;-- reserve names in the spaces/ctx context
+render: none
+
+exports: [render set-style]
 
 do with [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
@@ -137,9 +142,8 @@ set-style: function [name [word! path!] style [block!]] [
 	change/only pos style
 ]
 
-;-- draw code has to be evaluated after current-style changes, for inner calls to render to succeed
-n: 0
 context [
+	;-- draw code has to be evaluated after current-style changes, for inner calls to render to succeed
 	with-style: function [
 		"Draw calls should be wrapped with this to apply styles properly"
 		name [word!] code [block!]
@@ -224,3 +228,5 @@ context [
 		]
 	]
 ]
+
+export exports

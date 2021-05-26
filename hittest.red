@@ -4,6 +4,10 @@ Red [
 	license: BSD-3
 ]
 
+;-- requires export
+
+exports: [hittest]
+
 into-map: function [map [block!] xy [pair!] name [none! word!]] [
 	either name [
 		#assert [find map name]
@@ -82,3 +86,4 @@ hittest: function [
 	new-line/all path no
 ]
 
+export exports

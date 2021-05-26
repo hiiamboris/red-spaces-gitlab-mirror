@@ -151,22 +151,22 @@ define-handlers [
 		; 	do space/command
 		; ]
 		on-key [space path event] [
-			if all [
+			either all [
 				find " ^M" event/key
 				not space/pushed?
 			][
 				space/pushed?: yes
 				update
-			]
+			][pass]
 		]
 		on-key-up [space path event] [
-			if all [
+			either all [
 				find " ^M" event/key
 				space/pushed?
 			][
 				space/pushed?: no
 				update
-			]
+			][pass]
 		]
 	]
 

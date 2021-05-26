@@ -91,6 +91,14 @@ rename grid-view to data-grid?
 demo: debugger, need to mark functions, store values of all words during last iteration or 2-3 last iterations,
 	and be able to explore those (where spaces come to help)
 demo: round lists (like in games or sketchbook) - showing the power of container/layout
+splitters for UI panels
+inspect https://nicepage.com/nicepage-review for anything useful
+allow size to be an integer in `field` - so it will infer height automatically from font and adjust it on the fly
+demo: very basic layout designer for simple webpage-like shite, one others should be able to build upon
+    good example: https://discuss.streamlit.io/t/dynamic-grid-layout-ui/2097
+multi level popup menus (probably on separate borderless windows)
+demo: example of a glossy style sheet
+`arrange` func based on flow layouts that will work with faces?
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
@@ -145,6 +153,8 @@ funny thing about paths: example - we have 3 list-views on a window (a, b and c)
 	- from focusing POV they should be `a`, `b` and `c` (i.e. unique)
 	  this distinction applies only to faces, not anything inside (yes? maps provide enough uniqueness?)
 	  also `root` should be parent to them all
+	  ps. solved: faces can carry the name of their type but they're unique objects
+	  however, styling faces differently will require some understanding
 why keyboard/focus has to be a *deep* path containing focused face along with *all* of its parents:
 	tabbed navigation can be done in 2 ways:
 	- geometrically by finding nearest item along the path (but this is so called spatial navigation)
@@ -482,12 +492,61 @@ tricks of grid containing itself in each cell
 	and should only be invalidated before the outermost render
 	no static lists should be used in draw
 list-view's list width - how to infer it?
-	let it be fixed, locked to the width of list-view?
+	let it be locked to list-view's width?
 	there's no width for an infinite list
 	and adjusting width to a range of visible items is not great UX-wise
 	(scrollbars will show and hide while scrolling)
 	but it needs more thought.. esp. when I decide on sizing system
 	maybe this will help autosize items' content
+on resizing
+	some spaces' dimensions are fully automatic - list, data-view (unless limited), image (in auto mode)
+	some have only one dimension automatic - tube, paragraph (unless width = none), grid
+	some have only fixed dimensions - all scrollables, image (in fixed mode)
+	let's call all these fixed dimensions "free dimensions"
+	free as in "no inner constraints imposed" and "can be modified freely at any time"
+	automatic are the constrained dimensions out of user's control
+	ways to deal with free dimensions:
+	1 use plain reactivity (very boring and clumsy way)
+	2 define more high-level relations in terms of filling space and aligning in it
+	  (also if defined as a function of time they become animations)
+	3 use containers that will align/fill themselves with the inner space
+	  this is less flexible than pure relations, as only limited to parent/child sizing
+	  also floods the space tree with unnecessary entities (=> noise and slowdown)
+	so best option seems to build a DSL on top of reactivity (2)
+	OTOH some might expect predefined containers (3), esp. interactive ones,
+	  e.g. splitters (2-4 panels divided by a draggable delimiter)
+	  ? grid columns (draggable slim inter-column patch, inter-row too)
+	    key here is that columns are not objects, their widths is part of a map (which is not reactive at all)
+	    can be solved by using hash instead, but dealing with /skip is a headache (`map: map` is a lesser evil)
+	  columns that fill available space (splitting it using weights) - not interactive, but can be (changing weights)
+	what's also useful is expressing sizes in relative terms: window as part of the screen, widgets as part of the window
+	and another thing to consider is how to export all this so it'll work on faces too
+	  maybe a DSL that creates reactive relations from a description?
+	1 more consideration: such free sizes may appear and disappear on the fly, e.g. alignment within visible cells
+	  though that can be left to grid itself
+	on-resize can be useful to adapt the layout to size, or when rotated
+	  some use case: https://egghead.io/lessons/angularjs-angular-material-adaptive-layouts
+	  basically, things to show and things to hide (instead of just resizing)
+	  though it can be done simpler, by injecting a set of conditions into draw - to select which items to show
+	DSL sketch:
+	constrain [
+		a/size/x -> b/size/x -> c/size/x
+		a/size/x <-> a/size/y
+	]
+	creates 4 separate reactive relations:
+		b/size/x: a/size/x
+		c/size/x: b/size/x
+		a/size/x: a/size/y
+		a/size/y: a/size/x
+	ideally, but in reality this won't trigger reactivity, so it should change `size:` every time
+	constrain [
+		split a [10% 100 20% *]		-- can be applied to lists, `*` = rest, `none` may mean "don't touch"
+	]
+	but this thing can be just added into list itself
+	although then list will have a fixed size, so let's call it fixed-list or smth, maybe chain or stack or spring..
+	question is, what to do with opposite direction? fill or leave?
+	presumably, cases with split should all fill it
+	gonna need to make a few UIs first, then try to apply this model to them
 
 
 Timer design:
@@ -2031,4 +2090,92 @@ no longer relevant in the new styles design
 ; 	; 		]
 ; 	; 	]])
 ; 	; ]	
+; ]
+
+too complicated, hard to support reordering (e.g. left-to-right placement)
+; tube-layout-ctx: context [
+; 	~: self
+
+; 	place: function [layout [object!] item [word!]] [
+; 		sz: select get item 'size
+; 		#assert [sz]									;-- item must have a size
+; 		data: tail layout/raw-map
+; 		x: switch layout/align/1 [n s ['x] w e ['y]]
+; 		y: select [x y x] x
+; 		rw: data/-1/:x									;-- row width accumulated so far
+; 		cs: layout/content-size
+; 		sp: layout/spacing
+
+; 		if rw > 0 [rw: rw + sp/:x]						;-- add size to row
+; 		rw: rw + sz/:x
+; 		if all [
+; 			rw > sz/:x									;-- put at least 1 item per row, even if it's wider
+; 			layout/margin/:x * 2 + rw > layout/width	;-- jump to next row if needed
+; 		][
+; 			cs/:y: cs/:y + sz/:y						;-- count height in content-size
+; 			if 3 < index? data [cs/:y: cs/:y + sp/:y]
+; 			data: insert insert/only data copy [] 0x0
+; 			rw: sz/:x
+; 		]
+; 		if all [
+; 			rw > sz/:x
+; 			0 < added: sz/:y - data/-1/:y
+; 		][cs/:y: cs/:y + added]
+; 		data/-1/:x: max data/-1/:x rw					;-- update row size
+; 		data/-1/:y: max data/-1/:y sz/:y
+; 		layout/content-size: max data/-1 cs				;-- update content size (x from row-size, y from cs)
+
+; 		guide: select [x 1x0 y 0x1] x
+; 		ofs: rw - sz * guide
+; 		compose/deep/into [(item) [offset (ofs) size (sz)]] tail data/-2
+; 	]
+
+; 	build-map: function [layout] [
+; 		al: layout/align
+; 		x: switch al/1 [n s ['x] w e ['y]]
+; 		y: select [x y x] x
+; 		; guide: select [x 1x0 y 0x1] y
+; 		sign: switch al/1 [n w [1] e s [-1]]
+; 		move-items: sign * (switch al/3 [n w [-1] c [0] e s [1]]) + 1 / 2	;@@ use -1/+1 instead of nw/es pairs?
+; 		move-rows:  sign * (switch al/2 [n w [-1] c [0] e s [1]]) + 1 / 2
+; 		pos: layout/margin
+; 		r: make [] 20
+; 		foreach [row row-size] layout/raw-map [
+; 			gap: layout/width - (layout/margin/:x * 2) - row-size/:x	;-- can be negative, still correct
+; 			pos/:x: to 1 gap * move-rows
+; 			if layout/dir < 0 [reverse/skip row 2]
+; 			foreach [name geom] row [
+; 				if move-items <> 0 [
+; 					gap: row-size/:y - geom/size/:y
+; 					geom/offset/:y: geom/offset/:y + to 1 (move-items * gap)
+; 				]
+; 				geom/offset: geom/offset + pos
+; 			]
+; 			append r row
+; 			pos/:y: pos/:y + layout/spacing/:y + row-size/:y
+; 		]
+; 		; set 'xx layout
+; 		; ?? layout
+; 		r
+; 	]
+
+; 	set 'tube-layout object [
+; 		;-- interface
+; 		width:   100
+; 		; origin:  0x0			;@@ TODO - if needed
+; 		margin:  0x0
+; 		spacing: 0x0
+; 		align:   [n w n]		;-- 3 alignments: tube itself (nesw), then list within row (neswc), then item within list (neswc)
+; 		dir: 1
+
+; 		content-size: 0x0
+; 		size:  does [margin * 2 + content-size]
+; 		place: func [item [word!]] [~/place self item]
+; 		map:   does [~/build-map self]
+
+; 		;-- used internally
+; 		raw-map: [[] 0x0]		;-- accumulated map so far (make object! copies this deeply)
+; 	]
+
+; 	#assert [not same? tube-layout/raw-map/1 (first select make tube-layout [] 'raw-map)]
 ; ]

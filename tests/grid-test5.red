@@ -9,7 +9,7 @@ recycle/off
 change-dir %..
 do %everything.red
 
-append keyboard/focusable 'grid-view
+append spaces/keyboard/focusable 'grid-view
 ;@@ use (wrapped) data!
 ;@@ make set up grid spaces for common scenarios
 
@@ -25,7 +25,7 @@ copy-deep-limit: function [b n] [
 ]
 
 ; system/view/auto-sync?: no
-traversal/depth-limit: 4
+spaces/ctx/traversal/depth-limit: 4
 depth: 0
 max-depth: 1
 t0: now/precise

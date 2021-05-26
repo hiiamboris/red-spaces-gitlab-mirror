@@ -10,11 +10,11 @@ svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
 set-style 'heading [
 	(unless bigfont =? font [self/font: bigfont] ())
-	fill-pen (svmc/text + 0.0.0.200) pen off box 0x0 (width by 50)
+	fill-pen (svmc/text + 0.0.0.200) pen off box 0x0 (as-pair width 50)
 ]
 set-style 'field [fill-pen (0.0.0.100 + contrast-with svmc/text) pen off box 0x0 (size)]
 set-style 'field/caret [fill-pen (svmc/text)]
-append styles reduce [
+append spaces/styles reduce [
 	to path! 'tube
 	function [tube] [
 		drawn: tube/draw
@@ -25,7 +25,7 @@ append styles reduce [
 	]
 ]
 
-spaces/heading: make-space/block 'paragraph []
+spaces/templates/heading: make-space/block 'paragraph []
 
 boxes: map-each spec [
 	[size: 60x30 text: "A"]

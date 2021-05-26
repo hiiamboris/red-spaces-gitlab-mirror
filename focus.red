@@ -6,7 +6,9 @@ Red [
 
 
 ;-- provides focusing by clicking
-;-- requires: is-face? and window-of
+;-- requires: export is-face? and window-of
+
+exports: [focused? focus-space]
 
 ;@@ rename this!? e.g. focus/current instead of keyboard/focus?
 ;@@ `focus` itself should be somewhere else, as it is used by dispatch and who knows what
@@ -55,7 +57,7 @@ keyboard: object [
 
 
 ;-- for use within styles
-set 'focused? function [
+focused?: function [
 	"Check if current style is the one in focus"
 	/parent "Rather check if parent style is the one in focus"
 	;@@ will /parent be enough or need more levels?
@@ -143,3 +145,6 @@ register-previewer
 		#debug focus [#print "Attempting to focus (as path! path)"]
 		if focus-space path [update]
 	]
+
+
+export exports

@@ -53,7 +53,7 @@ REFINEMENTS:
 
 Forms:
 - `make-space 'type [...]` - returns instantiated space object. Good when you have a named facet and want it to refer to a space object. Similar to the native `make`, `spec` of `make-space` can add new facets to the spaces it creates.
-- `make-space/block 'type [...]` - returns spec block used to create a space object. Good for defining new space types (they're all blocks). To create new templates, they should be placed into the `spaces` map: `spaces/new-type: make-space/block 'template [...]`.
+- `make-space/block 'type [...]` - returns spec block used to create a space object. Good for defining new space types (they're all blocks). To create new templates, they should be placed into the `spaces` map: `spaces/templates/new-type: make-space/block 'template [...]`.
 - `make-space/name 'type [...]` - returns word `type` in an anonymous context, referring to an instantiated space object. Good for putting this name into `scrollable/content`, `list/item-list` or `grid/cell-map` facets.
 
 
@@ -119,7 +119,7 @@ Spaces do not impose any structural limitations. If a space can hold a box or a 
 
 Minimal space template to build upon:
 ```
-spaces/space: [
+spaces/templates/space: [
 	draw: []
 	size: 0x0
 ]
@@ -133,7 +133,7 @@ Since all composite spaces consist of other smaller spaces, this minimalism play
 
 Template used to create timers:
 ```
-spaces/timer: make-space/block 'space [rate: none]
+spaces/templates/timer: make-space/block 'space [rate: none]
 ```
 Timer is not required for `on-time` event handler to receive events. Any space that has a `rate` facet set will receive these. In fact `make-space 'space [rate: 1]` produces a space identical to `make-space 'timer [rate: 1]`.\
 However `timer` makes the intent of code a tiny bit clearer. So it is advised to base timers on this space.

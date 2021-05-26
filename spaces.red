@@ -4,13 +4,15 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires `for` loop from auxi.red, layouts.red
+;-- requires `for` loop from auxi.red, layouts.red, export
 
 
 ;@@ TODO: also a `spaces` context to wrap everything, to save it from being overridden (or other name, or under system/)
 
-
 ;@@ rename to standard-spaces ?
+
+
+exports: [make-space space?]
 
 make-space: function [
 	"Create a space from a template TYPE"
@@ -400,7 +402,7 @@ list-ctx: context [
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
 
 		make-layout: function [] [
-			also r: make list-layout []
+			also r: make layouts/list []
 			foreach w [axis margin spacing] [r/:w: self/:w]
 		]
 
@@ -421,7 +423,7 @@ tube-ctx: context [
 		axes:    [s e]
 
 		make-layout: function [] [
-			also r: make tube-layout []
+			also r: make layouts/tube []
 			foreach w [width margin spacing align axes] [r/:w: self/:w]
 		]
 
@@ -1687,3 +1689,5 @@ spaces/spiral: make-space/block 'space [
 		render
 	]
 ]
+
+export exports
