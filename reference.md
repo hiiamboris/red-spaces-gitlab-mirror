@@ -407,14 +407,14 @@ Implemented layouts so far:
 
 | name | description |
 |-|-|
-| `list-layout` | Simply stacks given items along given axis, adding spacing. Supports same facets as `list` space: `axis`, `origin`, `margin`, `spacing` |
-| `tube-layout` | Arranges items into rows and fits rows into a tube of fixed width. See [`tube` space](#tube) for details. |
+| `spaces/layouts/list` | Simply stacks given items along given axis, adding spacing. Supports same facets as `list` space: `axis`, `origin`, `margin`, `spacing` |
+| `spaces/layouts/tube` | Arranges items into rows and fits rows into a tube of fixed width. See [`tube` space](#tube) for details. |
 
 
 
 ## List
 
-A `container` that arranges spaces using `list-layout`.
+A `container` that arranges spaces using `spaces/layouts/list`.
 
 | ![](https://i.gyazo.com/32f6522fc5f1e8f86446c3bfc3e8fd33.png) | <pre>list with [axis: 'y] [<br>	button with [data: "button 1"]<br>	button with [data: "button 2"]<br>	button with [data: "button 3"]<br>]</pre> |
 |-|-|
