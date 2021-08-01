@@ -59,8 +59,10 @@ context [
 			forall path [
 				hpath: as path! compose/into [handlers (path) on-time] clear []	;-- not allocated
 				if empty? list: attempt [get hpath] [continue]					;-- no time handler
-				#assert [block? list]
-				#assert [any [time? rate  float? rate  integer? rate]  'rate]
+				#assert [
+					block? list
+					any [time? rate  float? rate  integer? rate]
+				]
 				if number? rate [rate: 0:0:1 / rate]					;-- turn rate into period
 				pos: find/same/tail marks space
 				set [prev: bias:] any [pos [0:0 0:0]]

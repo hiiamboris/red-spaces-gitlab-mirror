@@ -85,8 +85,7 @@ events: context [
 					opt [/local to end]
 				]
 				(source handler  none)
-			]
-			"invalid handler spec"
+			] "invalid handler spec"
 		]
 		foreach type types [
 			#assert [word? type]
@@ -454,8 +453,12 @@ events: context [
 		path': at drag-in/head index? path
 		set [spc': ofs':] path'
 		set [spc:  ofs: ] path
-		#assert [spc = spc']							;-- only makes sense to track it within the same space
-		#assert [word? spc]  #assert [pair? ofs]  #assert [pair? ofs']
+		#assert [
+			spc = spc'							;-- only makes sense to track it within the same space
+			word? spc
+			pair? ofs
+			pair? ofs'
+		]
 		ofs - ofs'
 	]
 

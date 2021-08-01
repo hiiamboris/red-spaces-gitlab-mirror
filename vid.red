@@ -22,7 +22,7 @@ init-spaces-tree: function [face [object!]] [
 		while [not empty? spec] [
 			name: spec/1  spec: next spec
 			#assert [word? name]		;@@ TODO: normal error handling here
-			#assert [spaces/:name  'name]
+			#assert [spaces/:name]
 
 			with-blk: []
 			if spec/1 = 'with [		;-- reserved keyword

@@ -161,10 +161,12 @@ context [
 		/only xy1 [pair! none!] xy2 [pair! none!]
 	][
 		#debug styles [#print "render-face on (face/type) with current-style: (mold current-style)"]
-		#assert [is-face? :face]
-		#assert [face/type = 'base]
-		#assert [in face 'space]
-		#assert [empty? current-style]
+		#assert [
+			is-face? :face
+			face/type = 'base
+			in face 'space
+			empty? current-style
+		]
 
 		with-style 'host [
 			host-drawn: compose/deep bind get-style face	;-- host style can only be a block

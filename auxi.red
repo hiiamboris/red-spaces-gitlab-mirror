@@ -61,12 +61,13 @@ closest-number: function [n [number!] list [block!]] [
 	]
 ]
 
-#assert [3 = closest-number 3 [1 2 3]]
-#assert [3 = closest-number 3 [3 4 5]]
-#assert [3 = closest-number 1 [3 4 5]]
-#assert [3 = closest-number 3 [1 4 5 3 2]]
-#assert [4 = closest-number 3 [1 4 5 0]]
-
+#assert [
+	3 = closest-number 3 [1 2 3]
+	3 = closest-number 3 [3 4 5]
+	3 = closest-number 1 [3 4 5]
+	3 = closest-number 3 [1 4 5 3 2]
+	4 = closest-number 3 [1 4 5 0]
+]
 
 swap: func ['a [word!] 'b [word!]] [
 	set a also get b set b get a
@@ -170,7 +171,10 @@ find-same-path: function [b [block!] p [path!]] [
 	none
 ]
 
-#assert [a: object [] b: object [] same-paths? 'a/b [a b]]
-#assert [2 = index? r: find-same-path [a/c a/b] 'a/b  'r]
-#assert [2 = index? r: find-same-path reduce [as path! bind [a b] construct [a: b:] 'a/b] 'a/b  'r]
+#assert [
+	(a: object [] b: object [])
+	same-paths? 'a/b [a b]
+	2 = index? r: find-same-path [a/c a/b] 'a/b
+	2 = index? r: find-same-path reduce [as path! bind [a b] construct [a: b:] 'a/b] 'a/b
+]
 
