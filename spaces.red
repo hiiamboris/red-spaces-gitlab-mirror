@@ -555,6 +555,7 @@ window-ctx: context [
 			]
 		]
 
+		cached-offset: none
 		draw: function [/only xy1 [pair!] xy2 [pair!]] [
 			#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
 			#assert [word? content]
@@ -564,12 +565,12 @@ window-ctx: context [
 			o: geom/offset
 			;-- there's no size for infinite spaces so we use `available?` to get the drawing size
 			s: max-size
-			o': first cache: []							;-- geom/offset during previous draw
+			o': cached-offset							;-- geom/offset during previous draw
 			if o <> o' [								;-- don't resize window unless it was moved
 				foreach x [x y] [s/:x: available? x 1 (0 - o/:x) s/:x]
 				self/size: s							;-- limit window size by content size
 				#debug list-view [#print "window resized to (s)"]
-				change cache o
+				set-quiet in self 'cached-offset o
 			]
 			default xy1: 0x0
 			default xy2: s
@@ -1209,7 +1210,9 @@ grid-ctx: context [
 		;@@ ensure it's called top-down only, so it can get upper row sizes from the cache
 		calc-row-height: function ["Render the row Y to obtain it's height" y [integer!]] [
 			#assert ['auto = any [heights/:y heights/default]]	;-- otherwise why call it?
-			xlim: draw-ctx/limits/x
+			limits: any [draw-ctx/limits draw-ctx/limits: cells/size]	;-- may be none if called from calc-limits before grid/draw
+			; #assert [draw-ctx/limits]
+			xlim: limits/x
 			#assert [integer? xlim]						;-- row size cannot be calculated for infinite grid
 			hmin: append clear [] min-row-height
 			for x: 1 xlim [
@@ -1218,7 +1221,7 @@ grid-ctx: context [
 				first: get-first-cell xy
 				height1: 0
 				if content: cells/pick first [
-					unless draw-ctx/ccache/:first [					;-- only render if not cached
+					unless draw-ctx/ccache/:first [			;-- only render if not cached
 						render wrap-space first content		;-- cell caches drawn content by itself
 					]
 					cspace: get content
@@ -1265,8 +1268,9 @@ grid-ctx: context [
 		]
 
 		calc-size: function [] [
+			#debug grid-view [#print "grid/calc-size is called!"]
 			#assert [not infinite?]
-			limits: any [draw-ctx/limits cells/size]	;@@ optimize this? cache limits?
+			limits: any [draw-ctx/limits draw-ctx/limits: cells/size]	;@@ optimize this? cache limits?
 			limits: as-pair limits/x limits/y
 			r: margin * 2 + (spacing * max 0x0 limits - 1)
 			repeat x limits/x [r/x: r/x + col-width?  x]
@@ -1359,6 +1363,7 @@ grid-ctx: context [
 			new-map: make [] 100
 
 			dc/limits: cells/size
+			#assert [dc/limits]
 			;-- locate-point calls row-height which may render cells when needed to determine the height
 			default xy1: 0x0
 			unless xy2 [dc/size: xy2: calc-size]
@@ -1422,18 +1427,22 @@ grid-view-ctx: context [
 			switch type?/word :source [
 				block! [
 					case [
-						pick [source/:y/:x]
+						pick [source/(xy/2)/(xy/1)]
 						0 = n: length? source [0x0]
 						'else [as-pair length? :source/1 n]
 					]
 				]
 				map! [either pick [source/:xy][source/size]]
+				'else [#assert [no "Unsupported data format"]]
 			]
 		]
 
 		grid: make-space 'grid [
 			available?: function [axis dir from [integer!] requested [integer!]] [	;@@ should `available?` be in *every* grid? (as a placeholder word)
+				;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
+				#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
 				limits: self/limits
+				#assert [limits "data/size is none!"]
 				r: case [
 					dir < 0 [from]
 					limits/:axis [
@@ -1477,6 +1486,7 @@ grid-view-ctx: context [
 
 		inf-scrollable-draw: :draw
 		draw: function [] [
+			#debug grid-view [#print "grid-view/draw is called! passing to inf-scrollable"]
 			setup
 			; grid/origin: self/origin		;@@ maybe remove grid/origin and make it inferred from /only xy1 ?
 			inf-scrollable-draw

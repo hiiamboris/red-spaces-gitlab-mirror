@@ -21,7 +21,7 @@ Spaces provide infrastructure and model using which **you can**:
 
 ## Setup
 
-Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only nightly builds!!), [Git](https://git-scm.com/downloads)
+Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only automated builds!!), [Git](https://git-scm.com/downloads)
 
 Spaces depend on the helpful functions & macros from [mezz warehouse](https://gitlab.com/hiiamboris/red-mezz-warehouse). So, in your favorite directory, run:
 ```
@@ -132,6 +132,8 @@ git clone https://gitlab.com/hiiamboris/red-spaces
 ```
 
 </details>
+
+Put it another way, if you download a zip from the Gitlab site, don't forget to rename directories after unzipping, to `red-spaces` and `common`.
 
 
 

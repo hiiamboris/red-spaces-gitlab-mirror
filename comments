@@ -99,6 +99,8 @@ demo: very basic layout designer for simple webpage-like shite, one others shoul
 multi level popup menus (probably on separate borderless windows)
 demo: example of a glossy style sheet
 `arrange` func based on flow layouts that will work with faces?
+web preview component to preview the links in the chat
+widget: markdown renderer (unless Bolek adds it)
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
