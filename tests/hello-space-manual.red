@@ -29,6 +29,7 @@ host/offset: 10x10						;) apply default VID margin
 window: make-face 'window				;) create window to put host into
 window/pane: reduce [host]				;) add host to it
 window/size: host/size + 20x20			;) add default VID margins to host/size to infer window/size
+window/offset: system/view/screens/1/size - window/size / 2		;) center the window
 
 show window								;) finally, we display the layout
 set-focus host							;) focus host for it to receive keyboard events
