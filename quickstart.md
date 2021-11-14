@@ -410,6 +410,8 @@ If such function calls `space/draw`, the call should look like `space/draw/only 
 
 ## Defining behavior
 
+> NOTE: View-like actors for static spaces will be supported later (just not yet)
+
 - non-standard or extended behavior for standard styles
 - behavior of custom styles
 
