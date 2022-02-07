@@ -29,7 +29,7 @@ range: func [a [integer!] b [integer!]] [
 
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
 clip: func [range [block!] value [scalar!]] [
-	range: reduce range
+	range: reduce/into range clear []
 	#assert [any [not number? range/1  range/1 <= range/2]]
 	min range/2 max range/1 value
 ]
