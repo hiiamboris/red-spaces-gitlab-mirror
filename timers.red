@@ -37,7 +37,7 @@ context [
 	;-- resolution estimation with period = O(100) timer events
 	update-resolution: function [/extern timer-resolution] [
 		last-mark: [1900/1/1]
-		elapsed: difference t: now/precise last-mark/1
+		elapsed: difference t: now/utc/precise last-mark/1		;-- /utc is 2x faster
 		last-mark/1: t
 		if elapsed < 0:0:1 [							;-- discard glitches like PC went to sleep etc.
 			timer-resolution: timer-resolution * 0.99 + (0.01 * elapsed)
@@ -66,7 +66,7 @@ context [
 				if number? rate [rate: 0:0:1 / rate]					;-- turn rate into period
 				pos: find/same/tail marks space
 				set [prev: bias:] any [pos [0:0 0:0]]
-				time: now/precise
+				time: now/utc/precise									;-- /utc is 2x faster
 				delay: either pos [difference time prev + rate][0:0]
 				if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call this timer?
 				path: back tail new-line/all path no					;-- position it at the target space (for handlers)
