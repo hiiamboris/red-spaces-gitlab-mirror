@@ -1,3 +1,8 @@
+---
+gitea: none
+include_toc: true
+---
+
 # RED SPACES - DRAW-BASED WIDGET LIBRARY FOR [RED](http://red-lang.org/)
 
 [[_TOC_]]
