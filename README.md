@@ -5,8 +5,6 @@ include_toc: true
 
 # RED SPACES - DRAW-BASED WIDGET LIBRARY FOR [RED](http://red-lang.org/)
 
-[[_TOC_]]
-
 ## Examples (clickable)
 
 | Spiral editable field | Table |
