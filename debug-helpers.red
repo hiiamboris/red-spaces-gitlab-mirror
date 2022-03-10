@@ -6,7 +6,7 @@ Red [
 
 ;-- requires export
 
-exports: [dump-tree expand-space-path get-space ?s ??s sdo dorc]
+exports: [dump-tree expand-space-path dorc]
 
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
@@ -45,25 +45,25 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 	out
 ]
 
-get-space: function ['path [word! path!]] [
-	get expand-space-path (path)
-]
+; get-space: function ['path [word! path!]] [
+	; get expand-space-path (path)
+; ]
 
-;-- debug helper
-?s: function ['path [word! path!]] [
-	val: get-space (path)
-	print replace help-string val "VAL" uppercase mold path
-]
+; ;-- debug helper
+; ?s: function ['path [word! path!]] [
+	; val: get-space (path)
+	; print replace help-string val "VAL" uppercase mold path
+; ]
 
-??s: function ['path [word! path!]] [
-	probe get-space (path)
-	()
-]
+; ??s: function ['path [word! path!]] [
+	; probe get-space (path)
+	; ()
+; ]
 
-sdo: function [code [block!]] [
-	map-each/self/only [p [path!]] code [get-space (p)]
-	do code
-]
+; sdo: function [code [block!]] [
+	; map-each/self/only [p [path!]] code [get-space (p)]
+	; do code
+; ]
 
 dorc: does [do read-clipboard]
 
