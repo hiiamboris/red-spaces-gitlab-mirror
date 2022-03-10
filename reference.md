@@ -1,8 +1,11 @@
+---
+gitea: none
+include_toc: true
+---
+
 # Red Spaces Widget Reference
 
 Explains how each Space works.
-
-[[_TOC_]]
 
 ## Space creation
 

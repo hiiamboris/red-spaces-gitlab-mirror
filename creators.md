@@ -1,9 +1,11 @@
+---
+gitea: none
+include_toc: true
+---
+
 # Red Spaces Widget Creators Guide
 
 Will explain the architecture of Spaces and how to extend them.
-
-[[_TOC_]]
-
 
 In essence, what is a UI?\
 A dialogue.\

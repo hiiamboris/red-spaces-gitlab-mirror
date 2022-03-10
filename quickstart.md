@@ -1,8 +1,11 @@
+---
+gitea: none
+include_toc: true
+---
+
 # Red Spaces Quick Start Tutorial
 
 Will guide you through the basics required to use Spaces in your code.
-
-[[_TOC_]]
 
 ## What's this
 
