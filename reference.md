@@ -100,9 +100,10 @@ Some facets are not reserved or prescribed but are **recommended** as a guidelin
 | `font`   | `object!` | An instance of `font!` object. Preferably should be set from styles. |
 
 <details>
-	<summary>Note on `map` vs `into`</summary>
+	<summary>Note on <code>map</code> vs <code>into</code></summary>
 
 <br>
+
 - hittesting is done with any of them, `into` takes precedence (this makes it possible to pass pointer events to inner spaces)
 - tree iteration (e.g. when tabbing) uses `map` only, but it uses only names from the map (not the geometry)
 
