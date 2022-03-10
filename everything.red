@@ -18,6 +18,7 @@ do/expand probe [
 	; ]
 
 	#include %../common/assert.red
+	; #assert off
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red
@@ -79,3 +80,4 @@ do/expand probe [
 ]
 
 #process on
+

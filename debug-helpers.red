@@ -6,7 +6,7 @@ Red [
 
 ;-- requires export
 
-exports: [dump-tree get-space ?s ??s sdo]
+exports: [dump-tree expand-space-path get-space ?s ??s sdo dorc]
 
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
@@ -16,17 +16,37 @@ dump-tree: function [] [
 	()
 ]
 
-get-space: function ['path [word! path!]] [
+expand-space-path: function [path [any-word! any-path!] /local coll] [
 	if word? path [path: to path! path]
-	o: get path/1
-	foreach x next path [
-		o: either any [
-			all [word? x  object? :o  in o 'map  p: find o/map x]
-			all [word? x  block?  :o             p: find o     x]
-		] [get p/1] [:o/:x]
-		if word? :o [o: get o]
+	set/any 'coll get/any path/1
+	out: head clear next copy path 
+	for-each [pos: item] as [] next path [				;@@ as [] = workaround for #4421
+		space: if word? :item [
+			;; substitute global word in the path with a word that refers to a space
+			any [
+				all [object? :coll  in coll 'map  found: find coll/map item  found/1]
+				all [object? :coll  is-face? coll  item = select coll 'space  coll/space]
+				all [block?  :coll  found: find coll item  found/1]
+			]
+		]
+		set/any 'coll either space [
+			append clear out space
+			get/any space
+		][
+			append out :item
+			:coll/:item
+		]
 	]
-	:o
+	if single? out [out: out/1]
+	case [
+		any [get-word? path get-path? path] [out: either word? out [to get-word! out][as get-path! out]]
+		any [set-word? path set-path? path] [out: either word? out [to set-word! out][as set-path! out]]
+	]
+	out
+]
+
+get-space: function ['path [word! path!]] [
+	get expand-space-path (path)
 ]
 
 ;-- debug helper
@@ -44,6 +64,28 @@ sdo: function [code [block!]] [
 	map-each/self/only [p [path!]] code [get-space (p)]
 	do code
 ]
+
+dorc: does [do read-clipboard]
+
+;; hack console to automatically expand space-containing paths
+;; unfortunately it's compiled, so we have to `run` it manually after
+system/console: make system/console [
+	try-do: func [code /local result path][
+		set/any 'result try/all/keep [
+			either 'halt-request = set/any 'result catch/name [
+				parse code [any [change only set path any-path! (to path expand-space-path path) | skip]]
+				do probe code
+			] 'console [
+				print "(halted)"						;-- return an unset value
+			][
+				:result
+			]
+		]
+		:result
+	]
+]
+
+
 
 
 ;-- experimental probe with depth control
