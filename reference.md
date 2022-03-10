@@ -603,7 +603,7 @@ Default `data` just acts as a wrapper around `source`, picking from it and retur
 Note that `grid-view` contains *data*, which it transforms into spaces automatically.
 
 
-# Tube
+## Tube
 
 Container that places items into rows of fixed width, and stacks rows on top of each other. Unlike grid, has no columns and no support for big number of items. Similar to VID's standard flow layout.
 
