@@ -12,7 +12,7 @@ set-style 'heading [
 	(unless bigfont =? font [self/font: bigfont] ())
 	fill-pen (svmc/text + 0.0.0.200) pen off box 0x0 (as-pair width 50)
 ]
-set-style 'field [fill-pen (0.0.0.100 + contrast-with svmc/text) pen off box 0x0 (size)]
+set-style 'field [fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]
 set-style 'field/caret [fill-pen (svmc/text)]
 append spaces/styles reduce [
 	to path! 'tube
