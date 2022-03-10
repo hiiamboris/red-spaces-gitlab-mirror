@@ -67,24 +67,6 @@ sdo: function [code [block!]] [
 
 dorc: does [do read-clipboard]
 
-;; hack console to automatically expand space-containing paths
-;; unfortunately it's compiled, so we have to `run` it manually after
-system/console: make system/console [
-	try-do: func [code /local result path][
-		set/any 'result try/all/keep [
-			either 'halt-request = set/any 'result catch/name [
-				parse code [any [change only set path any-path! (to path expand-space-path path) | skip]]
-				do probe code
-			] 'console [
-				print "(halted)"						;-- return an unset value
-			][
-				:result
-			]
-		]
-		:result
-	]
-]
-
 
 
 

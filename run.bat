@@ -1,0 +1,1 @@
+D:\devel\red\builds\red-12sep21-9aea165d9.exe --cli console.red %*
