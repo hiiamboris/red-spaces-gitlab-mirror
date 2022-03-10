@@ -514,7 +514,7 @@ Default `cells` just acts as a wrapper around `cell-map`, picking spaces from it
 
 <details>
 <summary>
-To work with cell span the following API is used: `get-span`, `set-span`, `get-first-cell`
+To work with cell span the following API is used: <code>get-span</code>, <code>set-span</code>, <code>get-first-cell</code>
 </summary>
 
 ```
