@@ -5,6 +5,8 @@ include_toc: true
 
 # RED SPACES - DRAW-BASED WIDGET LIBRARY FOR [RED](http://red-lang.org/)
 
+Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https://codeberg.org/hiiamboris/red-spaces)
+
 ## Examples (clickable)
 
 | Spiral editable field | Table |
@@ -48,7 +50,7 @@ Good enough to experiment with, and to propose design enhancements and feature r
 | Resize model | Need a powerful simple design idea, ideally that would apply to faces too |
 | Layout | Embedded into View layout seamlessly, but very basic: only accepts space names and `with` |
 | Grid/Table | Requires interactivity: columns dragging, sorting, filtering |
-| Reactivity | Waiting for https://github.com/red/red/pull/4529 |
+| Reactivity | Waiting for [PR #4529](https://github.com/red/red/pull/4529) (reactivity has to be scalable for Spaces scope) |
 | User's guide | Written |
 | Widget reference | Written |
 | Creator's guide | Written |
