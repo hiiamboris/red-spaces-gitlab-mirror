@@ -12,7 +12,7 @@ Red [
 ;@@ rename to standard-spaces ?
 
 
-exports: [make-space space?]
+exports: [make-space make-template space?]
 
 make-space: function [
 	"Create a space from a template TYPE"
@@ -27,6 +27,14 @@ make-space: function [
 	unless block [r: object r]
 	if name [r: anonymize type r]
 	r
+]
+
+make-template: function [
+	"Declare a space template"
+	base [word!]  "Type it will be based on"  
+	spec [block!] "Extension code"
+][
+	make-space/block base spec
 ]
 
 ;-- helps having less boilerplate when `map` is straightforward
@@ -65,15 +73,15 @@ spaces/space: [											;-- minimum basis to build upon
 ]
 space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
 
-spaces/timer: make-space/block 'space [rate: none]		;-- template space for timers
+spaces/timer: make-template 'space [rate: none]		;-- template space for timers
 
-spaces/rectangle: make-space/block 'space [
+spaces/rectangle: make-template 'space [
 	size: 20x10
 	margin: 0
 	draw: func [] [compose [box (margin * 1x1) (size - margin)]]
 ]
 
-spaces/triangle: make-space/block 'space [
+spaces/triangle: make-template 'space [
 	size: 16x10
 	dir: 'n
 	margin: 0
@@ -93,7 +101,7 @@ spaces/triangle: make-space/block 'space [
 	]
 ]
 
-spaces/image: make-space/block 'space [
+spaces/image: make-template 'space [
 	size: none											;-- set automatically unless `autosize?` = off
 	autosize?: true										;-- if off, `size` should be defined
 	margin: 0
@@ -108,7 +116,7 @@ spaces/image: make-space/block 'space [
 ;@@ TODO: externalize all functions, make them shared rather than per-object
 ;@@ TODO: automatic axis inferrence from size?
 scrollbar: context [
-	spaces/scrollbar: make-space/block 'space [
+	spaces/scrollbar: make-template 'space [
 		size: 100x16										;-- opposite axis defines thickness
 		axis: 'x
 		offset: 0%
@@ -208,7 +216,7 @@ scrollable-space: context [
 
 	;@@ TODO: just moving content around could be faster than rebuilding draw block when scrolling
 	;@@ although how to guarantee that it *can* be cached?
-	spaces/scrollable: make-space/block 'space [
+	spaces/scrollable: make-template 'space [
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: make-space/name 'space []			;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
@@ -297,7 +305,7 @@ paragraph-ctx: context [
 	;@@ BUG: not deeply reactive
 	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
 
-	spaces/paragraph: make-space/block 'space [
+	spaces/paragraph: make-template 'space [
 		size: none				;-- only valid after `draw` because it applies styles
 		text: ""
 		margin: 0x0				;-- default = no margin
@@ -375,7 +383,7 @@ container-ctx: context [
 		r
 	]
 
-	spaces/container: make-space/block 'space [
+	spaces/container: make-template 'space [
 		size: none				;-- only available after `draw` because it applies styles
 		item-list: []
 		items: function [/pick i [integer!] /size] [
@@ -393,7 +401,7 @@ container-ctx: context [
 ;@@ `list` is too common a name - easily get overridden and bugs ahoy
 ;@@ need to stash all these contexts somewhere for external access
 list-ctx: context [
-	spaces/list: make-space/block 'container [
+	spaces/list: make-template 'container [
 		axis: 'x
 		margin: 5x5
 		spacing: 5x5
@@ -414,8 +422,15 @@ list-ctx: context [
 ]
 
 
+row-ctx: context [
+	spaces/row: make-template 'list [
+		
+	]
+]
+
+
 tube-ctx: context [
-	spaces/tube: make-space/block 'container [
+	spaces/tube: make-template 'container [
 		width:   100
 		margin:  5x5
 		spacing: 5x5
@@ -438,7 +453,7 @@ tube-ctx: context [
 
 ;-- a polymorphic style: given `data` creates a visual representation of it
 ;@@ TODO: complex types should leverage table style
-spaces/data-view: make-space/block 'space [
+spaces/data-view: make-template 'space [
 	size:    none					;-- only available after `draw` because it applies styles
 	data:    none					;-- ANY red value
 	width:   none					;-- when set, forces output to have fixed width (can be a list)
@@ -527,7 +542,7 @@ spaces/data-view: make-space/block 'space [
 
 
 window-ctx: context [
-	spaces/window: make-space/block 'space [
+	spaces/window: make-template 'space [
 		;-- when drawn auto adjusts it's `size` up to `max-size` (otherwise scrollbars will always be visible)
 		max-size: 1000x1000
 
@@ -582,7 +597,7 @@ window-ctx: context [
 ]
 
 inf-scrollable-ctx: context [
-	spaces/inf-scrollable: make-space/block 'scrollable [	;-- `infinite-scrollable` is too long for a name
+	spaces/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 		pages: 10x10							;-- window size multiplier in sizes of inf-scrollable
@@ -638,7 +653,7 @@ inf-scrollable-ctx: context [
 
 ;@@ just for testing ;@@ TODO: beautify it and draw a spider at random location, or leave it to the others as a challenge
 ;@@ TODO: explore fractals this way :D
-spaces/web: make-space/block 'inf-scrollable [
+spaces/web: make-template 'inf-scrollable [
 	canvas: make-space 'space [
 		available?: function [axis dir from requested] [requested]
 	
@@ -685,7 +700,7 @@ spaces/web: make-space/block 'inf-scrollable [
 ]
 
 list-view-ctx: context [
-	spaces/list-view: make-space/block 'inf-scrollable [
+	spaces/list-view: make-template 'inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; cached?: no			;@@ TODO - cache of rendered code of items, to make it more realtime (will need invalidation after resize)
 		pages: 10
@@ -912,7 +927,7 @@ list-view-ctx: context [
 ;@@ TODO: height & width inferrence
 ;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
-	spaces/cell: make-space/block 'space [
+	spaces/cell: make-template 'space [
 		map: [space [offset 0x0 size 0x0]]
 		; map/1: make-space/name 'space []
 		cdrawn: none			;-- cached draw block of content to eliminate double redraw - used by row-height? and during draw when extending cell size
@@ -928,7 +943,7 @@ grid-ctx: context [
 		]
 	]
 
-	spaces/grid: make-space/block 'space [
+	spaces/grid: make-template 'space [
 		size:    none				;-- only available after `draw` because it applies styles
 		margin:  5x5
 		spacing: 5x5
@@ -1421,7 +1436,7 @@ grid-ctx: context [
 
 
 grid-view-ctx: context [
-	spaces/grid-view: make-space/block 'inf-scrollable [
+	spaces/grid-view: make-template 'inf-scrollable [
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
@@ -1501,7 +1516,7 @@ grid-view-ctx: context [
 ; ]
 
 button-ctx: context [
-	spaces/button: make-space/block 'data-view [
+	spaces/button: make-template 'data-view [
 		; width: none								;-- when not 'none', forces button width in pixels - defined by data-view
 		margin: 4x4								;-- change data-view's default
 		pushed?: no								;-- becomes true when user pushes it; triggers `command`
@@ -1534,7 +1549,7 @@ button-ctx: context [
 
 
 
-spaces/rotor: make-space/block 'space [
+spaces/rotor: make-template 'space [
 	content: none
 	angle: 0
 
@@ -1596,7 +1611,7 @@ spaces/rotor: make-space/block 'space [
 
 ;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go
 ;@@ if embedded, map composition should be a reverse of hittest: if something is drawn first then it's at the bottom of z-order
-spaces/field: make-space/block 'scrollable [
+spaces/field: make-template 'scrollable [
 	text: ""
 	selected: none		;@@ TODO
 	caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
@@ -1626,7 +1641,7 @@ spaces/field: make-space/block 'scrollable [
 	]
 ]
 
-spaces/spiral: make-space/block 'space [
+spaces/spiral: make-template 'space [
 	size: 100x100
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
