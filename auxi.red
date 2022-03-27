@@ -51,8 +51,8 @@ clip: func [range [block!] value [scalar!]] [
 constrain: function [
 	"Sets TARGET to SIZE clipped within LIMITS"
 	'target [set-word! set-path!]
-	limits  [none! word! object!]
 	size    [pair!]
+	limits  [none! word! object!]
 	; /force "Set it even if it's equal, to trigger reactions"
 ][
 	case [
@@ -83,7 +83,7 @@ for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code 
 	][
 		#assert [all [pair? i1 pair? i2]]
 		range: i2 - i1 + 1
-		unless 1x1 ◄= range [exit]	;-- empty range
+		unless 1x1 +<= range [exit]	;-- empty range
 		xyloop i: range [
 			set word i - 1 + i1		;@@ does not allow index changes within the code, but allows in integer part above
 			do code
@@ -180,22 +180,25 @@ top: func [series [series!]] [back tail series]
 }
 
 ;-- chainable pair comparison - instead of `within?` monstrosity
-; >> 1x1 ◄ 2x2 ◄= 3x3 ◄ 4x4
+; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
 ; == 4x4
-◄=: make op! func [
+
+;; very hard to find a sigil for these ops
+;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
++<=: make op! func [
 	"Chainable pair comparison (non-strict)"
 	a [pair! none!] b [pair! none!]
 ][
 	all [a b a = min a b  b]
 ]
-◄:  make op! func [
++<:  make op! func [
 	"Chainable pair comparison (strict)"    
 	a [pair! none!] b [pair! none!]
 ][
 	all [a b a = min a b - 1  b]
 ]
-; ►:  make op! func [a b] [a = max a b + 1]
-; ►=: make op! func [a b] [a = max a b]
+;+>:  make op! func [a b] [a = max a b + 1]
+;+>=: make op! func [a b] [a = max a b]
 
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
@@ -204,7 +207,7 @@ boxes-overlap?: function [
 	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
 	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
 ][
-	0x0 ◄ ((min A2 B2) - max A1 B1)							;-- 0x0 ◄ intersection size
+	0x0 +< ((min A2 B2) - max A1 B1)							;-- 0x0 +< intersection size
 ]
 
 vec-length?: function [v [pair!]] [

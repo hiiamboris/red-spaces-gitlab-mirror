@@ -139,6 +139,74 @@ spaces/image: make-template 'space [
 	]
 ]
 
+cell-ctx: context [
+	~: self
+
+	allowed-alignments: make hash! [
+		-1x-1 -1x0 -1x1
+		 0x-1  0x0  0x1
+		 1x-1  1x0  1x1
+	]
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			align [
+				unless find allowed-alignments :new [
+					set-quiet in space word :old
+					ERROR "Invalid alignment specified: (mold/part :new 100)"
+				]
+			]
+		]
+	]
+	
+	draw: function [space [object!] canvas [pair! none!]] [
+		drawn:  render/on space/content canvas
+		cspace: get space/content
+		either pair? canvas [						;-- canvas is already constrained by render
+			space/size: canvas
+		][											;-- no canvas = no alignment, minimal appearance
+			constrain space/size: cspace/size space/limits
+		]
+		free:   space/size - cspace/size
+		offset: free * space/align + 1 / 2
+		unless tail? drawn [
+			clip?:  not 0x0 +<= free
+			move?:  offset <> 0x0
+			if any [clip? move?] [
+				buf: clear []
+				if clip? [repend buf ['clip 0x0 space/size]]
+				if move? [repend buf ['translate offset]]
+				drawn: copy append/only buf drawn
+			]
+		]
+		space/map/1: space/content
+		space/map/2/offset: offset
+		space/map/2/size: space/size
+		drawn
+	]
+	
+	spaces/cell: make-template 'space [
+		align:   0x0									;@@ consider more high level VID-like specification of alignment
+		weight:  0										;@@ what default weight to use?
+		;@@ what about margin here?
+		content: make-space/name 'space					;@@ consider `content: none` optimization if it's worth it
+		map:     reduce [content [offset 0x0 size 0x0]]
+		
+		;@@ this should be needed in debug mode only?
+		on-change*: function [word [any-word!] old [any-type!] new [any-type!]] [
+			~/on-change self word :old :new
+		]
+		
+		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
+		;; but to do that we'll have to render content fully first to get it's size and align it
+		;; which defies the meaning of /only...
+		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
+		draw: function [/on canvas [pair! none!]] [
+			~/draw self canvas
+		]
+	]
+]
+
 ;@@ TODO: externalize all functions, make them shared rather than per-object
 ;@@ TODO: automatic axis inferrence from size?
 scrollbar: context [

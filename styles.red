@@ -204,7 +204,7 @@ context [
 					spec: spec-of :draw
 					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
 					unless find spec /on   [on: canvas: none]
-					if canvas [constrain canvas: select space 'limits canvas]
+					if canvas [constrain canvas: canvas space/limits]
 					code: case [						;@@ workaround for #4854 - remove me!!
 						all [canvas only] [[draw/only/on xy1 xy2 canvas]]
 						only              [[draw/only    xy1 xy2       ]]
@@ -224,7 +224,7 @@ context [
 					spec: spec-of :style
 					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
 					unless find spec /on   [on: canvas: none]
-					if canvas [constrain canvas: select space 'limits canvas]
+					if canvas [constrain canvas: canvas space/limits]
 					code: case [						;@@ workaround for #4854 - remove me!!
 						all [canvas only] [[style/only/on space xy1 xy2 canvas]]
 						only              [[style/only    space xy1 xy2       ]]
