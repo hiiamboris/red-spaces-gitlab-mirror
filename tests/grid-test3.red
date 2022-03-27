@@ -15,8 +15,8 @@ view/no-wait/options [
 	b: host [
 		grid-view with [
 			size: 400x400
-			; grid/limits: 10x10
-			; limits: [x: 10 y: auto]
+			; grid/bounds: 10x10
+			; bounds: [x: 10 y: auto]
 			source/(1x2): "1x2"
 			source/(2x2): "2x2"
 			source/(1x1): "1x1"

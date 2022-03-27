@@ -13,6 +13,7 @@ exports: [layouts]
 layouts: context [
 
 	list: none											;-- reserve names
+	row:  none
 	tube: none
 
 	;@@ TODO: free list of these
@@ -44,104 +45,143 @@ layouts: context [
 			place: func [item [word!]] [~/place self item]
 		]
 	]
-
+	
 	tube-layout-ctx: context [
 		~: self
-
-		fill-cache: function [layout [object!]] [
-			data: tail layout/raw-map
-			y: anchor2axis layout/axes/1
-			x: anchor2axis layout/axes/2
-			xvec: axis2pair x
-			yneg?: find [n w] layout/axes/1
-			xneg?: find [n w] layout/axes/2
-			#assert [y <> x]								;-- have to be normal to each other
-			cs: layout/content-size
-			sp: layout/spacing
-			maxw: layout/width - (layout/margin/:x * 2)
-
-			cache-names: [data x y cs sp maxw xvec xneg? yneg?]
-			reduce/into cache-names layout/cache
-		]
-
-
+		
 		place: function [layout [object!] item [word!]] [
-			sz: select get item 'size
-			#assert [sz]									;-- item must have a size
-			if empty? layout/cache [fill-cache layout]
-			set [data: x: y: cs: sp: maxw: xvec: xneg?: yneg?:] layout/cache
-			rsz: data/-1									;-- row size accumulated so far
-			first?: 0 = rw: rsz/:x							;-- row width accumulated so far
+			append layout/items item
+		]
+		
+		build-map: function [layout [object!]] [
+			;; to support automatic sizing, each item's constraints has to be analyzed
+			;; obviously there can be two strategies:
+			;;  1. fill everything with max size, then shrink, and rearrange as possible
+			;;  2. fill everything with min size, then expand within a single row
+			;;  2nd option seems more predictable and easier to implement
+			;; constraint presence does not mean that space can reach that size,
+			;; so it should only be used as hint (canvas size) to obtain min size
+			;; then, every item that has a nonzero weight has to be rendered twice:
+			;; once to get it's minimum appearance, second time to expand it
+			;; other items also has to be rendered twice - to fill the row height
 			
-			rw: rw + sz/:x
-			unless first? [
-				rw: rw + sp/:x
-				if rw > maxw [								;-- jump to next row if needed
-					cs/:y: cs/:y + sp/:y
-					data: insert insert/only data copy [] rsz: 0x0
-					rw: sz/:x
-					first?: yes
+			;; obtain constraints info
+			;@@ info can't be static since render may call another build-map; use block-stack!
+			info: make block! length? layout/items
+			i: 0 foreach item layout/items [			;@@ use for-each when becomes native
+				i: i + 1
+				space: get item
+				min-size: all [space/limits space/limits/min]	;@@ REP #113
+				max-size: all [space/limits space/limits/max]	;@@ REP #113
+				;@@ this is inconsistent with list which does NOT render it's items:
+				drawn: render/on item min-size			;-- needed to obtain space/size
+				#assert [pair? space/size]
+				weight: any [select space 'weight 0.0]
+				#assert [number? weight]
+				available: case [
+					weight <= 0  [0]					;-- fixed size
+					not max-size [2e9]					;-- unlimited extension possible
+					'else [max-size/x - space/size/x / weight]	;@@ REP #113
+				]
+				append/only info reduce [				;@@ use block stack
+					i item space drawn space/size max-size 1.0 * available weight
 				]
 			]
-			if 0 < added: sz/:y - rsz/:y [cs/:y: cs/:y + added]
-			rsz: max rsz sz									;-- update row size
-			rsz/:x: rw
-			layout/content-size: max data/-1: rsz cs		;-- update content size (x from row-size, y from cs)
-
-			ofs: rsz - sz * xvec
-			if yneg? [ofs/:y: 0 - ofs/:y - sz/:y]
-			if xneg? [ofs/:x: 0 - ofs/:x - sz/:x]
-			reduce/into [data x y cs sp maxw xvec xneg? yneg?] clear layout/cache
-			compose/deep/into [(item) [offset (ofs) size (sz)]] tail data/-2
-		]
-
-		build-map: function [layout] [
-			al: layout/align
-			set [data: x: y: cs: sp: maxw: xvec: xneg?: yneg?:] layout/cache
-			ox: anchor2pair layout/axes/2
-			oy: anchor2pair layout/axes/1
-			shift: 0x0
-			if ox/:x < 0 [shift/:x: maxw]
-			if oy/:y < 0 [shift/:y: cs/:y]
-			pos: shift + mg: layout/margin
-			move-items: al/2 + 1 / 2
-			move-rows:  al/1 + 1 / 2
-			r: make [] length? layout/raw-map
-			foreach [row row-size] layout/raw-map [
-				gap: maxw - row-size/:x						;-- can be negative, still correct
-				row-shift: gap * move-rows * ox
-				if move-items <> 0 [
-					foreach [name geom] row [
-						gap: row-size - geom/size * oy
-						geom/offset: geom/offset + (move-items * gap)
+			
+			;; split info into rows
+			rows: copy []								;@@ use block-stack
+			row:  copy []
+			row-size: layout/spacing/x * -1x0			;@@ not gonna work for empty rows
+			row-max-width: layout/width - (2 * layout/margin/x)
+			; canvas: layout/width - (2 * layout/margin/x) by 2e9		;@@ use canvas ?
+			foreach item info [
+				set [_: name: _: _: item-size:] item
+				new-row-size: as-pair
+					row-size/x + item-size/x + layout/spacing/x
+					max row-size/y item-size/y
+				row-size: either all [					;-- row is full, but has at least 1 item?
+					new-row-size/x > row-max-width
+					not tail? row
+				][
+					reduce/into [row-size copy row] tail rows
+					clear row
+					item-size
+				][
+					new-row-size
+				]
+				append/only row item
+			]
+			reduce/into [row-size row] tail rows
+			
+			;; expand row items - facilitates a second render cycle of the row
+			foreach [row-size row] rows [
+				free: row-max-width - row-size/x
+				if free > 0 [							;-- any space left to distribute?
+					;; free space distribution mechanism relies on continuous resizing!
+					;; render itself doesn't have to occupy max-size or the size we allocate to it
+					;; and since we don't know what render is up to,
+					;; we can only "fix" it by re-rendering until we fill whole row space
+					;; but this will be highly inefficient, and not even guaranteed to ever finish
+					;; so a proper solution in this case should be to use a custom layout or resize hook
+					;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
+					weights: clear []
+					extras:  clear []
+					foreach item row [
+						append weights item/8
+						append extras  item/7
+					]
+					exts: distribute free weights extras
+					
+					i: 0 foreach item row [				;@@ should be for-each
+						i: i + 1
+						set [_: name: space: drawn: item-size: max-size: available: weight:] item
+						new-size: item-size/x + exts/:i by row-size/y
+						item/4: render/on name new-size
+						item/5: space/size				;@@ or use new-size in a map?
 					]
 				]
-				foreach [name geom] row [
-					geom/offset: geom/offset + pos + row-shift
-				]
-				append r row
-				pos: pos + (sp + row-size * oy)
 			]
-			r
+			
+			map: clear []
+			margin:  layout/margin
+			spacing: layout/spacing
+			row-y: margin/y
+			total-length: 0
+			foreach [row-size row] rows [
+				ofs: margin/x by row-y
+				foreach item row [
+					set [_: name: space: drawn: item-size: max-size: available: weight:] item
+					ofs/y: to integer! row-size/y - item-size/y / 2 + row-y
+					geom: reduce ['offset ofs 'size item-size]
+					repend map [name geom]
+					ofs/x: ofs/x + spacing/x + item-size/x
+				]
+				total-length: total-length + row-size/y + spacing/y
+				row-y: margin/y + total-length
+			]
+			total-length: total-length - spacing/y
+			layout/content-size: row-max-width by total-length
+			layout/size: 2x2 * margin + layout/content-size
+			copy map
 		]
 
-		size: function [layout [object!]] [
-			;-- does not contract size if it's > width
-			;-- does not expand it either if some item is > width, otherwise can get this picture:
-			;-- [  ] = width
-			;-- XXXXXXXXXX
-			;-- X X        <- if expanded, these rows will look like they're half filled
-			;-- X X           instead, let the big item stick out
-			sz: layout/margin * 2 + layout/content-size
-			switch layout/axes/1 [
-				n s [layout/width by sz/y]
-				w e [sz/x by layout/width]
-			]
-		]
+		; size: function [layout [object!]] [
+			; ;-- does not contract size if it's > width
+			; ;-- does not expand it either if some item is > width, otherwise can get this picture:
+			; ;-- [  ] = width
+			; ;-- XXXXXXXXXX
+			; ;-- X X        <- if expanded, these rows will look like they're half filled
+			; ;-- X X           instead, let the big item stick out
+			; sz: layout/margin * 2 + layout/content-size
+			; switch layout/axes/1 [
+				; n s [layout/width by sz/y]
+				; w e [sz/x by layout/width]
+			; ]
+		; ]
 
 		set 'tube object [
 			;-- interface
-			width:   100
+			width:   100			;@@ TODO: use canvas instead?
 			; origin:  0x0			;@@ TODO - if needed
 			margin:  0x0
 			spacing: 0x0
@@ -151,51 +191,42 @@ layouts: context [
 			content-size: 0x0
 			place: func [item [word!]] [~/place self item]
 			map:   does [~/build-map self]
-			size:  does [~/size self]
+			size:  0x0
 
 			;-- used internally
-			cache: []				;-- various values used by `place`
-			raw-map: [[] 0x0]		;-- accumulated rows and row-sizes so far (make object! copies this deeply)
+			items: []
 		]
-
-		#assert [not same? tube/raw-map/1 (first select make tube [] 'raw-map)]
 	]
 
-; row-layout-ctx: context [
-; 	place: function [layout [object!] item [pair!]] [
-; 		set [ofs: siz: org:] list-layout-ctx/place layout item
-; 		guide: select [x 1x0 y 0x1] x: layout/axis
-; 		index: (length? layout/items) / 3
-; 		if w: layout/widths/:index  [siz/x: w]			;-- enforce size if provided
-; 		if h: layout/heights/:index [siz/y: h]
-; 		if index > pinned: layout/pinned [				;-- offset and clip unpinned items
-; 			either pinned > 0 [
-; 				plim: skip items pinned - 1 * 3
-; 				lim: plim/1 + plim/2 + layout/spacing * guide
-; 			][
-; 				lim: 0x0
-; 			]
-; 			ofs: ofs + (layout/origin * guide)
-; 			if ofs/:x < lim/:x [
-; 				org: org - dx: (lim - ofs) * guide
-; 				siz: max 0x0 siz - dx
-; 				ofs/:x: lim/:x
-; 			]
-; 		]
-; 		layout/content-size/:x: ofs/:x + siz/:x - layout/margin/:x
-; 		;-- content-size height accounts for all items, even clipped (by design)
-; 		reduce/into [ofs siz org] clear skip tail layout/items -3
-; 	]
+	row-layout-ctx: make tube-layout-ctx [
+		~: self
 
-; 	set 'row-layout make list-layout [
-; 		origin: 0
-; 		pinned: 0
-; 		widths: []				;-- can be a map: index -> integer width
-; 		heights: []				;-- same
+		place: function [layout [object!] item [word!]] [	;-- held separately to minimize the size of list-layout itself
+			sz: select get item 'size
+			#assert [sz]									;-- item must have a size
+			guide: select [x 1x0 y 0x1] layout/axis
+			cs: layout/content-size
+			if 0x0 <> cs [cs: cs + (layout/spacing * guide)]
+			ofs: cs * guide + layout/margin + layout/origin
+			cs: cs + (sz * guide)
+			cs: max cs sz
+			layout/content-size: cs
+			compose/deep/into [(item) [offset (ofs) size (sz)]] tail layout/map
+		]
 
-; 		place: function [item [pair!]] [row-layout-ctx/place self item]
-; 	]
-; ]
+		set 'row object [
+			origin:  0x0			;-- used by list-view
+			margin:  0x0
+			spacing: 0x0
+			axis:    'x				;-- vast majority of rows will be X-rows
+			divisable?: yes			;-- whether it can split into 2 or more rows when tight on space
+
+			content-size: 0x0
+			size: does [margin * 2 + content-size]
+			map: []			;-- accumulated map so far
+			place: func [item [word!]] [~/place self item]
+		]
+	]
 
 ]
 

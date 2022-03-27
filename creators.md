@@ -207,12 +207,12 @@ Why a name is needed?
 
 <details>
 	<summary>
-Why `(get name) = object` rather than `object [name: ..]`?
+Why <code>(get name) = object</code> rather than <code>object [name: ..]</code>?
 </summary>
 
-- listing the tree of spaces
 - dumping particular spaces tree: if you've ever tried `?? my-face` you know it is a bad idea that will force you to kill the console; spaces however are always fully inspectable
 - it makes inspectable style and event paths, which is helpful when debugging
+- simpler listing of the tree of spaces (otherwise all those words would have to be created anew every time a tree is listed)
 - to test and evaluate an approach different to the one taken in View
 
 Drawbacks:

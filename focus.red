@@ -103,12 +103,12 @@ focus-space: function [
 		unless find keyboard/focusable name [continue]
 		append path new-name: name
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
-		#debug [print ["Moving focus to" as path! path]]
+		#debug [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
 		unless empty? old-path: keyboard/focus [
-			events/do-previewers old-path none 'on-unfocus		;-- pass none as 'event' since we don't have any
-			events/do-handlers   old-path none 'on-unfocus no
-			events/do-finalizers old-path none 'on-focus
+			events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
+			events/do-handlers   old-path none 'unfocus no
+			events/do-finalizers old-path none 'unfocus
 		]
 
 		foreach name path [								;-- if faces are provided, find the innermost one
@@ -122,9 +122,9 @@ focus-space: function [
 		]
 		keyboard/focus: copy path						;-- copy since the path is static
 
-		events/do-previewers path none 'on-focus				;-- pass none as 'event' since we don't have any
-		events/do-handlers   path none 'on-focus no
-		events/do-finalizers path none 'on-focus
+		events/do-previewers path none 'focus				;-- pass none as 'event' since we don't have any
+		events/do-handlers   path none 'focus no
+		events/do-finalizers path none 'focus
 
 		return yes
 	]

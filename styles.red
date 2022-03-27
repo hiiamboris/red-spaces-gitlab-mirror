@@ -43,22 +43,22 @@ do with [
 	;-- using paths we get another benefit: we can apply the same style to multiple spaces (e.g. hscroll vscroll [style..])
 	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
 	set 'styles reshape [		;-- styles come before the main drawing code
-		host [[
+		host [
 			pen off
 			fill-pen !(svmc/panel)
 			font !(make font! [name: svf/system size: svf/size])
 			line-width 2
-			box 0x0 (size)		;-- makes host background opaque otherwise it loses mouse clicks on most of it's part
+			box 0x0 (any [size 0x0])	;-- makes host background opaque otherwise it loses mouse clicks on most of it's part
 			pen !(svmc/text)
-		]]
+		]
 
-		#if system/platform = 'Linux [			;@@ GTK fix for #4901
-			paragraph [[
+		#if system/platform = 'Linux [					;@@ GTK fix for #4901
+			paragraph [
 				;-- font can be set in the style!:
 				;-- but impossible to debug it, as probe draw lists font with thousands of parents
-				(self/font: serif-12 ())			;@@ #3804 - requires self/ or won't work
+				(self/font: serif-12 ())				;@@ #3804 - requires self/ or won't work
 				; pen blue
-			]]
+			]
 		]
 
 		; list/item [[pen cyan]]
@@ -98,16 +98,18 @@ do with [
 			]
 		]
 
-		cell [[
+		cell [
 			fill-pen !(svmc/panel)
 			box 0x0 (size)
 			pen      !(svmc/text)			;-- restore pen after `pen off` in grid
-		]]
+		]
 	]
 	
 
 	map-each/only/self [w [word! ]] styles [to path! w]	;-- replace words with paths
-	map-each/only/self [b [block!]] styles [do b]		;-- extract blocks, construct functions
+	map-each/only/self [b [block!]] styles [			;-- extract blocks, construct functions
+		either 'function = first b [do b][b]
+	]
 
 ]
 
@@ -133,13 +135,13 @@ get-style: function [
 	:style
 ]
 
-set-style: function [name [word! path!] style [block!]] [
+set-style: function [name [word! path!] style [block! function!]] [
 	name: to path! name
 	pos: any [											;-- `put` does not support paths/blocks so have to reinvent it
 		find/only/tail styles name
 		insert/only tail styles name
 	]
-	change/only pos style
+	change/only pos :style
 ]
 
 context [
@@ -151,7 +153,7 @@ context [
 		append current-style name
 		trap/all/catch code [
 			msg: form/part thrown 1000						;@@ should be formed immediately - see #4538
-			#print "^/*** Failed to render (name)!^/(msg)"
+			#print "*** Failed to render (name)!^/(msg)^/"
 		]
 		take/last current-style
 	]
@@ -170,7 +172,13 @@ context [
 
 		with-style 'host [
 			host-drawn: compose/deep bind get-style face	;-- host style can only be a block
-			space-drawn: render-space/only face/space xy1 xy2
+			space-drawn: render-space/only/on face/space xy1 xy2 face/size
+			#assert [block? :space-drawn]
+			unless face/size [								;-- initial render: define face/size
+				face/size: select get face/space 'size
+				#assert [face/size]
+				host-drawn: compose/deep bind get-style face	;-- reapply the host style using new size
+			]
 			render: reduce [host-drawn space-drawn]
 		]
 		any [render copy []]
@@ -179,6 +187,7 @@ context [
 	render-space: function [
 		name [word!] "Space name pointing to it's object"
 		/only xy1 [pair! none!] xy2 [pair! none!]
+		/on canvas [pair! none!]
 	][
 		space: get name
 		#assert [space? :space]
@@ -189,26 +198,43 @@ context [
 			either block? :style [
 				style: compose/deep bind style space	;@@ how slow this bind will be? any way not to bind? maybe construct a func?
 				draw: select space 'draw
-				all [
-					only
-					function? :draw
-					find spec-of :draw /only
-					do copy/deep [draw: draw/only xy1 xy2]	;@@ workaround for #4854 - remove me!!
-					; draw: draw/only xy1 xy2
+				
+				;@@ this basically cries for FAST `apply` func!!
+				if all [function? :draw  any [xy1 xy2 canvas]] [
+					spec: spec-of :draw
+					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+					unless find spec /on   [on: canvas: none]
+					if canvas [constrain canvas: select space 'limits canvas]
+					code: case [						;@@ workaround for #4854 - remove me!!
+						all [canvas only] [[draw/only/on xy1 xy2 canvas]]
+						only              [[draw/only    xy1 xy2       ]]
+						canvas            [[draw/on              canvas]]
+					]
+					draw: either code [do copy/deep code][draw]
 				]
+				draw: draw								;-- call the draw function if not called yet
+				#assert [block? :draw]
+				
 				if empty? style [unset 'style]
-				render: compose/only [(:style) (draw)]	;-- call the draw function if not called yet; compose removes `unset`
+				render: compose/only [(:style) (:draw)]	;-- compose removes style if it's unset
 			][
 				#assert [function? :style]
-				render: either all [
-					only
-					find spec-of :style /only
+				;@@ this basically cries for FAST `apply` func!!
+				either any [xy1 xy2 canvas] [
+					spec: spec-of :style
+					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+					unless find spec /on   [on: canvas: none]
+					if canvas [constrain canvas: select space 'limits canvas]
+					code: case [						;@@ workaround for #4854 - remove me!!
+						all [canvas only] [[style/only/on space xy1 xy2 canvas]]
+						only              [[style/only    space xy1 xy2       ]]
+						canvas            [[style/on      space         canvas]]
+					]
+					render: either code [do copy/deep code][style space]
 				][
-					do copy/deep [style/only space xy1 xy2]	;@@ workaround for #4854 - remove me!!
-					; draw: draw/only xy1 xy2
-				][
-					style space
+					render: style space
 				]
+				#assert [block? :render]
 			]
 		]
 		either render [
@@ -223,11 +249,24 @@ context [
 		space [word! object!] "Space name, or host face as object"
 		/only "Limit rendering area to [XY1,XY2] if space supports it"
 			xy1 [pair! none!] xy2 [pair! none!]
+		/on canvas [pair! none!] "Specify canvas size as sizing hint"
 	][
-		render: either word? space [:render-space][:render-face]
-		do copy/deep [									;@@ workaround for #4854 - remove me!!
-			render/only space xy1 xy2
+		; render: either word? space [:render-space][:render-face]
+		; render/only/on space xy1 xy2 canvas
+		rendered: either word? space [					;@@ workaround for #4854 - remove me!!
+			render-space/only/on space xy1 xy2 canvas
+		][
+			render-face/only space xy1 xy2
 		]
+		#debug draw [									;-- test the output to figure out which style has a Draw error
+			if error? error: try/keep [draw 1x1 rendered] [
+				prin "*** Invalid draw block: "
+				attempt [copy/deep rendered]			;@@ workaround for #5111
+				probe~ rendered
+				do error
+			]
+		]
+		rendered
 	]
 ]
 

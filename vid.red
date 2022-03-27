@@ -51,10 +51,18 @@ init-spaces-tree: function [face [object!]] [
 	tree: tree-from spec
 	#assert [any [1 >= length? tree]]
 	face/space: tree/1
-	face/draw: render face					;@@ required to populate `map`s & get the size
-	new-size: select get face/space 'size
-	#assert [new-size]			;-- `size: none` blows up `layout`
-	face/size: new-size
+	
+	;; this is rather tricky:
+	;;  1. we want `render` to render the content on currently set face/size
+	;;  2. yet, in `layout` we set face/size from the rendered content size
+	;; so, to avoid double rendering we have to re-apply the host style
+	;; this is done inside `render-face` if we set size to none
+	face/size: none
+	rendered: render face
+	#assert [face/size]						;-- should be set by `render-face`, `size: none` blows up `layout`
+	#debug draw [prin "host/draw: " probe~ rendered] 
+	
+	face/draw: rendered
 ]
 
 

@@ -2,11 +2,13 @@ Red []
 
 #include %../common/include-once.red
 
-#process off											;@@ required due to preprocessor bugs
+; #process off											;@@ required due to preprocessor bugs
 
-do/expand probe [
+; do/expand probe [
 	#include %../common/debug.red
 	#debug on
+	#debug set focus
+	; #debug set draw
 	; #debug set events
 	; #debug set styles
 	; #debug set grid-view
@@ -25,6 +27,7 @@ do/expand probe [
 	#include %../common/relativity.red
 	#include %../common/print-macro.red
 	#include %../common/error-macro.red
+	#include %../common/prettify.red
 	#include %../common/clock.red
 	#include %../common/profiling.red
 	#include %../common/extremi.red
@@ -46,6 +49,8 @@ do/expand probe [
 	context [
 		; joined: clear []
 		set 'joined clear []
+		script-dir: what-dir
+		change-dir #do keep [what-dir]
 		include: function [file [file!]] [
 			#debug [print ["loading" mold file]]
 			#debug [append joined compose/deep [print ["#including" (mold file)]]]
@@ -76,8 +81,10 @@ do/expand probe [
 		spaces/styles:    spaces/ctx/styles
 		spaces/layouts:   spaces/ctx/layouts
 		spaces/keyboard:  spaces/ctx/keyboard
+		
+		change-dir script-dir
 	]
-]
+; ]
 
-#process on
+; #process on
 

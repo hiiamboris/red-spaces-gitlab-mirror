@@ -76,12 +76,15 @@ define-handlers [
 			]
 		]
 		on-wheel [space path event] [
+			if 100 < absolute amount: event/picked [	;@@ workaround for #5110
+				amount: -256 * sign? amount + amount
+			]
 			scrollable-space/move-by/scale
 				space
 				'line
-				pick [forth back] event/picked <= 0
+				pick [forth back] amount <= 0
 				pick [x y] 'hscroll = path/3
-				absolute event/picked * 4
+				absolute amount * 4
 			update		;@@ TODO: only update when move succeeded
 		]
 		scroll-timer: [
@@ -196,13 +199,13 @@ define-handlers [
 		;-- so we have to use both
 		on-key [space path event] [				;-- char keys branch (inserts stuff as you type)
 			k: event/key
-			either space/active? [				;-- normal input when active
+			either space/active? [					;-- normal input when active
 				unless all [
 					char? k
 					any [
-						k >= #" "							;-- printable char
-						k = #"^-"							;-- Tab
-						if k = #"^M" [k: #"^/"]				;-- Enter -> NL
+						k >= #" "						;-- printable char
+						k = #"^-"						;-- Tab
+						if k = #"^M" [k: #"^/"]			;-- Enter -> NL
 					]
 				] [exit]
 				;@@ allow new-line char only when multiline?
@@ -214,39 +217,39 @@ define-handlers [
 				insert at t ci  k
 				space/invalidate						;@@ TODO: should be caught maybe automatically?
 				update
-			][									;-- has to handle Enter, or both key-down and key will handle it, twice
+			][										;-- has to handle Enter, or both key-down and key will handle it, twice
 				either k = #"^M" [
-					maybe space/active?: yes		;-- activate it on Enter
-					update							;-- let styles change
+					maybe space/active?: yes			;-- activate it on Enter
+					update								;-- let styles change
 				][
-					pass						;-- pass keys in inactive state (esp. tab)
+					pass								;-- pass keys in inactive state (esp. tab)
 				]
 			]
 		]
 		
-		on-key-down [space path event] [		;-- control keys & key combos branch (navigation)
+		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
 			k: event/key
-			unless space/active? [pass exit]	;-- keys should be passed thru (tab, arrows, ...); Enter is in on-key
-												;-- else, keys should be used on content (e.g. arrows)
+			unless space/active? [pass exit]			;-- keys should be passed thru (tab, arrows, ...); Enter is in on-key
+														;-- else, keys should be used on content (e.g. arrows)
 			if all [
-				char? k							;-- ignore chars without mod keys
+				char? k									;-- ignore chars without mod keys
 				not any [
-					find "^[^H" k				;-- use only Esc and BS
+					find "^[^H" k						;-- use only Esc and BS
 					event/ctrl?
 				]
 			] [exit]
 
 			len: length? t: space/text
-			ci: clip [0 len] space/caret-index	;-- may be >len if text was changed
+			ci: clip [0 len] space/caret-index			;-- may be >len if text was changed
 			switch/default k: event/key [
 				left   [ci: ci - 1]			;@@ TODO: ctrl-arrow etc logic
 				right  [ci: ci + 1]
 				home   [ci: 0]
 				end    [ci: len]
 				delete [remove skip t ci]
-				#"^H"  [remove skip t ci: ci - 1]	;-- backspace
-				#"^["  [maybe space/active?: no]	;-- Esc = deactivate
-			][exit]									;-- not supported yet key
+				#"^H"  [remove skip t ci: ci - 1]		;-- backspace
+				#"^["  [maybe space/active?: no]		;-- Esc = deactivate
+			][exit]										;-- not supported yet key
 			maybe space/caret-index: clip reduce [0 length? t] ci		;-- length may have changed, <> len
 			space/invalidate						;@@ TODO: should be caught maybe automatically?
 			update
@@ -257,12 +260,13 @@ define-handlers [
 		on-click [space path event] [
 			#assert [space/para/layout]
 			space/caret-index: offset-to-caret space/para/layout path/2
-			space/active?: yes				;-- activate, so Enter is not required
-			update							;-- let styles update
+			space/active?: yes							;-- activate, so Enter is not required
+			update										;-- let styles update
 		]
 
 		on-unfocus [space path event] [
-			space/active?: no				;-- deactivate so it won't catch Tab when next tabbed in
+			space/active?: no							;-- deactivate so it won't catch Tab when next tabbed in
+			update										;-- update the look (remove caret, decoration, etc)
 		]
 	]
 ]

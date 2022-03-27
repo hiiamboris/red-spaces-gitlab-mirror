@@ -36,7 +36,7 @@ view/no-wait/options [
 		grid-view with [
 			size: 500x300
 			; grid/pinned: 2x1
-			; grid/limits: [x: #[none] y: #[none]]
+			; grid/bounds: [x: #[none] y: #[none]]
 			; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
 			; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
 			; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]

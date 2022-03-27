@@ -101,6 +101,12 @@ demo: example of a glossy style sheet
 `arrange` func based on flow layouts that will work with faces?
 web preview component to preview the links in the chat
 widget: markdown renderer (unless Bolek adds it)
+consider removing double blocks from styles: just check if 1st word is func/function ?
+is there an alternative to styles than draw-blocks? like a set of facets and a special facet `style` for draw commands?
+let one define actors for static spaces (in VID or by adding them to the space manually)
+in widget reference: create a quick-nav map, somewhat like TOC but with pictures and arranged as a table
+UI where user can select table features and export code for this kind of table 
+if only bgnd color is specified for a widget (e.g. label), use contrast-with to determine the text color
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
@@ -131,6 +137,19 @@ content is a word!
 	at least we won't have to look for it..
 	but if we do, we'll have to wrap generic spaces and replace events inside
 	no... content+name looks cleaner to me
+word/object dilemma
+	though I've chosen to only have words inside spaces bodies, I'm not 100% convinced yet, not even 70%
+	we need names for styling, we don't want dumps of all objects in a space tree (even though as a tree it has no cycles)
+	but it creates an obstacle on the high level:
+	instead of writing `space/thing/x: 1` we have to write `thing: get space/thing thing/x: 1`
+	so far I haven't found a good workaround
+	for debugging, I wrote a helper that rewrites paths, but in real time code this is not an option
+	`with get space/thing [x: 1]` is the next option, but still not high-level
+	I'm still keeping *some* objects, e.g. parts of scroller in itself, but that's it
+	so another option to work with `list/items/1` and `space/content`-like paths is to use objects
+	but keep the name somewhere as well, and hack `??` and `probe`,
+	making them not dive into objects, or not dive into spaces & faces
+	still doesn't look like overall win, but maybe I'm missing something
 since no space knows it's parent, same space can be used multiple times in the tree
 scrollable-space supports `draw/only xy1 xy2` for it's content - to minimize rendering effort by preemptive clipping
 lot of parts in space become valid only after it's drawn (couldn't be any other way), e.g. it's map
@@ -502,7 +521,7 @@ list-view's list width - how to infer it?
 	maybe this will help autosize items' content
 on resizing
 	some spaces' dimensions are fully automatic - list, data-view (unless limited), image (in auto mode)
-	some have only one dimension automatic - tube, paragraph (unless width = none), grid
+	some have only one dimension automatic - tube, paragraph (unless width = none), grid, list with fixed width
 	some have only fixed dimensions - all scrollables, image (in fixed mode)
 	let's call all these fixed dimensions "free dimensions"
 	free as in "no inner constraints imposed" and "can be modified freely at any time"
@@ -549,7 +568,184 @@ on resizing
 	question is, what to do with opposite direction? fill or leave?
 	presumably, cases with split should all fill it
 	gonna need to make a few UIs first, then try to apply this model to them
-
+so next sizing steps, and considering "free dimensions" idea
+	list dimensions that require sizing:
+	  - list inside list-view: list width (or height) adjusts to that of list-view (is locked to it)
+		or vice versa? one changes list size, list-view adapts? unlikely, since list-view size is fully free
+		list itself doesn't change it's free size
+		scroller problem: either we leave it's space free even when there's no scroller
+		or list width gets reduced when scroller appears, stretching list even more
+		these 2 strategies can be chosen by the user, preferably 1st one being the default
+	  - grid inside grid-view: this has a lot of options
+	    when grid-view size changes, 
+	    we could stretch each column or only those configured as stretchable (split example above)
+	    or we could default to static size, with the ability to easily define stretch mechanics on top of it
+	    grid-view itself should not adapt to grid
+	    same scroller problem exists here too, same solutions apply
+	list dimensions that can be sized (by the user):
+	  - lists in complex layouts, e.g. web ui (take gitter as example, though it's fully static)
+	    it can be a grid with unified cells, and an ability to drag some columns/rows sizes
+	    or it can be a grid of grids, more complex but may make sense if resulting tree is easier to work with
+	    each grid cell then is a list-view and these adapt to cell size, forcing lists to adapt too
+	    what's important is to define some kind of aliases to cells here
+	    e.g. chatlog will be cell N, convo-list will be cell M, issues-list will be cell P, etc.
+	    but that's not an issue, since each cell is a space, it works out of the box
+	    (in fact grid can be composed with already named spaces)
+	  - visual fx and animations where things get smaller and bigger but have anchors and func of time
+	containers of other spaces:
+	- grid cell is the most important one - for layouts esp (this includes splitters)
+	- list cell is the next one, and list of lists (TODO: automatic switch of layout direction in this case h/v/h/..)
+	  however list cell has only zero to one free dimension (depending on width), so it's limited in it's size propagation 
+	- data-view usually adapts to it's content, like list
+	we want the logic of all this unified by a single shared mechanism
+	mechanism should allow fine control: each facet is a formula of other things
+	most used forms of it have names and are leveraged everywhere, exposed into VID
+biggest sizing question: how does grid cell size affect it's embedded space size?
+	grid may deal with generative data, or it may contain named spaces, so there's dangerous duality
+	it makes little sense to NOT adjust grid's cell space size to cell size?
+	in that case size adjustment may be done by wrap-space itself on in the render func
+	or, what is the use case for not adjusting the size? is it ever useful? and in that case, can it easily be switched off?
+	types of content in lists:
+		text line - e.g. for file view, whole space width is adapted to max line width 
+		text paragraph - typical for chats and books, paragraph width is adapted to list width
+		 (in chats though paragraph will be wrapped into a custom space with buttons and status and time)
+		 (and that custom space will adapt to list width)
+		image - usually before or after text, sometimes standalone, lists of icons (e.g. toolbar/appmenu, icons=buttons)
+		 in this case we may want control whether each image adjusts to list or not, use-case dependent
+		button/dropdown - tricky, we don't want a huge button but may want small button centered in big area
+		 so it makes sense to either use a centering container or hardcode alignment logic into lists/gridcells
+		 if it's a centering container, container adjusts to list width, but it's height is determined
+		 lists of buttons are very common, esp. lists of image-buttons, likely of fixed size and list should adjust
+		editbox - more likely we want to adjust it to list width or cell size
+		check/radioboxes - will be adjusted
+		sliders/progressbars - also
+		 I guess there's value in a list that has no width and includes a few different spaces
+		 but.. then one will have to either set each space's width manually, or use defaults
+		 also, in any case heights should either be default or set manually
+		 perhaps we need a common size constraint system, and make sure everything adheres to it
+		orthogonal sublist - width is autosized anyway, height may or may not be automatic
+		 again, we should both be able to set width from sublist length, or have it fixed
+		 although it's more likely that sublist will be a list-view (with fixed dimensions)
+	lists can be of two main forms:
+		- list that is within list-view, of minimal size, extends indefinitely, shows scrollers if needed
+		- elastic list that expands to layout size (or to own constraints), may stretch inner items (`band`? `row`?)
+		  if text is wider, it is ellipsized - same as in cells! (see MD lists)
+		  this list also may split itself into a few columns / rows
+	need to write down how I want e.g. gitters layout be expressed (top-down), then figure out how to do this
+	need to write some layouts of some websites and polish the declaration
+		GH is a great example: https://s7.gifyu.com/images/GIF-13-Mar-22-17-33-21.gif
+		great in that it does so many things and does them so pathetically that a comparison is a must have
+		it also highlights the importance of `stretch` item in a list of fixed length, which controls alignment
+		(means that we need to extend list to support fixed length, likely fixed by outside layout)
+		and that each element may react to layout size, e.g. "Pulls"/"Pull requests"
+		funny how tables react to resize: they rebalance, but do not keep the currently visible row
+		browser resize is a funny stress test for most sites btw
+		https://easings.net/ is interesting: it has 1-2 columns, consisting of 3 icons arranged in 1-2 rows
+	"protip" line is most interesting: it contains markdown
+		<code> of markdown is not part of paragraph, at best it's part of tube layout
+		OTOH, tube cannot tell it's items to wrap, and we need to wrap text, so rich-paragraph is going to be quite a quest
+	MD "chips" are also interesting in that they're part of an edit field's text by the look of it (needs rich content) 
+	TODO: ask community for site or UI examples that are challenging to consider how spaces may approach these
+	great flutter video: https://www.youtube.com/watch?v=kmZz_q7W2jI
+possible size to constraint adaptation strategies
+	e.g. for cells of a table, when contents does not fit in:
+		any text: none / clip / ellipsize / downscale (but not infinitely)
+			none is important as it enforces a minimum size of the item, not letting the container itself to shrink
+		button/dropdown/check/radio: adapts it's own size, lets the text decide how it adapts
+		editbox: adapts own size, for text probably nothing?
+		progress bars: scale/stretch easily
+		image: clip / downscale
+		list: adapts own size, content decides for itself
+		row: tricky! inspects constraints of inner items, weights, may contract them
+		grid: should not be affected, not automatically at least
+		grid-view/list-view: do nothing, but constraints may be used by row to resize them
+	but this applies to any other container
+	upper constraint bigger than the contents is only useful for containers/editbox/etc
+		ie anything that is arbitrarily scalable and/or allows varying content
+		no upscaling is done in any case
+	if we use tube as row, and to the 3 alignments: back/forth/center, we add fill
+	then we have 2 weights:
+		weight in a row - divided between all items
+		weight in a cell - either expand or not
+			alignment is set for a row, but we want to control this per item
+			so the value of this is either 0 (don't expand) or non-zero (expand),
+			which makes no sense to use a number for, but pair is still the best candidate
+		default weight: 0x0 - fixed
+		numeric weight: N = Nx0 - stretch along main axis
+		pair weight: Nx1 - stretch and fill
+		or, do we need weight for this?
+	having sec axis constraints should be enough for deciding whether to fill or not!
+	weight should not affect the secondary axis at all!
+	is there a point in 'fill' alignment then?
+		if constraint allows up to 80px, but row is 100px, we have to align the content, so alignment must be set
+		then we either expand by default to 80, or don't
+		expanding makes sense, because it's turned of by constraint, but if we don't expand, there's no switch to enable it
+		similarly, row can be full, but it's extent is bigger than max constraints, so alignment should still be set
+		so we must expand the content of each item too when possible
+		'width' parameter should be replaced by 2D constraints set
+		constraints is a long word, variants: bounds, limits, confines
+		can we rename grid/limits?
+		for grid it is the max number of cells in both directions, I'd rather use bounds/confines there
+	this is still a mess... and what about `draw/on size`?
+		image: only changes `size` if it's `none`, or if constaints require it, aims at `image/size` ?
+		paragraph: size can be `none` or `size/x` may determine width
+			`size/y` will be freely set or not?
+			in a cell it should not extend itself, better to clip
+			OTOH, if it's bigger it can be scaled down by the grid
+			also grid wants it to draw itself down so it can be measured
+			in a list we also want it maximized
+			we don't want to reset size/y to 99999 before every render to make maximize text
+			and we esp. don't want that after on-change
+			so draw/on will be a much cleaner and predictable way to tell the size of the canvas
+			also we should be able to automate constraining of draw/on argument, somehow
+			also since some draws call other draws, this constraining should be done by the caller
+			otherwise we end up with a series of constraining calls only first of which is useful
+			maybe render/on will do the clipping?
+on ranges: perhaps, instead of fixed 100 .. 200 or smth like that (which is shooting blindly)
+	we should by default let the minimum e.g. for any text to be the size of that text ?
+	OTOH do we ever want to stretch text labels? unlikely
+	ranges are for stretches, fields, areas
+on layout: with the introduction of spaces styles, it will blur the distinction between spaces and faces
+	so compatibility has value in this context
+	most likely I will need support of full set of VID commands and some superset will be spaces-only
+drop-menus: how will they work, considering they place themselves above the other content when expanded (with occlusion)?
+	idea is to have a popup layer, where a menu/tooltip is generated
+	but such menu may produce additional menus/tooltips so it cannot be a single layer
+	so we need to insert menu/tooltip into at the top of the stack (after all the other spaces)
+		this choice will make tooltips reside fully within the drawing area (rich text)
+		or possibly clipped by drawing area but scrollable to reveal the hidden parts (less useful)
+	or we may create another host in case of menu/tooltip, and this host then can appear anywhere inside the screen
+		drawback of this is overall bugginess of mouse event pipeline when new faces are spawned/shown
+		also each menu and each tooltip will be a separate face, bloating the whole app
+		and this face will have to be injected into the face tree, which is also not superb
+		also transparency (for non-boxy tooltips) won't work on W7
+		or better: it can be another window, but then this window should not be activated, 
+			and parent window should stay active
+			this will make possible to show tooltips outside of the window border, which is cool
+			but in this case non-boxy tooltips become impossible as Red has no transparent windows
+	ok new window is not an option, OS tooltips not supported, tried another face:
+		view [base all-over on-over [tip/offset: event/offset + 15x15 tip/visible?: not event/away?] tip: base 60x20 hidden "Hello?"]
+		view [button all-over on-over [tip/draw: either event/away? [[]][compose [fill-pen white box (pos: event/offset + 15x15) (pos + 60x20) text (pos) "Hello?"]]] at 0x0 tip: box 200x200]
+		#1640 concludes tooltips as faces are possible
+		a bit dangerous in that if it slows down, one can actually point at the tooltip,
+		but this can be fixed by tooltip code
+		since tooltip can only be single, it's just one reserved or spawned face, not resource hungry
+		still clipped by the window, so alignment have to be calculated properly
+		since the glass box way works, this opens possibilities for the menu as well
+		but since menu may show submenus, it makes sense to adopt another strategy:
+		fill whole window with a trasparent rich-text surface, use it to render all the spaces
+		but #5104 shows that it's a problematic approach
+		transparent layer is ruled out because it eats events on GTK at least
+		(and I'm sure a lot of other bugs will surface with it)
+		then spawning new faces on the fly (on the root window) is the best way so far
+cells - idea how to simplify and unify alignment
+	cell is a thin wrapper around single space
+	cell includes alignment and it's size and alignment is set by the parent
+	it then handles how to place it's content, when to cache or render it
+	cell will be directly used in a grid and in tube
+	on high level, vid styles will often declare a cell+content pair, with both alignment and content defined
+	when canvas is not provided, cell should render in it's minimal size (required by tube and grid)
+		
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
@@ -2181,3 +2377,134 @@ too complicated, hard to support reordering (e.g. left-to-right placement)
 
 ; 	#assert [not same? tube-layout/raw-map/1 (first select make tube-layout [] 'raw-map)]
 ; ]
+
+old attempt to hack the grid via list of lists, nothing to do with new row (stretch-list) layout
+; row-layout-ctx: context [
+; 	place: function [layout [object!] item [pair!]] [
+; 		set [ofs: siz: org:] list-layout-ctx/place layout item
+; 		guide: select [x 1x0 y 0x1] x: layout/axis
+; 		index: (length? layout/items) / 3
+; 		if w: layout/widths/:index  [siz/x: w]			;-- enforce size if provided
+; 		if h: layout/heights/:index [siz/y: h]
+; 		if index > pinned: layout/pinned [				;-- offset and clip unpinned items
+; 			either pinned > 0 [
+; 				plim: skip items pinned - 1 * 3
+; 				lim: plim/1 + plim/2 + layout/spacing * guide
+; 			][
+; 				lim: 0x0
+; 			]
+; 			ofs: ofs + (layout/origin * guide)
+; 			if ofs/:x < lim/:x [
+; 				org: org - dx: (lim - ofs) * guide
+; 				siz: max 0x0 siz - dx
+; 				ofs/:x: lim/:x
+; 			]
+; 		]
+; 		layout/content-size/:x: ofs/:x + siz/:x - layout/margin/:x
+; 		;-- content-size height accounts for all items, even clipped (by design)
+; 		reduce/into [ofs siz org] clear skip tail layout/items -3
+; 	]
+; 	set 'row-layout make list-layout [
+; 		origin: 0
+; 		pinned: 0
+; 		widths: []				;-- can be a map: index -> integer width
+; 		heights: []				;-- same
+
+; 		place: function [item [pair!]] [row-layout-ctx/place self item]
+; 	]
+; ]
+
+old render code, before /on introduction (apply kludge)
+; all [
+	; only
+	; function? :draw
+	; find spec-of :draw /only
+	; do copy/deep [draw: draw/only xy1 xy2]	;@@ workaround for #4854 - remove me!!
+; ]
+
+tube layout code before autosizing
+; cache: []				;-- various values used by `place`
+; raw-map: [[] 0x0]		;-- accumulated rows and row-sizes so far (make object! copies this deeply)
+; #assert [not same? tube/raw-map/1 (first select make tube [] 'raw-map)]
+; ;; fills a set of flags that are used by `place` func every time
+; ;; flags do not change so no need to recompute them
+; fill-cache: function [layout [object!]] [
+	; data: tail layout/raw-map
+	; y: anchor2axis layout/axes/1
+	; x: anchor2axis layout/axes/2
+	; xvec: axis2pair x
+	; yneg?: find [n w] layout/axes/1
+	; xneg?: find [n w] layout/axes/2
+	; #assert [y <> x]								;-- have to be normal to each other
+	; cs: layout/content-size
+	; sp: layout/spacing
+	; maxw: layout/width - (layout/margin/:x * 2)
+
+	; cache-names: [data x y cs sp maxw xvec xneg? yneg?]
+	; reduce/into cache-names layout/cache
+; ]
+; place: function [
+	; "Add ITEM space to LAYOUT"
+	; layout [object!] item [word!]
+; ][
+	; sz: select get item 'size
+	; #assert [sz]									;-- item must have a size
+	; if tail? layout/cache [fill-cache layout]
+	; set [data: x: y: cs: sp: maxw: xvec: xneg?: yneg?:] layout/cache
+	; rsz: data/-1									;-- row size accumulated so far
+	; first?: 0 = rw: rsz/:x							;-- row width accumulated so far
+	
+	; rw: rw + sz/:x
+	; unless first? [
+		; rw: rw + sp/:x
+		; if rw > maxw [								;-- jump to next row if needed
+			; cs/:y: cs/:y + sp/:y
+			; data: insert insert/only data make block! 16 rsz: 0x0
+			; rw: sz/:x
+			; first?: yes
+		; ]
+	; ]
+	; if 0 < added: sz/:y - rsz/:y [cs/:y: cs/:y + added]
+	; rsz: max rsz sz									;-- update row size
+	; rsz/:x: rw
+	; layout/content-size: max data/-1: rsz cs		;-- update content size (x from row-size, y from cs)
+
+	; ofs: rsz - sz * xvec
+	; if yneg? [ofs/:y: 0 - ofs/:y - sz/:y]
+	; if xneg? [ofs/:x: 0 - ofs/:x - sz/:x]
+	; reduce/into [data x y cs sp maxw xvec xneg? yneg?] clear layout/cache
+	; compose/deep/into [(item) [offset (ofs) size (sz)]] tail data/-2
+; ]
+; build-map: function [
+	; "Produce a final MAP from LAYOUT accumulated so far"
+	; layout [object!]
+; ][
+	; al: layout/align
+	; set [data: x: y: cs: sp: maxw: xvec: xneg?: yneg?:] layout/cache
+	; ox: anchor2pair layout/axes/2
+	; oy: anchor2pair layout/axes/1
+	; shift: 0x0
+	; if ox/:x < 0 [shift/:x: maxw]
+	; if oy/:y < 0 [shift/:y: cs/:y]
+	; pos: shift + mg: layout/margin
+	; move-items: al/2 + 1 / 2
+	; move-rows:  al/1 + 1 / 2
+	; r: make [] length? layout/raw-map
+	; foreach [row row-size] layout/raw-map [
+		; gap: maxw - row-size/:x						;-- can be negative, still correct
+		; row-shift: gap * move-rows * ox
+		; if move-items <> 0 [
+			; foreach [name geom] row [
+				; gap: row-size - geom/size * oy
+				; geom/offset: geom/offset + (move-items * gap)
+			; ]
+		; ]
+		; foreach [name geom] row [
+			; geom/offset: geom/offset + pos + row-shift
+		; ]
+		; append r row
+		; pos: pos + (sp + row-size * oy)
+	; ]
+	; r
+; ]
+

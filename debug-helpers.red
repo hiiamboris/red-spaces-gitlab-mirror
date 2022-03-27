@@ -4,9 +4,9 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires export
+;-- requires export, prettify
 
-exports: [dump-tree expand-space-path dorc]
+exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~]
 
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
@@ -16,6 +16,18 @@ dump-tree: function [] [
 	()
 ]
 
+fix-paths: function [
+	"Replaces convenient but invalid space-referring paths with valid ones"
+	code [block!] "Block where to replace paths"
+	/local path
+][
+	parse r: copy/deep code [any [
+		change only set path any-path! (to path expand-space-path path)
+	|	skip
+	]]
+	r
+]
+				
 expand-space-path: function [path [any-word! any-path!] /local coll] [
 	if word? path [path: to path! path]
 	set/any 'coll get/any path/1
@@ -25,7 +37,7 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 			;; substitute global word in the path with a word that refers to a space
 			any [
 				all [object? :coll  in coll 'map  found: find coll/map item  found/1]
-				all [object? :coll  is-face? coll  item = select coll 'space  coll/space]
+				all [object? :coll  is-face? coll  any [item = 'space  item = select coll 'space]  coll/space]
 				all [block?  :coll  found: find coll item  found/1]
 			]
 		]
@@ -68,6 +80,68 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 dorc: does [do read-clipboard]
 
 
+add-indent: function [text [string!] size [integer!]] [
+	indent: append/dup clear "" #" " size
+	parse text [any [#"^/" not end insert indent (lf?: yes) | skip]]
+	if lf? [insert text indent]
+	text
+]
+
+mold~: function [value [any-type!]] [
+	decor: select [
+		block!  ["[" "]"]
+		hash!   ["make hash! [" "]"] 
+		map!    ["#(" ")"] 
+		object! ["make object! [" "]"] 
+	] type?/word :value
+	switch/default type?/word :value [
+		map! object! [
+			block: to [] value
+			longest: any [last sort map-each [k v] block [length? form k]  0]
+			strings: copy []
+			foreach [k v] block [
+				v: either object? :v ["object [...]^/"][append mold~ :v #"^/"]
+				k: rejoin [k ": "]
+				if tail? find/tail v #"^/" [k: pad k longest + 2]
+				append strings rejoin [k v]
+			]
+			inside: add-indent rejoin ["" strings] 4
+			rejoin [decor/1 #"^/" inside decor/2]
+		]
+		block! hash! [
+			strings: copy []
+			p: value
+			forall p [
+				x: either object? :p/1 [copy "object [...]"][mold~ :p/1]
+				if new-line? p [insert x #"^/"]
+				append strings x
+			]
+			lf?: either new-line? value ["^/"][""]
+			inside: add-indent rejoin ["" strings] 4
+			rejoin [decor/1 inside lf? decor/2]
+		]
+	][mold :value]
+] 
+
+probe~: function [
+	"Returns a value after printing its molded form, excluding inner objects"
+	value [any-type!]
+][
+	print mold~ any [
+		attempt [prettify/data :value]
+		:value
+	]
+	:value
+]
+
+??~: function ['value [any-type!]] [
+	probe~ either any [any-word? :value any-path? :value] [
+		prin value prin ": "
+		get/any value
+	][
+		:value
+	]
+]
 
 
 ;-- experimental probe with depth control
@@ -84,7 +158,7 @@ context [
 		unless after [insert text indent]
 		replace/all text #"^/" line
 	]
-
+	
 	set '?p function [depth [integer!] value [any-type!] /indent isize [integer!]] [
 		isize: any [isize 0]
 		either find containers type: type? :value [
