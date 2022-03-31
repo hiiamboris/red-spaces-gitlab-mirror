@@ -10,42 +10,65 @@ Red [
 
 exports: [layouts]
 
+make-layout: function [type [word!] spaces [block!] settings [block! object!]] [
+	layouts/:type/create spaces settings
+]
+
 layouts: context [
 
-	list: none											;-- reserve names
-	row:  none
-	tube: none
-
-	;@@ TODO: free list of these
-	list-layout-ctx: context [
-		~: self
-
-		place: function [layout [object!] item [word!]] [	;-- held separately to minimize the size of list-layout itself
-			sz: select get item 'size
-			#assert [sz]									;-- item must have a size
-			guide: select [x 1x0 y 0x1] layout/axis
-			cs: layout/content-size
-			if 0x0 <> cs [cs: cs + (layout/spacing * guide)]
-			ofs: cs * guide + layout/margin + layout/origin
-			cs: cs + (sz * guide)
-			cs: max cs sz
-			layout/content-size: cs
-			compose/deep/into [(item) [offset (ofs) size (sz)]] tail layout/map
-		]
-
-		set 'list object [
-			origin:  0x0			;-- used by list-view
-			margin:  0x0
-			spacing: 0x0
-			axis:    'x
-
-			content-size: 0x0
-			size: does [margin * 2 + content-size]
-			map: []			;-- accumulated map so far
-			place: func [item [word!]] [~/place self item]
+	list: context [
+		;; settings for list layout:
+		;;   axis             [word!]   x or y
+		;;   margin           [pair!]   >= 0x0
+		;;   spacing          [pair!]   >= 0x0
+		;;   canvas        [pair! none!]   >= 0x0
+		;;   origin           [pair!]   unrestricted
+		;;   viewport         [pair!]   only matters if any cache-* is true
+		;;   cache-visible?   [logic!]  if true, items outside 0x0-viewport are not rendered if they have a size
+		;;   cache-invisible? [logic!]  if true, items inside  0x0-viewport are not rendered if they have a size
+		;; result of all layouts is a block: [size [pair!] map [block!]]
+		;@@ cache-* should only be true for unchanged canvas!
+		create: function [
+			spaces [block!]
+			settings [block! object! map!]
+		][
+			if tail? spaces [return copy/deep [0x0 []]]
+			foreach word [								;-- free settings block so it can be reused by the caller
+				axis: margin: spacing: canvas: origin:
+				viewport: cache-visible?: cache-invisible?:
+			][
+				set word select settings word
+			]
+			; ?? margin ?? origin 
+			default origin: 0x0
+			guide: select [x 1x0 y 0x1] axis
+			pos:   origin + (1x1 * margin)
+			size:  0x0
+			draw?: case [
+				cache-invisible? [[not space/size]]
+				cache-visible? [[
+					not space/size
+					all [boxes-overlap? 0x0 viewport pos space/size]
+				]]
+				'else [[true]]
+			]
+			map: make [] 2 * count: length? spaces
+			foreach name spaces [
+				space: get name
+				if all draw? [render/on name canvas]
+				compose/deep/into [(name) [offset (pos) size (space/size)]] tail map
+				pos:   pos + (space/size + spacing * guide)
+				size:  max size space/size
+			]
+			size: pos - (spacing * guide)				;-- cut trailing space
+				- origin + (1x1 * margin)				;-- 2 margins + size along axis
+				+ size - (size * guide)					;-- size normal to axis
+			reduce [size map]
 		]
 	]
 	
+	tube: none
+
 	tube-layout-ctx: context [
 		~: self
 		
@@ -185,8 +208,9 @@ layouts: context [
 			; origin:  0x0			;@@ TODO - if needed
 			margin:  0x0
 			spacing: 0x0
+			;@@ align can be a pair, total 9 options; though pair is interpreted in XY coordinate terms usually..
 			align:   [-1 -1]		;-- 2 alignments: list within row (-1/0/1), then item within list (-1/0/1)
-			axes:    [s e]			;-- default placement order: top-down rows, left-right items
+			axes:    [s e]			;-- 4x2 total; default placement order: top-down rows, left-right items
 
 			content-size: 0x0
 			place: func [item [word!]] [~/place self item]
@@ -197,37 +221,6 @@ layouts: context [
 			items: []
 		]
 	]
-
-	row-layout-ctx: make tube-layout-ctx [
-		~: self
-
-		place: function [layout [object!] item [word!]] [	;-- held separately to minimize the size of list-layout itself
-			sz: select get item 'size
-			#assert [sz]									;-- item must have a size
-			guide: select [x 1x0 y 0x1] layout/axis
-			cs: layout/content-size
-			if 0x0 <> cs [cs: cs + (layout/spacing * guide)]
-			ofs: cs * guide + layout/margin + layout/origin
-			cs: cs + (sz * guide)
-			cs: max cs sz
-			layout/content-size: cs
-			compose/deep/into [(item) [offset (ofs) size (sz)]] tail layout/map
-		]
-
-		set 'row object [
-			origin:  0x0			;-- used by list-view
-			margin:  0x0
-			spacing: 0x0
-			axis:    'x				;-- vast majority of rows will be X-rows
-			divisable?: yes			;-- whether it can split into 2 or more rows when tight on space
-
-			content-size: 0x0
-			size: does [margin * 2 + content-size]
-			map: []			;-- accumulated map so far
-			place: func [item [word!]] [~/place self item]
-		]
-	]
-
 ]
 
 export exports

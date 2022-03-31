@@ -168,7 +168,7 @@ cell-ctx: context [
 			constrain space/size: cspace/size space/limits
 		]
 		free:   space/size - cspace/size
-		offset: free * space/align + 1 / 2
+		offset: free * (space/align + 1) / 2
 		unless tail? drawn [
 			clip?:  not 0x0 +<= free
 			move?:  offset <> 0x0
@@ -187,9 +187,9 @@ cell-ctx: context [
 	
 	spaces/cell: make-template 'space [
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
-		weight:  0										;@@ what default weight to use?
+		weight:  0										;@@ what default weight to use? what default alignment?
 		;@@ what about margin here?
-		content: make-space/name 'space					;@@ consider `content: none` optimization if it's worth it
+		content: make-space/name 'space []				;@@ consider `content: none` optimization if it's worth it
 		map:     reduce [content [offset 0x0 size 0x0]]
 		
 		;@@ this should be needed in debug mode only?
@@ -430,18 +430,18 @@ paragraph-ctx: context [
 		layout/text: space/text
 		layout/font: space/font						;@@ careful: fonts are not collected by GC, may run out of them easily
 		either width [									;-- wrap
-			layout/size/x: width - (2 * space/margin/x)		;-- width has to be set to determine height
+			layout/size: width - (2 * space/margin/x) by 2e9	;-- width has to be set to determine height
 			#assert [0 < layout/size/x]						;@@ crashes on 0 - see #4897
 		][												;-- no wrap
 			layout/size: none
 		]
-		;-- NOTE: #4783 to keep in mind
+		;; NOTE: #4783 to keep in mind
 		layout/extra: size-text layout					;-- 'size-text' is slow, has to be cached (by using on-change)
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
 		layout: space/layout
-		old-width: all [layout layout/size layout/size/x]
+		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
 		new-width: all [canvas canvas/x]
 		if any [										;-- redraw if:
 			none = layout										;-- some facet changed
@@ -492,42 +492,39 @@ paragraph-ctx: context [
 container-ctx: context [
 	~: self
 
-	draw: function [cont [object!] layout [object!] xy1 [pair! none!] xy2 [pair! none!] canvas [pair! none!]] [
+	draw: function [
+		cont [object!]
+		type [word!]
+		settings [object! block! map!]
+		xy1 [pair! none!]
+		xy2 [pair! none!]
+		canvas [pair! none!]
+	][
 		#assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
 		r: make [] 4 * len: cont/items/size
 		
-		;; to support layouts that reposition of prior items (e.g. tube, circular list)
-		;; we have to fill the layout first, collect it later
-		drawn: make [] len
-		repeat i len [
-			item: get name: cont/items/pick i
-			;-- `unless item/size` allows to not render skipped items
-			;@@ TODO: think on such caching applicability
-			;@@ TODO: a cache of sizes to faster skip to the first visible item, or in layout?
-			append/only drawn
-				unless item/size [render/on name canvas]	;-- prerender to get the size, for layout
-				;@@ for tubes this is not needed!! ??
-			layout/place name
-		]
-		map: layout/map									;-- call if it's a function
-		; ?? layout/size
+		; drawn: make [] len
+		draw:  make [] len * 6
+		items: make [] len
+		repeat i len [append items name: cont/items/pick i]
+		set [size: map:] make-layout type items settings		;@@ canvas!!
 		i: 0 foreach [name geom] map [					;@@ should be for-each [/i name geom] but it's slower
 			i: i + 1
 			set [_: pos: _: siz: _: org:] geom
 			skip?: all [xy2  not boxes-overlap?  pos pos + siz  xy1 xy2]
-			unless skip? [
-				; compose/only/into [translate (pos + org) (idrawn)] tail r
-				compose/deep/only/into [
+			; unless skip? [
+				compose/only/deep/into [
 					clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
+						;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
 						translate (pos + any [org 0]) 
-						(any [drawn/:i  render/on name canvas])
+						(render/on name canvas)
 					]
-				] tail r
-			]
+				] tail draw
+			; ]
 		]
 		append clear cont/map map						;-- compose-map cannot be used because it calls render an extra time
-		maybe cont/size: layout/size
-		r
+		maybe cont/size: size
+		draw
 	]
 
 	spaces/container: make-template 'space [
@@ -541,10 +538,10 @@ container-ctx: context [
 		draw: function [
 			/only xy1 [pair! none!] xy2 [pair! none!]
 			/on canvas [pair! none!]
-			/layout lobj [object!]
+			/layout type [word!] settings [object! block! map!]
 		][
 			#assert [layout "container/draw requires layout to be provided"]
-			~/draw self lobj xy1 xy2 canvas
+			~/draw self type settings xy1 xy2 canvas
 		]
 	]
 ]
@@ -553,17 +550,12 @@ container-ctx: context [
 ;@@ need to stash all these contexts somewhere for external access
 list-ctx: context [
 	spaces/list: make-template 'container [
-		axis: 'x
-		margin: 5x5		;@@ default margins/spacing - should be tight or not? what is more common?
+		axis:    'x
+		margin:  5x5		;@@ default margins/spacing - should be tight or not? what is more common?
 		spacing: 5x5
 		;@@ TODO: alignment?
 		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
-
-		make-layout: function [] [
-			also r: make layouts/list []
-			foreach w [axis margin spacing] [r/:w: self/:w]
-		]
 
 		container-draw: :draw
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
@@ -578,23 +570,11 @@ list-ctx: context [
 					canvas/:sec: canvas/:sec - (2 * margin/:sec)
 				]
 			]
-			container-draw/layout/only/on make-layout xy1 xy2 canvas
+			container-draw/layout/only/on 'list self xy1 xy2 canvas
 		]
 	]
 ]
 
-
-row-ctx: context [
-	spaces/row: make-template 'list [
-		make-layout: function [] [
-			also r: make layouts/row []
-			foreach w [axis margin spacing] [r/:w: self/:w]
-		]
-		draw: function [/only xy1 [pair! none!] xy2 [pair! none!]] [
-			container-draw/layout/only make-layout xy1 xy2
-		]
-	]
-]
 
 
 tube-ctx: context [
@@ -604,14 +584,12 @@ tube-ctx: context [
 		align:   [-1 -1]
 		axes:    [s e]
 		
-		make-layout: function [] [
-			also r: make layouts/tube []
-			foreach w [width margin spacing align axes] [r/:w: self/:w]
-		]
-
 		container-draw: :draw
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
-			container-draw/layout/only/on make-layout xy1 xy2 canvas
+			repend settings: clear [] [
+				'margin margin 'spacing spacing 'align align 'axes axes 'canvas canvas
+			]
+			container-draw/layout/only/on 'tube settings xy1 xy2 canvas
 		]
 	]
 ]
@@ -929,6 +907,7 @@ list-view-ctx: context [
 		imax: list/items/size
 		space: list/spacing								;-- return value is named "space"
 		render-item: [
+			;@@ TODO: this is highly suboptimal: need to skip invisible items here, use current size!
 			list/rcache/:i: render/on name: list/items/pick i list/canvas
 			item: select get name 'size
 		]
@@ -1056,17 +1035,18 @@ list-view-ctx: context [
 			;-- leverages certain list properties as an optimization, so is not based on container/draw
 			draw: function [/only xy1 [pair!] xy2 [pair!]] [
 				#assert [all [xy1 xy2]]
+				;@@ TODO: don't clear rcache blindly! only if canvas changed or smth
+				;@@ also most spaces should cache themselves if canvas is not changed! (except content)
 				clear rcache								;-- may be filled by locate-range
 				set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
 				unless all [i1 i2] [return []]				;-- no visible items (see locate-range)
 				#assert [i1 <= i2]
 
-				layout: make-layout
+				layout: make-layout 'list item-list self
 				guide: select [x 1x0 y 0x1] axis
 				layout/origin: guide * (xy1 - o1 - margin)
 				r: make [] 4 * (i2 - i1 + 1)
 				clear map
-				?? self/canvas
 				for i: i1 i2 [
 					item: get name: items/pick i
 					drawn: any [rcache/:i  render/on name canvas]		;-- render to get the size, for layout
@@ -1129,7 +1109,7 @@ list-view-ctx: context [
 ;@@ TODO: height & width inferrence
 ;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
-	spaces/cell: make-template 'space [
+	spaces/grid-cell: make-template 'space [
 		map: [space [offset 0x0 size 0x0]]
 		; map/1: make-space/name 'space []
 		cdrawn: none			;-- cached draw block of content to eliminate double redraw - used by row-height? and during draw when extending cell size
@@ -1172,7 +1152,7 @@ grid-ctx: context [
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [
 				draw-ctx/ccache/:xy
-				draw-ctx/ccache/:xy: make-space/name 'cell []
+				draw-ctx/ccache/:xy: make-space/name 'grid-cell []
 			]
 			cell: get name
 			cell/map/1: space

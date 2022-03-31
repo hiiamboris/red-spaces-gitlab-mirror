@@ -86,7 +86,7 @@ demo: infinitely zoomable table, each cell is the table itself
 	will require limiting rendering depth (or < 1 pixel size), so it won't stackoverflow
 	and resetting the zoom, else we'll hit that depth sooner or later
 	and rotating slowly, for total mind blow - gonna need `clip [circle ..]` to be the clipping region of rotor
-truly rich text widget - where text is mixed with other (interactive) spaces
+truly rich text (hypertext) widget - where text is mixed with other (interactive) spaces
 rename grid-view to data-grid?
 demo: debugger, need to mark functions, store values of all words during last iteration or 2-3 last iterations,
 	and be able to explore those (where spaces come to help)
@@ -107,6 +107,8 @@ let one define actors for static spaces (in VID or by adding them to the space m
 in widget reference: create a quick-nav map, somewhat like TOC but with pictures and arranged as a table
 UI where user can select table features and export code for this kind of table 
 if only bgnd color is specified for a widget (e.g. label), use contrast-with to determine the text color
+rename field to input - a low level embeddable input field, while field should be high-level
+some help support for space types? in advanced console? maybe interactive, hyper-text?
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
@@ -745,6 +747,60 @@ cells - idea how to simplify and unify alignment
 	cell will be directly used in a grid and in tube
 	on high level, vid styles will often declare a cell+content pair, with both alignment and content defined
 	when canvas is not provided, cell should render in it's minimal size (required by tube and grid)
+	cells are also needed by grid and maybe list-view to receive clicks on a cell (not on it's content)
+	`stretch` becomes just an empty (content-less) `cell`
+alignment - with cells and canvas, there's no need to `fill`
+	but the question remains, what format to use?
+	-1x-1 to 1x1 looks simplest option code-wise
+	in vid, we'll use left/center/right/top/middle/bottom as usual
+	but should we also use these high-level words in the space itself?
+	it may be easier for the user to understand
+	though it also may be much harder for him to work with (if he has to)
+	e.g. it now has to be a block [center middle]
+	separate options for handling X and Y (since words are different)
+	also these words have to be often translated into numbers in computations
+	question is, should cell also have margin? this would conflict with layout-provided margins
+cells complicate tube:
+	compare https://i.gyazo.com/3ebe22d96c8b5a6ae726bc3ffe3a63e7.png
+	to https://i.gyazo.com/f89ea7c617a5da79dd703bab25579faa.png
+	in a tube there's alignment: of every row, and of every item within row
+	(2D alignment of rows within canvas should be dedicated to an external cell)
+	if we use cells that stretch without restriction, all these alignments are no more:
+	whole area is covered, every row is full, and every cell is expanded
+	there's however still alignment of every item within it's cell (X/Y - 3x3 alignments)
+	moreso, each cell's alignment can be differently configured by the user
+	we could use tube's alignment to fill cells alignments, but this would override user's choice
+	basically, tube's alignments still make sense for fixed items but become irrelevant once items stretch
+idea behind layouts was to abstract geometry computations from container code and rendering
+	also to be able to incrementally fill it, e.g. once we reach a certain size
+	but this failed miserably because it's only applicable to lists,
+	and lists are the only big enough layout where it makes sense
+	circular list already breaks incrementality
+	tube further complicates this by requiring two renders: first to get min. size, then to expand it's items
+	we can still pre-render items without canvas, arrange them in tube layout, set sizes in the map
+	and later render on sizes from the map, but this breaks the map idea a bit if rendered size is smaller
+	and it certainly will break alignment in this case
+	so rendering in the tube layout is a must, because we need to get the size
+	or else, we can rely on cells to always occupy the allocated area fully
+	for lists the point was to use old item size when possible, and not re-render hidden items, conserving resources
+	for tubes, this point is lost - if tube is shown it's almost certainly shown in full or it doesn't matter
+	so there appear to be different pipelines that each make sense in their context
+	it's tempting then to move render into layout, let it have control
+	but then it will have to know the viewport and maybe other gory details...
+	an issue with list cache: if item in the viewport changes it's size during forced render,
+	it's map geometry will be invalid as it was set for the old size
+	this also can only be solved if layout does the rendering
+	there must an option for list layout to disable the rendering (in case it's up to date)
+	layout interface also changes: should just take a list & settings, spit out size & map
+	the only critical feature for lists is to be able to render only selected (visible) items
+	which is easy enough to do 
+	another idea was that if layout renders, it discards the result, which is wasteful
+	but this we can fix with a cache in every space (cache may be a map with key = canvas size)
+TODO: for `area` space: it should be possible to do 2-3 renders to work around #5113 issues
+	I don't see how this can be applied to a general list-view case though, without performance degradation
+	maybe list-view can "learn" how it's content behaves and then apply this knowledge
+	but it's no priority 
+	
 		
 
 Timer design:
@@ -2508,3 +2564,193 @@ tube layout code before autosizing
 	; r
 ; ]
 
+layouts old design
+; layouts: context [
+
+	; list: none											;-- reserve names
+	; row:  none
+	; tube: none
+
+	; ;@@ TODO: free list of these
+	; list-layout-ctx: context [
+		; ~: self
+
+		; place: function [layout [object!] item [word!]] [	;-- held separately to minimize the size of list-layout itself
+			; sz: select get item 'size
+			; #assert [sz]									;-- item must have a size
+			; guide: select [x 1x0 y 0x1] layout/axis
+			; cs: layout/content-size
+			; if 0x0 <> cs [cs: cs + (layout/spacing * guide)]
+			; ofs: cs * guide + layout/margin + layout/origin
+			; cs: cs + (sz * guide)
+			; cs: max cs sz
+			; layout/content-size: cs
+			; compose/deep/into [(item) [offset (ofs) size (sz)]] tail layout/map
+		; ]
+
+		; set 'list object [
+			; origin:  0x0			;-- used by list-view
+			; margin:  0x0
+			; spacing: 0x0
+			; axis:    'x
+
+			; content-size: 0x0
+			; size: does [margin * 2 + content-size]
+			; map: []			;-- accumulated map so far
+			; place: func [item [word!]] [~/place self item]
+		; ]
+	; ]
+	
+	; tube-layout-ctx: context [
+		; ~: self
+		
+		; place: function [layout [object!] item [word!]] [
+			; append layout/items item
+		; ]
+		
+		; build-map: function [layout [object!]] [
+			; ;; to support automatic sizing, each item's constraints has to be analyzed
+			; ;; obviously there can be two strategies:
+			; ;;  1. fill everything with max size, then shrink, and rearrange as possible
+			; ;;  2. fill everything with min size, then expand within a single row
+			; ;;  2nd option seems more predictable and easier to implement
+			; ;; constraint presence does not mean that space can reach that size,
+			; ;; so it should only be used as hint (canvas size) to obtain min size
+			; ;; then, every item that has a nonzero weight has to be rendered twice:
+			; ;; once to get it's minimum appearance, second time to expand it
+			; ;; other items also has to be rendered twice - to fill the row height
+			
+			; ;; obtain constraints info
+			; ;@@ info can't be static since render may call another build-map; use block-stack!
+			; info: make block! length? layout/items
+			; i: 0 foreach item layout/items [			;@@ use for-each when becomes native
+				; i: i + 1
+				; space: get item
+				; min-size: all [space/limits space/limits/min]	;@@ REP #113
+				; max-size: all [space/limits space/limits/max]	;@@ REP #113
+				; ;@@ this is inconsistent with list which does NOT render it's items:
+				; drawn: render/on item min-size			;-- needed to obtain space/size
+				; #assert [pair? space/size]
+				; weight: any [select space 'weight 0.0]
+				; #assert [number? weight]
+				; available: case [
+					; weight <= 0  [0]					;-- fixed size
+					; not max-size [2e9]					;-- unlimited extension possible
+					; 'else [max-size/x - space/size/x / weight]	;@@ REP #113
+				; ]
+				; append/only info reduce [				;@@ use block stack
+					; i item space drawn space/size max-size 1.0 * available weight
+				; ]
+			; ]
+			
+			; ;; split info into rows
+			; rows: copy []								;@@ use block-stack
+			; row:  copy []
+			; row-size: layout/spacing/x * -1x0			;@@ not gonna work for empty rows
+			; row-max-width: layout/width - (2 * layout/margin/x)
+			; canvas: layout/width - (2 * layout/margin/x) by 2e9		;@@ use canvas ?
+			; foreach item info [
+				; set [_: name: _: _: item-size:] item
+				; new-row-size: as-pair
+					; row-size/x + item-size/x + layout/spacing/x
+					; max row-size/y item-size/y
+				; row-size: either all [					;-- row is full, but has at least 1 item?
+					; new-row-size/x > row-max-width
+					; not tail? row
+				; ][
+					; reduce/into [row-size copy row] tail rows
+					; clear row
+					; item-size
+				; ][
+					; new-row-size
+				; ]
+				; append/only row item
+			; ]
+			; reduce/into [row-size row] tail rows
+			
+			; ;; expand row items - facilitates a second render cycle of the row
+			; foreach [row-size row] rows [
+				; free: row-max-width - row-size/x
+				; if free > 0 [							;-- any space left to distribute?
+					; ;; free space distribution mechanism relies on continuous resizing!
+					; ;; render itself doesn't have to occupy max-size or the size we allocate to it
+					; ;; and since we don't know what render is up to,
+					; ;; we can only "fix" it by re-rendering until we fill whole row space
+					; ;; but this will be highly inefficient, and not even guaranteed to ever finish
+					; ;; so a proper solution in this case should be to use a custom layout or resize hook
+					; ;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
+					; weights: clear []
+					; extras:  clear []
+					; foreach item row [
+						; append weights item/8
+						; append extras  item/7
+					; ]
+					; exts: distribute free weights extras
+					
+					; i: 0 foreach item row [				;@@ should be for-each
+						; i: i + 1
+						; set [_: name: space: drawn: item-size: max-size: available: weight:] item
+						; new-size: item-size/x + exts/:i by row-size/y
+						; item/4: render/on name new-size
+						; item/5: space/size				;@@ or use new-size in a map?
+					; ]
+				; ]
+			; ]
+			
+			; map: clear []
+			; margin:  layout/margin
+			; spacing: layout/spacing
+			; row-y: margin/y
+			; total-length: 0
+			; foreach [row-size row] rows [
+				; ofs: margin/x by row-y
+				; foreach item row [
+					; set [_: name: space: drawn: item-size: max-size: available: weight:] item
+					; ofs/y: to integer! row-size/y - item-size/y / 2 + row-y
+					; geom: reduce ['offset ofs 'size item-size]
+					; repend map [name geom]
+					; ofs/x: ofs/x + spacing/x + item-size/x
+				; ]
+				; total-length: total-length + row-size/y + spacing/y
+				; row-y: margin/y + total-length
+			; ]
+			; total-length: total-length - spacing/y
+			; layout/content-size: row-max-width by total-length
+			; layout/size: 2x2 * margin + layout/content-size
+			; copy map
+		; ]
+
+		; size: function [layout [object!]] [
+			; ;-- does not contract size if it's > width
+			; ;-- does not expand it either if some item is > width, otherwise can get this picture:
+			; ;-- [  ] = width
+			; ;-- XXXXXXXXXX
+			; ;-- X X        <- if expanded, these rows will look like they're half filled
+			; ;-- X X           instead, let the big item stick out
+			; sz: layout/margin * 2 + layout/content-size
+			; switch layout/axes/1 [
+				; n s [layout/width by sz/y]
+				; w e [sz/x by layout/width]
+			; ]
+		; ]
+
+		; set 'tube object [
+			; ;-- interface
+			; width:   100			;@@ TODO: use canvas instead?
+			; origin:  0x0			;@@ TODO - if needed
+			; margin:  0x0
+			; spacing: 0x0
+			; ;@@ align can be a pair, total 9 options; though pair is interpreted in XY coordinate terms usually..
+			; align:   [-1 -1]		;-- 2 alignments: list within row (-1/0/1), then item within list (-1/0/1)
+			; axes:    [s e]			;-- 4x2 total; default placement order: top-down rows, left-right items
+
+			; content-size: 0x0
+			; place: func [item [word!]] [~/place self item]
+			; map:   does [~/build-map self]
+			; size:  0x0
+
+			; ;-- used internally
+			; items: []
+		; ]
+	; ]
+; ]

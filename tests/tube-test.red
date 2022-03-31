@@ -50,7 +50,12 @@ boxes: map-each spec [
 	[size: 20x20 text: "E"]
 	[size: 30x10 text: "F"]
 	[size: 10x10 text: "G"]
-] [make-space/name 'field spec]
+][
+	make-space/name 'cell [
+		weight: 1
+		content: make-space/name 'field spec
+	]
+]
 
 aligns: map-each/only x [-1 0 1] [ map-each/eval/only y [-1 0 1] [[x y]] ]
 tubes: collect [
@@ -86,4 +91,4 @@ if exists? ref: %tube-test-reference.png [
 	ref: load ref
 	unless ref = out [print "!! LAYOUT HAS CHANGED !!"]
 ]
-either system/build/config/gui-console? [print "---"][do-events]
+; either system/build/config/gui-console? [print "---"][do-events]

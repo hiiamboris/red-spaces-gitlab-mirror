@@ -15,7 +15,14 @@ system/console: make system/console [
 	try-do: func [code /local result path][
 		set/any 'result try/all/keep [
 			either 'halt-request = set/any 'result catch/name [
-				parse code [any [change only set path any-path! (to path expand-space-path path) | skip]]
+				parse code [any [
+					change only set path any-path! (
+						any [
+							attempt [to path expand-space-path path]	;-- e.g. function refinements can't be `get`
+							path
+						])
+				|	skip
+				]]
 				do probe code
 			] 'console [
 				print "(halted)"						;-- return an unset value

@@ -6,7 +6,7 @@ Red [
 
 ;-- requires export, prettify
 
-exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~]
+exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~ debug-draw]
 
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
@@ -87,7 +87,8 @@ add-indent: function [text [string!] size [integer!]] [
 	text
 ]
 
-mold~: function [value [any-type!]] [
+mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
+	default indent-size: 4
 	decor: select [
 		block!  ["[" "]"]
 		hash!   ["make hash! [" "]"] 
@@ -100,25 +101,27 @@ mold~: function [value [any-type!]] [
 			longest: any [last sort map-each [k v] block [length? form k]  0]
 			strings: copy []
 			foreach [k v] block [
-				v: either object? :v ["object [...]^/"][append mold~ :v #"^/"]
+				v: either object? :v
+					["object [...]^/"] [append mold~/indent :v #"^/" indent-size]
 				k: rejoin [k ": "]
 				if tail? find/tail v #"^/" [k: pad k longest + 2]
 				append strings rejoin [k v]
 			]
-			inside: add-indent rejoin ["" strings] 4
+			inside: add-indent rejoin ["" strings] indent-size
 			rejoin [decor/1 #"^/" inside decor/2]
 		]
 		block! hash! [
 			strings: copy []
 			p: value
 			forall p [
-				x: either object? :p/1 [copy "object [...]"][mold~ :p/1]
+				x: either object? :p/1
+					[copy "object [...]"] [mold~/indent :p/1 indent-size]
 				if new-line? p [insert x #"^/"]
 				append strings x
 			]
-			lf?: either new-line? value ["^/"][""]
-			inside: add-indent rejoin ["" strings] 4
-			rejoin [decor/1 inside lf? decor/2]
+			inside: rejoin ["" strings]
+			if new-line? value [append add-indent inside indent-size "^/"]
+			rejoin [decor/1 inside decor/2]
 		]
 	][mold :value]
 ] 
@@ -192,6 +195,62 @@ context [
 			]
 		][
 			prin indent-text/after mold/part :value 40 isize
+		]
+	]
+]
+
+debug-draw: function ["Show GUI to inspect spaces Draw block"] [
+	context [
+		list: code: free: sized: drawn: path: obj: none
+		rea: reactor [canvas?: no]
+		fixed: make font! [name: system/view/fonts/fixed]
+		update: does [
+			list/data: collect [
+				foreach-*ace path: anonymize 'screen system/view/screens/1 [
+					keep reduce [form path path]
+				]
+			]
+		]
+		view/no-wait/options [
+			below list: text-list 400x400 on-created [update]
+			panel 2 [
+				origin 0x0 space 10x-5
+				text 195 "w/o canvas" text "with canvas"
+				free:  box 195x170 on-up [rea/canvas?: no] 
+					react [face/color: do pick [white silver] not rea/canvas?]
+				sized: box 195x170 on-up [rea/canvas?: yes]
+					react [face/color: do pick [white silver] rea/canvas?]
+			] return
+			code: area 400x600 font fixed react [
+				face/text: either any [
+					not list/selected
+					not path: pick list/data list/selected * 2
+				][
+					"Select a space in the list"
+				][
+					either is-face? obj: get last path [
+						sized/draw: none
+						either free/draw: drawn: obj/draw [
+							mold~/indent prettify/draw drawn 3
+						][
+							"Face has no Draw block!"
+						]
+					][
+						drawn: reduce [
+							free/draw:  render    last path
+							sized/draw: render/on last path sized/size
+						]
+						mold~/indent prettify/draw pick drawn not rea/canvas? 3
+					]
+				] 
+			]
+			at 350x10 button "Update" [update]
+		][
+			actors: object [
+				on-created: func [face] [
+					face/offset: system/view/screens/1/size - face/size * 1x0
+				]
+			]
 		]
 	]
 ]

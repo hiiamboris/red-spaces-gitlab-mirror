@@ -236,6 +236,7 @@ context [
 				]
 				#assert [block? :render]
 			]
+			#assert [space/size "render must set the space's size"]
 		]
 		either render [
 			reduce ['push render]						;-- don't carry styles over to next spaces
