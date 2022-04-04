@@ -18,7 +18,7 @@ system/console: make system/console [
 				parse code [any [
 					change only set path any-path! (
 						any [
-							attempt [to path expand-space-path path]	;-- e.g. function refinements can't be `get`
+							to path expand-space-path path
 							path
 						])
 				|	skip

@@ -800,7 +800,19 @@ TODO: for `area` space: it should be possible to do 2-3 renders to work around #
 	I don't see how this can be applied to a general list-view case though, without performance degradation
 	maybe list-view can "learn" how it's content behaves and then apply this knowledge
 	but it's no priority 
-	
+why drawn block should be copied:
+	if I don't, the same style rendered twice in a tree will replace the first result with the second
+	even if I had a static draw block per unique space, same unique space still may appear on different canvases
+	so, caching is only possible in the sense "return previous result if nothing changed" (no static data involved)
+	whether or not to centralize this mechanism I'm still thinking
+	I'll need /cached facet to hold previous block and on-change clears it, as well as draw
+	another facet will be required to hold canvas size
+	alternately, global hash! can hold all that (key = space object),
+	which is probably a good idea, because in the lack of apply, render wastes a lot of time
+	this will also enable render to have more than one cache, but.. how to invalidate?
+	/cache? = yes / /cache? = 'invalid ?
+	TODO: such caching should also be invalidated when style changes
+	TODO: doc this, maybe make `invalidate` func?
 		
 
 Timer design:
@@ -2753,4 +2765,25 @@ layouts old design
 			; items: []
 		; ]
 	; ]
+; ]
+
+singular get-cache & set-cache - no use, even list-view renders each space on 2 canvases
+; get-cache: function [space [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+	; all [
+		; true =? select space 'cache?
+		; space/size
+		; cached: find/only/same space-cache space
+		; cached/2 =? canvas
+		; cached/3 =? xy1
+		; cached/4 =? xy2
+		; cached/5
+	; ]
+; ]
+; set-cache: function [space [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!] drawn [block!]] [
+	; reduce/into [space canvas xy1 xy2 drawn] data: clear []
+	; cached: any [
+		; find/only/same space-cache space
+		; tail space-cache
+	; ]
+	; change cached data
 ; ]

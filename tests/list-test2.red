@@ -40,6 +40,7 @@ view/no-wait/options [
 	]
 ] [offset: 10x10]
 ;foreach-*ace/next path system/view/screens/1 [probe path]
-probe list-*aces system/view/screens/1
+; dump-tree
+debug-draw
 either system/build/config/gui-console? [print "---"][do-events]
 

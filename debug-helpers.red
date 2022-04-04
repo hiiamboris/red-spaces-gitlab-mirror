@@ -8,6 +8,7 @@ Red [
 
 exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~ debug-draw]
 
+
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
 		spc: get last path
@@ -33,6 +34,7 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 	set/any 'coll get/any path/1
 	out: head clear next copy path 
 	for-each [pos: item] as [] next path [				;@@ as [] = workaround for #4421
+		if any-function? :coll [append out pos  break]
 		space: if word? :item [
 			;; substitute global word in the path with a word that refers to a space
 			any [
@@ -101,8 +103,9 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 			longest: any [last sort map-each [k v] block [length? form k]  0]
 			strings: copy []
 			foreach [k v] block [
+				if find [on-change* on-deep-change*] k [continue]	;-- skip hidden fields
 				v: either object? :v
-					["object [...]^/"] [append mold~/indent :v #"^/" indent-size]
+					["object [...]^/"] [append mold~/indent :v indent-size #"^/"]
 				k: rejoin [k ": "]
 				if tail? find/tail v #"^/" [k: pad k longest + 2]
 				append strings rejoin [k v]
@@ -212,7 +215,7 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 			]
 		]
 		view/no-wait/options [
-			below list: text-list 400x400 on-created [update]
+			below list: text-list focus 400x400 on-created [update]
 			panel 2 [
 				origin 0x0 space 10x-5
 				text 195 "w/o canvas" text "with canvas"

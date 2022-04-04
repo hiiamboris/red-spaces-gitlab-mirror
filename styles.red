@@ -117,6 +117,7 @@ do with [
 style-typeset!: make typeset! [block! function!]	;@@ hide this
 
 ;@@ TODO: profile & optimize this a lot
+;@@ devise some kind of style cache tree if it speeds it up
 ;@@ rename current-style to current-path? as it's not really a style per se..
 get-style: function [
 	"Fetch styling code object for the current space being drawn"
@@ -144,7 +145,50 @@ set-style: function [name [word! path!] style [block! function!]] [
 	change/only pos :style
 ]
 
+;; cache format for now: [space-object canvas xy1 xy2 drawn ...]
+;@@ once #5116 gets fixed, check if find/same .. #static-reduce [..] is going to be faster
+space-cache: make hash! 4096
+
 context [
+	find-cache: function [space [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+		cached: space-cache
+		while [cached: find/only/same/tail cached space] [		;@@ watch out for #5116 fix, or use for-each
+			all [												;@@ also maybe search in reverse?
+				cached/1 =? canvas
+				cached/2 =? xy1
+				cached/3 =? xy2
+				return back cached
+			]
+		]
+		none
+	]
+	
+	get-cache: function [space [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+		all [
+			true =? select space 'cache?
+			space/size
+			cached: find-cache space canvas xy1 xy2
+			cached/5
+		]
+	]
+	
+	;@@ TODO: limit number of caches per single space somehow, e.g. for list which has limitless xy1/xy2 combos!
+	set-cache: function [space [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!] drawn [block!]] [
+		either cached: find-cache space canvas xy1 xy2 [
+			cached/5: drawn
+		][
+			repend space-cache [space canvas xy1 xy2 drawn]
+		]
+	]
+	
+	clear-cache: function [space [object!]] [
+		while [pos: find/same/only space-cache space] [
+			other: skip tail space-cache -5
+			unless pos =? other [change pos other]
+			clear other
+		]
+	]
+
 	;-- draw code has to be evaluated after current-style changes, for inner calls to render to succeed
 	with-style: function [
 		"Draw calls should be wrapped with this to apply styles properly"
@@ -152,7 +196,7 @@ context [
 	][
 		append current-style name
 		trap/all/catch code [
-			msg: form/part thrown 1000						;@@ should be formed immediately - see #4538
+			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
 			#print "*** Failed to render (name)!^/(msg)^/"
 		]
 		take/last current-style
@@ -194,54 +238,63 @@ context [
 		#assert [not is-face? :space]					;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 
 		with-style name [
-			style: get-style							;-- call it before calling draw or draw/only, in case it modifies smth
-			either block? :style [
-				style: compose/deep bind style space	;@@ how slow this bind will be? any way not to bind? maybe construct a func?
-				draw: select space 'draw
-				
-				;@@ this basically cries for FAST `apply` func!!
-				if all [function? :draw  any [xy1 xy2 canvas]] [
-					spec: spec-of :draw
-					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-					unless find spec /on   [on: canvas: none]
-					if canvas [constrain canvas: canvas space/limits]
-					code: case [						;@@ workaround for #4854 - remove me!!
-						all [canvas only] [[draw/only/on xy1 xy2 canvas]]
-						only              [[draw/only    xy1 xy2       ]]
-						canvas            [[draw/on              canvas]]
+			unless render: get-cache space canvas xy1 xy2 [
+				#debug profile [prof/manual/start name]
+				style: get-style							;-- call it before calling draw or draw/only, in case it modifies smth
+				either block? :style [
+					style: compose/deep bind style space	;@@ how slow this bind will be? any way not to bind? maybe construct a func?
+					draw: select space 'draw
+					
+					;@@ this basically cries for FAST `apply` func!!
+					if all [function? :draw  any [xy1 xy2 canvas]] [
+						spec: spec-of :draw
+						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+						unless find spec /on   [on: canvas: none]
+						if canvas [constrain canvas: canvas space/limits]
+						code: case [						;@@ workaround for #4854 - remove me!!
+							all [canvas only] [[draw/only/on xy1 xy2 canvas]]
+							only              [[draw/only    xy1 xy2       ]]
+							canvas            [[draw/on              canvas]]
+						]
+						draw: either code [do copy/deep code][draw]
 					]
-					draw: either code [do copy/deep code][draw]
-				]
-				draw: draw								;-- call the draw function if not called yet
-				#assert [block? :draw]
-				
-				if empty? style [unset 'style]
-				render: compose/only [(:style) (:draw)]	;-- compose removes style if it's unset
-			][
-				#assert [function? :style]
-				;@@ this basically cries for FAST `apply` func!!
-				either any [xy1 xy2 canvas] [
-					spec: spec-of :style
-					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-					unless find spec /on   [on: canvas: none]
-					if canvas [constrain canvas: canvas space/limits]
-					code: case [						;@@ workaround for #4854 - remove me!!
-						all [canvas only] [[style/only/on space xy1 xy2 canvas]]
-						only              [[style/only    space xy1 xy2       ]]
-						canvas            [[style/on      space         canvas]]
-					]
-					render: either code [do copy/deep code][style space]
+					draw: draw								;-- call the draw function if not called yet
+					#assert [block? :draw]
+					
+					if empty? style [unset 'style]
+					render: compose/only [(:style) (:draw)]	;-- compose removes style if it's unset
 				][
-					render: style space
+					#assert [function? :style]
+					;@@ this basically cries for FAST `apply` func!!
+					either any [xy1 xy2 canvas] [
+						spec: spec-of :style
+						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+						unless find spec /on   [on: canvas: none]
+						if canvas [constrain canvas: canvas space/limits]
+						code: case [					
+							all [canvas only] [[style/only/on space xy1 xy2 canvas]]
+							only              [[style/only    space xy1 xy2       ]]
+							canvas            [[style/on      space         canvas]]
+						]
+						render: either code [do copy/deep code][style space]	;@@ workaround for #4854 - remove me!!
+					][
+						render: style space
+					]
+					#assert [block? :render]
 				]
-				#assert [block? :render]
+				if cache?: select space 'cache? [
+					if cache? = 'invalid [clear-cache space]	;-- clear all the other renders on invalidation
+					set-cache space canvas xy1 xy2 render
+					space/cache?: true							;-- mark cache as valid until invalidated
+				]
+				#debug profile [prof/manual/end name]
+				#assert [space/size "render must set the space's size"]
 			]
-			#assert [space/size "render must set the space's size"]
 		]
 		either render [
 			reduce ['push render]						;-- don't carry styles over to next spaces
 		][
-			copy []
+			[]											;-- never changed, so no need to copy it
 		]
 	]
 
@@ -254,20 +307,20 @@ context [
 	][
 		; render: either word? space [:render-space][:render-face]
 		; render/only/on space xy1 xy2 canvas
-		rendered: either word? space [					;@@ workaround for #4854 - remove me!!
+		drawn: either word? space [					;@@ workaround for #4854 - remove me!!
 			render-space/only/on space xy1 xy2 canvas
 		][
 			render-face/only space xy1 xy2
 		]
 		#debug draw [									;-- test the output to figure out which style has a Draw error
-			if error? error: try/keep [draw 1x1 rendered] [
+			if error? error: try/keep [draw 1x1 drawn] [
 				prin "*** Invalid draw block: "
-				attempt [copy/deep rendered]			;@@ workaround for #5111
-				probe~ rendered
+				attempt [copy/deep drawn]				;@@ workaround for #5111
+				probe~ drawn
 				do error
 			]
 		]
-		rendered
+		drawn
 	]
 ]
 

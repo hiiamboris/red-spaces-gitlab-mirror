@@ -24,10 +24,13 @@ layouts: context [
 		;;   canvas        [pair! none!]   >= 0x0
 		;;   origin           [pair!]   unrestricted
 		;;   viewport         [pair!]   only matters if any cache-* is true
-		;;   cache-visible?   [logic!]  if true, items outside 0x0-viewport are not rendered if they have a size
-		;;   cache-invisible? [logic!]  if true, items inside  0x0-viewport are not rendered if they have a size
+		;;   cache         [word! none!]
+		;;     none       = disabled
+		;;     'invisible = items outside 0x0-viewport are not rendered if they have a size
+		;;     'all       = all items are not rendered if they have a size
 		;; result of all layouts is a block: [size [pair!] map [block!]]
 		;@@ cache-* should only be true for unchanged canvas!
+		;@@ maybe cache: 'visible / 'all / none?
 		create: function [
 			spaces [block!]
 			settings [block! object! map!]
@@ -45,17 +48,17 @@ layouts: context [
 			pos:   origin + (1x1 * margin)
 			size:  0x0
 			draw?: case [
-				cache-invisible? [[not space/size]]
-				cache-visible? [[
+				cache-visible? [[not space/size]]		;-- cache everything, only redraw if never drawn
+				cache-invisible? [[						;-- cache invisible only, redraw if never drawn or visible
 					not space/size
-					all [boxes-overlap? 0x0 viewport pos space/size]
+					boxes-overlap? 0x0 viewport pos space/size
 				]]
-				'else [[true]]
+				'else [[true]]							;-- don't cache, always redraw
 			]
 			map: make [] 2 * count: length? spaces
 			foreach name spaces [
 				space: get name
-				if all draw? [render/on name canvas]
+				if any draw? [render/on name canvas]
 				compose/deep/into [(name) [offset (pos) size (space/size)]] tail map
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size

@@ -5,8 +5,26 @@ Red [
 ]
 
 ; #include %../common/assert.red
-
 exports: [by abs range! range? .. when clip ortho dump-event boxes-overlap?]
+
+;@@ unfortunately macros are not imported yet due to custom `include` :(
+;@@ need a special macros file
+; ;; readability helper instead of reduce/into [] clear [] ugliness
+; #macro [#static-reduce block!] func [[manual] s e] [
+	; change/only s 'reduce/into
+	; insert/only insert e 'clear copy []
+	; s
+; ]
+
+; ;@@ watch out for #5009 for a better way to specify refinements
+; #macro [#static-compose any refinement! block!] func [[manual] s e /local path] [
+	; path: copy 'compose/into
+	; e: next s
+	; while [refinement? :e/1] [append path to word! take e]
+	; change/only s path
+	; insert/only insert e 'clear copy []
+	; s
+; ]
 
 by: make op! :as-pair
 abs: :absolute
@@ -32,6 +50,21 @@ block-stack: object [
 	hold: func [b [block!]] [at  append get head b  index? b]
 ]
 
+
+; block-buffers: make hash! 100
+; buffer-for: function [block [block!]] [
+	; any [
+		; clear buf: select/only/same/skip buffers block 2	;@@ unfortunately #4466 - search is linear
+		; repend buffers [buf: copy []]
+	; ]
+	; buf
+; ]
+; cached-reduce: function [block [block!]] [
+	; reduce/into block buffer-for block
+; ]
+; cached-compose: function [block [block!]] [
+	; compose/into block buffer-for block
+; ]
 
 ;-- `compose` readability helper variant 2
 when: func [test value] [either :test [do :value][[]]]

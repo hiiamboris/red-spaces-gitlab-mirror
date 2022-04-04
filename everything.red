@@ -7,8 +7,9 @@ Red []
 ; do/expand probe [
 	#include %../common/debug.red
 	#debug on
-	#debug set focus
-	; #debug set draw
+	; #debug set focus
+	; #debug set draw										;-- turn on to see what space produces draw errors
+	#debug set profile									;-- turn on to see rendering times
 	; #debug set events
 	; #debug set styles
 	; #debug set grid-view

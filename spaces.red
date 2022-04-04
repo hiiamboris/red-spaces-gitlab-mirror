@@ -455,7 +455,7 @@ paragraph-ctx: context [
 		;; but if canvas is huge e.g. 2e9, then it's not so useful,
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
-		space/size: space/margin * 2x2 + space/layout/extra		;-- full size, regardless if canvas height is smaller?
+		maybe space/size: space/margin * 2x2 + space/layout/extra	;-- full size, regardless if canvas height is smaller?
 		
 		compose [text (1x1 * space/margin) (space/layout)]
 	]
@@ -474,12 +474,13 @@ paragraph-ctx: context [
 	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
 
 	spaces/paragraph: make-template 'space [
-		size: none										;-- only valid after `draw` because it applies styles
-		text: ""
+		size:   none									;-- only valid after `draw` because it applies styles
+		text:   ""
 		margin: 0x0										;-- default = no margin
-		font: none										;-- can be set in style, as well as margin
+		font:   none									;-- can be set in style, as well as margin
 
 		layout: none									;-- internal, text size is kept in layout/extra
+		cache?: 'invalid
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		on-change*: func [word old [any-type!] new [any-type!]] [
 			~/on-change self word :old :new
@@ -512,15 +513,15 @@ container-ctx: context [
 			i: i + 1
 			set [_: pos: _: siz: _: org:] geom
 			skip?: all [xy2  not boxes-overlap?  pos pos + siz  xy1 xy2]
-			; unless skip? [
+			unless skip? [
 				compose/only/deep/into [
+					;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
 					clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
-						;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
 						translate (pos + any [org 0]) 
-						(render/on name canvas)
+						(render/on name siz)			;-- use already rendered item's size as canvas
 					]
 				] tail draw
-			; ]
+			]
 		]
 		append clear cont/map map						;-- compose-map cannot be used because it calls render an extra time
 		maybe cont/size: size
@@ -553,6 +554,7 @@ list-ctx: context [
 		axis:    'x
 		margin:  5x5		;@@ default margins/spacing - should be tight or not? what is more common?
 		spacing: 5x5
+		canvas:  none
 		;@@ TODO: alignment?
 		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
@@ -570,6 +572,7 @@ list-ctx: context [
 					canvas/:sec: canvas/:sec - (2 * margin/:sec)
 				]
 			]
+			self/canvas: canvas
 			container-draw/layout/only/on 'list self xy1 xy2 canvas
 		]
 	]
@@ -610,6 +613,7 @@ spaces/data-view: make-template 'space [
 	content: none
 	map: []
 	valid?: no						;-- can be reset without losing content so content can be reused
+	cache?: 'invalid
 	invalidate: does [set-quiet 'valid? no]
 
 	set-content: function [] [
@@ -724,7 +728,7 @@ window-ctx: context [
 		default xy1: 0x0
 		default xy2: s
 		geom/size: xy2 - o							;-- enough to cover the visible area
-		cdraw: render/only space/content xy1 - o xy2 - o
+		cdraw: render/only/on space/content xy1 - o xy2 - o xy2 - xy1
 		compose/only [translate (o) (cdraw)]
 	]
 		
@@ -907,9 +911,13 @@ list-view-ctx: context [
 		imax: list/items/size
 		space: list/spacing								;-- return value is named "space"
 		render-item: [
-			;@@ TODO: this is highly suboptimal: need to skip invisible items here, use current size!
-			list/rcache/:i: render/on name: list/items/pick i list/canvas
-			item: select get name 'size
+			;@@ TODO: items size invalidation when list-view properties change
+			;@@ TODO: caching of all spaces draw code
+			obj: get name: list/items/pick i
+			item: any [
+				obj/size
+				(render/on name list/canvas  obj/size)
+			]
 		]
 		;@@ should this func use layout at all or it will only complicate things?
 		r: catch [
@@ -989,9 +997,10 @@ list-view-ctx: context [
 			icache: make map! []	;-- cache of last rendered item spaces (persistency required by the focus model: items must retain sameness)
 									;-- an int->word map! - for flexibility in caching strategies (which items to free and when)
 									;@@ when to forget these?
-			rcache: make map! []	;-- cache of rendering code saved by locate-line
 			canvas: none			;-- automatically updated by list-view (used by available?, not only by draw)
 			;@@ TODO: can I remove `canvas` or let list/draw set it?
+			;@@ e.g. `items` is using list-view parent `data`; could use `window` too
+			cache?: 'invalid
 
 			items: function [/pick i [integer!] /size] [
 				either pick [
@@ -1033,31 +1042,26 @@ list-view-ctx: context [
 			]
 
 			;-- leverages certain list properties as an optimization, so is not based on container/draw
-			draw: function [/only xy1 [pair!] xy2 [pair!]] [
-				#assert [all [xy1 xy2]]
-				;@@ TODO: don't clear rcache blindly! only if canvas changed or smth
-				;@@ also most spaces should cache themselves if canvas is not changed! (except content)
-				clear rcache								;-- may be filled by locate-range
-				set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
-				unless all [i1 i2] [return []]				;-- no visible items (see locate-range)
-				#assert [i1 <= i2]
+			; draw: function [/only xy1 [pair!] xy2 [pair!]] [
+				; #assert [all [xy1 xy2]]
+				; clear map
+				; set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
+				; unless all [i1 i2] [return []]				;-- no visible items (see locate-range)
+				; #assert [i1 <= i2]
 
-				layout: make-layout 'list item-list self
-				guide: select [x 1x0 y 0x1] axis
-				layout/origin: guide * (xy1 - o1 - margin)
-				r: make [] 4 * (i2 - i1 + 1)
-				clear map
-				for i: i1 i2 [
-					item: get name: items/pick i
-					drawn: any [rcache/:i  render/on name canvas]		;-- render to get the size, for layout
-					placed: layout/place name
-					compose/only/into [translate (placed/2/2) (drawn)] tail r
-				]
-				append map layout/map						;-- compose-map cannot be used because it calls render an extra time
-				self/size: xy1 - margin - o1 + layout/size	;@@ do we even care about the size of the list itself here?
-															;@@ should size/x be that of list-view/size/x ?
-				r
-			]
+				; guide: select [x 1x0 y 0x1] axis
+				; settings: repend clear [] [
+					; 'axis axis 'margin margin 'spacing spacing 'canvas canvas
+					; 'viewport xy2 - xy1
+					; 'origin guide * (xy1 - o1 - margin)
+					; 'cache 'all
+				; ]
+				; set [new-size: new-map:] make-layout 'list values-of icache settings
+				; append clear map new-map
+				; maybe self/size: new-size				;@@ do we even care about the size of the list itself here?
+														; ;@@ should size/x be that of list-view/size/x ?
+				; compose-map map							;@@ optimize it!
+			; ]
 		]
 		
 		window/content: 'list
