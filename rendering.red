@@ -34,11 +34,24 @@ get-current-style: function [
 
 context [
 	;; render cache format: [space-object [children] last-write-index 3x [canvas drawn] ...] (a tree of hashes)
+	;;   it holds rendered draw block of all spaces that have /cache? = true
 	;;   such cache only has slots for 3 canvas sizes, which should be enough for most cases hopefully
 	;;   otherwise we'll have to iterate over all cached canvas sizes which is not great for performance
 	;;   last write index helps efficiently fill the cache (other option - use random 3, which is less efficient)
 	;; parent cache format: [space-object [containing-node parent-object ...] ...] (flat 2-leveled)
-	;;   (one tree is last valid one - for invalidation, another is the one being built currently)
+	;;   parent cache is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
+	;;   it holds rendering tree of parent/child relationships on the last rendered frame
+	
+	;; caching workflow:
+	;; - drawn spaces draw blocks are committed to the cache if they have /cache? enabled
+	;; - render checks cache first, and only performs draw if cache is not found
+	;;   each block corresponds to a particular canvas size (usually 3: unlimited, half-unlimited and limited)
+	;; - spaces should detect changes in their data that require new rendering effort and call `invalidate`
+	;;   invalidate uses last rendered parents tree to locate upper nodes and invalidate them all
+	;;   (there can be multiple parents to the same space)
+	
+	
+	;@@ TODO: document this in a proper place
 	; hash!: :block!
 	render-cache:   make hash! 27						;@@ TODO: cleanup of it?
 	parents-list:   make hash! 2048
@@ -46,15 +59,6 @@ context [
 	visited-nodes:  make block! 32						;-- stack of nodes currently visited by render
 	visited-spaces: make block! 32						;-- stack of spaces currently visited by render
 	append/only visited-nodes render-cache				;-- currently rendered node (hash) where to look up spaces
-	
-	;; rendering workflow:
-	;; render has a name, checks if it exists in render-cache - lookup in visited-nodes by object
-	;;   and if it exists in last-parents - which serves as a quick registry of still valid spaces
-	;;   if exists and allows caching - returns drawn-code
-	;;   if not - renders it again, adds to cache if allows caching
-	;; invalidation workflow:
-	;; got a space, it's removed from last-parents repeat for parents in last-parents, then their parents
-	;; process does not repeat on every `set` since it will be absent in render-cache after 1st invalidation
 	
 	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
 	;@@ but maybe they won't be needed as I'm improving the design?
@@ -103,8 +107,8 @@ context [
 	][
 		if word? space [space: get name: space]			;@@ remove me once cache is stable to speed it up
 		r: all [
-			select space 'cache?						;-- must be enabled for caching
-			space/size									;-- must have been rendered
+			; select space 'cache?						;-- must be enabled for caching - checked by `commit` to lift it off `get-cache`
+			; space/size									;-- must have been rendered - should always be true if cache exists
 			cache: find-cache space						;-- must have a cache
 			select/skip/part skip cache 3 canvas 2 6	;-- search for the same canvas among 3 options
 			; print mold~ copy/part cache >> 2 6
