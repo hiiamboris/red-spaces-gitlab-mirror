@@ -4,14 +4,13 @@ Red [
 	license: BSD-3
 ]
 
-;@@ TODO: layouts/ context where all of these should reside; and `layouts/make type` smth to not repeat optimizations
-
-;-- requires export
+;-- requires export, typecheck
 
 exports: [layouts]
 
-make-layout: function [type [word!] spaces [block!] settings [block! object!]] [
-	layouts/:type/create spaces settings
+;@@ can this be layouts/make ?
+make-layout: function [type [word!] spaces [block! function!] settings [block!]] [
+	layouts/:type/create :spaces settings
 ]
 
 layouts: context [
@@ -21,208 +20,292 @@ layouts: context [
 		;;   axis             [word!]   x or y
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
-		;;   canvas        [pair! none!]   >= 0x0
+		;;   canvas        [pair! none!]   > 0x0
 		;;   origin           [pair!]   unrestricted
-		;;   viewport         [pair!]   only matters if any cache-* is true
+		;;   viewport         [pair!]   only matters if any cache-* is true, >= 0x0
 		;;   cache         [word! none!]
 		;;     none       = disabled
 		;;     'invisible = items outside 0x0-viewport are not rendered if they have a size
 		;;     'all       = all items are not rendered if they have a size
-		;; result of all layouts is a block: [size [pair!] map [block!]]
-		;@@ cache-* should only be true for unchanged canvas!
-		;@@ maybe cache: 'visible / 'all / none?
+		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
+		;; settings are passed as a list of bound words, not as context
+		;; this is done to make the list explicit, to avoid unexpected settings being read from the space object
+		;; some of the words are also calculated directly in `draw`, so object is a bad fit to pass these
+		;@@ cache should only be not none for unchanged canvas!
 		create: function [
-			spaces [block!]
-			settings [block! object! map!]
+			"Builds a list layout outo of given spaces and settings as bound words"
+			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+			settings [block!] "Any subset of [axis margin spacing canvas origin viewport cache]"
+			;; settings - imported locally to speed up and simplify access to them:
+			/local axis margin spacing canvas origin viewport cache
 		][
-			if tail? spaces [return copy/deep [0x0 []]]
-			foreach word [								;-- free settings block so it can be reused by the caller
-				axis: margin: spacing: canvas: origin:
-				viewport: cache-visible?: cache-invisible?:
-			][
-				set word select settings word
+			func?: function? :spaces
+			count: either func? [spaces/size][length? spaces]
+			if count <= 0 [return copy/deep [0x0 []]]	;-- empty list optimization
+			foreach word settings [						;-- free settings block so it can be reused by the caller
+				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
 			]
-			; ?? margin ?? origin 
+			#debug [typecheck [
+				axis     [word!       (find [x y] axis)]
+				margin   [pair!       (0x0 +<= margin)]
+				spacing  [pair!       (0x0 +<= spacing)]
+				canvas   [none! pair! (0x0 +< canvas)]
+				origin   [none! pair!]
+				viewport [none! pair! (0x0 +<= viewport)]
+				cache    [none! word! (find [all invisible] cache)]
+			]]
 			default origin: 0x0
-			guide: select [x 1x0 y 0x1] axis
-			pos:   origin + (1x1 * margin)
+			x: ortho y: axis
+			guide: axis2pair y
+			pos: pos': origin + (1x1 * margin)
 			size:  0x0
 			draw?: case [
-				cache-visible? [[not space/size]]		;-- cache everything, only redraw if never drawn
-				cache-invisible? [[						;-- cache invisible only, redraw if never drawn or visible
+				cache = 'all [[not space/size]]			;-- cache everything, only redraw if never drawn
+				cache = 'invisible [[					;-- cache invisible only, redraw if never drawn or visible
 					not space/size
 					boxes-overlap? 0x0 viewport pos space/size
 				]]
 				'else [[true]]							;-- don't cache, always redraw
 			]
-			map: make [] 2 * count: length? spaces
-			foreach name spaces [
-				space: get name
-				if any draw? [render/on name canvas]
-				compose/deep/into [(name) [offset (pos) size (space/size)]] tail map
+			;; list can be rendered in two modes:
+			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
+			;; - on fixed canvas: then only single render is required, unless some item sticks out
+			canvas1: canvas2: extend-canvas canvas axis
+			
+			map: make [] 2 * count
+			repeat i count [							;-- first render cycle
+				space: get name: either func? [spaces/pick i][spaces/:i]
+				if any draw? [drawn: render/on name canvas1]
+				#assert [space/size +< (1e7 by 1e7)]
+				compose/only/deep/into [(name) [offset (pos) size (space/size) drawn (drawn)]] tail map
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
+			if canvas2 [
+				canvas2/:x: max canvas2/:x size/:x		;-- only extend the canvas to max item's size, but not contract
+				if canvas2 <> canvas1 [					;-- second render cycle - only if canvas changed
+					pos: pos'  size: 0x0
+					repeat i count [
+						space: get name: either func? [spaces/pick i][spaces/:i]
+						if any draw? [drawn: render/on name canvas2]
+						#assert [space/size +< (1e7 by 1e7)]
+						geom: pick map 2 * i
+						geom/drawn: drawn
+						pos:   pos + (space/size + spacing * guide)
+						size:  max size space/size
+					]
+				]
+			]
 			size: pos - (spacing * guide)				;-- cut trailing space
 				- origin + (1x1 * margin)				;-- 2 margins + size along axis
-				+ size - (size * guide)					;-- size normal to axis
+				+ (size * reverse guide)				;-- size normal to axis
+			#assert [size +< (1e7 by 1e7)]
 			reduce [size map]
 		]
 	]
 	
-	tube: none
-
-	tube-layout-ctx: context [
-		~: self
-		
-		place: function [layout [object!] item [word!]] [
-			append layout/items item
-		]
-		
-		build-map: function [layout [object!]] [
-			;; to support automatic sizing, each item's constraints has to be analyzed
+	tube: context [
+		;; settings for tube layout:
+		;;   axes          [block! none!]   2 words, any of [n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
+		;;                                  in essence, any of n/e/s/w but both should be orthogonal, total 4x2
+		;;                                  default = [e s] - left-to-right items, top-down rows
+		;;   align         [block! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
+		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
+		;@@ TODO: reverse or rework alignment order, it's awkward and impossible to understand
+		;;   margin           [pair!]   >= 0x0
+		;;   spacing          [pair!]   >= 0x0
+		;;   canvas         [none! pair!]   > 0x0, cannot be none as tube needs to know it's width
+		create: function [
+			"Builds a tube layout out of given spaces and settings as bound words"
+			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+			settings [block!] "Any subset of [axes align margin spacing canvas cache]"
+			;; settings - imported locally to speed up and simplify access to them:
+			/local axes align margin spacing canvas
+		][
+			func?: function? :spaces
+			count: either func? [spaces/size][length? spaces]
+			if count <= 0 [return copy/deep [0x0 []]]
+			foreach word settings [						;-- free settings block so it can be reused by the caller
+				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
+			]
+			#debug [typecheck [
+				axes     [none! block! (find/only [[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]] axes)]
+				align    [none! pair! (-1x-1 +<= align +<= 1x1)]
+				margin   [      pair! (0x0 +<= margin)]
+				spacing  [      pair! (0x0 +<= spacing)]
+				canvas   [none! pair! (0x0 +< canvas)]
+			]]
+			default axes:  [e s]
+			default align: -1x-1
+			y: ortho x: anchor2axis axes/1
+			ox: anchor2pair axes/1
+			oy: anchor2pair axes/2
+			reverse?: either x = 'x [:do][:reverse]
+			
+			;; to support automatic sizing, each item's constraints (`limits`) has to be analyzed
 			;; obviously there can be two strategies:
 			;;  1. fill everything with max size, then shrink, and rearrange as possible
 			;;  2. fill everything with min size, then expand within a single row
 			;;  2nd option seems more predictable and easier to implement
-			;; constraint presence does not mean that space can reach that size,
-			;; so it should only be used as hint (canvas size) to obtain min size
-			;; then, every item that has a nonzero weight has to be rendered twice:
-			;; once to get it's minimum appearance, second time to expand it
-			;; other items also has to be rendered twice - to fill the row height
+			;; constraint presence does not mean that space can reach that size as content affects it too,
+			;; so it should only be used as hint (canvas size passed to render) to obtain real min size
+			;; then, every item has to be rendered 2-3 times:
+			;;  1. to get it's narrowest appearance
+			;;  2. to expand it horizontally (changes row height) - only for items with nonzero weight
+			;;  3. to fully fill row height
+			;; quite a rendering torture, but there's no way around it
+			;@@ this will require cache size of none, 0x2e9, widthx0, widthxheight - total of 4 at least
+			
+			;; constraints question is also a tricky one
+			;; I decided to estimate min. size of each space by using 0x2e9 and 2e9x0 canvases (best fit for text/tube)
+			;; then each space will report the "narrowest" possible form of it, suiting tube needs
+			;; when limits/min is set, it overrides the half-unlimited canvas
+			;; when only limits/max is set, it's "height" overrides the infinite 2e9, "width" stays zero
+			;@@ for this to work, buttons/radios/etc must never wrap or ellipsize their text,
+			;@@ and single-line generic text style is desirable with the option to: always show full text, ellipsize it, or clip
+			;@@ this may also require 4th cached canvas!
 			
 			;; obtain constraints info
-			;@@ info can't be static since render may call another build-map; use block-stack!
-			info: make block! length? layout/items
-			i: 0 foreach item layout/items [			;@@ use for-each when becomes native
-				i: i + 1
-				space: get item
-				min-size: all [space/limits space/limits/min]	;@@ REP #113
-				max-size: all [space/limits space/limits/max]	;@@ REP #113
-				;@@ this is inconsistent with list which does NOT render it's items:
-				drawn: render/on item min-size			;-- needed to obtain space/size
-				#assert [pair? space/size]
-				weight: any [select space 'weight 0.0]
+			;; `info` can't be static since render may call another build-map; same for other arrays here
+			;; info format: [space-name space-object draw-block drawn-width ]
+			info: obtain block! count * 5
+			#leaving [stash info]
+			
+			stripe: infxinf * abs oy					;-- thinnest canvas possible, used to estimate min. space/size
+			repeat i count [
+				space: get name: either func? [spaces/pick i][spaces/:i]
+				drawn: render/on name stripe			;-- 1st render needed to obtain min *real* space/size, which may be > limits/max
+				weight: any [select space 'weight 0]
 				#assert [number? weight]
-				available: case [
-					weight <= 0  [0]					;-- fixed size
-					not max-size [2e9]					;-- unlimited extension possible
-					'else [max-size/x - space/size/x / weight]	;@@ REP #113
+				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
+					weight <= 0 [0]						;-- fixed size
+					not max-size: all [space/limits space/limits/max] [infxinf/x]	;-- unlimited extension possible ;@@ REP #113
+					pair? max-size [max-size/:x - space/size/:x / weight]
+					number? max-size [
+						either x = 'x [				 	;-- numeric max-size only used on vertical tubes
+							max-size - space/size/:x / weight
+						][								;-- vertical is considered unbound
+							infxinf/x
+						]
+					]
 				]
-				append/only info reduce [				;@@ use block stack
-					i item space drawn space/size max-size 1.0 * available weight
-				]
+				;; if width is infinite, this 1st `drawn` block and `space/size` will be used as there's no meaningful width to fill
+				;; otherwise they're just drafts and will be replaced by proper size & block
+				repend info [name space drawn available weight]
 			]
 			
-			;; split info into rows
-			rows: copy []								;@@ use block-stack
-			row:  copy []
-			row-size: layout/spacing/x * -1x0			;@@ not gonna work for empty rows
-			row-max-width: layout/width - (2 * layout/margin/x)
-			; canvas: layout/width - (2 * layout/margin/x) by 2e9		;@@ use canvas ?
-			foreach item info [
-				set [_: name: _: _: item-size:] item
-				new-row-size: as-pair
-					row-size/x + item-size/x + layout/spacing/x
-					max row-size/y item-size/y
-				row-size: either all [					;-- row is full, but has at least 1 item?
-					new-row-size/x > row-max-width
-					not tail? row
-				][
-					reduce/into [row-size copy row] tail rows
-					clear row
-					item-size
-				][
-					new-row-size
-				]
-				append/only row item
+			;; split info into rows according to found min widths
+			;; rows coordinate system is always [x=e y=s] for simplicity; results are later normalized
+			rows: obtain block! 40
+			row:  obtain block! count * 5
+			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
+			allowed-row-width: either all [canvas canvas/:x < infxinf/x] [	;-- how wide rows to allow (splitting margin)
+				canvas/:x - (2 * margin/:x)
+			][
+				infxinf/x
 			]
-			reduce/into [row-size row] tail rows
+			peak-row-width: 0							;-- will be used to determine full layout size when canvas is not limited
+			foreach [name space drawn available weight] info [
+				new-row-size: as-pair					;-- add item-size and check if it hangs over
+					row-size/x + space/size/:x + spacing/:x
+					max row-size/y space/size/:y		;-- height will only be needed in infinite width case (no 2nd render)
+				row-size: either any [					;-- row either fits allowed-row-width, or has no items yet?
+					new-row-size/x <= allowed-row-width
+					tail? row
+				][										;-- accept new width
+					new-row-size
+				][										;-- else move this item to next row
+					append (new-row: obtain block! length? row) row
+					repend rows [row-size new-row]
+					clear row
+					reverse? space/size
+				]
+				peak-row-width: max peak-row-width row-size/x
+				repend row [name space drawn available weight]
+			]
+			repend rows [row-size row]
+			#leaving [foreach [_ row] rows [stash row]  stash rows]
 			
 			;; expand row items - facilitates a second render cycle of the row
-			foreach [row-size row] rows [
-				free: row-max-width - row-size/x
-				if free > 0 [							;-- any space left to distribute?
-					;; free space distribution mechanism relies on continuous resizing!
-					;; render itself doesn't have to occupy max-size or the size we allocate to it
-					;; and since we don't know what render is up to,
-					;; we can only "fix" it by re-rendering until we fill whole row space
-					;; but this will be highly inefficient, and not even guaranteed to ever finish
-					;; so a proper solution in this case should be to use a custom layout or resize hook
-					;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
-					weights: clear []
-					extras:  clear []
-					foreach item row [
-						append weights item/8
-						append extras  item/7
+			if allowed-row-width < infxinf/x [			;-- only if width is constrained
+				peak-row-width: 0						;-- will have to recalculate it during expansion
+				forall rows [							;@@ use for-each
+					set [row-size: row:] rows
+					free: allowed-row-width - row-size/x
+					if free > 0 [						;-- any space left to distribute?
+						;; free space distribution mechanism relies on continuous resizing!
+						;; render itself doesn't have to occupy max-size or the size we allocate to it
+						;; and since we don't know what render is up to,
+						;; we can only "fix" it by re-rendering until we fill whole row space
+						;; but this will be highly inefficient, and not even guaranteed to ever finish
+						;; so a proper solution in this case should be to use a custom layout or resize hook
+						;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
+						weights: clear []				;-- can be static, not used after distribute
+						extras:  clear []
+						foreach [_ _ _ available weight] row [	;@@ use 2 map-eachs
+							append weights weight
+							append extras  available
+						]
+						extensions: distribute free weights extras
+						
+						row-size: -1x0 * spacing
+						repeat i length? extensions [	;@@ use for-each
+							set [name: space:] item: skip row i - 1 * 5
+							if extensions/:i > 0 [		;-- only re-render items that are being extended
+								desired-size: reverse? space/size/:x + extensions/:i by infxinf/y
+								item/3: render/on name desired-size
+							]
+							row-size: as-pair			;-- update row size with the new render results
+								row-size/x + space/size/:x + spacing/:x
+								max row-size/y space/size/:y
+						]
+						rows/1: row-size
 					]
-					exts: distribute free weights extras
-					
-					i: 0 foreach item row [				;@@ should be for-each
-						i: i + 1
-						set [_: name: space: drawn: item-size: max-size: available: weight:] item
-						new-size: item-size/x + exts/:i by row-size/y
-						item/4: render/on name new-size
-						item/5: space/size				;@@ or use new-size in a map?
+					peak-row-width: max peak-row-width row-size/x
+					rows: next rows
+				]
+			]
+			
+			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
+			foreach [row-size row] rows [
+				repeat i (length? row) / 5 [			;@@ use for-each
+					set [name: space:] item: skip row i - 1 * 5
+					if space/size/:y < row-size/y [		;-- only re-render items that are being extended
+						item/3: render/on name reverse? space/size/:x by row-size/y
 					]
 				]
 			]
 			
-			map: clear []
-			margin:  layout/margin
-			spacing: layout/spacing
-			row-y: margin/y
+			;; build the map & measure the final layout size using results of 1st or 2nd render
+			map:   clear []
+			row-y: margin/:y
+			shift: min 0x0 oxy: ox + oy					;-- offset correction for negative axes
+			row-shift:    align/2 + 1 / 2
+			in-row-shift: align/1 + 1 / 2
+			total-width:  either allowed-row-width >= infxinf/x [peak-row-width][allowed-row-width] 
 			total-length: 0
 			foreach [row-size row] rows [
-				ofs: margin/x by row-y
-				foreach item row [
-					set [_: name: space: drawn: item-size: max-size: available: weight:] item
-					ofs/y: to integer! row-size/y - item-size/y / 2 + row-y
-					geom: reduce ['offset ofs 'size item-size]
+				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
+				foreach [name space drawn _ _] row [
+					ofs/:y: to integer! row-size/y - space/size/:y * in-row-shift + row-y
+					geom: reduce ['offset ofs * oxy + (space/size * shift) 'size space/size 'drawn drawn]
 					repend map [name geom]
-					ofs/x: ofs/x + spacing/x + item-size/x
+					ofs/:x: ofs/:x + spacing/:x + space/size/:x
 				]
-				total-length: total-length + row-size/y + spacing/y
-				row-y: margin/y + total-length
+				total-length: total-length + row-size/y + spacing/:y
+				row-y: margin/:y + total-length
 			]
-			total-length: total-length - spacing/y
-			layout/content-size: row-max-width by total-length
-			layout/size: 2x2 * margin + layout/content-size
-			copy map
+			total-length: total-length - spacing/:y
+			;; fill the desired canvas width if canvas is given:
+			size: 2x2 * margin + reverse? total-width by total-length
+			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive
+				shift: size * abs shift
+				foreach [name geom] map [geom/offset: geom/offset + shift]
+			]
+			#assert [size +< infxinf]
+			reduce [size copy map]
 		]
 
-		; size: function [layout [object!]] [
-			; ;-- does not contract size if it's > width
-			; ;-- does not expand it either if some item is > width, otherwise can get this picture:
-			; ;-- [  ] = width
-			; ;-- XXXXXXXXXX
-			; ;-- X X        <- if expanded, these rows will look like they're half filled
-			; ;-- X X           instead, let the big item stick out
-			; sz: layout/margin * 2 + layout/content-size
-			; switch layout/axes/1 [
-				; n s [layout/width by sz/y]
-				; w e [sz/x by layout/width]
-			; ]
-		; ]
-
-		set 'tube object [
-			;-- interface
-			width:   100			;@@ TODO: use canvas instead?
-			; origin:  0x0			;@@ TODO - if needed
-			margin:  0x0
-			spacing: 0x0
-			;@@ align can be a pair, total 9 options; though pair is interpreted in XY coordinate terms usually..
-			align:   [-1 -1]		;-- 2 alignments: list within row (-1/0/1), then item within list (-1/0/1)
-			axes:    [s e]			;-- 4x2 total; default placement order: top-down rows, left-right items
-
-			content-size: 0x0
-			place: func [item [word!]] [~/place self item]
-			map:   does [~/build-map self]
-			size:  0x0
-
-			;-- used internally
-			items: []
-		]
 	]
 ]
 
