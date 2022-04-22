@@ -1,7 +1,5 @@
 Red [needs: view]						;) we need the View module to be able to show graphics
 
-recycle/off								;) without this - often crashes on heisenbugs :(
-
 #include %../everything.red				;) add Spaces to the current program
 
 list: make-space 'list [				;) make-space is used to instantiate spaces
@@ -15,7 +13,7 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 		make-space/name 'button [
 			data: "OK"					;) data can be any Red type
 			width: 80					;) width makes the button bigger than it's data
-			command: [quit]				;) code that is evaluated when button is released
+			command: [unview]			;) code that is evaluated when button is released
 		]
 	]
 ]
