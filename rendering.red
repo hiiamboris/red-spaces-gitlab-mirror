@@ -33,11 +33,12 @@ get-current-style: function [
 
 
 context [
-	;; render cache format: [space-object [children] last-write-index 3x [canvas drawn] ...] (a tree of hashes)
+	;; render cache format: [space-object [children] last-write-index 4x [canvas space-size drawn] ...] (a tree of hashes)
 	;;   it holds rendered draw block of all spaces that have /cache? = true
-	;;   such cache only has slots for 3 canvas sizes, which should be enough for most cases hopefully
+	;;   such cache only has slots for 4 canvas sizes, which should be enough for most cases hopefully
 	;;   otherwise we'll have to iterate over all cached canvas sizes which is not great for performance
-	;;   last write index helps efficiently fill the cache (other option - use random 3, which is less efficient)
+	;;   last write index helps efficiently fill the cache (other option - use random 4, which is less efficient)
+	;;   space-size is required because `draw` usually changes space/size and if draw is avoided, /size still must be set
 	;; parent cache format: [space-object [containing-node parent-object ...] ...] (flat 2-leveled)
 	;;   parent cache is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
 	;;   it holds rendering tree of parent/child relationships on the last rendered frame
@@ -45,15 +46,15 @@ context [
 	;; caching workflow:
 	;; - drawn spaces draw blocks are committed to the cache if they have /cache? enabled
 	;; - render checks cache first, and only performs draw if cache is not found
-	;;   each block corresponds to a particular canvas size (usually 3: unlimited, half-unlimited and limited)
+	;;   each block corresponds to a particular canvas size (usually 3: unlimited, half-unlimited and limited, but tube uses 3 except none)
 	;; - spaces should detect changes in their data that require new rendering effort and call `invalidate`
 	;;   invalidate uses last rendered parents tree to locate upper nodes and invalidate them all
 	;;   (there can be multiple parents to the same space)
-	
-	
 	;@@ TODO: document this in a proper place
+	
 	; hash!: :block!
-	render-cache:   make hash! 27						;@@ TODO: cleanup of it?
+	slots:          12									;-- must be x3! triple max number of cache slots per single space
+	render-cache:   make hash! slots + 3 * 3			;@@ TODO: cleanup of it?
 	parents-list:   make hash! 2048
 	
 	visited-nodes:  make block! 32						;-- stack of nodes currently visited by render
@@ -86,9 +87,10 @@ context [
 			if pos: find/same parents-list space [		;-- no matter if cache?=yes or no, parents still have to be invalidated
 				foreach [node parent] pos/2 [
 					while [node: find/same/tail node space] [
-						change/dup at node 3 none 6		;-- remove cached draw blocks but not the children node!
+						change/dup at node 3 none slots			;-- remove cached draw blocks but not the children node!
 					]
-					if parent [invalidate-cache parent]	;-- can be none if upper-level space
+					#assert [not space =? parent]
+					if parent [invalidate-cache parent]			;-- can be none if upper-level space
 				]
 			]
 		]
@@ -107,19 +109,17 @@ context [
 	][
 		if word? space [space: get name: space]			;@@ remove me once cache is stable to speed it up
 		r: all [
-			; select space 'cache?						;-- must be enabled for caching - checked by `commit` to lift it off `get-cache`
-			; space/size									;-- must have been rendered - should always be true if cache exists
-			cache: find-cache space						;-- must have a cache
-			select/skip/part skip cache 3 canvas 2 6	;-- search for the same canvas among 3 options
-			; print mold~ copy/part cache >> 2 6
+			cache: find-cache space								;-- must have a cache
+			find/skip/part skip cache 3 canvas 3 slots			;-- search for the same canvas among 3 options
+			; print mold~ copy/part cache >> 2 slots
 		]
 		#debug cache [
 			name: any [name 'space]
 			either r [
-				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part r 40)"
+				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part r 400)"
 			][
 				reason: case [
-					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 6 2]]
+					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 slots 3]]
 					not space/size ["never drawn"]
 					not select space 'cache? ["cache disabled"]
 					'else ["not cached or invalidated"]
@@ -141,17 +141,17 @@ context [
 		unless select space 'cache? [exit]				;-- do nothing if caching is disabled
 		cache: find/same last visited-nodes space
 		#assert [cache]
-		unless pos: find/skip/part skip cache 3 canvas 2 6 [
-			pos: skip cache 3 + (cache/3 * 2)
-			change at cache 3 cache/3 + 1 % 3			;@@ #5120
+		unless pos: find/skip/part skip cache 3 canvas 3 slots [
+			pos: skip cache 3 + (cache/3 * 3)
+			change at cache 3 cache/3 + 1 % (slots / 3)			;@@ #5120
 			; pos/1: canvas								;@@ #5120
 			change pos canvas
 		]
 		; pos/2: drawn									;@@ #5120
-		change/only next pos drawn
+		change/only change next pos space/size drawn
 		#debug cache [
 			name: any [name 'space]
-			#print "Saved cache for (name) size=(space/size) on canvas=(canvas)"
+			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 400)"
 		]
 	]
 	
@@ -160,6 +160,7 @@ context [
 		child  [object!]
 		parent [object! none!]							;-- parent=none is allowed to mark top level spaces as cacheable
 	][
+		#assert [not child =? parent]
 		node: last visited-nodes						;-- tree node where current `child` is found
 		either parents: select/same parents-list child [
 			pos: any [
@@ -180,8 +181,8 @@ context [
 		append visited-spaces space
 		append/only visited-nodes any [
 			select/same level: last visited-nodes space
-			also branch: make hash! 18
-				repend level [space branch 0 none none none none none none]
+			also branch: make hash! 3 + slots * 2
+				append/dup repend level [space branch 0] none slots
 		]
 	]
 	
@@ -209,7 +210,11 @@ context [
 	#debug cache [										;-- for cache creep detection
 		cache-size?: function [node [any-block!]] [
 			size: length? node
-			foreach [_ inner _ _ _ _ _ _ _] node [size: size + cache-size? inner]
+			forall node [
+				inner: node/2
+				size: size + cache-size? inner
+				node: skip node 2 + slots
+			]
 			size
 		]
 		parents-size?: function [] [
@@ -232,15 +237,15 @@ context [
 
 		host: face										;-- required for `same-paths?` to have a value (used by cache)
 		with-style 'host [
-			host-drawn: compose/deep bind get-current-style face	;-- host style can only be a block
-			space-drawn: render-space/only/on face/space xy1 xy2 face/size
-			#assert [block? :space-drawn]
+			style: compose/deep bind get-current-style face	;-- host style can only be a block
+			drawn: render-space/only/on face/space xy1 xy2 face/size
+			#assert [block? :drawn]
 			unless face/size [								;-- initial render: define face/size
 				face/size: select get face/space 'size
 				#assert [face/size]
-				host-drawn: compose/deep bind get-current-style face	;-- reapply the host style using new size
+				style: compose/deep bind get-current-style face	;-- reapply the host style using new size
 			]
-			render: reduce [host-drawn space-drawn]
+			render: reduce [style drawn]
 		]
 		#debug cache [#print "cache size=(cache-size? render-cache) parents size=(parents-size?)"]
 		any [render copy []]
@@ -251,8 +256,10 @@ context [
 		/only xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas [pair! none!]
 	][
+		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]	
 		space: get name
+		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [space? :space]
 		#assert [not is-face? :space]					;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 		#assert [
@@ -260,6 +267,12 @@ context [
 				none = canvas canvas +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
 				also no #print "(name): canvas=(canvas)" 
 			] "Oversized canvas detected!"
+		]
+		#assert [
+			any [
+				none = canvas  0x0 +<= canvas
+				also no #print "(name): canvas=(canvas)" 
+			] "Negative canvas detected!"
 		]
 
 		with-style name [
@@ -270,15 +283,16 @@ context [
 			
 			either all [
 				not xy1 not xy2							;-- usage of region is not supported by current cache model
-				; render: get-cache space canvas
-				render: get-cache name canvas
+				cache: get-cache name canvas
 			][
+				set [size: render:] next cache
+				maybe space/size: size
 				set-parent space last visited-spaces	;-- mark it as cached in the new parents tree
 				#debug cache [							;-- add a frame to cached spaces after committing
 					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]
 				]
 			][
-				; if name = 'paragraph [print space/text]
+				; if name = 'list [print ["canvas:" canvas mold space/item-list]]
 				#debug profile [prof/manual/start name]
 				enter-cache-branch space
 				
@@ -290,8 +304,8 @@ context [
 					if all [function? :draw  any [xy1 xy2 canvas]] [
 						spec: spec-of :draw
 						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-						canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
-						if canvas' [constrain canvas': canvas' space/limits]
+						canvas': either find spec /on [canvas][on: none]		;-- must not affect `canvas` used by cache
+						if canvas' [canvas': constrain canvas' space/limits]	;-- `none` canvas should never be constrained
 						code: case [						;@@ workaround for #4854 - remove me!!
 							all [canvas' only] [[draw/only/on xy1 xy2 canvas']]
 							only               [[draw/only    xy1 xy2        ]]
@@ -310,7 +324,7 @@ context [
 						spec: spec-of :style
 						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
 						canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
-						if canvas' [constrain canvas': canvas' space/limits]
+						if canvas' [canvas': constrain canvas' space/limits]
 						code: case [					
 							all [canvas' only] [[style/only/on space xy1 xy2 canvas']]
 							only               [[style/only    space xy1 xy2        ]]
