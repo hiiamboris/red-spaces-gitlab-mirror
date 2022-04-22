@@ -70,7 +70,7 @@ layouts: context [
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: extend-canvas canvas axis
+			canvas1: canvas2: extend-canvas if canvas [canvas - (2x2 * margin)] axis
 			
 			map: make [] 2 * count
 			repeat i count [							;-- first render cycle
@@ -89,8 +89,8 @@ layouts: context [
 						space: get name: either func? [spaces/pick i][spaces/:i]
 						if any draw? [drawn: render/on name canvas2]
 						#assert [space/size +< (1e7 by 1e7)]
-						geom: pick map 2 * i
-						geom/drawn: drawn
+						geom:  pick map 2 * i
+						compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
 						pos:   pos + (space/size + spacing * guide)
 						size:  max size space/size
 					]
@@ -106,12 +106,12 @@ layouts: context [
 	
 	tube: context [
 		;; settings for tube layout:
-		;;   axes          [block! none!]   2 words, any of [n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
+		;;   axes          [block! none!]   2 words, any of [n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s] (also supports arrows)
 		;;                                  in essence, any of n/e/s/w but both should be orthogonal, total 4x2
 		;;                                  default = [e s] - left-to-right items, top-down rows
 		;;   align         [block! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
 		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
-		;@@ TODO: reverse or rework alignment order, it's awkward and impossible to understand
+		;@@ maybe support ↑↓→← and nsew for alignment too?
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas         [none! pair!]   > 0x0, cannot be none as tube needs to know it's width
@@ -129,8 +129,19 @@ layouts: context [
 				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
 			]
 			#debug [typecheck [
-				axes     [none! block! (find/only [[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]] axes)]
-				align    [none! pair! (-1x-1 +<= align +<= 1x1)]
+				axes     [none! block! (
+					find/only [
+						[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
+						[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
+					] axes
+				)]
+				align    [none! pair! (-1x-1 +<= align +<= 1x1) block! [(
+					all [
+						2 >= length? align
+						find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/1
+						find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/2
+					]
+				)]]
 				margin   [      pair! (0x0 +<= margin)]
 				spacing  [      pair! (0x0 +<= spacing)]
 				canvas   [none! pair! (0x0 +< canvas)]
@@ -140,6 +151,7 @@ layouts: context [
 			y: ortho x: anchor2axis axes/1
 			ox: anchor2pair axes/1
 			oy: anchor2pair axes/2
+			align: normalize-alignment align ox oy
 			reverse?: either x = 'x [:do][:reverse]
 			
 			;; to support automatic sizing, each item's constraints (`limits`) has to be analyzed
@@ -280,8 +292,8 @@ layouts: context [
 			map:   clear []
 			row-y: margin/:y
 			shift: min 0x0 oxy: ox + oy					;-- offset correction for negative axes
-			row-shift:    align/2 + 1 / 2
-			in-row-shift: align/1 + 1 / 2
+			row-shift:    align/1 + 1 / 2
+			in-row-shift: align/2 + 1 / 2
 			total-width:  either allowed-row-width >= infxinf/x [peak-row-width][allowed-row-width] 
 			total-length: 0
 			foreach [row-size row] rows [
