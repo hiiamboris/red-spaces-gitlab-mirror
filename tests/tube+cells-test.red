@@ -1,9 +1,5 @@
 Red [needs: view]
 
-;; fun: this demo contains 7840 spaces!
-;; (as shown by dump-tree output, most of it comes from `field` usage, which has hidden scrollers)
-;; as a result, just physically drawing it takes 15-20ms! and it's a bit laggy
-
 ; recycle/off					
 #include %../../common/include-once.red
 ; #include %../../common/assert.red
@@ -24,14 +20,14 @@ set-style 'heading function [self /on canvas [pair! none!]] [
 		(drawn) 
 	]
 ]
-set-style 'field [push [fill-pen (c: contrast-with svmc/text) pen (contrast-with c) line-width 1 box 0x0 (size)]]
+set-style 'field [fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]
 set-style 'field/caret [fill-pen (svmc/text)]
 set-style 'tube function [tube /on canvas [pair! none!]] [
 	drawn: tube/draw/on canvas
 	#assert [drawn]
 	#assert [tube/size]
 	compose/only/deep [
-		push [fill-pen off pen blue box 0x0 (tube/size)]
+		push [fill-pen off pen blue box 1x1 (tube/size - 1x1)]
 		(drawn)
 	]
 ]
@@ -48,26 +44,26 @@ boxes: map-each spec [
 	[size: 10x10 text: "G"]
 ][
 	; make-space/name 'rectangle spec
-	make-space/name 'field spec
+	; make-space/name 'field spec
+	make-space/name 'cell [
+		weight: 1
+		content: make-space/name 'field spec
+	]
 ]
 
-; aligns: map-each/only x [-1 0 1] [ map-each y [-1 0 1] [as-pair x y] ]
-aligns: map-each/only y [↑ #[none] ↓] [ map-each/only x [← #[none] →] [trim reduce [x y]] ]
 tubes: collect [
-	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
+	; for-each [/i axes] [ [→ ↓] ][;] [→ ↑] ][;] [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
-		if i > 1 [keep [space with [size: 1x30]]]		;-- delimiter
-		keep compose/deep [heading with [data: (#composite "axes: (mold axes)")]]
-		for-each group aligns [
-			keep [list with [axis: 'x]]
-			keep/only map-each align group [
-				compose/deep/only [
-					list with [axis: 'y] [
-						paragraph with [width: 130 text: (#composite "align: (mold align)")]
-						tube with [axes: (axes) align: (align) width: 130 item-list: boxes]
-					]
+	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
+		keep reshape [
+			; cell with [limits: 170x200 .. 170x200] [
+			cell with [limits: none .. 170x200] [
+				list with [axis: 'y] [
+					heading with [data: !(#composite "axes: (mold axes)")]
+					tube with [axes: !(axes) width: 130 item-list: boxes]
 				]
 			]
+			; space with [size: 1x30]		/if even? i		;-- delimiter
 		]
 	]
 ]
@@ -79,7 +75,7 @@ view/no-wait compose/only/deep [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
 			scrollable with [size: 540x500] [
-				list with [axis: 'y] (tubes)
+				tube with [spacing: 5x10] (tubes)
 			]
 		]
 	]
@@ -90,13 +86,6 @@ view/no-wait compose/only/deep [
 ]
 
 ; dump-tree
-list: do fix-paths [h/list/scrollable/list]
-out: none
-save %tube-test-output.png out: draw list/size render/on 'list list/size
-if exists? ref: %tube-test-reference.png [
-	ref: load ref
-	unless ref = out [print "!! LAYOUT HAS CHANGED !!"]
-]
 prof/show
 prof/reset
 ; debug-draw
