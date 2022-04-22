@@ -36,11 +36,12 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
+		invalidate <everything>
 		b/draw: render b
 	]
 ] [offset: 10x10]
 ;foreach-*ace/next path system/view/screens/1 [probe path]
 ; dump-tree
-debug-draw
+; debug-draw
 either system/build/config/gui-console? [print "---"][do-events]
 

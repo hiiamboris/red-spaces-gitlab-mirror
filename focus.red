@@ -65,8 +65,8 @@ focused?: function [
 	all [
 		name1: last keyboard/focus						;-- order here: from likely empty..
 		name2: either parent [							;-- ..to rarely empty (performance)
-			pick tail current-style -2
-		][	last current-style
+			pick tail current-path -2
+		][	last current-path
 		]
 		(get name1) =? get name2
 	]													;-- result: true or none
