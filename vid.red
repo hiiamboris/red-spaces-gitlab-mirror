@@ -57,6 +57,7 @@ init-spaces-tree: function [face [object!]] [
 	;;  2. yet, in `layout` we set face/size from the rendered content size
 	;; so, to avoid double rendering we have to re-apply the host style
 	;; this is done inside `render-face` if we set size to none
+	;@@ what if size is set explicitly by the user?
 	face/size: none
 	rendered: render face
 	#assert [face/size]						;-- should be set by `render-face`, `size: none` blows up `layout`

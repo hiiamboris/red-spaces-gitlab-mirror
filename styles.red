@@ -105,9 +105,17 @@ do with [
 		]
 
 		cell [
-			fill-pen !(svmc/panel)
-			box 0x0 (size)
-			pen      !(svmc/text)			;-- restore pen after `pen off` in grid
+			function [cell /on canvas] [
+				drawn: cell/draw/on canvas				;-- draw to obtain the size
+				compose/only/deep [
+					push [
+						line-width 1
+						fill-pen !(svmc/panel)
+						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
+					]
+					(drawn)
+				]
+			]
 		]
 	]
 	

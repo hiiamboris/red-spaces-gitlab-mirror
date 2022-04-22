@@ -29,6 +29,7 @@ fix-paths: function [
 	r
 ]
 				
+;; helper to work with words as objects in paths
 expand-space-path: function [path [any-word! any-path!] /local coll] [
 	if word? path [path: to path! path]
 	set/any 'coll get/any path/1
@@ -47,6 +48,9 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 			append clear out space
 			get/any space
 		][
+			unless any [series? :coll  any-object? :coll  map? :coll] [
+				#print "Error getting path (path) after (out) which is (type?/word :coll)"
+			]
 			append out :item
 			:coll/:item
 		]

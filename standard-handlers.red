@@ -258,8 +258,8 @@ define-handlers [
 		on-key-up [space path event] []				;-- eats the event so it's not passed forth
 
 		on-click [space path event] [
-			#assert [space/para/layout]
-			space/caret-index: offset-to-caret space/para/layout path/2
+			#assert [space/paragraph/layout]
+			space/caret-index: offset-to-caret space/paragraph/layout path/2
 			space/active?: yes							;-- activate, so Enter is not required
 			update										;-- let styles update
 		]
@@ -267,6 +267,25 @@ define-handlers [
 		on-unfocus [space path event] [
 			space/active?: no							;-- deactivate so it won't catch Tab when next tabbed in
 			update										;-- update the look (remove caret, decoration, etc)
+		]
+	]
+
+	fps-meter: [
+		on-time [space path event delay [percent!]] [	;@@ TODO: only measure last 3-5 secs
+			time: now/precise/utc
+			frames: space/frames
+			forall frames [
+				if frames/1 + space/aggregate > time [
+					remove/part head frames frames
+					break
+				]
+			]
+			append frames time							;-- let frames never be empty, so frame/1 is not none
+			elapsed: to float! difference time frames/1
+			fps: (length? space/frames) / (max 0.01 elapsed)	;-- max for overflow protection
+			space/text: rejoin ["FPS: " 0.1 * to integer! 10 * fps]
+			invalidate space							;-- invalidates parents (lists etc)
+			update
 		]
 	]
 ]

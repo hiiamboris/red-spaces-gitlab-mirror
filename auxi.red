@@ -41,8 +41,52 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ]
 
 
-;-- we need this to be able to call event functions recursively with minimum allocations
-;-- we can't use a static block but we can use one block per recursion level
+;; need this to be able to call event functions recursively with minimum allocations
+;; can't use a static block but can use one block per recursion level
+obtain: stash: none
+context [
+	;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
+	factor: 1.4											;-- https://stackoverflow.com/q/1100311
+	log-factor: log-e factor
+	free-list: #()
+	
+	;; `make` alternative that uses a free list of series when possible - to reduce GC load
+	set 'obtain function [
+		"Get a series of type TYPE with a buffer of at least SIZE length"
+		type [datatype!] "Any series type"
+		size [integer!]  "Minimal length before reallocation, >= 1"
+	][
+		#assert [
+			find series! type
+			size >= 1
+		]
+		name: to word! type								;-- datatype is not supported by maps
+		ladder: any [free-list/:name  free-list/:name: make hash! 256]
+		step: round/ceiling/to (log-e size) / log-factor 1
+		either pos: any [
+			find ladder step
+			find ladder step + 1						;-- try little bigger sizes as well
+			find ladder step + 2						;@@ how many to try optimally?
+		][
+			also pos/2  fast-remove pos 2
+		][
+			make type round/ceiling/to factor ** step 1
+		]
+	]
+	
+	set 'stash function [
+		"Put SERIES back into the free list for futher OBTAIN calls"
+		series [series!]
+	][
+		type: type?/word series
+		ladder: any [free-list/:type  free-list/:type: make hash! 256]
+		step: round/floor/to (log-e length? series) / log-factor 1
+		repend ladder [step clear series]
+	]
+]
+
+;; older (but faster) design - for blocks only - not sure if worth keeping
+;; main problem of it: doesn't care about length, may result in lots of reallocations
 block-stack: object [
 	stack: []
 	get: does [any [take/last stack  make [] 100]]
@@ -81,31 +125,43 @@ clip: func [range [block!] value [scalar!]] [
 	min range/2 max range/1 value
 ]
 
+;; constraining is used by `render` to impose soft limits on space sizes
+;; constraining logic:
+;; no canvas (unlimited) and no limits (unlimited) => return `none` (also unlimited)
+;; no canvas (unlimited) and has upper limit => return upper limit
+;; pair canvas and no limits => pass canvas thru
+;; pair canvas and any of limits defined => clip canvas by limits
+;; this includes 0x0 and 0x2e9 canvases which aim for min (0) on one axis and max (2e9) on another
+;; numeric canvas defines only X coordinate, while Y remains unconstrained (min=0, max=2e9)
+;; 2e9 pair coordinate is treated exactly as `none` (unlimited)
+;; 2e9x2e9 result is normalized to `none`
+infxinf: 2000000000x2000000000							;-- used too often to always type it numerically
 constrain: function [
-	"Sets TARGET to SIZE clipped within LIMITS"
-	'target [set-word! set-path!]
-	size    [pair!]
-	limits  [none! word! object!]
-	; /force "Set it even if it's equal, to trigger reactions"
+	"Clip SIZE within LIMITS (allows none for both)"
+	size    [none! pair!]   "none if unlimited"
+	limits  [none! object!] "none if no limits"
 ][
-	case [
-		limits = 'fixed [size: get target]				;-- cannot be changed ;@@ need to think more about this
-		range? limits  [
-			case [
-				none = min: limits/min [min: 0x0]
-				number? min [min: min by 0]				;@@ should numbers only apply to X, or to main axis (harder)? 
-			]
-			case [
-				none = max: limits/max [max: max by 2e9]
-				number? max [max: max by 2e9]
-			]
-			size: clip [min max] size
+	unless limits [return size]							;-- most common case optimization
+	#assert [range? limits]
+	either size [										;-- pair size
+		case [
+			none =? min: limits/min [min: 0x0]
+			number? min [min: min by 0]					;-- numeric limits only affect X
 		]
-		;-- rest is treated as `none`
+		case [
+			none =? max: limits/max [max: infxinf]
+			number? max [max: max by infxinf/y]
+		]
+		size: clip [min max] size
+		;; rest is treated as `none`, not affecting size
+	][													;-- `none` size
+		case [
+			pair? max: limits/max [size: max]
+			number? max [size: max by infxinf/y]
+			;; no /max leaves unlimited size as `none`
+		]
 	]
-	set target size
-	; if any [force  not size == get target] [set target size]
-	; size
+	unless size =? infxinf [size]						;-- normalization
 ]
 
 for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code [block!]] [
@@ -143,21 +199,23 @@ closest-number: function [n [number!] list [block!]] [
 ]
 
 ;@@ make a REP with this? (need use cases)
-; native-swap: :swap
-; swap: func [a [word! series!] b [word! series!]] [
-	; either series? a [
-		; native-swap a b
-	; ][
-		; set a also get b set b get a
-	; ]
-; ]
+native-swap: :system/words/swap
+swap: func [a [word! series!] b [word! series!]] [
+	either series? a [
+		native-swap a b
+	][
+		set a also get b set b get a
+	]
+]
 
 
 ortho: func [
 	"Get axis orthogonal to a given one"
 	xy [word! pair!] "One of [x y 0x1 1x0]"
 ][
-	select/skip [x y y x 0x1 1x0 1x0 0x1] xy 2
+	;; switch here is ~20% faster than select/skip
+	; select/skip [x y y x 0x1 1x0 1x0 0x1] xy 2
+	switch xy [x ['y] y ['x] 0x1 [1x0] 1x0 [0x1]]
 ]
 
 axis2pair: func [xy [word!]] [
@@ -165,12 +223,65 @@ axis2pair: func [xy [word!]] [
 ]
 
 anchor2axis: func [nesw [word!]] [
-	switch nesw [n s ['y] w e ['x]]
+	; switch nesw [n s ['y] w e ['x]];
+	switch nesw [n s ↑ ↓ ['y] w e → ← ['x]]				;-- arrows are way more readable, if harder to type (ascii 24-27)
 ]
 
 anchor2pair: func [nesw [word!]] [
-	switch nesw [n [0x-1] s [0x1] w [-1x0] e [1x0]]
+	; switch nesw [n [0x-1] s [0x1] w [-1x0] e [1x0]]
+	switch nesw [e → [1x0] s ↓ [0x1] n ↑ [0x-1] w ← [-1x0]]
 ]
+
+normalize-alignment: function [
+	"Turn block alignment into a -1x-1 to 1x1 pair along provided Ox and Oy axes"
+	align [block! pair!] "Pair is just passed through"
+	ox [pair!] oy [pair!]
+][
+	either pair? align [
+		align
+	][
+		;; center/middle are the default and do not need to be specified, but double arrows are still supported ;@@ should be?
+		dict: [n ↑ [0x-1] s ↓ [0x1] e → [1x0] w ← [-1x0] #[none] ↔ ↕ [0x0]]
+		align: ox + oy * add switch align/1 dict switch align/2 dict
+		either ox/x =? 0 [reverse align][align]
+	]
+]
+
+#assert [
+	-1x-1 = normalize-alignment -1x-1  0x1   1x0
+	 1x1  = normalize-alignment  1x1   0x1   1x0
+	 0x0  = normalize-alignment  0x0   0x1   1x0
+	 1x1  = normalize-alignment  1x1   1x0   0x1
+	 1x1  = normalize-alignment [n w] -1x0   0x-1
+	 1x1  = normalize-alignment [w n] -1x0   0x-1		;-- unordered
+	-1x-1 = normalize-alignment [n w]  0x1   1x0
+	 1x-1 = normalize-alignment [n w]  0x-1  1x0		;-- swapped vertical X => change in /1
+	 1x1  = normalize-alignment [n w]  0x-1 -1x0		;-- swapped horizontal Y => change in /2
+	-1x1  = normalize-alignment [n w]  0x1  -1x0
+	-1x-1 = normalize-alignment [n e]  0x1  -1x0
+	-1x-1 = normalize-alignment [↑ →]  0x1  -1x0		;-- arrows support
+	 0x-1 = normalize-alignment  [e]   0x1  -1x0		;-- no vertical alignment => no vertical X => no /1
+	 1x0  = normalize-alignment  [s]   0x1  -1x0		;-- no horizontal alignment => no horizontal Y => no /2
+	 0x0  = normalize-alignment  []    0x1  -1x0		;-- no alignment => no axes => no /1 or /2
+]
+
+
+extend-canvas: function [canvas [pair! none!] axis [word!]] [
+	if canvas [
+		canvas/:axis: infxinf/x
+		all [canvas <> infxinf canvas]					;-- normalize infxinf to `none`
+	]
+]
+
+;; useful to subtract margins, but only from finite dimensions
+subtract-canvas: function [canvas [pair! none!] pair [pair!]] [
+	if canvas [
+		mask: 1x1 - (canvas / infxinf)					;-- 0x0 (infinite) to 1x1 (finite)
+		max 0x0 canvas - (pair * mask)
+	]
+]
+
+#assert [(60 by infxinf/y) = subtract-canvas 100 by infxinf/y 40x30]
 
 
 ;-- debug func
@@ -248,6 +359,7 @@ vec-length?: function [v [pair!]] [
 ]
 
 ;-- faster than for-each/reverse, but only correct if series length is a multiple of skip
+;@@ use for-each when becomes available
 foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 	if empty? series [exit]
 	step: 0 - length? spec: compose [(spec)]
@@ -257,6 +369,14 @@ foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 		do code
 		head? series
 	]
+]
+
+fast-remove: function [block [any-block!] length [integer!]] [
+	any [
+		block =? other: skip tail block negate length
+		change block other
+	]
+	clear other
 ]
 
 ;-- see REP #104, but this is still different: we don't care what context word belongs to, only it's spelling and value
@@ -318,7 +438,7 @@ distribute: function [
 		]
 	]
 	
-	result: append/dup make block! count amount * 0 count
+	result: append/dup make block! count amount * 0 count	;@@ use obtain?
 	if sum-weights <= 0 [return result]
 	sort/skip/compare data 3 3
 	

@@ -49,7 +49,7 @@ layouts: context [
 				axis     [word!       (find [x y] axis)]
 				margin   [pair!       (0x0 +<= margin)]
 				spacing  [pair!       (0x0 +<= spacing)]
-				canvas   [none! pair! (0x0 +< canvas)]
+				canvas   [none! pair! (0x0 +<= canvas)]
 				origin   [none! pair!]
 				viewport [none! pair! (0x0 +<= viewport)]
 				cache    [none! word! (find [all invisible] cache)]
@@ -70,7 +70,7 @@ layouts: context [
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: extend-canvas if canvas [canvas - (2x2 * margin)] axis
+			canvas1: canvas2: extend-canvas if canvas [subtract-canvas canvas 2x2 * margin] axis
 			
 			map: make [] 2 * count
 			repeat i count [							;-- first render cycle
@@ -144,7 +144,7 @@ layouts: context [
 				)]]
 				margin   [      pair! (0x0 +<= margin)]
 				spacing  [      pair! (0x0 +<= spacing)]
-				canvas   [none! pair! (0x0 +< canvas)]
+				canvas   [none! pair! (0x0 +<= canvas)]
 			]]
 			default axes:  [e s]
 			default align: -1x-1
@@ -179,7 +179,7 @@ layouts: context [
 			
 			;; obtain constraints info
 			;; `info` can't be static since render may call another build-map; same for other arrays here
-			;; info format: [space-name space-object draw-block drawn-width ]
+			;; info format: [space-name space-object draw-block available-extension weight]
 			info: obtain block! count * 5
 			#leaving [stash info]
 			

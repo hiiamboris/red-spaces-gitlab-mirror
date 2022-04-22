@@ -294,7 +294,7 @@ events: context [
 	;-- other events' path does not (tree node format)
 	;-- focus/unfocus events have not 'event' arg!
 	;@@ any way to unify these 2 formats?
-	dispatch: function [face event /local result /extern resolution last-on-time] [
+	dispatch: function [face [object!] event [event!] /local result /extern resolution last-on-time] [
 		focused?: no
 		with-commands [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
@@ -320,9 +320,11 @@ events: context [
 				time [
 					on-time face event						;-- handled by timers.red
 					if any [commands/update? face/dirty?] [	;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
+						#debug profile [prof/manual/start 'drawing]
 						face/draw: render face
 						face/dirty?: no
 						unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
+						#debug profile [prof/manual/end   'drawing]
 					]
 					; none
 					exit									;-- timer does not need further processing
@@ -399,9 +401,11 @@ events: context [
 		event [event!] "View event"
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][
+		#debug profile [prof/manual/start 'process-event]
 		do-previewers path event event/type
 		unless commands/stop? [do-handlers path event event/type focused?]
 		do-finalizers path event event/type
+		#debug profile [prof/manual/end 'process-event]
 	]
 
 
