@@ -39,6 +39,7 @@ context [
 	;;   otherwise we'll have to iterate over all cached canvas sizes which is not great for performance
 	;;   last write index helps efficiently fill the cache (other option - use random 4, which is less efficient)
 	;;   space-size is required because `draw` usually changes space/size and if draw is avoided, /size still must be set
+	;;   unused slots contain 'free word to distinguish committed canvas=none case from unused cache slot
 	;; parent cache format: [space-object [containing-node parent-object ...] ...] (flat 2-leveled)
 	;;   parent cache is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
 	;;   it holds rendering tree of parent/child relationships on the last rendered frame
@@ -87,7 +88,7 @@ context [
 			if pos: find/same parents-list space [		;-- no matter if cache?=yes or no, parents still have to be invalidated
 				foreach [node parent] pos/2 [
 					while [node: find/same/tail node space] [
-						change/dup at node 3 none slots			;-- remove cached draw blocks but not the children node!
+						change/dup at node 3 'free slots		;-- remove cached draw blocks but not the children node!
 					]
 					#assert [not space =? parent]
 					if parent [invalidate-cache parent]			;-- can be none if upper-level space
@@ -113,6 +114,7 @@ context [
 			find/skip/part skip cache 3 canvas 3 slots			;-- search for the same canvas among 3 options
 			; print mold~ copy/part cache >> 2 slots
 		]
+		; if r [print rejoin ["cache=" map-each/eval [a b _] copy/part skip cache 3 slots [[a b]]]]
 		#debug cache [
 			name: any [name 'space]
 			either r [
@@ -148,6 +150,7 @@ context [
 			change pos canvas
 		]
 		; pos/2: drawn									;@@ #5120
+		#assert [pair? space/size]
 		change/only change next pos space/size drawn
 		#debug cache [
 			name: any [name 'space]
@@ -182,7 +185,7 @@ context [
 		append/only visited-nodes any [
 			select/same level: last visited-nodes space
 			also branch: make hash! 3 + slots * 2
-				append/dup repend level [space branch 0] none slots
+				append/dup repend level [space branch 0] 'free slots
 		]
 	]
 	
@@ -286,6 +289,7 @@ context [
 				cache: get-cache name canvas
 			][
 				set [size: render:] next cache
+				#assert [pair? size]
 				maybe space/size: size
 				set-parent space last visited-spaces	;-- mark it as cached in the new parents tree
 				#debug cache [							;-- add a frame to cached spaces after committing
