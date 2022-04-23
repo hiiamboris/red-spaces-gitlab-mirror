@@ -109,6 +109,11 @@ UI where user can select table features and export code for this kind of table
 if only bgnd color is specified for a widget (e.g. label), use contrast-with to determine the text color
 rename field to input - a low level embeddable input field, while field should be high-level
 some help support for space types? in advanced console? maybe interactive, hyper-text?
+deeper design docs should include visual examples (snippets + gifs) how this or that works
+document resource usage howto:
+	- draw can be heavy (10-20ms)
+	- spaces do not redraw unless `update` or `invalidate` is called
+	- cache? = yes usage
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
@@ -658,7 +663,7 @@ possible size to constraint adaptation strategies
 		progress bars: scale/stretch easily
 		image: clip / downscale
 		list: adapts own size, content decides for itself
-		row: tricky! inspects constraints of inner items, weights, may contract them
+		row/tube: tricky! inspects constraints of inner items, weights, may contract them
 		grid: should not be affected, not automatically at least
 		grid-view/list-view: do nothing, but constraints may be used by row to resize them
 	but this applies to any other container
@@ -707,6 +712,42 @@ on ranges: perhaps, instead of fixed 100 .. 200 or smth like that (which is shoo
 	we should by default let the minimum e.g. for any text to be the size of that text ?
 	OTOH do we ever want to stretch text labels? unlikely
 	ranges are for stretches, fields, areas
+on ranges and constraints:
+	what should be the `canvas` to obtain the minimum space's size? none or limits/min? and if limits/min = none, 0x0?
+	specifying canvas as 0x0 is bad idea, 0x0 should only be used internally in `constain` if no lower limit
+	on the other hand, none is "infinite" canvas, so it does not really align with the minimum size idea
+	it works because if canvas is infinite, there's no point in trying to fill it, so the minimum is taken
+	so what about:
+	- no limits/min => canvas=none as usual => min size
+	- pair limits/min => canvas=limits/min => real size may be bigger or smaller depending on how space adjusts
+	  (cell is never smaller, paragraph can be smaller vertically, list can be bigger horizontally and smaller/bigger vertically)
+	- integer limits/min => canvas is half-unlimited => adjusts width only (of dubious use... - should it be supported?)
+	problem with this is that `none` is different from any canvas in that it doesn't `fill` the space whatever it is
+	e.g. paragraph with no min. size => one line, with min. size => will now fit into that min size, which is undesired
+	so another idea: min. size is always obtained with `canvas=none` but further once canvas is specified, render constrains it
+	in this case constrained canvas can easily be smaller than the size with `none`
+	e.g. paragraph will lay itself out in one line with `none`, but will adjust to the width if given
+	so, render should not constrain `none` canvas, only pair canvas
+	so, tube will unroll any paragraphs into lines, even if they are wrapped into cells, which is also bad
+	what if I assume tube only contains cells ever, and then use min-size ?
+	list: on `none` will unroll paragraphs then fill it's own width, with `min-size` - will fit paragraphs
+	biggest issue is: if no limits/min but have limits/max - unrolled text may be bigger than /max on 1st render
+	I can't use 0x0 canvas here, nor it makes sense to use /max to obtain min size
+	what in this case should be used? and tube behaves exactly like paragraph... except `none` may be forbidden for it
+	this needs more thought...
+	maybe really use 0x0 or 1x1? for text this will work for horizontal tubes only, vertical should use `none`
+	if text is in vertical tube, it's "min" size will be that written in one line, or limits/max if it's defined
+	which will lead to very wide tube
+	there can also be different layout intents for text: lay out in one line, or make it as square as possible
+	in other words, placing tube inside a tube is a bad idea overall, unless both of it's limits are defined
+	also, rendering on `none` when limits/min is defined may make space bigger than /max, so canvas should be limited if possible
+	also, /max may not be honored by text: with 1x1, size-text will still return full text size (single column)
+	same with list: wide items that stick out of whatever /max is set, will make whole list wider than /max
+	this means clipping will have to be done, even though not for every space
+	okay for text 1x2e9 and 2e9x1 are most consistent/predictable "min" canvases, what of other spaces?
+	btw, on VID side, /min can be `'fit` for text, esp. buttons, radio buttons etc. - meaning never clip the text
+	because maybe we want to be able to clip button text? hmm that's unlikely - and possible using `cell`
+	then button&co should always render their text in full even on 1x1 canvas
 on layout: with the introduction of spaces styles, it will blur the distinction between spaces and faces
 	so compatibility has value in this context
 	most likely I will need support of full set of VID commands and some superset will be spaces-only
@@ -813,6 +854,68 @@ why drawn block should be copied:
 	/cache? = yes / /cache? = 'invalid ?
 	TODO: such caching should also be invalidated when style changes
 	TODO: doc this, maybe make `invalidate` func?
+	TODO: styles are no longer able to invalidate cache, but they should!
+global caching is trickier than I thought 
+	since a lot of spaces are composite - from `cell` & `scrollable` to `tube` to `grid-view` etc
+	they cannot be directly cached as they never know if their `content` is changed
+	so I have to check if all their inner spaces are unchanged, and if not - do a redraw
+	so I either have to render all inner spaces (those in `map`) and check against cached code
+	or to check if they all are in the cache and have /cache? = true (preferably, since render conditions are unknown)
+	but this means to cache a composite space, all of it's inner spaces has to be cacheable as well
+	and inner spaces of inner spaces too..
+	a single uncacheable space inside a huge parent will nullify any caching attempt
+	and of course this is happening, as I don't know what was drawn on canvas=none and what on a geom/size
+	and I don't know even if space will look the same if rendered on none or geom/size (though reasonable assumption)
+	extend cache with geom/size? then I can search by object and resulting size
+	another issue is that I have paths in styles, and styles may differently paint the *same* space in different places
+	so say I have a differently paragraph (same object, even same size) how can I cache it?
+	the only way to ensure style uniqueness seems to be ensure path uniqueness
+	but lookups by path are slow, so I need to lookup by object and then filter by path
+	then if I have a path, do I still need xy1 xy2 canvas?
+	canvas yes, because e.g. cell is drawn at least twice - on none then on fixed size, and results will differ
+	as for scrollable, maybe xy1 xy2 are not that important? TODO: consider removing them
+	crap.. `same-paths?` is 10x slower than all the renders, need some kind of render tree marking to not repeat it
+	or arrange caches in a tree - should be much faster this way, but may still need marking
+	any way to avoid deep tree visiting on render?
+	space1 can contain space2 that contains space3 that is changed, and maybe even set cache? to 'invalid
+	how does space1 know that without deep visiting?
+	the only proper way to handle this is to have host render produce a tree
+	then any invalidation will bubble up the tree invalidating all of it's parents
+	then validity checking is simple and fast
+	meaning that tree has to carry references from all spaces to parents
+	but how each space will locate itself on that tree on invalidation?
+	direct link to cache node will make spaces unmoldable
+	just a path? invalidation will then have to traverse the whole path to find the node
+	it's okay even if not ideal
+	anonymous word referring to a cache node? that's 260 bytes more per space or ~2MB for 8k spaces (tube-test)
+	maybe a path of words - reduced into a path of space objects - `get` natively?
+	unfortunately `get` matches objects by content, not by pointer, and select/same is slower
+	OTOH I have to invalidate it all up anyway, so I'm either going up from a cell, or down from root to cell
+	so a path should be enough if I invalidate everything along it
+	cache should then still contain space objects for quicker search (words are looked up by symbol)
+	and be structured as a tree, containing rendering parameters, size and code for each node
+	hmmm space cannot contain a path, since it may be at different tree nodes
+	so how to invalidate it? it has to be invalidated on all nodes anyway
+	idea: let cache still be flat, but each node will contain links to all it's last parents
+	going to be unwieldy to keep it up to date, so let there be 2 caches:
+	- cache of space object, render conditions and results
+	- 2 tree caches for each host: one that is being built, another for validation lookups
+	  and they're swapped on every host render
+	  or one? I only need single validation lookup if it succeeds
+	  but if it fails - it's subtree cannot be cleared as I wanna know what children are still valid
+	on the bright side, no point in keeping render parameters except canvas (needed for double rendering) 
+	no, damn, flat cache is ruled out because we have path styling
+	TODO: hosts have to be roots of render-cache because styles may include host names
+	but right now there's no support for that, all hosts appear as `host` in paths
+	with this, cache? = 'invalid is not needed anymore, but a global `invalidate` function?
+	tricky: if space appears multiple times in a tree, I cannot mark it as valid until it's rendered in all places
+	thus /cache? = 'invalid is a bad strategy
+	there's also these issues:
+	- I save cache into new tree, but only look up in the old tree, thus re-rendering the same thing many times until tree is committed
+	- I look it up in both trees, but then once I add render on one canvas to new tree, it's auto-validated for other canvases in old tree
+	  which results in fetching the outdated look
+	also after some thought, invalidation is a rare procudure and it can be slow
+	only cache lookups should be optimized to the fullest
 		
 
 Timer design:
@@ -2786,4 +2889,317 @@ singular get-cache & set-cache - no use, even list-view renders each space on 2 
 		; tail space-cache
 	; ]
 	; change cached data
+; ]
+
+list layout settings as object support - probably wont be needed as object is heavy
+; either object? settings [
+	; bound: append clear [] words
+	; set words bind bound settings
+; foreach word [			
+	; axis: margin: spacing: canvas: origin:
+	; viewport: cache-visible?: cache-invisible?:
+; ][
+	; set word select settings word
+; ]
+
+part of cell/draw - this makes cleaner draw blocks but does not make it any faster and adds complexity 
+; clip?: not 0x0 +<= free
+; move?: offset <> 0x0
+; if any [clip? move?] [
+	; buf: clear []
+	; if clip? [repend buf ['clip 0x0 space/size]]
+	; if move? [repend buf ['translate offset]]
+	; drawn: copy append/only buf drawn
+; ]
+
+this cache idea didn't work well since it has to deeply visit all tree nodes which is 10x slower than rendering
+; ;; cache format for now: [space-object space-path canvas xy1 xy2 drawn-size drawn-code ...]
+; ;;   from find/tail:           -1           1        2    3   4      5           6         
+; ;@@ once #5116 gets fixed, check if find/same .. #static-reduce [..] is going to be faster
+; space-cache: make hash! 4096
+
+; find-cache: function [space [object!] path [path!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+	; cached: space-cache
+	; while [cached: find/only/same/tail cached space] [		;@@ watch out for #5116 fix, or use for-each
+		; all [												;@@ also maybe search in reverse?
+			; cached/2 =? canvas
+			; cached/3 =? xy1
+			; cached/4 =? xy2
+			; same-paths? cached/1 path
+			; return back cached
+		; ]
+	; ]
+	; none
+; ]
+
+; ;; assumes that given the same canvas & xy1/2, inner spaces will not be resized/relocated
+; children-cached?: function [space [object!] path [path!]] [
+	; if map: select space 'map [						;-- composite space?
+		; foreach [name geom] map [
+			; inner: get name
+			; cached: space-cache
+			; while [cached: find/only/same/tail cached inner] [		;@@ watch out for #5116 fix, or use for-each
+				; unless child-cached?: all [							;@@ also maybe search in reverse?
+					; ;@@ this is not gonna work for scrollables which are using xy1 xy2 too?
+					; geom/size =? cached/5
+					; geom/size =? inner/size 
+					; same-paths? cached/1 path
+					; (
+						; append path name
+						; also children-cached? inner path
+						; remove top path
+					; )
+				; ] [return no]
+			; ]
+		; ]
+	; ]
+	; yes
+; ]
+
+; get-cache: function [space [object!] path [path!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+	; all [
+		; true =? select space 'cache?
+		; space/size
+		; cached: find-cache space path canvas xy1 xy2
+		; children-cached? space path
+		; cached/7
+	; ]
+; ]
+
+; ;@@ TODO: limit number of caches per single space somehow, e.g. for list which has limitless xy1/xy2 combos!
+; set-cache: function [
+	; space [object!] path [path!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!] drawn [block!]
+; ][
+	; either cached: find-cache space path canvas xy1 xy2 [
+		; cached/6: space/size
+		; cached/7: drawn
+	; ][
+		; repend space-cache [space copy path canvas xy1 xy2 space/size drawn]
+	; ]
+; ]
+
+; clear-cache: function [space [object!]] [
+	; while [pos: find/same/only space-cache space] [
+		; unless pos =? other: skip tail space-cache -7 [change pos other]
+		; clear other
+	; ]
+; ]
+
+version of constrain that does not accept `none` canvas size
+; constrain: function [
+	; "Sets TARGET to SIZE clipped within LIMITS"
+	; 'target [set-word! set-path!]
+	; size    [pair!]
+	; limits  [none! word! object!]
+	; /force "Set it even if it's equal, to trigger reactions"
+; ][
+	; case [
+		; limits = 'fixed [size: get target]				;-- cannot be changed ;@@ need to think more about this
+		; range? limits  [
+			; case [
+				; none = min: limits/min [min: 0x0]
+				; number? min [min: min by 0]				;@@ should numbers only apply to X, or to main axis (harder)? 
+			; ]
+			; case [
+				; none = max: limits/max [max: 2000000000x2000000000]
+				; number? max [max: max by 2e9]
+			; ]
+			; size: clip [min max] size
+		; ]
+		; ;-- rest is treated as `none`
+	; ]
+	; set target size
+	; if any [force  not size == get target] [set target size]
+	; size
+; ]
+
+working tube until alignments/axes were added
+; tube: context [
+	; ;; settings for tube layout:
+	; ;;   axes          [block! none!]   2 words, any of [n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
+	; ;;                                  in essence, any of n/e/s/w but both should be orthogonal, total 4x2
+	; ;;                                  default = [s e] - top-down rows, left-to-right items
+	; ;;   align         [block! none!]   2 integers, any of [-1 0 1]: list within row, then item within list
+	; ;;                                  default = [-1 -1] ??????
+	; ;@@ TODO: reverse or rework alignment order, it's awkward and impossible to understand
+	; ;;   margin           [pair!]   >= 0x0
+	; ;;   spacing          [pair!]   >= 0x0
+	; ;;   canvas         [none! pair!]   > 0x0, cannot be none as tube needs to know it's width
+	; create: function [
+		; "Builds a tube layout out of given spaces and settings as bound words"
+		; spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+		; settings [block!] "Any subset of [axes align margin spacing canvas cache]"
+		; ;; settings - imported locally to speed up and simplify access to them:
+		; /local axes align margin spacing canvas
+	; ][
+		; func?: function? :spaces
+		; count: either func? [spaces/size][length? spaces]
+		; if count <= 0 [return copy/deep [0x0 []]]
+		; foreach word settings [						;-- free settings block so it can be reused by the caller
+			; set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
+		; ]
+		; #debug [typecheck [
+			; axes     [none! block! (find/only [[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]] axes)]
+			; align    [none! block! (all [find [-1 0 1] align/1 find [-1 0 1] align/2])]
+			; margin   [      pair! (0x0 +<= margin)]
+			; spacing  [      pair! (0x0 +<= spacing)]
+			; canvas   [none! pair! (0x0 +< canvas)]
+		; ]]
+		; default axes:  [s e]
+		; default align: [-1 -1]	;@@
+		; y: ortho x: anchor2axis axes/1
+		
+		; ;; to support automatic sizing, each item's constraints (`limits`) has to be analyzed
+		; ;; obviously there can be two strategies:
+		; ;;  1. fill everything with max size, then shrink, and rearrange as possible
+		; ;;  2. fill everything with min size, then expand within a single row
+		; ;;  2nd option seems more predictable and easier to implement
+		; ;; constraint presence does not mean that space can reach that size as content affects it too,
+		; ;; so it should only be used as hint (canvas size passed to render) to obtain real min size
+		; ;; then, every item that has a nonzero weight has to be rendered twice (so cache is not supported):
+		; ;; once to get it's minimum appearance, second time to expand it along the row
+		; ;; other items also has to be rendered twice - to fill the row height, even though width is constant
+		
+		; ;; constraints question is also a tricky one
+		; ;; I decided to estimate min. size of each space by using 0x2e9 and 2e9x0 canvases (best fit for text/tube)
+		; ;; then each space will report the "narrowest" possible form of it, suiting tube needs
+		; ;; when limits/min is set, it overrides the half-unlimited canvas
+		; ;; when only limits/max is set, it's "height" overrides the infinite 2e9, "width" stays zero
+		; ;@@ for this to work, buttons/radios/etc must never wrap or ellipsize their text,
+		; ;@@ and single-line generic text style is desirable with the option to: always show full text, ellipsize it, or clip
+		; ;@@ also 4th cached canvas may be needed!
+		
+		; ;; obtain constraints info
+		; ;; `info` can't be static since render may call another build-map; same for other arrays here
+		; ;; info format: [space-name space-object draw-block drawn-width ]
+		; info: obtain block! count * 5
+		; #leaving [stash info]
+		
+		; stripe: 0 by infxinf/x						;-- thinnest canvas possible, used to estimate min. space/size
+		; repeat i count [
+			; space: get name: either func? [spaces/pick i][spaces/:i]
+			; drawn: render/on name stripe			;-- 1st render needed to obtain min *real* space/size, which may be > limits/max
+			; weight: any [select space 'weight 0]
+			; #assert [number? weight]
+			; available: 1.0 * case [					;-- max possible width extension length, normalized to weight
+				; weight <= 0 [0]						;-- fixed size
+				; not max-size: all [space/limits space/limits/max] [infxinf/x]	;-- unlimited extension possible ;@@ REP #113
+				; pair? max-size [max-size/x - space/size/x / weight]
+				; number? max-size [max-size - space/size/x / weight]		;@@ only use on vertical tubes
+			; ]
+			; ;; if width is infinite, this 1st `drawn` block and `space/size` will be used as there's no meaningful width to fill
+			; ;; otherwise they're just drafts and will be replaced by proper size & block
+			; repend info [name space drawn available weight]
+		; ]
+		
+		; ;; split info into rows according to found min widths
+		; rows: obtain block! 40
+		; row:  obtain block! count * 5
+		; row-size: -1x0 * spacing					;@@ not gonna work for empty rows
+		; allowed-row-width: either all [canvas canvas/x < infxinf/x] [canvas/x - (2 * margin/x)][infxinf/x]
+		; peak-row-width: 0							;-- will be used to determine full layout size
+		; canvas: layout/width - (2 * margin/x) by 2e9		;@@ use canvas ?
+		; foreach [name space drawn available weight] info [
+			; new-row-size: as-pair					;-- add item-size and check if it hangs over
+				; row-size/x + space/size/x + spacing/x
+				; max row-size/y space/size/y			;-- height will only be needed in infinite width case (no 2nd render)
+			; peak-row-width: max peak-row-width new-row-size/x
+			; row-size: either any [					;-- row either fits allowed-row-width, or has no items yet?
+				; new-row-size/x <= allowed-row-width
+				; tail? row
+			; ][										;-- accept new width
+				; new-row-size
+			; ][										;-- else move this item to next row
+				; append (new-row: obtain block! length? row) row
+				; repend rows [row-size new-row]
+				; clear row
+				; space/size
+			; ]
+			; repend row [name space drawn available weight]
+		; ]
+		; repend rows [row-size row]
+		; #leaving [foreach [_ row] rows [stash row]  stash rows]
+		
+		; ;; expand row items - facilitates a second render cycle of the row
+		; if allowed-row-width < infxinf/x [			;-- only if width is constrained
+			; forall rows [							;@@ use for-each
+				; set [row-size: row:] rows
+				; free: allowed-row-width - row-size/x
+				; if free > 0 [						;-- any space left to distribute?
+					; ;; free space distribution mechanism relies on continuous resizing!
+					; ;; render itself doesn't have to occupy max-size or the size we allocate to it
+					; ;; and since we don't know what render is up to,
+					; ;; we can only "fix" it by re-rendering until we fill whole row space
+					; ;; but this will be highly inefficient, and not even guaranteed to ever finish
+					; ;; so a proper solution in this case should be to use a custom layout or resize hook
+					; ;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
+					; weights: clear []				;-- can be static, not used after distribute
+					; extras:  clear []
+					; foreach [_ _ _ available weight] row [	;@@ use 2 map-eachs
+						; append weights weight
+						; append extras  available
+					; ]
+					; extensions: distribute free weights extras
+					
+					; row-size: -1x0 * spacing		;@@ not gonna work for empty rows
+					; peak-row-width: 0
+					; repeat i length? extensions [	;@@ use for-each
+						; set [name: space:] item: skip row i - 1 * 5
+						; desired-size: space/size/x + extensions/:i by row-size/y
+						; item/3: render/on name desired-size
+						; item/4: space/size			;-- use real `space/size` for positioning, not `desired-size`
+						; row-size: as-pair			;-- update row size with the new render results
+							; row-size/x + space/size/x + spacing/x
+							; max row-size/y space/size/y
+					; ]
+					; rows/1: row-size
+					; peak-row-width: max peak-row-width row-size/x
+				; ]
+				; rows: next rows
+			; ]
+		; ]
+		
+		; ;; build the map & measure the final layout size using results of 1st or 2nd render
+		; map:   clear []
+		; row-y: margin/y
+		; total-length: 0
+		; foreach [row-size row] rows [
+			; ofs: margin/x by row-y
+			; foreach [name space drawn _ _] row [
+				; ofs/y: to integer! row-size/y - space/size/y / 2 + row-y
+				; geom: reduce ['offset ofs 'size space/size 'drawn drawn]	;@@ use alignment
+				; repend map [name geom]
+				; ofs/x: ofs/x + spacing/x + space/size/x
+			; ]
+			; total-length: total-length + row-size/y + spacing/y
+			; row-y: margin/y + total-length
+		; ]
+		; total-length: total-length - spacing/y
+		
+		; size: 2x2 * margin + (peak-row-width by total-length)
+		; #assert [size +< infxinf]
+		; reduce [size copy map]
+	; ]
+
+; ]
+
+this invalidation doesn't work if space contains itself (or another space with this space inside) - overflows
+; set 'invalidate-cache function [
+	; "If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
+	; space [object! tag!] "Use <everything> to affect all spaces"
+; ][
+	; either tag? space [
+		; #assert [space = <everything>]
+		; clear render-cache
+	; ][
+		; if pos: find/same parents-list space [		;-- no matter if cache?=yes or no, parents still have to be invalidated
+			; foreach [node parent] pos/2 [
+				; while [node: find/same/tail node space] [
+					; change/dup at node 3 'free slots		;-- remove cached draw blocks but not the children node!
+				; ]
+				; #assert [not space =? parent]
+				; if parent [invalidate-cache parent]			;-- can be none if upper-level space
+			; ]
+		; ]
+	; ]
 ; ]
