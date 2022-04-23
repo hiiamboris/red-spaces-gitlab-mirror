@@ -76,6 +76,8 @@ context [
 		]
 	]
 	
+	invalidation-stack: make hash! []
+	
 	;; tag is used so I can later add support for referrng to spaces by words
 	set 'invalidate-cache function [
 		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
@@ -85,14 +87,18 @@ context [
 			#assert [space = <everything>]
 			clear render-cache
 		][
-			if pos: find/same parents-list space [		;-- no matter if cache?=yes or no, parents still have to be invalidated
-				foreach [node parent] pos/2 [
-					while [node: find/same/tail node space] [
-						change/dup at node 3 'free slots		;-- remove cached draw blocks but not the children node!
+			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
+				append invalidation-stack space
+				if pos: find/same parents-list space [			;-- no matter if cache?=yes or no, parents still have to be invalidated
+					foreach [node parent] pos/2 [
+						while [node: find/same/tail node space] [
+							change/dup at node 3 'free slots	;-- remove cached draw blocks but not the children node!
+						]
+						#assert [not space =? parent]
+						if parent [invalidate-cache parent]		;-- can be none if upper-level space
 					]
-					#assert [not space =? parent]
-					if parent [invalidate-cache parent]			;-- can be none if upper-level space
 				]
+				remove top invalidation-stack
 			]
 		]
 	]
@@ -111,14 +117,16 @@ context [
 		if word? space [space: get name: space]			;@@ remove me once cache is stable to speed it up
 		r: all [
 			cache: find-cache space								;-- must have a cache
-			find/skip/part skip cache 3 canvas 3 slots			;-- search for the same canvas among 3 options
+			find/skip/part skip cache 3
+				any [canvas 'none] 3 slots						;@@ workaround for #5126
+			; find/skip/part skip cache 3 canvas 3 slots			;-- search for the same canvas among 3 options
 			; print mold~ copy/part cache >> 2 slots
 		]
-		; if r [print rejoin ["cache=" map-each/eval [a b _] copy/part skip cache 3 slots [[a b]]]]
+		; if cache [print rejoin ["cache=" map-each/eval [a b _] copy/part skip cache 3 slots [[a b]]]]
 		#debug cache [
 			name: any [name 'space]
 			either r [
-				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part r 400)"
+				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 400)"
 			][
 				reason: case [
 					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 slots 3]]
@@ -143,6 +151,7 @@ context [
 		unless select space 'cache? [exit]				;-- do nothing if caching is disabled
 		cache: find/same last visited-nodes space
 		#assert [cache]
+		canvas: any [canvas 'none]						;@@ workaround for #5126
 		unless pos: find/skip/part skip cache 3 canvas 3 slots [
 			pos: skip cache 3 + (cache/3 * 3)
 			change at cache 3 cache/3 + 1 % (slots / 3)			;@@ #5120
@@ -346,7 +355,7 @@ context [
 				; commit-cache space canvas render
 				
 				#debug profile [prof/manual/end name]
-				#assert [space/size "render must set the space's size"]
+				#assert [any [space/size name = 'grid] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
 			]
 		]
 		#debug profile [prof/manual/end 'render]	

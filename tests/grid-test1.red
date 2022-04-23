@@ -17,12 +17,12 @@ view/no-wait/options [
 		grid with [
 			cell-map/(1x2): make-space/name 'button [data: "button1"]
 			; cell-map/(3x3): make-space/name 'space [draw: [] size: 80x80]
-			cell-map/(3x1): make-space/name 'button [data: "button2"]
+			; cell-map/(3x1): make-space/name 'button [data: "button2"]
 			; set-span 2x2 2x2
 			; set-span/force 1x2 2x2
 			heights/default: 'auto
 		]
-	] with [color: system/view/metrics/colors/panel]
+	]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

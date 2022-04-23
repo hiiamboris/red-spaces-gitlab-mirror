@@ -117,6 +117,21 @@ do with [
 				]
 			]
 		]
+		
+		grid-cell [
+			function [cell /on canvas] [
+				; drawn: cell/draw/on canvas				;-- draw to obtain the size ;@@ TODO
+				drawn: cell/draw						;-- draw to obtain the size
+				compose/only/deep [
+					push [
+						line-width 1
+						fill-pen !(svmc/panel)
+						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
+					]
+					(drawn)
+				]
+			]
+		]
 	]
 	
 

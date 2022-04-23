@@ -1229,10 +1229,9 @@ grid-ctx: context [
 	spaces/grid-cell: make-template 'space [
 		map: [space [offset 0x0 size 0x0]]
 		; map/1: make-space/name 'space []
-		cdrawn: none			;-- cached draw block of content to eliminate double redraw - used by row-height? and during draw when extending cell size
 		draw: function [] [
-			unless cdrawn [self/cdrawn: render map/1]
 			spc: get name: map/1
+			cdrawn: render name
 			map/2/size: spc/size
 			unless size [self/size: spc/size]
 			compose/only [
@@ -1326,13 +1325,13 @@ grid-ctx: context [
 			xy [pair!] "Column (x) and row (y); returns XY unchanged if no such multicell"
 		][
 			span: get-span xy
-			if span ◄ 1x1 [xy: xy + span]
+			if span +< 1x1 [xy: xy + span]
 			xy
 		]
 
 		break-cell: function [first [pair!]] [
 			if 1x1 <> span: get-span first [
-				#assert [1x1 ◄= span]					;-- ensure it's a first cell of multicell
+				#assert [1x1 +<= span]					;-- ensure it's a first cell of multicell
 				xyloop xy span [
 					remove/key spans xy': first + xy - 1x1
 					;@@ invalidate content within ccache?
@@ -1342,7 +1341,7 @@ grid-ctx: context [
 
 		unify-cells: function [first [pair!] span [pair!]] [
 			if 1x1 <> old: get-span first [
-				if old ◄ 1x1 [
+				if old +< 1x1 [
 					ERROR "Cell (first + old) should be broken before (first)"	;@@ or break silently? probably unexpected move..
 				]
 				break-cell first
@@ -1362,14 +1361,14 @@ grid-ctx: context [
 			/force "Also break all multicells that intersect with the given area"
 		][
 			if span = get-span first [exit]
-			#assert [1x1 ◄= span]						;-- forbid setting to span to non-positives
+			#assert [1x1 +<= span]						;-- forbid setting to span to non-positives
 			xyloop xy span [							;-- break all multicells within the area
 				cell: first + xy - 1
 				old-span: get-span cell
 				if old-span <> 1x1 [
 					all [
 						not force
-						any [cell <> first  1x1 ◄= old-span]	;-- only `first` is broken silently if it's a multicell
+						any [cell <> first  1x1 +<= old-span]	;-- only `first` is broken silently if it's a multicell
 						ERROR "Cell (first + old-span) should be broken before (first)"
 					]
 					break-cell cell + min 0x0 old-span
@@ -1535,9 +1534,7 @@ grid-ctx: context [
 				first: get-first-cell xy
 				height1: 0
 				if content: cells/pick first [
-					unless draw-ctx/ccache/:first [			;-- only render if not cached
-						render wrap-space first content		;-- cell caches drawn content by itself
-					]
+					render wrap-space first content		;-- render to get the size
 					cspace: get content
 					height1: cspace/size/y
 				]
@@ -1573,7 +1570,7 @@ grid-ctx: context [
 		]
 
 		is-cell-pinned?: func [xy [pair!]] [
-			not pinned ◄ xy
+			not pinned +< xy
 		]
 
 		infinite?: function [] [
@@ -1602,11 +1599,6 @@ grid-ctx: context [
 			size:   none
 			cleanup: function [] [
 				self/size: self/bounds: none
-				foreach [xy name] ccache [
-					cspace: get name
-					cspace/cdrawn: none
-					;@@ TODO: clean up cell-spaces themselves that go out of the window
-				]
 			]
 
 		]
@@ -1645,17 +1637,19 @@ grid-ctx: context [
 				
 				mcname: wrap-space mcell mcell-name
 				mcspace: get mcname
-				mcspace/cdrawn: none						;@@ allows grid to contain itself, but may be a resource waste?
+				;@@ this mess needs improvement, now that we get /canvas
+				mcspace/size: none							;-- let it refresh it's size
+				invalidate-cache mcspace					;@@ temporary
 				render mcname								;-- render cell content before getting it's size
-															;-- cell caches it's rendered content by itself
-															;@@ TODO: invalidate this cache in dc/cleanup or somewhere
 				mcsize: cell-size? mcell					;-- size of all rows/cols it spans
 				mcspace/size: mcsize						;-- update cell's size to cover it's rows/cols fully,
 															;-- not just the size of it's content
-				mcdraw: render mcname						;-- re-render (cached) to draw the full background
+				invalidate-cache mcspace					;@@ temporary
+				mcdraw: render mcname						;-- re-render to draw the full background
 				;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 				compose/deep/into [							;-- map may contain the same space if it's both pinned & normal
-					(anonymize 'cell mcspace) [offset (draw-ofs) size (mcsize)]
+					(mcname) [offset (draw-ofs) size (mcsize)]
+					; (anonymize 'grid-cell mcspace) [offset (draw-ofs) size (mcsize)]
 				] tail map
 				compose/only/into [							;-- compose-map calls extra render, so let's not use it here
 					translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
@@ -1682,7 +1676,7 @@ grid-ctx: context [
 			default xy1: 0x0
 			unless xy2 [dc/size: xy2: calc-size]
 
-			unless pinned ◄= 0x0 [
+			unless pinned +<= 0x0 [
 				set [map: drawn-common-header:] draw-range 1x1 pinned (margin + xy1)
 				xy1: (xy0: xy1 + margin) + get-offset-from 1x1 (pinned + 1x1)
 				append new-map map
