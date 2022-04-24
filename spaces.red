@@ -1226,26 +1226,11 @@ list-view-ctx: context [
 ;@@ TODO: height & width inferrence
 ;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
-	spaces/grid-cell: make-template 'space [
-		map: [space [offset 0x0 size 0x0]]
-		; map/1: make-space/name 'space []
-		draw: function [] [
-			spc: get name: map/1
-			cdrawn: render name
-			map/2/size: spc/size
-			unless size [self/size: spc/size]
-			compose/only [
-				; box 0x0 (size)	;-- already done in styles
-				(cdrawn)
-			]
-		]
-	]
-
 	spaces/grid: make-template 'space [
 		size:    none				;-- only available after `draw` because it applies styles
 		margin:  5x5
 		spacing: 5x5
-		cell-map: make map! []				;-- XY coordinate -> space-name  ;@@ TODO: maybe rename to `pane`? ;@@ TODO: support a function instead of map here?
+		cell-map: make map! []				;-- XY coordinate -> space-name  ;@@ TODO: maybe rename to `pane`?
 											;@@ or `cmap` for brevity?
 		spans:   make map! []				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 											;@@ make spans a picker too?? or pointless for infinite data anyway
@@ -1268,10 +1253,10 @@ grid-ctx: context [
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [
 				draw-ctx/ccache/:xy
-				draw-ctx/ccache/:xy: make-space/name 'grid-cell []
+				draw-ctx/ccache/:xy: make-space/name 'cell []
 			]
 			cell: get name
-			cell/map/1: space
+			cell/content: space
 			name
 		]
 
@@ -1635,21 +1620,13 @@ grid-ctx: context [
 				mcell-to-cell: get-offset-from mcell cell	;-- pixels from multicell to this cell
 				draw-ofs: origin + start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
 				
-				mcname: wrap-space mcell mcell-name
+				render mcname: wrap-space mcell mcell-name	;-- render content to get it's size - in case it was invalidated
 				mcspace: get mcname
-				;@@ this mess needs improvement, now that we get /canvas
-				mcspace/size: none							;-- let it refresh it's size
-				invalidate-cache mcspace					;@@ temporary
-				render mcname								;-- render cell content before getting it's size
-				mcsize: cell-size? mcell					;-- size of all rows/cols it spans
-				mcspace/size: mcsize						;-- update cell's size to cover it's rows/cols fully,
-															;-- not just the size of it's content
-				invalidate-cache mcspace					;@@ temporary
-				mcdraw: render mcname						;-- re-render to draw the full background
+				mcsize: cell-size? mcell					;-- size of all rows/cols it spans = canvas size
+				mcdraw: render/on mcname mcsize				;-- re-render to draw the full background
 				;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 				compose/deep/into [							;-- map may contain the same space if it's both pinned & normal
 					(mcname) [offset (draw-ofs) size (mcsize)]
-					; (anonymize 'grid-cell mcspace) [offset (draw-ofs) size (mcsize)]
 				] tail map
 				compose/only/into [							;-- compose-map calls extra render, so let's not use it here
 					translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
