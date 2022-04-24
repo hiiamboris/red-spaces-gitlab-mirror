@@ -86,8 +86,10 @@ context [
 		either tag? space [
 			#assert [space = <everything>]
 			clear render-cache
+			clear parents-list
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
+				#debug cache [#print "Invalidating space=[(mold/part/only/flat body-of space 80)]"]
 				append invalidation-stack space
 				if pos: find/same parents-list space [			;-- no matter if cache?=yes or no, parents still have to be invalidated
 					foreach [node parent] pos/2 [
@@ -126,7 +128,7 @@ context [
 		#debug cache [
 			name: any [name 'space]
 			either r [
-				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 400)"
+				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 40)"
 			][
 				reason: case [
 					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 slots 3]]
@@ -163,7 +165,7 @@ context [
 		change/only change next pos space/size drawn
 		#debug cache [
 			name: any [name 'space]
-			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 400)"
+			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 	]
 	
