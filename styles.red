@@ -95,10 +95,12 @@ do with [
 		grid-view/window [
 			function [window /only xy1 xy2] [
 				drawn: window/draw/only xy1 xy2
-				bgnd: compose [
-					fill-pen !(svmc/text + 0.0.0.120)
-					pen off
-					box 0x0 (window/size)
+				bgnd: compose/deep [
+					push [
+						fill-pen !(svmc/text + 0.0.0.120)
+						pen off
+						box 0x0 (window/size)
+					]
 				]
 				compose [(bgnd) (drawn)]
 			]
@@ -118,20 +120,20 @@ do with [
 			]
 		]
 		
-		grid-cell [
-			function [cell /on canvas] [
+		; grid/cell [
+			; function [cell /on canvas] [
 				; drawn: cell/draw/on canvas				;-- draw to obtain the size ;@@ TODO
-				drawn: cell/draw						;-- draw to obtain the size
-				compose/only/deep [
-					push [
-						line-width 1
-						fill-pen !(svmc/panel)
-						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
-					]
-					(drawn)
-				]
-			]
-		]
+				; drawn: cell/draw						;-- draw to obtain the size
+				; compose/only/deep [
+					; push [
+						; line-width 1
+						; fill-pen !(svmc/panel)
+						; box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
+					; ]
+					; (drawn)
+				; ]
+			; ]
+		; ]
 	]
 	
 
