@@ -55,7 +55,9 @@ context [
 	
 	; hash!: :block!
 	slots:          12									;-- must be x3! triple max number of cache slots per single space
-	render-cache:   make hash! slots + 3 * 3			;@@ TODO: cleanup of it?
+	;@@ TODO: both render-cache and parents-list require cleanup on highly dynamic layouts, or they slow down
+	;@@ will need a flat registry of still valid spaces
+	render-cache:   make hash! slots + 3 * 3
 	parents-list:   make hash! 2048
 	
 	visited-nodes:  make block! 32						;-- stack of nodes currently visited by render
@@ -78,15 +80,18 @@ context [
 	
 	invalidation-stack: make hash! []
 	
-	;; tag is used so I can later add support for referrng to spaces by words
+	;; tag is used so I can later add support for referring to spaces by words
 	set 'invalidate-cache function [
 		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
 		space [object! tag!] "Use <everything> to affect all spaces"
 	][
 		either tag? space [
 			#assert [space = <everything>]
+			; dump-parents-list parents-list render-cache
+			;@@ what method to prefer? parse or radical?
 			clear render-cache
 			clear parents-list
+			; parse render-cache rule: [any [skip into rule skip slots change skip 'free]]
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating space=[(mold/part/only/flat body-of space 80)]"]
