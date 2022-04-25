@@ -1256,7 +1256,7 @@ grid-ctx: context [
 				draw-ctx/ccache/:xy: make-space/name 'cell []
 			]
 			cell: get name
-			cell/content: space
+			unless cell/content =? space [cell/content: space]	;-- prevent unnecessary invalidation
 			name
 		]
 
@@ -2006,6 +2006,7 @@ spaces/spiral: make-template 'space [
 spaces/fps-meter: make-template 'paragraph [
 	cache?:    off
 	rate:      100
+	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host
 	init-time: now/precise/utc
 	frames:    make [] 400
 	aggregate: 0:0:5
