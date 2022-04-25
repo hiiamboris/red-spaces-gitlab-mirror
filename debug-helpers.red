@@ -93,6 +93,7 @@ add-indent: function [text [string!] size [integer!]] [
 	text
 ]
 
+mold~stack: make hash! 100								;-- used to avoid cycles
 mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 	default indent-size: 4
 	decor: select [
@@ -101,7 +102,11 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 		map!    ["#(" ")"] 
 		object! ["make object! [" "]"] 
 	] type?/word :value
-	switch/default type?/word :value [
+	if decor [
+		if find/same/only mold~stack :value [return "..."]
+		append/only mold~stack value
+	]
+	result: switch/default type?/word :value [
 		map! object! [
 			block: to [] value
 			longest: any [last sort map-each [k v] block [length? form k]  0]
@@ -130,7 +135,11 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 			if new-line? value [append add-indent inside indent-size "^/"]
 			rejoin [decor/1 inside decor/2]
 		]
-	][mold :value]
+	][
+		mold :value
+	]
+	if decor [remove top mold~stack]
+	result
 ] 
 
 probe~: function [
@@ -204,6 +213,44 @@ context [
 			prin indent-text/after mold/part :value 40 isize
 		]
 	]
+]
+
+find-deep: none
+context [
+	path: make path! 10
+	
+	find-deep*: function [list [any-block!] value [any-type!]] [
+		;; find should be faster on hashes than parse
+		either pos: find/only/same list :value [
+			throw copy append path index? pos
+		][
+			append path 1
+			for-each [pos: inner [block! hash!]] list [
+				unless any [hash? inner block? inner] [continue]	;@@ can't locate this bug!
+				change top path index? pos
+				find-deep* inner :value
+			]
+			remove top path
+		]
+		none
+	]
+	
+	set 'find-deep function [list [any-block!] value [any-type!]] [
+		clear path
+		catch [find-deep* list :value]
+	]
+]
+	
+dump-parents-list: function [list [hash! block!] cache [hash! block!]] [			;-- used for cache debugging only
+	#print "parents-list: (\size = ((length? list) / 2)) ["
+	foreach [space parents] list [
+		prin ["   " mold/part/flat space 40 "(" pad find-deep cache space 12 ")" "-> "]
+		foreach [node parent] parents [
+			prin [find-deep cache node find-deep cache parent "| "]
+		]
+		print ""
+	]
+	print "]"
 ]
 
 debug-draw: function ["Show GUI to inspect spaces Draw block"] [
