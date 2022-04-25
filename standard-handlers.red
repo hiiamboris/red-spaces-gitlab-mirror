@@ -271,7 +271,7 @@ define-handlers [
 	]
 
 	fps-meter: [
-		on-time [space path event delay [percent!]] [	;@@ TODO: only measure last 3-5 secs
+		on-time [space path event] [
 			time: now/precise/utc
 			frames: space/frames
 			forall frames [
