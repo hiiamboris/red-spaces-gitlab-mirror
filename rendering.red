@@ -68,8 +68,12 @@ context [
 	;@@ but maybe they won't be needed as I'm improving the design?
 	set 'invalidate function [
 		"Invalidate SPACE content and cache, or use <everything> to affect all spaces' cache"
-		space [object! tag!] "If contains `invalidate` func, it is evaluated"
+		space [word! object! tag!] "If contains `invalidate` func, it is evaluated"
 	][
+		if word? space [
+			space: get space
+			#assert [object? space]
+		]
 		invalidate-cache space
 		all [
 			object? space
@@ -80,7 +84,6 @@ context [
 	
 	invalidation-stack: make hash! []
 	
-	;; tag is used so I can later add support for referring to spaces by words
 	set 'invalidate-cache function [
 		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
 		space [object! tag!] "Use <everything> to affect all spaces"

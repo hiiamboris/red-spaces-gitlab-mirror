@@ -3203,3 +3203,19 @@ this invalidation doesn't work if space contains itself (or another space with t
 		; ]
 	; ]
 ; ]
+
+grid-cell is no longer needed as general cell is available
+; spaces/grid-cell: make-template 'space [
+	; map: [space [offset 0x0 size 0x0]]
+	; map/1: make-space/name 'space []
+	; draw: function [] [
+		; spc: get name: map/1
+		; cdrawn: render name
+		; map/2/size: spc/size
+		; unless size [self/size: spc/size]
+		; compose/only [
+			; box 0x0 (size)	;-- already done in styles
+			; (cdrawn)
+		; ]
+	; ]
+; ]
