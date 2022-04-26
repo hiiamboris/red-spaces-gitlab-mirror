@@ -42,6 +42,9 @@ view/no-wait/options [
 	status: text 300x40
 ] [offset: 10x10]
 
+prof/show
+prof/reset
 ; foreach-*ace/next path system/view/screens/1 [probe path]
 either system/build/config/gui-console? [print "---"][do-events]
+prof/show
 
