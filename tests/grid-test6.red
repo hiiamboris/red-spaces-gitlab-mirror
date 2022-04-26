@@ -94,8 +94,8 @@ view/no-wait/options [
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 						append clear r old-draw
 						prof/manual/start 'truncation
-						; r: copy-deep-limit r 36
-						r: copy-deep-limit r 23
+						r: copy-deep-limit r 36
+						; r: copy-deep-limit r 23
 						prof/manual/end 'truncation
 					]
 					depth: depth - 1
