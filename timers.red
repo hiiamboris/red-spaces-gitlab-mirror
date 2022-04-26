@@ -13,9 +13,11 @@ context [
 	timer-host: none									;-- a single host face that is used for resolution estimation
 
 	events/on-time: function [face [object!] event [event!]] [
+		#debug profile [prof/manual/start 'timers]
 		update-timer-host face
 		if face =? timer-host [update-resolution]
 		process-timers face event
+		#debug profile [prof/manual/end 'timers]
 	]
 
 	update-timer-host: function [face [object!]] [		;-- automatically choose the host with maximum rate
