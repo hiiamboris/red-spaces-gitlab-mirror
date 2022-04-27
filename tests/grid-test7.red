@@ -90,7 +90,8 @@ view/no-wait/options [
 				if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 					append clear r old-draw
 					elapsed: to float! difference now/precise t0
-					zx: zy: exp elapsed // log-e (size/x / cell-size/x)
+					zx: exp elapsed // log-e (size/x / cell-size/x)
+					zy: zx * (size/y / cell-size/y) / (size/x / cell-size/x)
 					r: copy-deep-limit
 						compose/only [
 							translate (size / 2)		;-- zoom in effect

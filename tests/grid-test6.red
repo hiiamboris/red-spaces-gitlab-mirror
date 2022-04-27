@@ -6,7 +6,9 @@ Red [
 ]
 
 {
-	22M draw file, 2666 clip commands (~ 100ms spent on clipping)
+	Draw is the bottleneck of this test - see #5130
+	22M draw file, 2666 clip commands (~30% spent on clipping)
+	
 	<4>      0%      .47   ms       1'877 B [timers]
 	<2>      0%     1.03   ms      26'868 B [fps-meter]
 	<6>      0%      .167  ms       2'273 B [render]
@@ -33,15 +35,16 @@ copy-deep-limit: function [b n] [
 	b
 ]
 
+;@@ is this useful out of the box?
 spaces/templates/zoomer: make-template 'cell [
-	zoom: 1.0
+	zoom: [x: 1.0 y: 1.0]
 	; pivot: ?
 	draw: function [] [
 		drawn: render content
 		maybe self/size: select get content 'size
 		compose/only [
 			translate (size / 2)						;-- zoom in effect
-			scale (zoom) (zoom)
+			scale (zoom/x) (zoom/y)
 			translate (size / -2)
 			(drawn)
 		]
@@ -63,7 +66,8 @@ view/no-wait/options [
 				; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
 				; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
 				; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]
-				; grid/set-span 1x1 2x2
+				grid/set-span 6x1 1x5					;-- unify outside cells for more fps
+				grid/set-span 1x6 6x1
 				; grid/set-span 4x4 2x2
 				; grid/set-span/force 2x2 3x2
 				; set-span/force 1x1 1x3
@@ -87,15 +91,15 @@ view/no-wait/options [
 				;; but at the top level it is clipped at certain depth level,
 				;; so face/draw receives a truncated draw tree which it is able to render without deadlocking
 				;; copying depth has to be adjusted manually to a reasonable amount
-				;; depth<=7 even if 4 cells are visible means 4**7=16384 cells! and about ~1G of RAM
+				;; with 6x6=36 cells, at depth 2 it becomes 1296 (~40fps), at depth 3 - 46656 cells (~1fps)
 				depth: 0
 				draw: function [/extern depth] [
 					r: []
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 						append clear r old-draw
 						prof/manual/start 'truncation
-						; r: copy-deep-limit r 36
-						r: copy-deep-limit r 23
+						; r: copy-deep-limit r 36			;-- 3 levels
+						r: copy-deep-limit r 23				;-- 2 levels
 						prof/manual/end 'truncation
 					]
 					depth: depth - 1
@@ -103,22 +107,24 @@ view/no-wait/options [
 				]
 			]
 		]
-	] rate 99 on-time [
-		z: get b/space
-		elapsed: to float! difference now/utc/precise t0
-		gv: get z/content
-		z/zoom: exp (1 * elapsed) // log-e (gv/size/x / gv/cell-size/x)
-		invalidate z
-		prof/manual/start 'drawing
-		b/draw: render b
-		prof/manual/end 'drawing
-		; unless exists? %drawn.txt [save %drawn.txt b/draw]
 	]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]
+	text hidden rate 99 on-time [
+		z: get b/space
+		elapsed: to float! difference now/utc/precise t0
+		gv: get z/content
+		z/zoom/x: exp (1 * elapsed) // log-e (gv/size/x / gv/cell-size/x)
+		z/zoom/y: z/zoom/x * (gv/size/y / gv/cell-size/y) / (gv/size/x / gv/cell-size/x)
+		invalidate z
+		prof/manual/start 'drawing
+		b/draw: render b
+		prof/manual/end 'drawing
+		; unless exists? %drawn.txt [save %drawn.txt b/draw]
+	]
 ] [offset: 10x10]
 
 prof/show

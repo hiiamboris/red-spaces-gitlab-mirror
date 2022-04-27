@@ -5,9 +5,7 @@ Red [
 	needs:   view
 ]
 
-recycle/off
-change-dir %..
-do %everything.red
+#include %../everything.red
 
 append spaces/keyboard/focusable 'grid-view
 ;@@ use (wrapped) data!
@@ -17,6 +15,7 @@ append spaces/keyboard/focusable 'grid-view
 
 view/no-wait/options [
 	below
+	host [fps-meter]
 	b: host [
 		grid-view with [
 			size: 1000x500
