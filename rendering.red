@@ -100,20 +100,21 @@ context [
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating space=[(mold/part/only/flat body-of space 80)]"]
-				append invalidation-stack space
-				if all [
-					not only
-					pos: find/same parents-list space			;-- no matter if cache?=yes or no, parents still have to be invalidated
-				][
+				if pos: find/same parents-list space [			;-- no matter if cache?=yes or no, parents still have to be invalidated
+					append invalidation-stack space
 					foreach [node parent] pos/2 [
 						while [node: find/same/tail node space] [
 							change/dup at node 3 'free slots	;-- remove cached draw blocks but not the children node!
 						]
 						#assert [not space =? parent]
-						if parent [invalidate-cache parent]		;-- can be none if upper-level space
+						all [
+							not only
+							parent								;-- can be none if upper-level space
+							invalidate-cache parent
+						]
 					]
+					remove top invalidation-stack
 				]
-				remove top invalidation-stack
 			]
 		]
 		#debug profile [prof/manual/end 'invalidation]
@@ -220,21 +221,7 @@ context [
 		remove top visited-nodes
 		remove top visited-spaces
 	]
-	
 
-	;-- draw code has to be evaluated after current-path changes, for inner calls to render to succeed
-	with-style: function [
-		"Draw calls should be wrapped with this to apply styles properly"
-		name [word!] code [block!]
-	][
-		append current-path name
-		trap/all/catch code [
-			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
-			#print "*** Failed to render (name)!^/(msg)^/"
-		]
-		take/last current-path
-	]
-	
 	#debug cache [										;-- for cache creep detection
 		cache-size?: function [node [any-block!]] [
 			size: length? node
@@ -251,6 +238,28 @@ context [
 		]
 	]
 
+	#if true = get/any 'disable-cache? [
+		clear body-of :invalidate-cache
+		append clear body-of :get-cache none
+		clear body-of :commit-cache
+		clear body-of :set-parent
+		clear body-of :enter-cache-branch
+		clear body-of :leave-cache-branch
+	]
+	
+	;-- draw code has to be evaluated after current-path changes, for inner calls to render to succeed
+	with-style: function [
+		"Draw calls should be wrapped with this to apply styles properly"
+		name [word!] code [block!]
+	][
+		append current-path name
+		trap/all/catch code [
+			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
+			#print "*** Failed to render (name)!^/(msg)^/"
+		]
+		take/last current-path
+	]
+	
 	render-face: function [
 		face [object!] "Host face"
 		/only xy1 [pair! none!] xy2 [pair! none!]
