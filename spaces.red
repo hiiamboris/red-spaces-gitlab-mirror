@@ -398,10 +398,16 @@ scrollable-space: context [
 			if hdraw?: shown/x < 100 [box/y: space/size/y - space/hscroll/size/y]
 			if vdraw?: shown/y < 100 [box/x: space/size/x - space/vscroll/size/x]
 		]
-		space/hscroll/offset: 100% * (clip-p1/x - p1/x) / max 1 csz/x
-		space/vscroll/offset: 100% * (clip-p1/y - p1/y) / max 1 csz/y
-		space/hscroll/amount: min 100% 100% * box/x / full/x
-		space/vscroll/amount: min 100% 100% * box/y / full/y
+		
+		;; avoid multiple recursive invalidation when changing srcollers fields (else may stack up to 99% of time)
+		quietly space/hscroll/offset: 100% * (clip-p1/x - p1/x) / max 1 csz/x
+		quietly space/vscroll/offset: 100% * (clip-p1/y - p1/y) / max 1 csz/y
+		quietly space/hscroll/amount: min 100% 100% * box/x / full/x
+		quietly space/vscroll/amount: min 100% 100% * box/y / full/y
+		; invalidate/only [hscroll vscroll]
+		invalidate-cache/only space/hscroll
+		invalidate-cache/only space/vscroll
+		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		space/map/(space/content)/size: box
 		space/map/hscroll/offset: box * 0x1

@@ -87,7 +87,9 @@ context [
 	set 'invalidate-cache function [
 		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
 		space [object! tag!] "Use <everything> to affect all spaces"
+		/only "Do not invalidate parents (e.g. if they are invalid already)"
 	][
+		#debug profile [prof/manual/start 'invalidation]
 		either tag? space [
 			#assert [space = <everything>]
 			; dump-parents-list parents-list render-cache
@@ -99,7 +101,10 @@ context [
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating space=[(mold/part/only/flat body-of space 80)]"]
 				append invalidation-stack space
-				if pos: find/same parents-list space [			;-- no matter if cache?=yes or no, parents still have to be invalidated
+				if all [
+					not only
+					pos: find/same parents-list space			;-- no matter if cache?=yes or no, parents still have to be invalidated
+				][
 					foreach [node parent] pos/2 [
 						while [node: find/same/tail node space] [
 							change/dup at node 3 'free slots	;-- remove cached draw blocks but not the children node!
@@ -111,6 +116,7 @@ context [
 				remove top invalidation-stack
 			]
 		]
+		#debug profile [prof/manual/end 'invalidation]
 	]
 	
 	find-cache: function [
