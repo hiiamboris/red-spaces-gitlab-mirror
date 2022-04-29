@@ -430,6 +430,11 @@ scrollable-space: context [
 			box - origin
 			ccanvas
 		csz: cspace/size
+		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
+		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
+		maybe space/origin: max origin box - csz
+		
+		;; determine what scrollers to show
 		p2: csz + p1: origin
 		full: max 1x1 csz + (max 0x0 origin)
 		clip-p1: max 0x0 p1
@@ -440,14 +445,12 @@ scrollable-space: context [
 			if vdraw?: shown/y < 100 [box/x: space/size/x - space/vscroll/size/x]
 		]
 		
-		;; avoid multiple recursive invalidation when changing srcollers fields (else may stack up to 99% of time)
-		quietly space/hscroll/offset: 100% * (clip-p1/x - p1/x) / max 1 csz/x
-		quietly space/vscroll/offset: 100% * (clip-p1/y - p1/y) / max 1 csz/y
-		quietly space/hscroll/amount: min 100% 100% * box/x / full/x
-		quietly space/vscroll/amount: min 100% 100% * box/y / full/y
-		; invalidate/only [hscroll vscroll]
-		invalidate-cache/only space/hscroll
-		invalidate-cache/only space/vscroll
+		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
+		;; (else may stack up to 99% of all rendering time)
+		quietly space/hscroll/offset: ofs: 100% * (clip-p1/x - p1/x) / max 1 csz/x
+		quietly space/hscroll/amount: min 100% - ofs 100% * box/x / full/x
+		quietly space/vscroll/offset: ofs: 100% * (clip-p1/y - p1/y) / max 1 csz/y
+		quietly space/vscroll/amount: min 100% - ofs 100% * box/y / full/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		space/map/(space/content)/size: box
@@ -457,6 +460,11 @@ scrollable-space: context [
 		space/vscroll/size/y: either vdraw? [box/y][0]
 		space/map/hscroll/size: space/hscroll/size
 		space/map/vscroll/size: space/vscroll/size
+		
+		; invalidate/only [hscroll vscroll]
+		invalidate-cache/only space/hscroll
+		invalidate-cache/only space/vscroll
+		
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
 		compose/deep/only [
 			translate (origin) [						;-- special geometry for content
