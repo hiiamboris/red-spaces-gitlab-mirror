@@ -9,7 +9,7 @@ Red [
 ;; each invalidation will have to traverse the whole tree, slowing it down significantly
 ;; (because the same space appears on it thousands of times)
 ;; and nothing can be cached anyway as all cells are unique and thus form unique branches
-#do [disable-cache?: yes]
+#do [disable-space-cache?: yes]
 
 #include %../everything.red
 

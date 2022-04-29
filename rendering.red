@@ -238,7 +238,7 @@ context [
 		]
 	]
 
-	#if true = get/any 'disable-cache? [
+	#if true = get/any 'disable-space-cache? [
 		clear body-of :invalidate-cache
 		append clear body-of :get-cache none
 		clear body-of :commit-cache
