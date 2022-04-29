@@ -131,11 +131,7 @@ triangle-ctx: context [
 		; ]
 	; ]
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		any [
-			:old =? :new
-			word = 'cache?
-			invalidate-cache space
-		]
+		unless :old =? :new [invalidate-cache space]
 	]
 		
 	spaces/triangle: make-template 'space [
@@ -152,22 +148,57 @@ triangle-ctx: context [
 	]
 ]
 
-spaces/image: make-template 'space [
-	size: none											;-- if `none`, set automatically
-	margin: 0
-	; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
-	data: none											;-- images are not recyclable, so `none` by default
-	draw: function [/on canvas [pair! none!]] [
-		size: case [
-			canvas      [canvas - (2x2 * margin)]
-			image? data [data/size]
-			'empty      [0x0]
+image-ctx: context [
+	~: self
+	
+	draw: function [image [object!] canvas [pair! none!]] [
+		;@@ haven't figured out image stretching yet... and limits - who should enforce them? and how should it be scaled?
+		; case [
+			; not image? data [size: 0x0]
+			; canvas [
+				; size: subtract-canvas canvas 2x2 * margin
+				; ?? size
+				; case [
+					; canvas +< infxinf ['nothing]
+					; size/x >= infxinf/x [
+						; size/x: either size/y = 0 [data/size/x][round/ceiling/to size/y * data/size/x / data/size/y 1]
+					; ]
+					; size/y >= infxinf/y [
+						; size/y: either size/x = 0 [data/size/y][round/ceiling/to size/x * data/size/y / data/size/x 1]
+					; ]
+				; ]
+				; ?? size
+				; #assert [size +< infxinf]
+			; ]
+			; 'else [size: data/size]
+		; ]
+		; probe self/size: 2x2 * margin + size
+		either image? image/data [
+			maybe image/size: 2x2 * image/margin + image/data/size
+			reduce ['image image/data 1x1 * image/margin image/data/size + image/margin]
+		][
+			maybe image/size: 2x2 * image/margin
+			[]
 		]
-		self/size: 2x2 * margin + size
-		unless data [return copy []]
-		compose [image (data) (1x1 * margin) (size + margin)]
+	]
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if switch to word! word [
+			margin [:old <> :new]
+			data   [true] 								;-- can't know if image bits were changed, better to update
+		] [invalidate-cache space]
+	]
+	
+	spaces/image: make-template 'space [
+		size: none											;-- if `none`, set automatically
+		margin: 0
+		; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
+		data: none											;-- images are not recyclable, so `none` by default
+		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		#on-change-redirect
 	]
 ]
+
 
 cell-ctx: context [
 	~: self
@@ -616,6 +647,16 @@ container-ctx: context [
 ;@@ `list` is too common a name - easily get overridden and bugs ahoy
 ;@@ need to stash all these contexts somewhere for external access
 list-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		all [
+			find [axis margin spacing] to word! word
+			:old <> :new
+			invalidate-cache space
+		]
+	]
+	
 	spaces/list: make-template 'container [
 		axis:    'x
 		margin:  5x5		;@@ default margins/spacing - should be tight or not? what is more common?
@@ -630,6 +671,44 @@ list-ctx: context [
 			settings: [axis margin spacing canvas]
 			container-draw/layout/only 'list settings xy1 xy2
 		]
+		#on-change-redirect
+	]
+]
+
+
+icon-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			image [space/spaces/image/data: image]
+			text  [space/spaces/text/text:  text]
+		]
+		space/list-on-change word :old :new
+	]
+	
+	spaces/icon: make-template 'list [
+		axis:   'y
+		margin: 0x0
+		image:  none
+		text:   ""
+		
+		spaces: context [
+			image: make-space 'image []
+			text:  make-space 'paragraph []
+			label: make-space 'cell [content: 'text]	;-- used to align paragraph
+			set 'item-list [image label]
+		]
+		
+		list-draw: :draw
+		draw: func [/on canvas] [
+			spaces/text/text:  text
+			spaces/image/data: image
+			list-draw/on canvas
+		]
+		
+		list-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 
