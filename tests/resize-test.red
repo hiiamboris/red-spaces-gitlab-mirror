@@ -173,10 +173,10 @@ view/no-wait/flags compose/deep [
 			]
 		]
 	] react [
-		face/size: max 0x0 face/parent/size - 20
+		face/size: max 0x0 face/parent/size - 20		;-- adjust face size
 		scrollable: get face/space
-		scrollable/size: face/size
-		adjust-limits scrollable/size/x - 16			;-- 16 for the scroller
+		scrollable/size: face/size						;-- adjust scrollable size
+		adjust-limits scrollable/size/x - 16			;-- set triplet lower size limit; 16 for the scroller
 		face/draw: render face
 	] 
 ] 'resize
