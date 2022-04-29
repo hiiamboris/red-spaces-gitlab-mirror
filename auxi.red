@@ -298,6 +298,7 @@ top: func [series [series!]] [back tail series]
 quietly: function ['path [set-path!] value [any-type!]] [
 	obj: get append/part as path! clear [] path top path
 	set-quiet in obj last path :value
+	:value
 ]
 
 >>: make op! function [
