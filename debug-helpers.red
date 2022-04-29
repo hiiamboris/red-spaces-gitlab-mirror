@@ -113,8 +113,11 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 			strings: copy []
 			foreach [k v] block [
 				if find [on-change* on-deep-change*] k [continue]	;-- skip hidden fields
-				v: either object? :v
-					["object [...]^/"] [append mold~/indent :v indent-size #"^/"]
+				v: case [
+					object? :v ["object [...]^/"]
+					image?  :v ["make image! [...]^/"]
+					'else [append mold~/indent :v indent-size #"^/"]
+				]
 				k: rejoin [k ": "]
 				if tail? find/tail v #"^/" [k: pad k longest + 2]
 				append strings rejoin [k v]
@@ -122,12 +125,15 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 			inside: add-indent rejoin ["" strings] indent-size
 			rejoin [decor/1 #"^/" inside decor/2]
 		]
-		block! hash! [
+		block! hash! image! [
 			strings: copy []
 			p: value
 			forall p [
-				x: either object? :p/1
-					[copy "object [...]"] [mold~/indent :p/1 indent-size]
+				x: case [
+					object? :p/1 [copy "object [...]"]
+					image?  :p/1 [copy "make image! [...]"]
+					'else [mold~/indent :p/1 indent-size]
+				]
 				if new-line? p [insert x #"^/"]
 				append strings x
 			]
@@ -135,6 +141,7 @@ mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
 			if new-line? value [append add-indent inside indent-size "^/"]
 			rejoin [decor/1 inside decor/2]
 		]
+		image!
 	][
 		mold :value
 	]
