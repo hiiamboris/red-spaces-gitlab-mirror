@@ -101,10 +101,19 @@ space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
 
 spaces/timer: make-template 'space [rate: none]			;-- template space for timers
 
-spaces/rectangle: make-template 'space [
-	size: 20x10
-	margin: 0
-	draw: does [compose [box (margin * 1x1) (size - margin)]]
+rectangle-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		unless :old =? :new [invalidate-cache space]
+	]
+	
+	spaces/rectangle: make-template 'space [
+		size:   20x10
+		margin: 0
+		draw:   does [compose [box (margin * 1x1) (size - margin)]]
+		#on-change-redirect
+	]
 ]
 
 triangle-ctx: context [
@@ -291,15 +300,16 @@ scrollbar: context [
 		]
 		w-pgup:  w-inner - w-thumb + (w-inner * space/amount) * space/offset
 		w-pgdn:  w-inner - w-pgup - w-thumb
-		space/map/back-arrow/size:  space/back-arrow/size:   sz: as-pair w-arrow h
+		space/map/back-arrow/size:  quietly space/back-arrow/size:   sz: as-pair w-arrow h
 		space/map/back-page/offset: o: sz * 1x0		;@@ TODO: this space filling algorithm can be externalized probably
-		space/map/back-page/size:   space/back-page/size:    sz: as-pair w-pgup  h
+		space/map/back-page/size:   quietly space/back-page/size:    sz: as-pair w-pgup  h
 		space/map/thumb/offset:     o: sz * 1x0 + o
-		space/map/thumb/size:       space/thumb/size:        sz: as-pair w-thumb h
+		space/map/thumb/size:       quietly space/thumb/size:        sz: as-pair w-thumb h
 		space/map/forth-page/offset:   sz * 1x0 + o
-		space/map/forth-page/size:  space/forth-page/size:   sz: as-pair w-inner - w-thumb - w-pgup h	;-- compensates for previous rounding errors
+		space/map/forth-page/size:  quietly space/forth-page/size:   sz: as-pair w-inner - w-thumb - w-pgup h	;-- compensates for previous rounding errors
 		space/map/forth-arrow/offset:  w-full - w-arrow * 1x0		;-- arrows should stick to sides even for uneven sizes
-		space/map/forth-arrow/size: space/forth-arrow/size:  as-pair w-arrow h
+		space/map/forth-arrow/size: quietly space/forth-arrow/size:  as-pair w-arrow h
+		foreach [name _] space/map [invalidate-cache/only get name]
 		compose/deep [
 			push [
 				matrix [(select [x [1 0 0 1] y [0 1 1 0]] space/axis) 0 0]
