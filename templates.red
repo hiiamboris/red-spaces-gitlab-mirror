@@ -860,7 +860,7 @@ label-ctx: context [
 		label/list-draw
 	]
 		
-	templates/label: make-template 'tube [
+	templates/label: make-template 'list [
 		axis:    'x
 		margin:  0x0
 		spacing: 5x0
@@ -870,7 +870,7 @@ label-ctx: context [
 		spaces: context [
 			image: make-space 'image []
 			sigil: make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
-			text:  make-space 'text []
+			text:  make-space 'paragraph [limits: 20 .. 40]
 			lists: [text: [text] sigil: [sigil text] image: [image text]]	;-- used to avoid extra bind
 			set 'item-list [text]
 		]
@@ -2195,7 +2195,7 @@ templates/fps-meter: make-template 'paragraph [
 	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host
 	init-time: now/precise/utc
 	frames:    make [] 400
-	aggregate: 0:0:5
+	aggregate: 0:0:3
 ]
 
 export exports

@@ -277,6 +277,7 @@ define-handlers [
 			forall frames [
 				if frames/1 + space/aggregate > time [
 					remove/part head frames frames
+					frames: head frames
 					break
 				]
 			]
