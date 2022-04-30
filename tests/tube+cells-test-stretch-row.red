@@ -74,7 +74,7 @@ view/no-wait compose/only/deep [
 		list with [axis: 'y] [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
-			scrollable with [size: 540x500] [
+			scrollable with [size: 540x240] [
 				tube with [spacing: 5x10] (tubes)
 			]
 		]
