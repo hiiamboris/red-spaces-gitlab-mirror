@@ -339,11 +339,11 @@ context [
 					draw: select space 'draw
 					
 					;@@ this basically cries for FAST `apply` func!!
-					if all [function? :draw  any [xy1 xy2 canvas]] [
+					if function? :draw [
 						spec: spec-of :draw
 						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-						canvas': either find spec /on [canvas][on: none]		;-- must not affect `canvas` used by cache
-						if canvas' [canvas': constrain canvas' space/limits]	;-- `none` canvas should never be constrained
+						canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
+						canvas': constrain canvas' space/limits
 						code: case [						;@@ workaround for #4854 - remove me!!
 							all [canvas' only] [[draw/only/on xy1 xy2 canvas']]
 							only               [[draw/only    xy1 xy2        ]]
@@ -358,20 +358,16 @@ context [
 				][
 					#assert [function? :style]
 					;@@ this basically cries for FAST `apply` func!!
-					either any [xy1 xy2 canvas] [
-						spec: spec-of :style
-						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-						canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
-						if canvas' [canvas': constrain canvas' space/limits]
-						code: case [					
-							all [canvas' only] [[style/only/on space xy1 xy2 canvas']]
-							only               [[style/only    space xy1 xy2        ]]
-							canvas'            [[style/on      space         canvas']]
-						]
-						render: either code [do copy/deep code][style space]	;@@ workaround for #4854 - remove me!!
-					][
-						render: style space
+					spec: spec-of :style
+					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+					canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
+					canvas': constrain canvas' space/limits
+					code: case [					
+						all [canvas' only] [[style/only/on space xy1 xy2 canvas']]
+						only               [[style/only    space xy1 xy2        ]]
+						canvas'            [[style/on      space         canvas']]
 					]
+					render: either code [do copy/deep code][style space]	;@@ workaround for #4854 - remove me!!
 					#assert [block? :render]
 				]
 				
