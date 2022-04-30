@@ -597,6 +597,86 @@ paragraph-ctx: context [
 	]
 ]
 
+paragraph-ctx: context [
+	~: self
+	
+	;@@ font won't be recreated on `make paragraph!`, but must be careful
+	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
+		unless space/layout [space/layout: rtd-layout [""]]
+		layout: space/layout
+		layout/text: space/text
+		layout/font: space/font						;@@ careful: fonts are not collected by GC, may run out of them easily
+		either width [									;-- wrap
+			layout/size: (max 1 width - (2 * space/margin/x)) by 2e9	;-- width has to be set to determine height
+			#assert [0 < layout/size/x]						;@@ crashes on 0 - see #4897
+		][												;-- no wrap
+			layout/size: none
+		]
+		;; NOTE: #4783 to keep in mind
+		layout/extra: size-text layout					;-- 'size-text' is slow, has to be cached (by using on-change)
+	]
+
+	draw: function [space [object!] canvas [pair! none!]] [
+		layout: space/layout
+		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
+		new-width: all [canvas canvas/x]
+		if any [												;-- redraw if:
+			none = layout										;-- some facet changed
+			old-width <> new-width								;-- canvas width changed
+		] [lay-out space new-width]
+		
+		;; size can be adjusted in various ways:
+		;;  - if rendered < canvas, we can report either canvas or rendered
+		;;  - if rendered > canvas, the same
+		;; it's tempting to use canvas width and rendered height,
+		;; but if canvas is huge e.g. 2e9, then it's not so useful,
+		;; so just the rendered size is reported
+		;; and one has to wrap it into a data-view space to stretch
+		text-size: constrain space/layout/extra space/limits	;-- don't make it narrower than min limit
+		maybe space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
+		
+		;; this is quite hacky: rich-text is embedded directly into draw block
+		;; so when layout/text is changed, we don't need to call `draw`
+		;; just reassigning host's `draw` block to itself is enough to update it
+		;; (and we can't stop it from updating)
+		;; direct changes to /text get reflected into /layout automatically long as it scales
+		;; however we wish to keep size up to date with text content, which requires a `draw` call
+		compose [text (1x1 * space/margin) (space/layout)]
+	]
+
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if all [
+			find [text font margin] to word! word
+			not :old =? :new
+		][
+			invalidate-cache space
+			space/layout: none							;-- will be laid out on next `draw`
+		]
+	]
+	
+	;; every `make font!` brings View closer to it's demise, so it has to use a shared font
+	;; styles may override `/font` with another font created in advance 
+	;@@ BUG: not deeply reactive
+	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
+
+	templates/paragraph: make-template 'space [
+		size:   none									;-- only valid after `draw` because it applies styles
+		text:   ""
+		margin: 0x0										;-- default = no margin
+		font:   none									;-- can be set in style, as well as margin
+
+		layout: none									;-- internal, text size is kept in layout/extra
+		; cache?: true
+		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		#on-change-redirect
+	]
+
+	;; unlike paragraph, text is never wrapped
+	templates/text: make-template 'paragraph [
+		draw: does [~/draw self none]
+	]
+]
+
 
 ;-- layout-agnostic template for list, ring & other layout using space collections
 container-ctx: context [
@@ -728,12 +808,34 @@ icon-ctx: context [
 ]
 
 
+
+tube-ctx: context [
+	templates/tube: make-template 'container [
+		margin:  5x5
+		spacing: 5x5
+		axes:    [e s]
+		align:   -1x-1
+		width:   none			;@@ this seems required, but maybe a mandatory cell can replace it?
+		; cache?:  off
+		
+		container-draw: :draw
+		;; canvas for tube cannot be none as it controls tube's width
+		;@@ or we need an explicit width
+		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
+			if width [canvas: width * 1x1]				;-- override canvas if width is set (only 1 dimension matters)
+			settings: [margin spacing align axes canvas]
+			container-draw/layout/only 'tube settings xy1 xy2
+		]
+	]
+]
+
+
 label-ctx: context [
 	~: self
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		if find [axis margin image text] word [invalidate-cache space]
-		space/list-on-change word :old :new
+		; space/list-on-change word :old :new
 	]
 	
 	draw: function [label [object!]] [
@@ -758,7 +860,7 @@ label-ctx: context [
 		label/list-draw
 	]
 		
-	templates/label: make-template 'list [
+	templates/label: make-template 'tube [
 		axis:    'x
 		margin:  0x0
 		spacing: 5x0
@@ -767,8 +869,8 @@ label-ctx: context [
 		
 		spaces: context [
 			image: make-space 'image []
-			sigil: make-space 'paragraph [limits: 20 .. none]
-			text:  make-space 'paragraph []
+			sigil: make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
+			text:  make-space 'text []
 			lists: [text: [text] sigil: [sigil text] image: [image text]]	;-- used to avoid extra bind
 			set 'item-list [text]
 		]
@@ -776,30 +878,8 @@ label-ctx: context [
 		list-draw: :draw
 		draw: does [~/draw self]
 		
-		list-on-change: :on-change*
+		; list-on-change: :on-change*
 		#on-change-redirect
-	]
-]
-
-
-
-tube-ctx: context [
-	templates/tube: make-template 'container [
-		margin:  5x5
-		spacing: 5x5
-		axes:    [e s]
-		align:   -1x-1
-		width:   none			;@@ this seems required, but maybe a mandatory cell can replace it?
-		; cache?:  off
-		
-		container-draw: :draw
-		;; canvas for tube cannot be none as it controls tube's width
-		;@@ or we need an explicit width
-		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
-			if width [canvas: width * 1x1]				;-- override canvas if width is set (only 1 dimension matters)
-			settings: [margin spacing align axes canvas]
-			container-draw/layout/only 'tube settings xy1 xy2
-		]
 	]
 ]
 
