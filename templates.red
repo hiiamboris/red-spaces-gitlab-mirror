@@ -870,7 +870,7 @@ label-ctx: context [
 		spaces: context [
 			image: make-space 'image []
 			sigil: make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
-			text:  make-space 'paragraph [limits: 20 .. 40]
+			text:  make-space 'text []
 			lists: [text: [text] sigil: [sigil text] image: [image text]]	;-- used to avoid extra bind
 			set 'item-list [text]
 		]
