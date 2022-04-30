@@ -422,9 +422,8 @@ scrollable-space: context [
 			#print "scrollable/draw: renders content from (max 0x0 0x0 - origin) to (box - origin); box=(box)"
 		]
 		;; scroller's area is reserved, otherwise we'll see X scroller on vertical lists and vice versa:
-		ccanvas: max 1x1 box
-		if ccanvas/y <> 2e9 [ccanvas/y: ccanvas/y - space/hscroll/size/y]	;-- don't subtract from "infinite" pair
-		if ccanvas/x <> 2e9 [ccanvas/x: ccanvas/x - space/vscroll/size/x]
+		scrollers: space/vscroll/size/x by space/hscroll/size/y
+		ccanvas: subtract-canvas max 1x1 box scrollers			;-- don't subtract from "infinite" pair
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		cdraw: render/only/on space/content		
 			max 0x0 0x0 - origin
@@ -433,7 +432,7 @@ scrollable-space: context [
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
-		maybe space/origin: max origin box - csz
+		maybe space/origin: max origin box - scrollers - csz
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
