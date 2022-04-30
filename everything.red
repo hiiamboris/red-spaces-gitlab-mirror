@@ -75,7 +75,7 @@ do/expand [
 		include %styles.red
 		include %rendering.red
 		include %layouts.red
-		include %spaces.red
+		include %templates.red
 		include %vid.red
 		include %events.red
 		include %traversal.red
@@ -91,7 +91,7 @@ do/expand [
 	
 		;-- makes some things readily available:
 		spaces/events:    spaces/ctx/events
-		spaces/templates: spaces/ctx/spaces
+		spaces/templates: spaces/ctx/templates
 		spaces/styles:    spaces/ctx/styles
 		spaces/layouts:   spaces/ctx/layouts
 		spaces/keyboard:  spaces/ctx/keyboard

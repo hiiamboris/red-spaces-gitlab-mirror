@@ -9,8 +9,6 @@ Red [
 
 ;@@ TODO: also a `spaces` context to wrap everything, to save it from being overridden (or other name, or under system/)
 
-;@@ rename this file to templates !
-
 
 #macro [#on-change-redirect] func [s e] [				;@@ see REP #115
 	copy/deep [											;-- copy so it can be bound to various contexts
@@ -30,7 +28,7 @@ make-space: function [
 	/block "Do not instantiate the object"
 	/name "Return a word referring to the space, rather than space object"
 ][
-	base: spaces/:type
+	base: templates/:type
 	#assert [block? base]
 	r: append copy/deep base spec
 	unless block [r: object r]
@@ -73,7 +71,7 @@ compose-map: function [
 ]
 
 
-spaces: #()												;-- map for extensibility
+templates: #()											;-- map for extensibility
 
 ;; On limits:
 ;; to waste less RAM (each range is 468 bytes), a single range is used instead of two (X+Y)
@@ -90,7 +88,7 @@ spaces: #()												;-- map for extensibility
 ;; in this case zero (e.g. 0x100) should be used
 ;@@ doc this semantics once it's proven
 
-spaces/space: [											;-- minimum basis to build upon
+templates/space: [										;-- minimum basis to build upon
 	draw: []
 	size: 0x0
 	limits: none
@@ -99,7 +97,7 @@ spaces/space: [											;-- minimum basis to build upon
 ]
 space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
 
-spaces/timer: make-template 'space [rate: none]			;-- template space for timers
+templates/timer: make-template 'space [rate: none]		;-- template space for timers
 
 rectangle-ctx: context [
 	~: self
@@ -108,7 +106,7 @@ rectangle-ctx: context [
 		unless :old =? :new [invalidate-cache space]
 	]
 	
-	spaces/rectangle: make-template 'space [
+	templates/rectangle: make-template 'space [
 		size:   20x10
 		margin: 0
 		draw:   does [compose [box (margin * 1x1) (size - margin)]]
@@ -143,7 +141,7 @@ triangle-ctx: context [
 		unless :old =? :new [invalidate-cache space]
 	]
 		
-	spaces/triangle: make-template 'space [
+	templates/triangle: make-template 'space [
 		size:    16x10						;@@ use canvas instead?
 		dir:     'n
 		margin:  0
@@ -162,6 +160,9 @@ image-ctx: context [
 	
 	draw: function [image [object!] canvas [pair! none!]] [
 		;@@ haven't figured out image stretching yet... and limits - who should enforce them? and how should it be scaled?
+		;@@ besides such stretching may be harmful: image has it's optimum size
+		;@@ and stretching it by default would require one to work around it in most cases
+		;@@ using fixed /size is a viable option but is a bit of a hack and I'm worried about consistency with other spaces
 		; case [
 			; not image? data [size: 0x0]
 			; canvas [
@@ -198,11 +199,11 @@ image-ctx: context [
 		] [invalidate-cache space]
 	]
 	
-	spaces/image: make-template 'space [
-		size: none											;-- if `none`, set automatically
+	templates/image: make-template 'space [
+		size: none										;@@ should fixed size be used as an override?
 		margin: 0
 		; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
-		data: none											;-- images are not recyclable, so `none` by default
+		data: none										;-- images are not recyclable, so `none` by default
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		#on-change-redirect
 	]
@@ -255,7 +256,7 @@ cell-ctx: context [
 		drawn
 	]
 	
-	spaces/cell: make-template 'space [
+	templates/cell: make-template 'space [
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
 		margin:  1x1									;-- useful for drawing inner frame, which otherwise would be hidden by content
 		weight:  1										;@@ what default weight to use? what default alignment?
@@ -322,7 +323,7 @@ scrollbar: context [
 		switch to word! word [offset amount size axis [invalidate-cache bar]]
 	]
 				
-	spaces/scrollbar: make-template 'space [
+	templates/scrollbar: make-template 'space [
 		size: 100x16										;-- opposite axis defines thickness
 		axis: 'x
 		offset: 0%
@@ -498,7 +499,7 @@ scrollable-space: context [
 		]
 	]
 		
-	spaces/scrollable: make-template 'space [
+	templates/scrollable: make-template 'space [
 		; cache?: off
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: make-space/name 'space []			;-- should be defined (overwritten) by the user
@@ -584,7 +585,7 @@ paragraph-ctx: context [
 	;@@ BUG: not deeply reactive
 	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
 
-	spaces/paragraph: make-template 'space [
+	templates/paragraph: make-template 'space [
 		size:   none									;-- only valid after `draw` because it applies styles
 		text:   ""
 		margin: 0x0										;-- default = no margin
@@ -643,7 +644,7 @@ container-ctx: context [
 		drawn
 	]
 
-	spaces/container: make-template 'space [
+	templates/container: make-template 'space [
 		size: none				;-- only available after `draw` because it applies styles
 		item-list: []
 		items: function [/pick i [integer!] /size] [
@@ -675,7 +676,7 @@ list-ctx: context [
 		]
 	]
 	
-	spaces/list: make-template 'container [
+	templates/list: make-template 'container [
 		axis:    'x
 		margin:  5x5		;@@ default margins/spacing - should be tight or not? what is more common?
 		spacing: 5x5
@@ -705,7 +706,7 @@ icon-ctx: context [
 		space/list-on-change word :old :new
 	]
 	
-	spaces/icon: make-template 'list [
+	templates/icon: make-template 'list [
 		axis:   'y
 		margin: 0x0
 		image:  none
@@ -733,7 +734,7 @@ icon-ctx: context [
 
 
 tube-ctx: context [
-	spaces/tube: make-template 'container [
+	templates/tube: make-template 'container [
 		margin:  5x5
 		spacing: 5x5
 		axes:    [e s]
@@ -756,7 +757,7 @@ tube-ctx: context [
 
 ;-- a polymorphic style: given `data` creates a visual representation of it
 ;@@ TODO: complex types should leverage table style
-spaces/data-view: make-template 'space [
+templates/data-view: make-template 'space [
 	size:    none					;-- only available after `draw` because it applies styles
 	data:    none					;-- ANY red value
 	;@@ remove width
@@ -893,7 +894,7 @@ window-ctx: context [
 		]
 	]
 		
-	spaces/window: make-template 'space [
+	templates/window: make-template 'space [
 		;; when drawn auto adjusts it's `size` up to `max-size` (otherwise scrollbars will always be visible)
 		;; but `max-size` itself is set by `inf-scrollable`, to a multiple of it's own size!
 		max-size: 1000x1000
@@ -954,7 +955,7 @@ inf-scrollable-ctx: context [
 		wo <> wo0								;-- should return true when updates origin - used by event handlers
 	]
 		
-	spaces/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
+	templates/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 		pages: 10x10							;-- window size multiplier in sizes of inf-scrollable
@@ -988,7 +989,7 @@ inf-scrollable-ctx: context [
 
 ;@@ just for testing ;@@ TODO: beautify it and draw a spider at random location, or leave it to the others as a challenge
 ;@@ TODO: explore fractals this way :D
-spaces/web: make-template 'inf-scrollable [
+templates/web: make-template 'inf-scrollable [
 	canvas: make-space 'space [
 		available?: function [axis dir from requested] [requested]
 	
@@ -1171,7 +1172,7 @@ list-view-ctx: context [
 		r
 	]
 
-	spaces/list-view: make-template 'inf-scrollable [
+	templates/list-view: make-template 'inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; cache?: off
 		
@@ -1329,7 +1330,7 @@ list-view-ctx: context [
 ;@@ TODO: height & width inferrence
 ;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
-	spaces/grid: make-template 'space [
+	templates/grid: make-template 'space [
 		size:    none				;-- only available after `draw` because it applies styles
 		margin:  5x5
 		spacing: 5x5
@@ -1809,7 +1810,7 @@ grid-ctx: context [
 
 
 grid-view-ctx: context [
-	spaces/grid-view: make-template 'inf-scrollable [
+	templates/grid-view: make-template 'inf-scrollable [
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
@@ -1890,7 +1891,7 @@ grid-view-ctx: context [
 ; ]
 
 button-ctx: context [
-	spaces/button: make-template 'data-view [
+	templates/button: make-template 'data-view [
 		; width: none								;-- when not 'none', forces button width in pixels - defined by data-view
 		margin: 4x4								;-- change data-view's default
 		pushed?: no								;-- becomes true when user pushes it; triggers `command`
@@ -1929,7 +1930,7 @@ button-ctx: context [
 
 
 
-spaces/rotor: make-template 'space [
+templates/rotor: make-template 'space [
 	content: none
 	angle: 0
 
@@ -2010,7 +2011,7 @@ field-ctx: context [
 	]
 		
 	;@@ TODO: only area should be scrollable
-	spaces/field: make-template 'scrollable [
+	templates/field: make-template 'scrollable [
 		text: ""
 		selected: none		;@@ TODO
 		caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
@@ -2032,7 +2033,7 @@ field-ctx: context [
 	]
 ]
 
-spaces/spiral: make-template 'space [
+templates/spiral: make-template 'space [
 	size: 100x100
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
@@ -2106,7 +2107,7 @@ spaces/spiral: make-template 'space [
 	]
 ]
 
-spaces/fps-meter: make-template 'paragraph [
+templates/fps-meter: make-template 'paragraph [
 	cache?:    off
 	rate:      100
 	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host

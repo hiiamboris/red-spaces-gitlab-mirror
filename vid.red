@@ -10,6 +10,14 @@ Red [
 ;@@ also, templates e.g. `vlist` should appear as `list` in the tree but have an `axis: 'y` as default
 ;@@ also combine them faces and spaces in one object! or not? `draw` will prove difficult, but we can rename it to render
 
+{
+	VID Styles:
+	row - horizontal tube
+	column - vertical tube
+	hlist - horizontal list
+	vlist - vertical list
+}
+
 ;@@ make it internal?
 init-spaces-tree: function [face [object!]] [
 	unless spec: select face/actors 'worst-actor-ever [exit]
@@ -22,7 +30,7 @@ init-spaces-tree: function [face [object!]] [
 		while [not empty? spec] [
 			name: spec/1  spec: next spec
 			#assert [word? name]		;@@ TODO: normal error handling here
-			#assert [spaces/:name]
+			#assert [templates/:name]
 
 			with-blk: []
 			if spec/1 = 'with [		;-- reserved keyword
