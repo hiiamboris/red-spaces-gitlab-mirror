@@ -698,10 +698,7 @@ icon-ctx: context [
 	~: self
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			image [space/spaces/image/data: image]
-			text  [space/spaces/text/text:  text]
-		]
+		if find [axis margin image text] word [invalidate-cache space]
 		space/list-on-change word :old :new
 	]
 	
@@ -724,6 +721,60 @@ icon-ctx: context [
 			spaces/image/data: image
 			list-draw/on canvas
 		]
+		
+		list-on-change: :on-change*
+		#on-change-redirect
+	]
+]
+
+
+label-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if find [axis margin image text] word [invalidate-cache space]
+		space/list-on-change word :old :new
+	]
+	
+	draw: function [label [object!]] [
+		sig: label/spaces/sigil
+		label/spaces/text/text: label/text
+		type: case [
+			image? label/image [
+				label/spaces/image/data: label/image
+				'image
+			]
+			string? label/image [
+				sig/text: label/image
+				'sigil
+			]
+			char? label/image [
+				sig/text: form label/image
+				'sigil
+			]
+			'else ['text]
+		]
+		label/item-list: label/spaces/lists/:type
+		label/list-draw
+	]
+		
+	templates/label: make-template 'list [
+		axis:    'x
+		margin:  0x0
+		spacing: 5x0
+		image:   none									;-- can be a string! as well
+		text:    ""
+		
+		spaces: context [
+			image: make-space 'image []
+			sigil: make-space 'paragraph [limits: 20 .. none]
+			text:  make-space 'paragraph []
+			lists: [text: [text] sigil: [sigil text] image: [image text]]	;-- used to avoid extra bind
+			set 'item-list [text]
+		]
+		
+		list-draw: :draw
+		draw: does [~/draw self]
 		
 		list-on-change: :on-change*
 		#on-change-redirect
