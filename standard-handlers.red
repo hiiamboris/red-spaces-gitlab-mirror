@@ -276,14 +276,13 @@ define-handlers [
 			frames: space/frames
 			forall frames [
 				if frames/1 + space/aggregate > time [
-					remove/part head frames frames
-					frames: head frames
+					remove/part frames frames: head frames
 					break
 				]
 			]
 			append frames time							;-- let frames never be empty, so frame/1 is not none
 			elapsed: to float! difference time frames/1
-			fps: (length? space/frames) / (max 0.01 elapsed)	;-- max for overflow protection
+			fps: (length? frames) / (max 0.01 elapsed)	;-- max for overflow protection
 			space/text: rejoin ["FPS: " 0.1 * to integer! 10 * fps]
 			invalidate space							;-- invalidates parents (lists etc)
 			update
