@@ -78,7 +78,7 @@ events: context [
 		#assert [										;-- validate the spec to help detect bugs
 			any [
 				parse spec-of :handler [
-					word! opt quote [object!]
+					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
 					word! opt quote [block!]
 					word! opt [quote [event!] | quote [event! none!] | quote [none! event!]]
 					;@@ does not receive delay [percent!] - but should it?
@@ -147,10 +147,11 @@ events: context [
 	do-global: function [map [map!] path [block!] event [event! none!] type [word!]] [
 		unless list: map/:type [exit]
 		kind: either map =? previewers ["previewer"]["finalizer"]
+		space: all [path/1 get path/1]					;-- space can be none if event falls into space-less area of the host ;@@ REP #113
 		foreach fn list [
-			pcopy: cache/hold path					;-- copy in case user modifies/reduces it, preserve index
-			trap/all/catch [fn get path/1 pcopy event] [
-				msg: form/part thrown 1000			;@@ should be formed immediately - see #4538
+			pcopy: cache/hold path						;-- copy in case user modifies/reduces it, preserve index
+			trap/all/catch [fn space pcopy event] [
+				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
 				#print "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!^/(msg)"
 			]
 			cache/put pcopy
