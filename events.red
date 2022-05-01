@@ -13,15 +13,15 @@ Red [
 ;@@ DOC it: user can use any face as long as 'space' is defined (serves as a marker for the host-event-func)
 ;@@ TODO: get this out somewhere else
 system/view/VID/styles/host: [
-	default-actor: worst-actor-ever					;-- worry not! this is useful
-													;@@ TODO: lay it out
+	default-actor: worst-actor-ever						;-- worry not! this is useful
+														;@@ TODO: lay it out
 	template: [
-		type: 'base
-		size: 100x100
-		space: none
-		flags: 'all-over							;-- else 'over' events won't make sense over spaces
-		rate: 100									;-- for space timers to work
-		dirty?: no
+		type:   'base
+		size:   100x100
+		space:  none
+		flags:  'all-over								;-- else 'over' events won't make sense over spaces
+		rate:   100										;-- for space timers to work
+		dirty?: no										;-- for events to mark the host for redraw
 	]
 	init: [init-spaces-tree face]
 ]
