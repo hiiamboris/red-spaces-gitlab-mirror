@@ -138,13 +138,12 @@ context [
 	;; global space timers are not called unless event is processed, so timer needs a dedicated event function
 	hint-text:   none
 	show-time:   now/utc/precise						;-- when to show next hint
-	last-offset: 0x0									;-- pointer offset of the over event (timer doesn't have this info)
-	anchor:      0x0
+	anchor:      0x0									;-- pointer offset of the over event (timer doesn't have this info)
 	on-time: function [host event] [
 		all [
 			hint-text
 			show-time <= now/utc/precise
-			show-hint event/window last-offset hint-text
+			show-hint event/window anchor hint-text
 		]
 	]
 
@@ -163,7 +162,7 @@ context [
 	reset-hint: func [event [event!]] [
 		if hint-text [
 			hint-text: none
-			anchor: face-to-screen event/offset event/face
+			anchor: face-to-window event/offset event/face
 		]
 		if any [
 			event/away?									;-- moved off the hint; away event should never be missed as it won't repeat!
@@ -174,13 +173,13 @@ context [
 	]
 	
 	travel: func [event [event!]] [
-		distance? anchor face-to-screen event/offset event/face
+		distance? anchor face-to-window event/offset event/face
 	]
 	
 	;; over event should be tied to spaces and is guaranteed to fire even if no space below
 	register-previewer [over] function [
 		space [object! none!] path [block!] event [event! none!]
-		/extern hint-text show-time last-offset
+		/extern hint-text show-time anchor
 	][
 		; #assert [event/window/type = 'window]
 		either is-hint? window: event/window host: event/face [		;-- hovering over a hint face
@@ -191,7 +190,7 @@ context [
 				text: find-hint path					;-- hint is enabled for this space or one of it's parents
 			][
 				hint-text: text
-				last-offset: face-to-window event/offset event/face
+				anchor: face-to-window event/offset event/face
 				unless hint-text? window [				;-- delay only if no other hint is visible
 					;; by design no extra face should be created until really necessary to show it
 					;; so creation is triggered by timer, renewed on each over event
