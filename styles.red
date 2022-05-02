@@ -23,7 +23,7 @@ do with [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
 	svm: system/view/metrics
 	unless svm/colors [svm/colors: copy #()]			;@@ MacOS fix for #4740
-	svmc: copy system/view/metrics/colors
+	svmc: system/view/metrics/colors
 	unless svmc/text [svmc/text: black]					;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
