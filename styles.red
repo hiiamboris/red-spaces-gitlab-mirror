@@ -59,7 +59,7 @@ do with [
 		]
 
 		#if system/platform = 'Linux [					;@@ GTK fix for #4901
-			paragraph [
+			text paragraph fps-meter [
 				;-- font can be set in the style!:
 				;-- but impossible to debug it, as probe draw lists font with thousands of parents
 				(self/font: serif-12 ())				;@@ #3804 - requires self/ or won't work
