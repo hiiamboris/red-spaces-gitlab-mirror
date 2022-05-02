@@ -120,6 +120,21 @@ do with [
 			]
 		]
 		
+		;@@ for this name to work, layout should prefer 'hint' keyword over 'hint' template
+		hint [
+			function [cell] [
+				drawn: cell/draw						;-- draw to obtain the size
+				compose/only/deep [
+					push [
+						line-width 1
+						fill-pen !(svmc/panel)
+						box 1x1 (cell/size - 1x1) 3
+					]
+					(drawn)
+				]
+			]
+		]
+		
 		; grid/cell [
 			; function [cell /on canvas] [
 				; drawn: cell/draw/on canvas				;-- draw to obtain the size ;@@ TODO

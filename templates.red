@@ -1979,7 +1979,8 @@ button-ctx: context [
 		pushed?: no								;-- becomes true when user pushes it; triggers `command`
 		rounding: 5								;-- box rounding radius in px
 		command: []								;-- code to run on click (on up: when `pushed?` becomes false)
-		;@@ TODO: shadow? or in styles? and for what other spaces?
+		;@@ TODO: shadow? or in styles? and for what other spaces? (only works on windows yet q.q)
+		;@@ should command be also a function (actor)? if so, where to take event info from?
 
 		data-view-draw: :draw
 		draw: function [] [

@@ -1,0 +1,189 @@
+Red [
+	title:   "Popup windows support for Draw-based widgets"
+	author:  @hiiamboris
+	license: BSD-3
+]
+
+
+;; requires events, templates
+
+templates/hint: make-template 'cell []					;-- renamed for styling
+
+popup-registry: make hash! 2
+
+is-hint?: function [									;-- must be blazing-fast, used in global event function
+	"Check within WINDOW if FACE is a hint host"
+	window [object!] face [object!]
+][
+	none <> find/same select/same popup-registry window face
+]
+
+get-popups-for: function [
+	window [object!] "Each window has it's own popups stack"
+][
+	#assert [window/type = 'window]
+	any [
+		stack: select/same popup-registry window
+		; repend popup-registry [window stack: make block! 4]
+		repend popup-registry [window stack: make hash! 4]
+	]
+	stack
+]
+
+save-popup: function [
+	window [object!] "Each window has it's own popups stack"
+	level  [integer!] ">= 0"
+	face   [object!] "Popup face"
+][
+	#assert [level >= 0]
+	stack: get-popups-for window
+	append/dup stack none level - length? stack
+	change skip stack level face
+]
+
+make-popup: function [
+	"Create a popup face but don't show it"
+	spec [block!] "VID layout; must contain a single host face"
+][
+	first layout/only spec
+]
+
+show-popup: function [
+	"Show a popup in the WINDOW at LEVEL and OFFSET"
+	window [object!]  "Each window has it's own popups stack"
+	level  [integer!] ">= 0"
+	offset [pair!]    "Desired offset (adjusted to not be clipped)"
+	face   [object!]  "Previously created popup face"
+][
+	hide-popups window level
+	limit: window/size - face/size
+	face/offset: clip [0x0 limit] offset
+	append window/pane face
+	??~ window/pane
+	save-popup window level face
+]
+
+hide-popups: function [
+	"Hides popup faces of a WINDOW from LEVEL and above"
+	window [object!] "Each window has it's own popups stack"
+	level [integer!] ">= 0; if zero, only hint is hidden"
+][
+	stack: get-popups-for window
+	either level = 0 [
+		; remove find/same window/pane stack/1			;-- only hide the hint
+		change stack none
+	][
+		foreach face pos: skip stack level [			;-- hide all popups but the hint
+			remove find/same window/pane face
+		]
+		clear pos
+	]
+]
+
+hint-text?: function [
+	"Get text of the shown hint for WINDOW; none if not shown"
+	window [object!] "Each window has it's own popups stack"
+][
+	stack: get-popups-for window
+	all [face: stack/1  face/extra/1]
+]
+
+show-hint: function [
+	"Immediately show a TEXT hint in the WINDOW around POINTER"
+	window  [object!]
+	pointer [pair!]
+	text    [string!]
+][
+	unless text == old-text: hint-text? window [		;-- don't redisplay an already shown hint
+		hint: make-popup compose/deep [
+			host [hint with [margin: 5x5] [text with [text: (text)]]]
+			extra [(text) #[none]]						;-- text for `hint-text?`, none for pointer travel estimation
+		]
+		center: window/size / 2
+		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
+		offset: either above? [hint/size * 0x-1 + 8x-8][8x16]	;@@ should these offsets be configurable or can I infer them somehow?
+		show-popup window 0 pointer + offset hint 
+	]
+]
+
+
+hint-delay: 0:0:1										;-- can be user-modified
+
+context [
+	;; event function that displays hints across all host faces when time hits
+	popup-event-func: function [host event] [
+		all [
+			event/type = 'time
+			word? select host 'space					;-- a host face?
+			on-time host event
+			none   										;-- the event can be processed by other handlers
+		]
+	]
+	unless find/same system/view/handlers :popup-event-func [
+		insert-event-func :popup-event-func
+	]
+	
+	;; global space timers are not called unless event is processed, so timer needs a dedicated event function
+	hint-text:   none
+	show-time:   now/utc/precise						;-- when to show next hint
+	last-offset: 0x0									;-- pointer offset of the over event (timer doesn't have this info)
+	on-time: function [host event] [
+		all [
+			hint-text
+			show-time <= now/utc/precise
+			show-hint event/window last-offset hint-text
+		]
+	]
+
+	;; searches the path for a defined hint (lowest one wins)
+	find-hint: function [path [block!]] [
+		path: tail path
+		until [											;@@ use for-each/reverse
+			path: skip path -2
+			space: get path/1
+			if string? text: select space 'hint [return text]
+			head? path
+		]
+		none
+	]	
+	
+	;; over event should be tied to spaces and is guaranteed to fire even if no space below
+	register-previewer [over] function [
+		space [object! none!] path [block!] event [event! none!]
+		/extern hint-text show-time last-offset
+	][
+		; #assert [event/window/type = 'window]
+		either is-hint? window: event/window host: event/face [		;-- hovering over a hint face
+			either any [
+				event/away?								;-- moved off the hint
+				all [									;-- or moved far enough over the hint
+					host/extra/2
+					travel: distance? host/extra/2 event/offset
+					travel >= 5							;-- distinguish pointer move from sensor jitter
+				]
+			][
+				hide-popups window 0
+			][
+				unless host/extra/2 [host/extra/2: event/offset]	;-- save initial offset
+			]
+			hint-text: none								;-- no hint can trigger other hint
+		][												;-- hovering over a normal host
+			either all [
+				space
+				text: find-hint path					;-- hint is enabled for this space or one of it's parents
+			][
+				hint-text: text
+				last-offset: face-to-window event/offset event/face
+				unless hint-text? window [				;-- delay only if no other hint is visible
+					;; by design no extra face should be created until really necessary to show it
+					;; so creation is triggered by timer, renewed on each over event
+					show-time: now/utc/precise + hint-delay		;-- show tooltip at some point in the future
+				]
+			][											;-- hint-less space or no space below
+				hide-popups window 0
+				hint-text: none
+			]
+		]
+	]
+]
+

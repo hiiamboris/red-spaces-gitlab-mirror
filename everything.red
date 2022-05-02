@@ -78,6 +78,7 @@ do/expand [
 		include %templates.red
 		include %vid.red
 		include %events.red
+		include %popups.red
 		include %traversal.red
 		include %focus.red
 		include %tabbing.red

@@ -781,6 +781,45 @@ drop-menus: how will they work, considering they place themselves above the othe
 		transparent layer is ruled out because it eats events on GTK at least
 		(and I'm sure a lot of other bugs will surface with it)
 		then spawning new faces on the fly (on the root window) is the best way so far
+popup logic
+	menus: have to appear under the pointer, so move away closes the window
+	  one menu may open another menu and both should stay open until pointer leaves both
+	  second layer menu may be replaced (hidden) by another second layer menu, and so on (any number of layers)
+	  no need for hints on menus for now for simplicity
+	  I do hate popup menus though, worst UX ever, maybe fuck them? so much trouble for me and users
+	  main menu is supported natively, but it's shitty and naturally one may want to use a spaces-based one
+	  and main menu is still widely used everywhere, no way around it..
+	  ribbon? even worse, besides it's not a replacement but an addition to menu (maybe a replacement for toolbars)
+	  menus are shown next to each other without gaps so mouse travel is possible across them
+	radial menu: is an ok thing but has one level usually and stays only as long as LMB/RMB is down
+	  also usually displayed around the pointer, even if gets clipped by the window, which makes it less useful around borders
+	  but this is easy to fix
+	  UX idea:
+	    RMB to show menu until pointer leaves it's radius or another RMB or pick is made (by LMB)
+	    LMB to show menu until LMB is up, then pick is made by LMB being up at it
+	    this works fine for touchpad and touchscreen
+	hints: should be away from the pointer so it doesn't obstruct the text
+	  (and I never know the pointer's hotspot so better reserve ~16 px from both sides)
+	  new hint always replaces old hint - no two hints are shown at the same time
+	  trigger - delay for the first hint, but when one hint is visible next hint should be shown immediately on hover
+	  then I need a way to check if other hint is visible or not, to decide the delay 
+	so on the base level I want smth like show-popup: func [level layout] and a map of window->popup-face
+	to allow hints on menus (esp radial menus) they have to have a special level, e.g. 0, while menus have level 1 and up
+	- any level popup replaces popups of the same level
+	- popups of level > 0 also hide popups of level above
+	I need to:
+	- determine if popup level 0 is visible (to adjust hint delay)
+	- show popup of a certain level (to replace another popup of that level and hide upper levels)
+	- get all visible popups of a certain level and above (to hide and replace popups)
+	should hint display be automatic? having /hint inside any cell would show the hint on hover... makes sense
+	hint showing logic:
+	- timer must be used to display it
+	- should hook to host's timer and over events:
+	  - host itself because it should fire even when there's no space below the pointer
+	  - over so on /away? it hides the hint
+	  - timer so there can be a delay
+	- hover over the hint itself must hide it, but only if the pointer moved, not if it was already upon the hint
+	  should travel ~5px to be considered "moved" (not just ball vibration or sensor jitter) 
 cells - idea how to simplify and unify alignment
 	cell is a thin wrapper around single space
 	cell includes alignment and it's size and alignment is set by the parent
