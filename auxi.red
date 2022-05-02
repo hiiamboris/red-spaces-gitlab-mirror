@@ -385,6 +385,15 @@ fast-remove: function [block [any-block!] length [integer!]] [
 	clear other
 ]
 
+;; extend & expand are taken already
+enlarge: function [
+	"Ensure certain SIZE of the BLOCK, fill empty space with VALUE"
+	block [any-block!] size [integer!] value [any-type!]
+][
+	insert/dup skip block size :value size - length? block
+	;; returns after size
+]
+
 ;-- see REP #104, but this is still different: we don't care what context word belongs to, only it's spelling and value
 same-paths?: function [p1 [block! path!] p2 [block! path!]] [
 	to logic! all [

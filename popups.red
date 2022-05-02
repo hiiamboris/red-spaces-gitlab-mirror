@@ -7,7 +7,7 @@ Red [
 
 ;; requires events, templates
 
-templates/hint: make-template 'cell []					;-- renamed for styling
+templates/hint: make-template 'cell [margin: 5x5]		;-- renamed for styling
 
 popup-registry: make hash! 2
 
@@ -24,7 +24,6 @@ get-popups-for: function [
 	#assert [window/type = 'window]
 	any [
 		stack: select/same popup-registry window
-		; repend popup-registry [window stack: make block! 4]
 		repend popup-registry [window stack: make hash! 4]
 	]
 	stack
@@ -37,15 +36,20 @@ save-popup: function [
 ][
 	#assert [level >= 0]
 	stack: get-popups-for window
-	append/dup stack none level - length? stack
-	change skip stack level face
+	change enlarge stack level none face
 ]
 
+;@@ `layout` cannot work - see #5131, so have to reuse the faces and refrain from VID
 make-popup: function [
-	"Create a popup face but don't show it"
-	spec [block!] "VID layout; must contain a single host face"
+	"Create a popup face of LEVEL but don't show it yet (reuse if exists)"
+	window [object!]
+	level  [integer!]
 ][
-	first layout/only spec
+	stack: get-popups-for window
+	unless face: pick stack level + 1 [
+		change (enlarge stack level none) face: make-face 'host
+	]
+	face
 ]
 
 show-popup: function [
@@ -55,12 +59,12 @@ show-popup: function [
 	offset [pair!]    "Desired offset (adjusted to not be clipped)"
 	face   [object!]  "Previously created popup face"
 ][
-	hide-popups window level
 	limit: window/size - face/size
 	face/offset: clip [0x0 limit] offset
-	append window/pane face
-	??~ window/pane
+	unless level = 0 [hide-popups window level + 1]		;-- no need to hide the hint - it's reused
+		??~ face
 	save-popup window level face
+	unless find/same window/pane face [append window/pane face]
 ]
 
 hide-popups: function [
@@ -70,13 +74,11 @@ hide-popups: function [
 ][
 	stack: get-popups-for window
 	either level = 0 [
-		; remove find/same window/pane stack/1			;-- only hide the hint
-		change stack none
+		remove find/same window/pane stack/1			;-- only hide the hint
 	][
 		foreach face pos: skip stack level [			;-- hide all popups but the hint
 			remove find/same window/pane face
 		]
-		clear pos
 	]
 ]
 
@@ -85,7 +87,11 @@ hint-text?: function [
 	window [object!] "Each window has it's own popups stack"
 ][
 	stack: get-popups-for window
-	all [face: stack/1  face/extra/1]
+	all [
+		face: stack/1
+		find/same window/pane face						;-- must be visible
+		face/extra/1
+	]
 ]
 
 show-hint: function [
@@ -95,10 +101,14 @@ show-hint: function [
 	text    [string!]
 ][
 	unless text == old-text: hint-text? window [		;-- don't redisplay an already shown hint
-		hint: make-popup compose/deep [
-			host [hint with [margin: 5x5] [text with [text: (text)]]]
-			extra [(text) #[none]]						;-- text for `hint-text?`, none for pointer travel estimation
-		]
+		hint: make-popup window 0						;@@ working around #5131 here, can't use `layout`
+		hint/rate: none									;-- unlike menus, hints should not add timer pressure
+		space: get hint/space: make-space/name 'hint []
+		space/content: make-space/name 'text compose [text: (text)]
+		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
+		hint/size: none
+		hint/draw: render hint
+		
 		center: window/size / 2
 		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
 		offset: either above? [hint/size * 0x-1 + 8x-8][8x16]	;@@ should these offsets be configurable or can I infer them somehow?
@@ -107,7 +117,7 @@ show-hint: function [
 ]
 
 
-hint-delay: 0:0:1										;-- can be user-modified
+hint-delay: 0:0:0.5										;-- can be user-modified
 
 context [
 	;; event function that displays hints across all host faces when time hits
