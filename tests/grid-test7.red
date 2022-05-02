@@ -108,7 +108,7 @@ view/no-wait/options [
 				r
 			]
 		]
-	] rate 99 on-time [invalidate b/space b/draw: render b]
+	] on-time [invalidate b/space b/draw: render b]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
