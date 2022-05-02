@@ -7,6 +7,9 @@ Red [
 
 ;; requires events, templates
 
+;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
+;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
+
 templates/hint: make-template 'cell [margin: 5x5]		;-- renamed for styling
 
 popup-registry: make hash! 2
@@ -62,7 +65,6 @@ show-popup: function [
 	limit: window/size - face/size
 	face/offset: clip [0x0 limit] offset
 	unless level = 0 [hide-popups window level + 1]		;-- no need to hide the hint - it's reused
-		??~ face
 	save-popup window level face
 	unless find/same window/pane face [append window/pane face]
 ]
@@ -106,7 +108,7 @@ show-hint: function [
 		space: get hint/space: make-space/name 'hint []
 		space/content: make-space/name 'text compose [text: (text)]
 		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
-		hint/size: none
+		hint/size: none									;-- to make render set face/size
 		hint/draw: render hint
 		
 		center: window/size / 2
@@ -137,6 +139,7 @@ context [
 	hint-text:   none
 	show-time:   now/utc/precise						;-- when to show next hint
 	last-offset: 0x0									;-- pointer offset of the over event (timer doesn't have this info)
+	anchor:      0x0
 	on-time: function [host event] [
 		all [
 			hint-text
@@ -157,6 +160,23 @@ context [
 		none
 	]	
 	
+	reset-hint: func [event [event!]] [
+		if hint-text [
+			hint-text: none
+			anchor: face-to-screen event/offset event/face
+		]
+		if any [
+			event/away?									;-- moved off the hint; away event should never be missed as it won't repeat!
+			10 <= travel event							;-- distinguish pointer move from sensor jitter
+		][
+			hide-popups event/window 0
+		]
+	]
+	
+	travel: func [event [event!]] [
+		distance? anchor face-to-screen event/offset event/face
+	]
+	
 	;; over event should be tied to spaces and is guaranteed to fire even if no space below
 	register-previewer [over] function [
 		space [object! none!] path [block!] event [event! none!]
@@ -164,19 +184,7 @@ context [
 	][
 		; #assert [event/window/type = 'window]
 		either is-hint? window: event/window host: event/face [		;-- hovering over a hint face
-			either any [
-				event/away?								;-- moved off the hint
-				all [									;-- or moved far enough over the hint
-					host/extra/2
-					travel: distance? host/extra/2 event/offset
-					travel >= 5							;-- distinguish pointer move from sensor jitter
-				]
-			][
-				hide-popups window 0
-			][
-				unless host/extra/2 [host/extra/2: event/offset]	;-- save initial offset
-			]
-			hint-text: none								;-- no hint can trigger other hint
+			reset-hint event							;-- no hint can trigger other hint
 		][												;-- hovering over a normal host
 			either all [
 				space
@@ -190,8 +198,7 @@ context [
 					show-time: now/utc/precise + hint-delay		;-- show tooltip at some point in the future
 				]
 			][											;-- hint-less space or no space below
-				hide-popups window 0
-				hint-text: none
+				reset-hint event
 			]
 		]
 	]

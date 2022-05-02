@@ -819,7 +819,8 @@ popup logic
 	  - over so on /away? it hides the hint
 	  - timer so there can be a delay
 	- hover over the hint itself must hide it, but only if the pointer moved, not if it was already upon the hint
-	  should travel ~5px to be considered "moved" (not just ball vibration or sensor jitter) 
+	  should travel ~5px to be considered "moved" (not just ball vibration or sensor jitter)
+	- I decided to add travel to hiding as well, otherwise even 1px distance between spaces requires another delay to show the next hint  
 cells - idea how to simplify and unify alignment
 	cell is a thin wrapper around single space
 	cell includes alignment and it's size and alignment is set by the parent
