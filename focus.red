@@ -106,9 +106,11 @@ focus-space: function [
 		#debug [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
 		unless empty? old-path: keyboard/focus [
-			events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
-			events/do-handlers   old-path none 'unfocus no
-			events/do-finalizers old-path none 'unfocus
+			events/with-commands [						;-- init a separate flags for a separate event
+				events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
+				events/do-handlers   old-path none 'unfocus no
+				events/do-finalizers old-path none 'unfocus
+			]
 		]
 
 		foreach name path [								;-- if faces are provided, find the innermost one

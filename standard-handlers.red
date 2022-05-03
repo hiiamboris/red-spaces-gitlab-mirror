@@ -171,6 +171,10 @@ define-handlers [
 				update
 			][pass]
 		]
+		on-unfocus [space path event] [					;-- remove focus decoration
+			invalidate-cache space
+			update
+		]
 	]
 
 
