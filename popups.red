@@ -5,20 +5,36 @@ Red [
 ]
 
 
-;; requires events, templates
+;; requires events, templates, reshape
 
 ;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
 ;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
+
+{	;@@ document this
+	Menu DSL - unlike View's default:
+	
+	menu: a block! [any menu-item]
+	menu-item: [layout opt hotkey action]
+	layout:    [string! | block!]
+		string is interpreted simply as text,
+		while block may include other data as accepted by data-view
+	hotkey:    [issue!] e.g. #Ctrl+O
+	action:    [code | menu] (block is a submenu in this case)
+	code:      [paren!]
+}
 
 templates/hint: make-template 'cell [margin: 5x5]		;-- renamed for styling
 
 popup-registry: make hash! 2
 
-is-hint?: function [									;-- must be blazing-fast, used in global event function
-	"Check within WINDOW if FACE is a hint host"
+is-popup?: function [									;-- must be blazing-fast, used in global event function
+	"Check within WINDOW if FACE is a popup host; return popup level or none"
 	window [object!] face [object!]
 ][
-	none <> find/same select/same popup-registry window face
+	all [
+		found: find/same select/same popup-registry window face
+		-1 + index? found
+	]
 ]
 
 get-popups-for: function [
@@ -118,8 +134,46 @@ show-hint: function [
 	]
 ]
 
+lay-out-menu: function [spec [block!] /local code' data'] reshape [	;@@ DSL is ~20% implemented only
+	;@@ preferably VID/S should be used here and in hints above
+	=menu=:      [any =menu-item= !(expected end)]
+	=menu-item=: [=layout= opt =hotkey= =action=]
+	=layout=:    [not end set data' !(expected [string! | block!]) (
+		append list/item-list anonymize 'button item: make-space 'button [data: data']	;@@ need a better button-like style/widget
+	)]
+	=hotkey=:    [issue!]
+	=action=:    [ahead !(expected [block! | paren!]) =code= | =submenu=]
+	=submenu=:   [ahead block! into =menu=]
+	=code=:      [set code' paren! (item/command: code')]
+	
+	list: none
+	layout: make-space/name 'cell [						;@@ must be 'menu
+		content: make-space/name 'list [axis: 'y set 'list self]
+	]
+	parse spec =menu=
+	layout
+]
 
-hint-delay: 0:0:0.5										;-- can be user-modified
+show-menu: function [
+	"Immediately show a menu LAYOUT at OFFSET and LEVEL in WINDOW"
+	window  [object!]
+	level   [integer!]
+	offset  [pair!]
+	menu    [block!] "Written using Menu DSL"
+	;@@ maybe also a flag to make it appear above the offset?
+][
+	#assert [level > 0]
+	face: make-popup window level
+	face/rate: 10										;-- reduced timer pressure
+	face/space: lay-out-menu menu
+	face/size: none										;-- to make render set face/size
+	face/draw: render face
+	show-popup window level offset face 
+]
+
+
+hint-delay: 0:0:0.5										;-- for hints to appear
+; menu-delay: 0:0:0.5										;-- for submenus to appear on hover
 
 context [
 	;; event function that displays hints across all host faces when time hits
@@ -147,13 +201,15 @@ context [
 		]
 	]
 
-	;; searches the path for a defined hint (lowest one wins)
-	find-hint: function [path [block!]] [
+	;; searches the path for a defined field (lowest one wins)
+	find-field: function [path [block!] name [word!] types [datatype! typeset!]] [
 		path: tail path
+		type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types
 		until [											;@@ use for-each/reverse
 			path: skip path -2
 			space: get path/1
-			if string? text: select space 'hint [return text]
+			value: select space name
+			if do type-check [return :value]
 			head? path
 		]
 		none
@@ -182,12 +238,18 @@ context [
 		/extern hint-text show-time anchor
 	][
 		; #assert [event/window/type = 'window]
-		either is-hint? window: event/window host: event/face [		;-- hovering over a hint face
-			reset-hint event							;-- no hint can trigger other hint
+		either level: is-popup? window: event/window host: event/face [	;-- hovering over a popup face
+			either level = 0 [
+				reset-hint event						;-- no hint can trigger other hint
+			][
+				;@@ this is very simpistic now
+				if event/away? [hide-popups event/window level]
+				;@@ should menus also reset hint?
+			]
 		][												;-- hovering over a normal host
 			either all [
 				space
-				text: find-hint path					;-- hint is enabled for this space or one of it's parents
+				text: find-field path 'hint string!		;-- hint is enabled for this space or one of it's parents
 			][
 				hint-text: text
 				anchor: face-to-window event/offset event/face
@@ -201,5 +263,19 @@ context [
 			]
 		]
 	]
+
+	
+	;; context menu display support
+	register-finalizer [alt-up] function [				;-- finalizer so other spaces can eat the event
+		space [object! none!] path [block!] event [event! none!]
+	][
+		if menu: find-field path 'menu block! [
+			;; has to be under the pointer, so it won't miss /away? event closing the menu
+			offset: -1x-1 + face-to-window event/offset event/face
+			show-menu event/window 1 offset menu
+		]
+	]
+
+	;@@ should context menu eat next click outside of it? I'm not convinced on the necessity
 ]
 
