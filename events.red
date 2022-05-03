@@ -198,79 +198,73 @@ events: context [
 	;--     ]                                     
 	;-- ]                                         
 	;@@ TODO: doc this DSL
-	define-handlers: do with [
-		expected: function ['rule] [
-			reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
+	define-handlers: function [
+		"Define event handlers for any number of spaces"
+		def [block!] "[name: [on-event [space path event] [...]] ...]"
+	] reshape [
+		prefix: copy [handlers]
+
+		=style-def=: [
+			set name set-word! (name: to word! name)
+			['extends
+				;@@ TODO: allow paths here too
+				set base !(expected [lit-word! | word!]) (base: to word! base)
+			|	(base: none)
+			]
+			set body !(expected block!)
+			(add-style/from name body base)
 		]
-	][
-		function [
-			"Define event handlers for any number of spaces"
-			def [block!] "[name: [on-event [space path event] [...]] ...]"
-		] reshape [
-			prefix: copy [handlers]
-
-			=style-def=: [
-				set name set-word! (name: to word! name)
-				['extends
-					;@@ TODO: allow paths here too
-					set base !(expected [lit-word! | word!]) (base: to word! base)
-				|	(base: none)
-				]
-				set body !(expected block!)
-				(add-style/from name body base)
+		add-style: function [name body /from base] [
+			append prefix name
+			#debug events [print ["Defining" mold as path! prefix when base ["from"] when base [base]]]
+			path: as path! prefix
+			map: either base [
+				copy-deep-map get as path! compose [handlers (to [] base)]
+			][	copy #()
 			]
-			add-style: function [name body /from base] [
-				append prefix name
-				#debug events [print ["Defining" mold as path! prefix when base ["from"] when base [base]]]
-				path: as path! prefix
-				map: either base [
-					copy-deep-map get as path! compose [handlers (to [] base)]
-				][	copy #()
-				]
-				set path map
-				fill-body body map
-				take/last prefix
-			]
-
-			fill-body: function [body map] [
-				parse body =style-body=
-			]
-			=style-body=: [
-				any [
-					not end
-					ahead !(expected [word! | set-word!])
-					=style-def= | =hndlr-def=
-				]
-			]
-
-			=hndlr-def=: [
-				set name word!
-				set spec [ahead !(expected block!) into =spec-def=]
-				set body !(expected block!)
-				(add-handler name spec body)
-			]
-			add-handler: function [name spec body] [
-				#debug events [print ["-" name]]
-				path: as path! compose [(prefix) (name)]
-				list: any [get path  set path copy []]
-				append list function spec bind body commands
-			]
-
-			=spec-def=: [								;-- just validation, to protect from errors
-				!(expected word!) opt [ahead block! [quote @(expected [object!])] ]
-				!(expected word!) opt [ahead block! [quote @(expected [block!]) ] ]
-				!(expected word!) opt [ahead block!
-					!(expected [quote [event!] | quote [event! none!] | quote [none! event!]])
-				]
-				opt [if (name = 'on-time) not [refinement! | end]
-					!(expected word!) opt [ahead block! [quote @(expected [percent!])]]
-				]
-				opt [not end !(expected /local) to end]
-			]
-
-			ok?: parse def [any [not end ahead !(expected set-word!) =style-def=]]		;-- no handlers in the topmost block allowed
-			#assert [ok?]
+			set path map
+			fill-body body map
+			take/last prefix
 		]
+
+		fill-body: function [body map] [
+			parse body =style-body=
+		]
+		=style-body=: [
+			any [
+				not end
+				ahead !(expected [word! | set-word!])
+				=style-def= | =hndlr-def=
+			]
+		]
+
+		=hndlr-def=: [
+			set name word!
+			set spec [ahead !(expected block!) into =spec-def=]
+			set body !(expected block!)
+			(add-handler name spec body)
+		]
+		add-handler: function [name spec body] [
+			#debug events [print ["-" name]]
+			path: as path! compose [(prefix) (name)]
+			list: any [get path  set path copy []]
+			append list function spec bind body commands
+		]
+
+		=spec-def=: [								;-- just validation, to protect from errors
+			!(expected word!) opt [ahead block! [quote @(expected [object!])] ]
+			!(expected word!) opt [ahead block! [quote @(expected [block!]) ] ]
+			!(expected word!) opt [ahead block!
+				!(expected [quote [event!] | quote [event! none!] | quote [none! event!]])
+			]
+			opt [if (name = 'on-time) not [refinement! | end]
+				!(expected word!) opt [ahead block! [quote @(expected [percent!])]]
+			]
+			opt [not end !(expected /local) to end]
+		]
+
+		ok?: parse def [any [not end ahead !(expected set-word!) =style-def=]]		;-- no handlers in the topmost block allowed
+		#assert [ok?]
 	]
 
 	export [define-handlers]

@@ -113,6 +113,11 @@ block-stack: object [
 ;-- `compose` readability helper variant 2
 when: func [test value] [either :test [do :value][[]]]
 
+;; parse helper: reshape [ !(expected block!) or !(expected [integer! | float!]) ]
+expected: function ['rule] [
+    reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
+]
+
 
 range: func [a [integer!] b [integer!]] [
 	collect [while [a <= b] [keep a  a: a + 1]]
