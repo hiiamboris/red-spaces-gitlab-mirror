@@ -155,7 +155,7 @@ define-handlers [
 		; ]
 	]
 	
-	button: extends 'clickable [
+	button: extends 'clickable [						;-- focusable unlike `clickable` space
 		on-key [space path event] [
 			either all [
 				find " ^M" event/key

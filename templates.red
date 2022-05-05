@@ -2013,34 +2013,26 @@ grid-view-ctx: context [
 ; ]
 
 button-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if all [word = 'pushed?  :old <> :new] [
+			invalidate-cache space
+			;; prevents command from being evaluated multiple times on key press & hold:
+			if :old [do space/command]
+		]
+		space/data-view-on-change word :old :new
+	]
+	
 	templates/clickable: make-template 'data-view [
 		margin:   4										;-- change data-view's default
-		pushed?:  no									;-- becomes true when user pushes it; triggers `command`
 		rounding: 5										;-- box rounding radius in px
+		pushed?:  no									;-- becomes true when user pushes it; triggers `command`
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 
-		data-view-draw: :draw
-		draw: function [] [
-			drawn: data-view-draw						;-- draw content before we know it's size
-			self/size: margin * 2 + size
-			compose/only [translate (1x1 * margin) (drawn)]
-		]
-
 		data-view-on-change: :on-change*
-		on-change*: function [word [word!] old [any-type!] new [any-type!]] [
-			unless :old =? :new [
-				switch to word! word [
-					pushed? [
-						invalidate-cache self
-						;; prevents command from being evaluated multiple times on key press & hold:
-						if :old [do command]
-					]
-					rounding margin [invalidate-cache self]
-				]
-			]
-			data-view-on-change word :old :new
-		]
+		#on-change-redirect
 	]
 	
 	templates/button: make-template 'clickable []		;-- styled with decor
