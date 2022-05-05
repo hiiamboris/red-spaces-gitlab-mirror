@@ -153,6 +153,9 @@ define-handlers [
 		; on-click [space path event] [
 		; 	do space/command
 		; ]
+	]
+	
+	button: extends 'clickable [
 		on-key [space path event] [
 			either all [
 				find " ^M" event/key
@@ -176,8 +179,6 @@ define-handlers [
 			update
 		]
 	]
-	
-	button: extends 'clickable []
 
 
 	;-- *************************************************************************************
