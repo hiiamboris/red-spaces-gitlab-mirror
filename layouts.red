@@ -81,19 +81,18 @@ layouts: context [
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
-			if canvas2 [
-				canvas2/:x: max canvas2/:x size/:x		;-- only extend the canvas to max item's size, but not contract
-				if canvas2 <> canvas1 [					;-- second render cycle - only if canvas changed
-					pos: pos'  size: 0x0
-					repeat i count [
-						space: get name: either func? [spaces/pick i][spaces/:i]
-						if any draw? [drawn: render/on name canvas2]
-						#assert [space/size +< (1e7 by 1e7)]
-						geom:  pick map 2 * i
-						compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
-						pos:   pos + (space/size + spacing * guide)
-						size:  max size space/size
-					]
+			unless canvas2 [canvas2: 0x0]
+			canvas2/:x: max canvas2/:x size/:x			;-- only extend the canvas to max item's size, but not contract
+			if canvas2 <> canvas1 [					;-- second render cycle - only if canvas changed
+				pos: pos'  size: 0x0
+				repeat i count [
+					space: get name: either func? [spaces/pick i][spaces/:i]
+					if any draw? [drawn: render/on name canvas2]
+					#assert [space/size +< (1e7 by 1e7)]
+					geom:  pick map 2 * i
+					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
+					pos:   pos + (space/size + spacing * guide)
+					size:  max size space/size
 				]
 			]
 			size: pos - (spacing * guide)				;-- cut trailing space
