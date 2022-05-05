@@ -260,6 +260,7 @@ dump-parents-list: function [list [hash! block!] cache [hash! block!]] [			;-- u
 	print "]"
 ]
 
+;@@ TODO: at least 3 canvases: none (and maybe 0x0), half-infinite, and finite; configurable size
 debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 	context [
 		list: code: free: sized: drawn: path: obj: none

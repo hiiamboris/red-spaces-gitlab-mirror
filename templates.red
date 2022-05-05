@@ -21,9 +21,16 @@ Red [
 
 exports: [make-space make-template space?]
 
+space-object!: object [									;@@ workaround for #3804
+	;; this slows down space creation a little but lightens it's `draw` which is more important
+	;; because if on-change can't be relied upon, all initialization has to be done inside draw
+	;; see label template for an example of the related house keeping
+	on-change*: func [word old [any-type!] new [any-type!]] []
+]
+
 make-space: function [
 	"Create a space from a template TYPE"
-	type [word!]  "Looked up in spaces"	;@@ TODO: need an encompassing namespace for everything
+	type [word!]  "Looked up in templates"
 	spec [block!] "Extension code"
 	/block "Do not instantiate the object"
 	/name "Return a word referring to the space, rather than space object"
@@ -31,7 +38,7 @@ make-space: function [
 	base: templates/:type
 	#assert [block? base]
 	r: append copy/deep base spec
-	unless block [r: object r]
+	unless block [r: make space-object! r]
 	if name [r: anonymize type r]
 	r
 ]
@@ -98,6 +105,11 @@ templates/space: [										;-- minimum basis to build upon
 space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
 
 templates/timer: make-template 'space [rate: none]		;-- template space for timers
+
+;; has to be an object so these words have binding and can be placed as words into content field
+generic: object [										;-- holds commonly used spaces ;@@ experimental
+	empty: make-space 'space []							;-- used when no content is given
+]
 
 rectangle-ctx: context [
 	~: self
@@ -234,6 +246,7 @@ cell-ctx: context [
 	]
 	
 	draw: function [space [object!] canvas [pair! none!]] [
+		#assert [space/content]
 		drawn:  render/on space/content if canvas [subtract-canvas canvas 2x2 * space/margin]
 		cspace: get space/content
 		size: 2x2 * space/margin + cspace/size
@@ -256,7 +269,7 @@ cell-ctx: context [
 		drawn
 	]
 	
-	templates/cell: make-template 'space [
+	templates/box: make-template 'space [
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
 		margin:  1x1									;-- useful for drawing inner frame, which otherwise would be hidden by content
 		weight:  1										;@@ what default weight to use? what default alignment?
@@ -275,6 +288,8 @@ cell-ctx: context [
 			~/draw self canvas
 		]
 	]
+	
+	templates/cell: make-template 'box []				;-- same thing just with a border and background
 ]
 
 ;@@ TODO: externalize all functions, make them shared rather than per-object
@@ -722,6 +737,10 @@ container-ctx: context [
 		maybe cont/size: size
 		drawn
 	]
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if find [items item-list] to word! word [invalidate-cache space]
+	]
 
 	templates/container: make-template 'space [
 		size: none				;-- only available after `draw` because it applies styles
@@ -739,6 +758,7 @@ container-ctx: context [
 			#assert [layout "container/draw requires layout to be provided"]
 			~/draw self type settings xy1 xy2
 		]
+		#on-change-redirect
 	]
 ]
 
@@ -753,6 +773,7 @@ list-ctx: context [
 			:old <> :new
 			invalidate-cache space
 		]
+		space/container-on-change word :old :new
 	]
 	
 	templates/list: make-template 'container [
@@ -769,6 +790,8 @@ list-ctx: context [
 			settings: [axis margin spacing canvas]
 			container-draw/layout/only 'list settings xy1 xy2
 		]
+		
+		container-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -778,7 +801,11 @@ icon-ctx: context [
 	~: self
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [axis margin image text] word [invalidate-cache space]
+		switch to word! word [
+			; axis margin spacing [invalidate-cache space]		;-- handled by list itself
+			image       [space/spaces/image/data: new]	;-- invalidation is done by inner spaces
+			text        [space/spaces/text/text:  new]
+		]
 		space/list-on-change word :old :new
 	]
 	
@@ -791,15 +818,8 @@ icon-ctx: context [
 		spaces: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
-			label: make-space 'cell [content: 'text]	;-- used to align paragraph
-			set 'item-list [image label]
-		]
-		
-		list-draw: :draw
-		draw: func [/on canvas] [
-			spaces/text/text:  text
-			spaces/image/data: image
-			list-draw/on canvas
+			box:   make-space 'box [content: 'text]	;-- used to align paragraph
+			set 'item-list [image box]
 		]
 		
 		list-on-change: :on-change*
@@ -810,6 +830,13 @@ icon-ctx: context [
 
 
 tube-ctx: context [
+	~: self
+
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if find [margin spacing axes align width] word [invalidate-cache space]
+		space/container-on-change word :old :new
+	]
+	
 	templates/tube: make-template 'container [
 		margin:  5x5
 		spacing: 5x5
@@ -826,6 +853,9 @@ tube-ctx: context [
 			settings: [margin spacing align axes canvas]
 			container-draw/layout/only 'tube settings xy1 xy2
 		]
+
+		container-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 
@@ -833,33 +863,42 @@ tube-ctx: context [
 label-ctx: context [
 	~: self
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [axis margin image text] word [invalidate-cache space]
-		; space/list-on-change word :old :new
+	on-change: function [label [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			image [
+				spaces: label/spaces
+				spaces/image-box/content: bind case [	;-- invalidated by cell
+					image? label/image [
+						spaces/image/data: label/image
+						'image
+					]
+					string? label/image [
+						spaces/sigil/text: label/image
+						'sigil
+					]
+					char? label/image [
+						spaces/sigil/text: form label/image
+						'sigil
+					]
+					'else [in generic 'empty]
+				] spaces
+			]
+			text [
+				spaces: label/spaces
+				type: either newline: find label/text #"^/" [
+					spaces/text/text: copy/part label/text newline
+					spaces/comment/text: copy next newline
+					'comment
+				][
+					spaces/text/text: label/text
+					'text
+				]
+				spaces/body/item-list: spaces/lists/:type	;-- invalidated by container
+			]
+		]
+		label/list-on-change word :old :new				;-- handles axis margin spacing
 	]
 	
-	draw: function [label [object!]] [
-		sig: label/spaces/sigil
-		label/spaces/text/text: label/text
-		type: case [
-			image? label/image [
-				label/spaces/image/data: label/image
-				'image
-			]
-			string? label/image [
-				sig/text: label/image
-				'sigil
-			]
-			char? label/image [
-				sig/text: form label/image
-				'sigil
-			]
-			'else ['text]
-		]
-		label/item-list: label/spaces/lists/:type
-		label/list-draw
-	]
-		
 	templates/label: make-template 'list [
 		axis:    'x
 		margin:  0x0
@@ -867,18 +906,19 @@ label-ctx: context [
 		image:   none									;-- can be a string! as well
 		text:    ""
 		
-		spaces: context [
-			image: make-space 'image []
-			sigil: make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
-			text:  make-space 'text []
-			lists: [text: [text] sigil: [sigil text] image: [image text]]	;-- used to avoid extra bind
-			set 'item-list [text]
+		spaces: object [								;-- all lower level spaces used by label
+			image:      make-space 'image []
+			sigil:      make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
+			image-box:  make-space 'box  [content: in generic 'empty]	;-- needed for centering the image/sigil
+			text:       make-space 'text []						;-- 1st line of text
+			comment:    make-space 'text []						;-- lines after the 1st
+			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  item-list: [text comment]]
+			text-box:   make-space 'box  [content: 'body]		;-- needed for text centering
+			lists: [text: [text] comment: [text comment]]		;-- used to avoid extra bind in on-change
+			set 'item-list [image-box text-box]
 		]
 		
-		list-draw: :draw
-		draw: does [~/draw self]
-		
-		; list-on-change: :on-change*
+		list-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -1439,7 +1479,7 @@ grid-ctx: context [
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [
 				draw-ctx/ccache/:xy
-				draw-ctx/ccache/:xy: make-space/name 'cell []
+				draw-ctx/ccache/:xy: make-space 'cell []
 			]
 			cell: get name
 			unless cell/content =? space [cell/content: space]	;-- prevent unnecessary invalidation

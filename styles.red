@@ -41,6 +41,14 @@ do with [
 	; |y: make op! func [a b] [either :a [:b][:a]]
 	; |n: make op! func [a b] [either :a [:a][:b]]
 ][
+	;@@ fill this with some more
+	fonts: make map! reduce [
+		'text      make font! [name: svf/system size: svf/size]
+		'label     make font! [name: svf/system size: svf/size + 1]
+		'sigil     make font! [name: svf/system size: svf/size + 1]
+		'sigil-big make font! [name: svf/system size: svf/size + 8]
+		'comment   make font! [name: svf/system size: svf/size]
+	]
 
 	;-- styles should balance between readability, ease of extension and lookup speed
 	;-- benchmarks prove that if we define styles as words sequences, lookups are 5x slower (find, parse)
@@ -68,6 +76,20 @@ do with [
 		]
 
 		; list/item [[pen cyan]]
+		
+		label [(
+			if spaces/image-box/content = 'sigil [
+				spaces/sigil/font: either (spaces/body/item-list/2) = 'comment [
+					spaces/sigil/limits/min: 32
+					fonts/sigil-big
+				][
+					spaces/sigil/limits/min: 20
+					fonts/sigil
+				] 
+			] ()
+		)]
+		label/text-box/body/text    [(self/font: fonts/label ())]
+		label/text-box/body/comment [(self/font: fonts/comment ())]
 
 		button [
 			function [btn] [
@@ -106,6 +128,7 @@ do with [
 			]
 		]
 
+		;; cell is a box with a border around it; while general box is widely used in borderless state
 		cell [
 			function [cell /on canvas] [
 				drawn: cell/draw/on canvas				;-- draw to obtain the size

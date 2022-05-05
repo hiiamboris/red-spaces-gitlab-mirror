@@ -52,7 +52,7 @@ define-handlers [
 
 view/no-wait [
 	h: host [
-		tube with [width: 130 spacing: 5x5 hint: "Tube hint"] [
+		tube with [limits: 100 .. 180 spacing: 5x5 hint: "Tube hint"] [
 			wheel with [hint: "Just a travelling cog"]
 			; popup with [
 				; data: "click me buddy" layout: [button with [data: "WTF"]]
@@ -68,6 +68,11 @@ view/no-wait [
 			label with [image: #"✋" text: "Mentioned" hint: "Hint 3"]
 			label with [image: #"🙌" text: "Team mentioned" hint: "Hint 4"]
 			label with [image: #"👀" text: "Review requested" hint: "Hint 5"]
+			label with [text: "Label without a sigil" hint: "Hint 6"]
+			label with [image: "" text: "Label with empty sigil" hint: "Hint 7"]
+			label with [image: #"🍄" text: "Label with a heading^/and some text" hint: "Hint 8"]
+			;@@ there must be both image="string" and just #"char" ways of adding an image to the label
+			label with [image: "👩‍🚀" text: "Label with a heading^/and some text^/on two lines" hint: "Hint 9"]
 		]
 	]
 ]

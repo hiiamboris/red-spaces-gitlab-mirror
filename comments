@@ -114,6 +114,8 @@ document resource usage howto:
 	- draw can be heavy (10-20ms)
 	- spaces do not redraw unless `update` or `invalidate` is called
 	- cache? = yes usage
+generative planet atlas to demo full-featured table widget
+lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
 
 
 key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
@@ -956,6 +958,49 @@ global caching is trickier than I thought
 	  which results in fetching the outdated look
 	also after some thought, invalidation is a rare procudure and it can be slow
 	only cache lookups should be optimized to the fullest
+how to lay out rows? that is, should it be a block for data-view or row style or what?
+	what's in the block? how to denote separators? should separator be a globally shared widget?
+	e.g. image+heading+text+switch like on android?
+	or label+hotkey+'>'marker like in menus?
+	on a lower level this can be just a VID/S `row [image %img note "heading^/text" switch off]` or smth
+	but can I leverage type richness to get rid of template declarations and fit row into a single template?
+	easy: char!/file!/image! -> image, string! -> note, logic! -> switch, string! -> hotkey
+	no need for separator, can just declare first string as weight=1, rest as weight=0, with possible overrides
+	may still use issue for hotkeys, with the aim to automatically react to these hotkeys
+	how does the row know it's has submenus? aha, menu layout does that
+	also `>` stands in it's own column which hotkeys do not intersect, which makes it a bit too special
+	how to generalize? hmm what about `pad` space which I assign the same size as `>` limits, so they align
+	great!
+	don't like the weight=1 for general row though, maybe lists will have a special kind of row?
+	band? list-row? line? bar? strap? lane? band best hints at elasticity
+	may ofc just use row and add a stretch space, may even call it `<->`, and let menu add it
+	also menu may add `pad` or impose a limit on stretch, so hotkeys never get close to text
+menu DSL:
+	1st iteration:
+	  menu: a block! [any menu-item]
+	  menu-item: [layout opt hotkey action]
+	  layout:    [string! | block!]
+	  	string is interpreted simply as text,
+	  	while block may include other data as accepted by data-view
+	  hotkey:    [issue!] e.g. #Ctrl+O
+	  action:    [code | menu] (block is a submenu in this case)
+	  code:      [paren!]
+	hotkey as issue is bad: e.g. `Ctrl+,` is not a word type
+	but hotkey can be a string easily, why not? or tag.. let it be string for now until a better idea
+	so 2nd iteration:
+	  menu: a block! [any menu-item]
+	  menu-item: [any content [code | submenu]]
+	  content: [space | data]
+	  data: [string! | char! | image!]	- | logic! ? for list rows/bands
+	     question then can I use the same dialect for both menu and lists?
+	     certainly, android rows are either submenus, toggles or actions (popups?)
+	  space: [word!] - refers to an existing named space, e.g. <->
+	  code: [paren!]
+	  submenu: [ahead block! into menu]
+	  instead of text, menu/list will use `note` or.. how to name? message? record? all off
+	  ah! label could support multiple lines out of the box!
+	  `line` is a nice name for horizontal divisor, maybe `hline`, but only if `vline` makes sense, which I'm not sure
+is there a difference between tube and row? other than possibly applied style? row is only a VID style then
 		
 
 Timer design:
