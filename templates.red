@@ -545,7 +545,7 @@ paragraph-ctx: context [
 	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
 		unless space/layout [space/layout: rtd-layout [""]]
 		layout: space/layout
-		layout/text: space/text
+		layout/text: as string! space/text
 		layout/font: space/font						;@@ careful: fonts are not collected by GC, may run out of them easily
 		either width [									;-- wrap
 			layout/size: (max 1 width - (2 * space/margin/x)) by 2e9	;-- width has to be set to determine height
@@ -616,6 +616,9 @@ paragraph-ctx: context [
 	templates/text: make-template 'paragraph [
 		draw: does [~/draw self none]
 	]
+
+	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
+	templates/url: make-template 'paragraph []
 ]
 
 

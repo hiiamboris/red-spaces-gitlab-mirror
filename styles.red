@@ -75,6 +75,14 @@ do with [
 				; pen blue
 			]
 		]
+		
+		url [
+			function [url /on canvas] [
+				drawn: url/draw/on canvas				;-- must create `layout` which can otherwise be none
+				url/layout/data: reduce [1 by length? url/text  'underline]
+				compose/only [pen blue (drawn)]			;@@ color should be taken from the OS theme
+			]
+		]
 
 		; list/item [[pen cyan]]
 		

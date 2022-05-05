@@ -132,6 +132,13 @@ define-handlers [
 	]
 	
 	;-- *************************************************************************************
+	url: [
+		on-up [space path event] [
+			browse as url! space/text
+		]
+	]
+	
+	;-- *************************************************************************************
 	clickable: [
 		on-down [space path event] [
 			space/pushed?: yes
