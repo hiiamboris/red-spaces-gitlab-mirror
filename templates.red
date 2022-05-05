@@ -1075,13 +1075,11 @@ inf-scrollable-ctx: context [
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 		pages: 10x10							;-- window size multiplier in sizes of inf-scrollable
-
-		
-		content: 'window
-		window: make-space 'window [size: none]			;-- size is set by window/draw
-		#assert [map/1 = 'space]
-		map/1: 'window
 		; cache?: off
+
+		window: make-space 'window [size: none]			;-- size is set by window/draw
+		content: 'window
+		#assert [map/1 = 'window]						;-- set by on-change
 
 		roll-timer: make-space 'timer [rate: 4]			;-- how often to call `roll` when dragging
 		append map [roll-timer [offset 0x0 size 0x0]]
