@@ -139,7 +139,7 @@ define-handlers [
 	grid-view: extends 'inf-scrollable []
 
 	;-- *************************************************************************************
-	button: [
+	clickable: [
 		on-down [space path event] [
 			space/pushed?: yes
 			start-drag path
@@ -176,6 +176,8 @@ define-handlers [
 			update
 		]
 	]
+	
+	button: extends 'clickable []
 
 
 	;-- *************************************************************************************
