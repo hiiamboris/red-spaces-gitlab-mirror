@@ -860,6 +860,26 @@ tube-ctx: context [
 ]
 
 
+switch-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		all [
+			word = 'state
+			:old <> :new
+			invalidate-cache space
+		]
+	]
+	
+	templates/switch: make-template 'space [
+		state: off
+		data: make-space 'data-view []
+		draw: does [also data/draw size: data/size]
+		#on-change-redirect
+	]
+]
+
+
 label-ctx: context [
 	~: self
 	

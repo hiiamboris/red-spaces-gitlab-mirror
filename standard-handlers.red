@@ -118,35 +118,28 @@ define-handlers [
 	]
 
 	;-- *************************************************************************************
-	list-view: extends 'inf-scrollable [
-		;@@ just a temporary collapsing test - remove it later!
-		; list: [
-		; 	item: [
-		; 		on-click [space path event] [
-		; 			space/limits/max/y: unless space/limits/max/y [20]
-		; 			update
-		; 		]
-		; 	]
-		; ]
-	]
-
-	;-- *************************************************************************************
-	table: [
-		columns: extends 'list-view []
-	]
+	list-view: extends 'inf-scrollable []
 
 	;-- *************************************************************************************
 	grid-view: extends 'inf-scrollable []
 
 	;-- *************************************************************************************
+	switch: [
+		on-up [space path event] [
+			space/state: not space/state
+			update
+		]
+	]
+	
+	;-- *************************************************************************************
 	clickable: [
 		on-down [space path event] [
 			space/pushed?: yes
-			start-drag path
+			; start-drag path
 			update
 		]
 		on-up [space path event] [
-			stop-drag
+			; stop-drag
 			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
 			update
 		]

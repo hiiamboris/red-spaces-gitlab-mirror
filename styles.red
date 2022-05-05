@@ -41,10 +41,11 @@ do with [
 	; |y: make op! func [a b] [either :a [:b][:a]]
 	; |n: make op! func [a b] [either :a [:a][:b]]
 ][
-	;@@ fill this with some more
+	;@@ fill this with some more ;@@ should it be part of system/view/metrics/fonts?
 	fonts: make map! reduce [
 		'text      make font! [name: svf/system size: svf/size]
 		'label     make font! [name: svf/system size: svf/size + 1]
+		'switch    make font! [name: svf/system size: svf/size + 6]
 		'sigil     make font! [name: svf/system size: svf/size + 1]
 		'sigil-big make font! [name: svf/system size: svf/size + 8]
 		'comment   make font! [name: svf/system size: svf/size]
@@ -70,12 +71,15 @@ do with [
 			text paragraph fps-meter [
 				;-- font can be set in the style!:
 				;-- but impossible to debug it, as probe draw lists font with thousands of parents
-				(self/font: serif-12 ())				;@@ #3804 - requires self/ or won't work
+				(font: serif-12 ())
 				; pen blue
 			]
 		]
 
 		; list/item [[pen cyan]]
+		
+		switch [(data/font: fonts/switch data/data: either state ["☒"]["☐"] ())]	;-- clickable
+		logic  [(data/font: fonts/switch data/data: either state ["✓"]["✗"] ())]	;-- readonly
 		
 		label [(
 			if spaces/image-box/content = 'sigil [
@@ -88,8 +92,8 @@ do with [
 				] 
 			] ()
 		)]
-		label/text-box/body/text    [(self/font: fonts/label ())]
-		label/text-box/body/comment [(self/font: fonts/comment ())]
+		label/text-box/body/text    [(font: fonts/label ())]
+		label/text-box/body/comment [(font: fonts/comment ())]
 
 		button [
 			function [btn] [

@@ -1001,6 +1001,14 @@ menu DSL:
 	  ah! label could support multiple lines out of the box!
 	  `line` is a nice name for horizontal divisor, maybe `hline`, but only if `vline` makes sense, which I'm not sure
 	  OTOH divisor doesn't have to be a line, it may be styled differently
+	what other than string/char/image/logic (or word referring to these) can be data? (also a question for data-view)
+	  block can be a sublist? but it makes little sense, unless it's somehow different from the outer list
+	  besides, menus use blocks
+	  url will need a special url style that is underlined and can be clicked (TODO)
+	  other datatypes should be molded perhaps - as will be best for data-view
+	  word should probably be formed too, and reduce used when needed - useful for data-view of arbitrary red content
+	  data block is not a VID/S block - it doesn't support any space parameters or anything, just a plain list of stuff
+	  data block should likely become a tube, not list, so it will go to the next line gracefully
 is there a difference between tube and row? other than possibly applied style? row is only a VID style then
 		
 
