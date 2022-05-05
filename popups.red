@@ -80,7 +80,10 @@ show-popup: function [
 ][
 	limit: window/size - face/size
 	face/offset: clip [0x0 limit] offset
-	unless level = 0 [hide-popups window level + 1]		;-- no need to hide the hint - it's reused
+	unless level = 0 [									;-- no need to hide the hint - it's reused
+		hide-popups window 0							;-- hide hints if menu was shown
+		hide-popups window level + 1
+	]
 	save-popup window level face
 	unless find/same window/pane face [append window/pane face]
 ]
@@ -164,10 +167,10 @@ show-menu: function [
 ][
 	#assert [level > 0]
 	face: make-popup window level
-	face/rate: 10										;-- reduced timer pressure
+	face/rate:  10										;-- reduced timer pressure
 	face/space: lay-out-menu menu
-	face/size: none										;-- to make render set face/size
-	face/draw: render face
+	face/size:  none									;-- to make render set face/size
+	face/draw:  render face
 	show-popup window level offset face 
 ]
 
@@ -190,9 +193,9 @@ context [
 	]
 	
 	;; global space timers are not called unless event is processed, so timer needs a dedicated event function
-	hint-text:   none
-	show-time:   now/utc/precise						;-- when to show next hint
-	anchor:      0x0									;-- pointer offset of the over event (timer doesn't have this info)
+	hint-text: none
+	show-time: now/utc/precise							;-- when to show next hint
+	anchor:    0x0										;-- pointer offset of the over event (timer doesn't have this info)
 	on-time: function [host event] [
 		all [
 			hint-text
@@ -242,13 +245,14 @@ context [
 			either level = 0 [
 				reset-hint event						;-- no hint can trigger other hint
 			][
-				;@@ this is very simpistic now
+				;@@ this is very simpistic now - need multiple levels support
 				if event/away? [hide-popups event/window level]
-				;@@ should menus also reset hint?
+				; reset-hint event
 			]
 		][												;-- hovering over a normal host
 			either all [
 				space
+				not event/away?
 				text: find-field path 'hint string!		;-- hint is enabled for this space or one of it's parents
 			][
 				hint-text: text
@@ -272,6 +276,7 @@ context [
 		if menu: find-field path 'menu block! [
 			;; has to be under the pointer, so it won't miss /away? event closing the menu
 			offset: -1x-1 + face-to-window event/offset event/face
+			reset-hint event
 			show-menu event/window 1 offset menu
 		]
 	]
