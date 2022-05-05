@@ -139,7 +139,7 @@ lay-out-menu: function [spec [block!] /local code' data'] reshape [	;@@ DSL is ~
 	=menu=:      [any =menu-item= !(expected end)]
 	=menu-item=: [=layout= opt =hotkey= =action=]
 	=layout=:    [not end set data' !(expected [string! | block!]) (
-		append list/item-list anonymize 'button item: make-space 'button [data: data']	;@@ need a better button-like style/widget
+		append list/item-list anonymize 'clickable item: make-space 'clickable [data: data']
 	)]
 	=hotkey=:    [issue!]
 	=action=:    [ahead !(expected [block! | paren!]) =code= | =submenu=]

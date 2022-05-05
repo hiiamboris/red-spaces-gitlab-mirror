@@ -107,8 +107,9 @@ do with [
 				]
 				compose/only [
 					; shadow 2x4 5 0 (green)			;@@ not working - see #4895; not portable (Windows only)
-					fill-pen (bgnd)
 					push (drawn)
+					fill-pen (bgnd)
+					box 1x1 (btn/size - 1) (btn/rounding)
 					(any [focus ()])
 				]
 			]

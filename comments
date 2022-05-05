@@ -1000,6 +1000,7 @@ menu DSL:
 	  instead of text, menu/list will use `note` or.. how to name? message? record? all off
 	  ah! label could support multiple lines out of the box!
 	  `line` is a nice name for horizontal divisor, maybe `hline`, but only if `vline` makes sense, which I'm not sure
+	  OTOH divisor doesn't have to be a line, it may be styled differently
 is there a difference between tube and row? other than possibly applied style? row is only a VID style then
 		
 

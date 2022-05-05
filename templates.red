@@ -1479,7 +1479,7 @@ grid-ctx: context [
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [
 				draw-ctx/ccache/:xy
-				draw-ctx/ccache/:xy: make-space 'cell []
+				draw-ctx/ccache/:xy: make-space/name 'cell []
 			]
 			cell: get name
 			unless cell/content =? space [cell/content: space]	;-- prevent unnecessary invalidation
@@ -2013,25 +2013,18 @@ grid-view-ctx: context [
 ; ]
 
 button-ctx: context [
-	templates/button: make-template 'data-view [
-		; width: none								;-- when not 'none', forces button width in pixels - defined by data-view
-		margin: 4x4								;-- change data-view's default
-		pushed?: no								;-- becomes true when user pushes it; triggers `command`
-		rounding: 5								;-- box rounding radius in px
-		command: []								;-- code to run on click (on up: when `pushed?` becomes false)
-		;@@ TODO: shadow? or in styles? and for what other spaces? (only works on windows yet q.q)
+	templates/clickable: make-template 'data-view [
+		margin:   4										;-- change data-view's default
+		pushed?:  no									;-- becomes true when user pushes it; triggers `command`
+		rounding: 5										;-- box rounding radius in px
+		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 
 		data-view-draw: :draw
 		draw: function [] [
-			drawn: data-view-draw				;-- draw content before we know it's size
-			new: margin * 2 + size
-			self/size: as-pair any [width new/x] new/y
-			;-- box has to come before the content, so whatever fill-pen is used by style it won't override the text
-			compose/deep/only [
-				box 1x1 (size - 1) (rounding)
-				translate (margin) (drawn)
-			]
+			drawn: data-view-draw						;-- draw content before we know it's size
+			self/size: margin * 2 + size
+			compose/only [translate (1x1 * margin) (drawn)]
 		]
 
 		data-view-on-change: :on-change*
@@ -2049,6 +2042,8 @@ button-ctx: context [
 			data-view-on-change word :old :new
 		]
 	]
+	
+	templates/button: make-template 'clickable []		;-- styled with decor
 ]
 
 
