@@ -155,6 +155,14 @@ define-handlers [
 		; ]
 	]
 	
+	menu: [
+		clickable: extends 'clickable [
+			on-up [space path event] [
+				hide-popups event/window 1				;-- click on a menu item hides all visible menus
+			]
+		]
+	]
+		
 	button: extends 'clickable [						;-- focusable unlike `clickable` space
 		on-key [space path event] [
 			either all [

@@ -114,7 +114,7 @@ document resource usage howto:
 	- draw can be heavy (10-20ms)
 	- spaces do not redraw unless `update` or `invalidate` is called
 	- cache? = yes usage
-generative planet atlas to demo full-featured table widget
+generative planet atlas to demo full-featured table widget; galaxy name hash used as random seed
 lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
 
 
@@ -3313,3 +3313,65 @@ grid-cell is no longer needed as general cell is available
 		; ]
 	; ]
 ; ]
+
+parts of the prehistoric data-view template, now handled by box and on-change
+; invalidate: does [set-quiet 'valid? no]
+; set-content: function [] [
+	; case [
+		; block? :data [								;-- only recreates item spaces as necessary
+			; unless content = 'list [set-quiet 'content make-space/name 'list []]
+			; list: get content
+			; maybe list/margin: 0x0					;-- fit the list contents tightly, as we already have a margin
+			; maybe list/spacing: spc: spacing * 1x1	;-- ensure a pair value
+			; mrg: margin * 1x1
+			; n: length? data
+			; ;-- evenly distribute the items	only when width is fixed:  ;@@ any better idea??
+			; ;@@ also how to or should we apply width to images?
+			; item-width: all [width  to 1 width - (n - 1 * spc/x) - (2 * mrg/x) / n]
+			; repeat i n [
+				; value: :data/:i
+				; unless item: list/item-list/:i [
+					; append list/item-list item: anonymize 'item make-space 'data-view []
+				; ]
+				; item: get item
+				; maybe item/width: item-width
+				; set/any 'item/data :value
+				; item/set-content
+			; ]
+			; clear skip list/item-list n
+		; ]
+		; image? :data [
+			; unless content = 'image [set-quiet 'content make-space/name 'image []]
+			; img: get content
+			; img/data: data			;@@ copy or not? images consume RAM easily; need them at least GC-able to copy
+			; img/data: copy data
+		; ]
+		; 'else [
+			; text: either string? :data [copy data][mold :data]		;@@ limit it or not?
+			; unless content = 'paragraph [set-quiet 'content make-space/name 'paragraph []]
+			; para: get content
+			; maybe para/margin: margin
+			; maybe para/text: text
+			; unless para/font =? font [para/font: font]
+		; ]
+	; ]
+	; set-quiet 'valid? yes
+; ]
+; draw: function [/on canvas [pair! none!]] [
+	; unless valid? [set-content]
+	; obj: get content
+	; cdraw: render/on content canvas					;-- apply style to get the size
+	; sz: (mrg: margin * 1x1) * 2 + obj/size
+	; fsz: any [canvas sz]							;-- adapts it's size to canvas, if provided
+	; foreach x [x y] [								;-- but if it's unlimited, uses rendered size
+		; if fsz/:x >= 2e9 [fsz/:x: sz/:x]
+	; ]
+	; self/size: fsz
+	; change/only change map content compose [offset: (mrg) size: (sz - mrg)]
+	; compose/deep/only [
+		; clip 0x0 (sz) [				;@@ clipping should be done automatically somewhere for all spaces
+			; translate (mrg) (cdraw)
+		; ]
+	; ]
+; ]
+		

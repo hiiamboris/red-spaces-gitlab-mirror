@@ -36,7 +36,11 @@ make-space: function [
 	/name "Return a word referring to the space, rather than space object"
 ][
 	base: templates/:type
-	#assert [block? base]
+	#assert [any [
+		block? base
+		unless base [#print "*** Non-existing template '(type)'"]
+		#print "*** Template '(type)' is of type (type? base)"
+	]]
 	r: append copy/deep base spec
 	unless block [r: make space-object! r]
 	if name [r: anonymize type r]
@@ -271,9 +275,9 @@ cell-ctx: context [
 	
 	templates/box: make-template 'space [
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
-		margin:  1x1									;-- useful for drawing inner frame, which otherwise would be hidden by content
+		margin:  0x0									;-- useful for drawing inner frame, which otherwise would be hidden by content
 		weight:  1										;@@ what default weight to use? what default alignment?
-		content: make-space/name 'space []				;@@ consider `content: none` optimization if it's worth it
+		content: in generic 'empty						;@@ consider `content: none` optimization if it's worth it
 		map:     reduce [content [offset 0x0 size 0x0]]
 		;; cannot be cached, as content may change at any time and we have no way of knowing
 		; cache?:  off
@@ -289,7 +293,7 @@ cell-ctx: context [
 		]
 	]
 	
-	templates/cell: make-template 'box []				;-- same thing just with a border and background
+	templates/cell: make-template 'box [margin: 1x1]	;-- same thing just with a border and background ;@@ margin - in style?
 ]
 
 ;@@ TODO: externalize all functions, make them shared rather than per-object
@@ -707,8 +711,8 @@ list-ctx: context [
 	
 	templates/list: make-template 'container [
 		axis:    'x
-		margin:  5x5		;@@ default margins/spacing - should be tight or not? what is more common?
-		spacing: 5x5
+		margin:  0x0		;@@ default margins/spacing - should be tight or not? what is more common?
+		spacing: 0x0
 		;@@ TODO: alignment?
 		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
 		;@@ or use on-deep-change to update size - what will incur less recalculations?
@@ -767,11 +771,11 @@ tube-ctx: context [
 	]
 	
 	templates/tube: make-template 'container [
-		margin:  5x5
-		spacing: 5x5
+		margin:  0x0
+		spacing: 0x0
 		axes:    [e s]
 		align:   -1x-1
-		width:   none			;@@ this seems required, but maybe a mandatory cell can replace it?
+		width:   none			;@@ this seems required, but maybe a mandatory cell can replace it? or limits?
 		; cache?:  off
 		
 		container-draw: :draw
@@ -806,6 +810,8 @@ switch-ctx: context [
 		draw: does [also data/draw size: data/size]
 		#on-change-redirect
 	]
+	
+	templates/logic: make-template 'switch []			;-- uses different style
 ]
 
 
@@ -874,89 +880,40 @@ label-ctx: context [
 
 
 
-;-- a polymorphic style: given `data` creates a visual representation of it
+;; a polymorphic style: given `data` creates a visual representation of it
+;; `content` can be used directly to put a space into it (useful in clickable, button)
 ;@@ TODO: complex types should leverage table style
-templates/data-view: make-template 'space [
-	size:    none					;-- only available after `draw` because it applies styles
-	data:    none					;-- ANY red value
-	;@@ remove width
-	width:   none					;-- when set, forces output to have fixed width (can be a list)
-	margin:  0x0
-	spacing: 5x5					;-- used only when data is a block
-	font:    none					;-- can be set in style
-	
-	content: none
-	map:     []
-	valid?:  no						;-- can be reset without losing content so content can be reused
-	; cache?:  off
-	invalidate: does [set-quiet 'valid? no]
+data-view-ctx: context [
+	~: self
 
-	set-content: function [] [
-		case [
-			block? :data [								;-- only recreates item spaces as necessary
-				unless content = 'list [set-quiet 'content make-space/name 'list []]
-				list: get content
-				maybe list/margin: 0x0					;-- fit the list contents tightly, as we already have a margin
-				maybe list/spacing: spc: spacing * 1x1	;-- ensure a pair value
-				mrg: margin * 1x1
-				n: length? data
-				;-- evenly distribute the items	only when width is fixed:  ;@@ any better idea??
-				;@@ also how to or should we apply width to images?
-				item-width: all [width  to 1 width - (n - 1 * spc/x) - (2 * mrg/x) / n]
-				repeat i n [
-					value: :data/:i
-					unless item: list/item-list/:i [
-						append list/item-list item: anonymize 'item make-space 'data-view []
-					]
-					item: get item
-					maybe item/width: item-width
-					set/any 'item/data :value
-					item/set-content
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			spacing [invalidate-cache space]
+			font [
+				cspace: get space/content
+				if all [in cspace 'font  not cspace/font =? space/font] [
+					cspace/font: space/font
+					invalidate-cache space
 				]
-				clear skip list/item-list n
 			]
-			image? :data [
-				unless content = 'image [set-quiet 'content make-space/name 'image []]
-				img: get content
-				img/data: data			;@@ copy or not? images consume RAM easily; need them at least GC-able to copy
-				; img/data: copy data
-			]
-			'else [
-				text: either string? :data [copy data][mold :data]		;@@ limit it or not?
-				unless content = 'paragraph [set-quiet 'content make-space/name 'paragraph []]
-				para: get content
-				; maybe para/margin: margin
-				maybe para/text: text
-				unless para/font =? font [para/font: font]
+			data [
+				space/content: either block? :new [
+					anonymize 'tube lay-out-data new	;@@ use `row`?
+				][
+					wrap-value :new
+				] 
 			]
 		]
-		set-quiet 'valid? yes
+		space/box-on-change word :old :new
 	]
-
-	draw: function [/on canvas [pair! none!]] [
-		unless valid? [set-content]
-		obj: get content
-		cdraw: render/on content canvas					;-- apply style to get the size
-		sz: (mrg: margin * 1x1) * 2 + obj/size
-		fsz: any [canvas sz]							;-- adapts it's size to canvas, if provided
-		foreach x [x y] [								;-- but if it's unlimited, uses rendered size
-			if fsz/:x >= 2e9 [fsz/:x: sz/:x]
-		]
-		self/size: fsz
-		change/only change map content compose [offset: (mrg) size: (sz - mrg)]
-		compose/deep/only [
-			; clip 0x0 (sz) [				;@@ clipping should be done automatically somewhere for all spaces
-				translate (mrg) (cdraw)
-			; ]
-		]
-	]
-	
-	on-change*: function [word old [any-type!] new [any-type!]] [
-		all [
-			find [data width] word
-			not :old =? :new
-			invalidate
-		]
+			
+	templates/data-view: make-template 'box [			;-- inherit margin, content, map from the box
+		data:    none					;-- ANY red value
+		spacing: 5x5					;-- used only when data is a block
+		font:    none					;-- can be set in style, unfortunately required here to override font of rich-text face
+		
+		box-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 

@@ -42,7 +42,7 @@ spaces/templates/wheel: make-template 'space [
 	font: make font! [size: 27]
 	draw: does [
 		angle: angle + 1 % 360
-		compose [translate 25x25 rotate (angle) translate -25x-25 font (font) text 0x0 "⚙"]
+		compose/deep [push [translate 25x25 rotate (angle) translate -25x-25 font (font) text 0x0 "⚙"]]
 	]
 	rate: 67
 ]
@@ -50,17 +50,19 @@ define-handlers [
 	wheel: [on-time [space path event] [invalidate space update]]
 ]
 
-view/no-wait [
+view/no-wait reshape [
 	h: host [
-		tube with [limits: 100 .. 180 spacing: 5x5 hint: "Tube hint"] [
+		tube with [limits: 100 .. 180 spacing: 5x5 hint: "Tube hint"] [ 
 			wheel with [hint: "Just a travelling cog"]
+			switch switch with [state: on]
 			; popup with [
 				; data: "click me buddy" layout: [button with [data: "WTF"]]
 			; ]
+			url with [text: https://codeberg.org/hiiamboris/red-spaces limits: 150 .. 200]
 			label with [image: #"🎯" text: "Assigned" hint: "Hint 1"
 				menu: [
-					"calc 1+1"   (probe 1 + 1)
-					"calc 2*2"   (probe 2 * 2)
+					"calc 1+1" #[true]   (probe 1 + 1)
+					"calc 2*2" #[false]   (probe 2 * 2)
 					"beam me up" (print "Zweeee")
 				]
 			]
@@ -77,4 +79,5 @@ view/no-wait [
 	]
 ]
 
+; debug-draw 
 unless system/build/config/gui-console? [do-events]

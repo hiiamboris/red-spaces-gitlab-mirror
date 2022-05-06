@@ -30,7 +30,7 @@ init-spaces-tree: function [face [object!]] [
 		r: copy []
 		while [not empty? spec] [
 			name: spec/1  spec: next spec
-			#assert [word? name]		;@@ TODO: normal error handling here
+			#assert [word? name "VID/S encountered a non-word space name!"]		;@@ TODO: normal error handling here
 			#assert [templates/:name]
 
 			with-blk: []
@@ -75,4 +75,34 @@ init-spaces-tree: function [face [object!]] [
 	face/draw: rendered
 ]
 
+
+wrap-value: function [
+	"Create a space to represent given VALUE; return it's name"
+	value [any-type!]
+][ 
+	switch/default type?/word :value [
+		string! [make-space/name 'text  [text:  value]]	;@@ text or paragraph??
+		logic!  [make-space/name 'logic [state: value]]
+		image!  [make-space/name 'image [data:  value]]
+		url!    [make-space/name 'url   [data:  value]]
+		;@@ also object & map as grid? and use lay-out-data for block?
+	] [make-space/name 'text [text: mold :value]]
+]
+
+lay-out-data: function [
+	"Create a space layout out of DATA block"
+	data [block!] "image, logic, url get special treatment"
+	/only "Return only the spaces list, do not create a layout"
+][
+	result: map-each value data [wrap-value :value]
+	either only [
+		result
+	][
+		make-space 'tube [
+			margin:    0x0								;-- outer space most likely has it's own margin
+			spacing:   10x10
+			item-list: result
+		]
+	]
+]
 

@@ -5,7 +5,7 @@ Red [
 ]
 
 
-;; requires events, templates, reshape
+;; requires events, templates, vid, reshape
 
 ;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
 ;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
@@ -137,23 +137,35 @@ show-hint: function [
 	]
 ]
 
-lay-out-menu: function [spec [block!] /local code' data'] reshape [	;@@ DSL is ~20% implemented only
+lay-out-menu: function [spec [block!] /local code name] reshape [	;@@ DSL is ~20% implemented only
 	;@@ preferably VID/S should be used here and in hints above
+	data:   clear []
+	spaces: clear []
 	=menu=:      [any =menu-item= !(expected end)]
-	=menu-item=: [=layout= opt =hotkey= =action=]
-	=layout=:    [not end set data' !(expected [string! | block!]) (
-		append list/item-list anonymize 'clickable item: make-space 'clickable [data: data']
+	=menu-item=: [=content= =new-item= ahead !(expected [paren! | block!]) [=code= | =submenu=]]
+	=content=:   [ahead !(expected [word! | string! | char! | image! | logic!]) some [=data= | =space=]]
+	=data=:      [
+		collect into data some keep [string! | char! | image! | logic!] (
+			append spaces lay-out-data/only data
+			clear data
+		)
+	]
+	=space=:     [set name word! (#assert [space? get/any name]) (append spaces name)]
+	; =submenu=:   [ahead block! into =menu=]	;@@ not yet supported
+	=new-item=:  [(
+		append list/item-list anonymize 'clickable item: make-space 'clickable [
+			content: make-space/name 'tube [item-list: copy spaces]
+		]
+		clear spaces
 	)]
-	=hotkey=:    [issue!]
-	=action=:    [ahead !(expected [block! | paren!]) =code= | =submenu=]
-	=submenu=:   [ahead block! into =menu=]
-	=code=:      [set code' paren! (item/command: code')]
+	; =new-item=:  [(append list/item-list anonymize 'clickable item: make-space 'clickable [data: data'])]
+	=code=:      [set code paren! (item/command: code)]
 	
-	list: none
 	layout: make-space/name 'cell [						;@@ must be 'menu
-		content: make-space/name 'list [axis: 'y set 'list self]
+		content: anonymize 'menu set 'list make-space 'list [axis: 'y]
 	]
 	parse spec =menu=
+	list/item-list: list/item-list						;-- trigger on-change after all appends
 	layout
 ]
 
