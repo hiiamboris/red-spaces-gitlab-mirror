@@ -711,11 +711,11 @@ list-ctx: context [
 	
 	templates/list: make-template 'container [
 		axis:    'x
-		margin:  0x0		;@@ default margins/spacing - should be tight or not? what is more common?
+		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
+		;@@ VID layout styles may include nonzero spacing as defaults, unless tight option is used
+		margin:  0x0
 		spacing: 0x0
 		;@@ TODO: alignment?
-		;@@ this requires /size caching - ensure it is cached (e.g. as `content` which is generic and may be a list)
-		;@@ or use on-deep-change to update size - what will incur less recalculations?
 		; cache?:    off
 
 		container-draw: :draw
