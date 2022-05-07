@@ -25,7 +25,7 @@ view/no-wait/options [
 				size: 300x300
 			]
 		]
-	] with [color: system/view/metrics/colors/panel]
+	]
 	; b: host with [color: system/view/metrics/colors/panel size: test/size space: 'test]
 	; draw b/space/draw
 	; on-detect [probe event/type]

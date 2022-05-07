@@ -1952,7 +1952,7 @@ templates/rotor: make-template 'space [
 	;@@ TODO: zoom for round spaces like spiral
 
 	map: [							;-- unused, required only to tell space iterators there's inner faces
-		ring ring					;-- 1st = placeholder for `content` (see `draw`)
+		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
 	]
 
 	into: function [xy [pair!] /force name [word! none!]] [
@@ -2051,10 +2051,17 @@ templates/spiral: make-template 'space [
 	size: 100x100
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
+	map: [field [offset 0x0 size 999x999]]
 
+	invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
+		paragraph/layout: none
+		invalidate-cache ??~ self
+	]
+		
 	into: function [xy [pair!] /force name [word! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
-		r: field/para/layout
+		render in field 'paragraph			;-- produce layout 
+		r: field/paragraph/layout
 		#assert [r]
 
 		len: length? text: field/text
@@ -2080,11 +2087,11 @@ templates/spiral: make-template 'space [
 	]
 
 	draw: function [] [
-		maybe field/para/width: none		;-- disable wrap
-		maybe field/para/text: field/text
-		unless r: field/para/layout [
-			field/para/lay-out
-			r: field/para/layout
+		maybe field/paragraph/width: none		;-- disable wrap
+		maybe field/paragraph/text: field/text
+		unless r: field/paragraph/layout [
+			paragraph-ctx/lay-out field/paragraph none
+			r: field/paragraph/layout
 			#assert [r]
 		]
 
@@ -2121,7 +2128,7 @@ templates/spiral: make-template 'space [
 	]
 ]
 
-templates/fps-meter: make-template 'paragraph [
+templates/fps-meter: make-template 'text [
 	cache?:    off
 	rate:      100
 	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host
