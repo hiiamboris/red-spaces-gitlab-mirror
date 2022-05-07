@@ -162,7 +162,10 @@ lay-out-menu: function [spec [block!] /local code name] reshape [	;@@ DSL is ~20
 	=code=:      [set code paren! (item/command: code)]
 	
 	layout: make-space/name 'cell [						;@@ must be 'menu
-		content: anonymize 'menu set 'list make-space 'list [axis: 'y]
+		content: anonymize 'menu set 'list make-space 'list [
+			margin: spacing: 5x5
+			axis: 'y
+		]
 	]
 	parse spec =menu=
 	list/item-list: list/item-list						;-- trigger on-change after all appends

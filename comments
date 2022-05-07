@@ -101,6 +101,7 @@ demo: example of a glossy style sheet
 `arrange` func based on flow layouts that will work with faces?
 web preview component to preview the links in the chat
 widget: markdown renderer (unless Bolek adds it)
+	even more value is in a truly rich editor that can be used for markdown, for email composition, wiki creation etc
 consider removing double blocks from styles: just check if 1st word is func/function ?
 is there an alternative to styles than draw-blocks? like a set of facets and a special facet `style` for draw commands?
 let one define actors for static spaces (in VID or by adding them to the space manually)
@@ -116,9 +117,11 @@ document resource usage howto:
 	- cache? = yes usage
 generative planet atlas to demo full-featured table widget; galaxy name hash used as random seed
 lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
+debug-draw should become a fully-featured layout explorer to help users understand the anatomy of their layouts
+	and it should move the main window to the left
 
 
-key aspects: draggable columns, row span, rearrange by styles (and styling DSL?), sizing model
+key aspects: draggable columns, rearrange by styles (and styling DSL?)
 
 QUIRKS
 

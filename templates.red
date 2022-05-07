@@ -1932,8 +1932,8 @@ button-ctx: context [
 	]
 	
 	templates/clickable: make-template 'data-view [
-		margin:   4										;-- change data-view's default
-		rounding: 5										;-- box rounding radius in px
+		;@@ should pushed be in button rather?
+		align:    0x0									;-- center by default
 		pushed?:  no									;-- becomes true when user pushes it; triggers `command`
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
 		;@@ should command be also a function (actor)? if so, where to take event info from?
@@ -1942,7 +1942,10 @@ button-ctx: context [
 		#on-change-redirect
 	]
 	
-	templates/button: make-template 'clickable []		;-- styled with decor
+	templates/button: make-template 'clickable [		;-- styled with decor
+		margin: 4x4
+		rounding: 5										;-- box rounding radius in px
+	]
 ]
 
 
