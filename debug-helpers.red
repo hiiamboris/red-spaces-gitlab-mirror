@@ -232,9 +232,11 @@ context [
 			throw copy append path index? pos
 		][
 			append path 1
-			for-each [pos: inner [block! hash!]] list [
-				unless any [hash? inner block? inner] [continue]	;@@ can't locate this bug!
-				change top path index? pos
+			forall list [								;@@ for-each can't be used with throw yet!
+				inner: list/1
+				;@@ [hash! block!] value filter seems buggy in for-each! can't locate the bug!
+				unless any [hash? inner block? inner] [continue]	
+				change top path index? list
 				find-deep* inner :value
 			]
 			remove top path
