@@ -62,9 +62,9 @@ tubes: collect [
 			keep [list with [axis: 'x]]
 			keep/only map-each align group [
 				compose/deep/only [
-					list with [axis: 'y] [
+					list with [axis: 'y spacing: margin: 5x5] [
 						paragraph with [width: 130 text: (#composite "align: (mold align)")]
-						tube with [axes: (axes) align: (align) width: 130 item-list: boxes]
+						tube with [spacing: margin: 5x5 axes: (axes) align: (align) width: 130 item-list: boxes]
 					]
 				]
 			]
@@ -79,7 +79,7 @@ view/no-wait compose/only/deep [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
 			scrollable with [size: 540x500] [
-				list with [axis: 'y] (tubes)
+				list with [axis: 'y margin: spacing: 5x5] (tubes)
 			]
 		]
 	]

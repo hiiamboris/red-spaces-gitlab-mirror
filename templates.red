@@ -908,9 +908,12 @@ data-view-ctx: context [
 	]
 			
 	templates/data-view: make-template 'box [			;-- inherit margin, content, map from the box
-		data:    none					;-- ANY red value
-		spacing: 5x5					;-- used only when data is a block
-		font:    none					;-- can be set in style, unfortunately required here to override font of rich-text face
+		align:   -1x-1									;-- left-top aligned by default
+		data:    none									;-- ANY red value
+		spacing: 5x5									;-- used only when data is a block
+		;; font can be set in style, unfortunately required here to override font of rich-text face
+		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
+		font:    none									
 		
 		box-on-change: :on-change*
 		#on-change-redirect
@@ -1943,7 +1946,7 @@ button-ctx: context [
 ]
 
 
-
+;@@ this should not be generally available, as it's for the tests only - remove it!
 templates/rotor: make-template 'space [
 	content: none
 	angle: 0
