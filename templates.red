@@ -1954,6 +1954,12 @@ templates/rotor: make-template 'space [
 	map: [							;-- unused, required only to tell space iterators there's inner faces
 		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
 	]
+	
+	on-change*: function [word [any-word!] old [any-type!] new [any-type!]] [
+		if find [angle content] word [
+			invalidate-cache self
+		]
+	]
 
 	into: function [xy [pair!] /force name [word! none!]] [
 		unless content [return none]
@@ -2053,9 +2059,9 @@ templates/spiral: make-template 'space [
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
 	map: [field [offset 0x0 size 999x999]]
 
-	invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
+	invalidate: does [
 		paragraph/layout: none
-		invalidate-cache ??~ self
+		invalidate-cache
 	]
 		
 	into: function [xy [pair!] /force name [word! none!]] [
@@ -2090,7 +2096,9 @@ templates/spiral: make-template 'space [
 		maybe field/paragraph/width: none		;-- disable wrap
 		maybe field/paragraph/text: field/text
 		unless r: field/paragraph/layout [
-			paragraph-ctx/lay-out field/paragraph none
+			invalidate-cache field/paragraph
+			render in field 'paragraph			;-- produce layout 
+			; paragraph-ctx/lay-out field/paragraph none
 			r: field/paragraph/layout
 			#assert [r]
 		]
@@ -2103,9 +2111,9 @@ templates/spiral: make-template 'space [
 		rmid: full/y / -2 + absolute p/y	;-- radius of the middle line of the string
 		wavg: full/x / len					;-- average char width
 		p: p - (wavg / 2)					;-- offset the typesetter to center the average char
-		render: clear []		;@@ this is a bug, really
+		drawn: clear []		;@@ this is a bug, really
 		;@@ TODO: initial angle
-		append render compose [translate (size / 2)]
+		append drawn compose [translate (size / 2)]
 		repeat i len [			;@@ should be for-each [/i c]
 			c: text/:i
 			bgn: caret-to-offset r i
@@ -2122,9 +2130,9 @@ templates/spiral: make-template 'space [
 					(box)
 					text (p) (form c)
 				]
-			] tail render
+			] tail drawn
 		]
-		render
+		drawn
 	]
 ]
 
