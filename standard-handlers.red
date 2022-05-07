@@ -194,13 +194,18 @@ define-handlers [
 		ring: [
 			on-down [space path event] [
 				rotor: get path/-2
-				start-drag/with path (rotor/angle - path/2/x) // 360
+				ofs: path/-1 - (rotor/size / 2)
+				angle: arctangent2 ofs/y ofs/x
+				start-drag/with path reduce [rotor/angle angle]
 			]
 			on-up [space path event] [stop-drag]
 			on-over [space path event] [
 				unless dragging? [exit]
 				rotor: get path/-2
-				rotor/angle: (path/2/x + drag-parameter) // 360
+				ofs: path/-1 - (rotor/size / 2)
+				angle: arctangent2 ofs/y ofs/x
+				parm: drag-parameter
+				rotor/angle: (parm/1 + angle - parm/2) // 360
 				update
 			]
 		]

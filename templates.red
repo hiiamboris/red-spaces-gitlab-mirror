@@ -1966,7 +1966,7 @@ templates/rotor: make-template 'space [
 		spc: get content
 		r1: to 1 spc/size/x ** 2 + (spc/size/y ** 2) / 4 ** 0.5
 		r2: r1 + 10
-		c: cosine angle  s: sine angle
+		c: cosine angle  s: negate sine angle
 		p0: p: xy - (size / 2)
 		p: as-pair  p/x * c - (p/y * s)  p/x * s + (p/y * c)	;-- rotate the coordinates
 		xy: p + (size / 2)
@@ -1993,7 +1993,7 @@ templates/rotor: make-template 'space [
 			push [
 				line-width 10
 				translate (size / 2)
-				rotate (0 - angle)
+				rotate (angle)
 				(collect [
 					repeat i 5 [
 						keep compose [arc 0x0 (r1 + 5 * 1x1) (a: i * 72 - 24 - 90) 48]
@@ -2002,7 +2002,7 @@ templates/rotor: make-template 'space [
 				; circle (size / 2) (r1 + 5)
 			]
 			translate (size - spc/size / 2) [
-				rotate (0 - angle) (spc/size / 2)
+				rotate (angle) (spc/size / 2)
 				(drawn)
 			]
 		]
