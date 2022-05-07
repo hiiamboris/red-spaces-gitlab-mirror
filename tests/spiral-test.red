@@ -5,8 +5,13 @@ Red [
 	needs:   view
 ]
 
+;; Fun facts:
+;; - the text string in this demo is circa 25000px long
+;; - it takes ~100ms to lay out the text, but 400-600ms to draw it (see #5130)
+
 #include %../everything.red
 
+;; this code is a bit messy and I'm lazy to clean it up
 spaces/templates/spiral: make-template 'space [
 	size: 100x100
 	content: 'field			;-- reuse field to apply it's event handlers
@@ -91,7 +96,6 @@ lorem10: append/dup {} lorem 10
 
 
 counter: 0
-; system/view/capturing?: yes
 view/no-wait/options [
 	below
 	b: host [
@@ -102,9 +106,6 @@ view/no-wait/options [
 			]
 		]
 	]
-	; b: host with [color: system/view/metrics/colors/panel size: test/size space: 'test]
-	; draw b/space/draw
-	; on-detect [probe event/type]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
