@@ -106,7 +106,7 @@ templates/space: [										;-- minimum basis to build upon
 	cache?: on
 	; rate: none
 ]
-space?: func [obj] [all [object? :obj  in obj 'draw  in obj 'size]]
+space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
 
 templates/timer: make-template 'space [rate: none]		;-- template space for timers
 
