@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;@@ needs: map-each, anonymize, reshape, export
+;@@ needs: map-each, anonymize, reshape, export, contrast-with
 
 
 styles: none											;-- reserve names in the spaces/ctx context
@@ -142,7 +142,7 @@ do with [
 		]
 
 		;; cell is a box with a border around it; while general box is widely used in borderless state
-		cell [
+		menu cell [
 			function [cell /on canvas] [
 				drawn: cell/draw/on canvas				;-- draw to obtain the size
 				compose/only/deep [
@@ -155,6 +155,16 @@ do with [
 				]
 			]
 		]
+		
+		menu/list/clickable [(
+			when self =? :highlight [
+				compose/deep [push [
+					pen off
+					fill-pen !(svmc/text + 0.0.0.220)
+					box 0x0 (size)
+				] pen !(enhance svmc/panel svmc/text 125%)]
+			]
+		)]
 		
 		;@@ for this name to work, layout should prefer 'hint' keyword over 'hint' template
 		hint [

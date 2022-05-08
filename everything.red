@@ -47,6 +47,7 @@ do/expand [
 	#include %../common/with.red
 	#include %../common/catchers.red
 	#include %../common/is-face.red
+	#include %../common/contrast-with.red
 	; #include %../common/keep-type.red
 	#include %../common/typecheck.red
 	; #include %../common/selective-catch.red

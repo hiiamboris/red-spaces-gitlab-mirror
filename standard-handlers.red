@@ -156,9 +156,21 @@ define-handlers [
 	]
 	
 	menu: [
-		clickable: extends 'clickable [
-			on-up [space path event] [
-				hide-popups event/window 1				;-- click on a menu item hides all visible menus
+		list: [
+			clickable: extends 'clickable [
+				on-up [space path event] [
+					hide-popups event/window 1			;-- click on a menu item hides all visible menus
+				]
+				on-over [space path event] [
+					unless :highlight =? space [
+						if space? :highlight [invalidate-cache highlight]
+						set 'highlight space
+						invalidate-cache space
+						update
+					]
+					; probe within? path/2 0x0 space/size
+					; dump-event event
+				]
 			]
 		]
 	]

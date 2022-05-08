@@ -137,38 +137,37 @@ show-hint: function [
 	]
 ]
 
-lay-out-menu: function [spec [block!] /local code name] reshape [	;@@ DSL is ~20% implemented only
+lay-out-menu: function [spec [block!] /local code name tube list] reshape [
 	;@@ preferably VID/S should be used here and in hints above
-	data:   clear []
-	spaces: clear []
+	data*:       clear []								;-- consecutive data values
+	row*:        clear []								;-- space names of a single row
+	menu*:       clear []								;-- row names list
+	
 	=menu=:      [any =menu-item= !(expected end)]
-	=menu-item=: [=content= =new-item= ahead !(expected [paren! | block!]) [=code= | =submenu=]]
+	=menu-item=: [=content= (do new-item) ahead !(expected [paren! | block!]) [=code= | =submenu=]]
 	=content=:   [ahead !(expected [word! | string! | char! | image! | logic!]) some [=data= | =space=]]
-	=data=:      [
-		collect into data some keep [string! | char! | image! | logic!] (
-			append spaces lay-out-data/only data
-			clear data
-		)
-	]
-	=space=:     [set name word! (#assert [space? get/any name]) (append spaces name)]
+	=data=:      [collect into data* some keep [string! | char! | image! | logic!] (do flush-data)]
+	=space=:     [set name word! (#assert [space? get/any name]) (append row* name)]
 	; =submenu=:   [ahead block! into =menu=]	;@@ not yet supported
-	=new-item=:  [(
-		append list/item-list anonymize 'clickable item: make-space 'clickable [
-			content: make-space/name 'tube [item-list: copy spaces]
-		]
-		clear spaces
-	)]
-	; =new-item=:  [(append list/item-list anonymize 'clickable item: make-space 'clickable [data: data'])]
 	=code=:      [set code paren! (item/command: code)]
 	
-	layout: make-space/name 'cell [						;@@ must be 'menu
-		content: anonymize 'menu set 'list make-space 'list [
-			margin: spacing: 5x5
-			axis: 'y
+	flush-data: [
+		append row* lay-out-data/only data*
+		clear data*
+	]
+	new-item: [
+		append menu* anonymize 'clickable item: make-space 'clickable [
+			margin: 4x4
+			content: anonymize 'tube set 'tube make-space 'tube []
 		]
+		tube/item-list: flush row*
 	]
 	parse spec =menu=
-	list/item-list: list/item-list						;-- trigger on-change after all appends
+	
+	layout: anonymize 'menu make-space 'cell [
+		content: anonymize 'list set 'list make-space 'list [axis: 'y margin: 4x4]
+	]
+	list/item-list: flush menu*
 	layout
 ]
 
