@@ -5,7 +5,7 @@ Red [
 ]
 
 ; #include %../common/assert.red
-exports: [by abs range! range? .. when clip ortho dump-event boxes-overlap?]
+exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap?]
 
 ;@@ unfortunately macros are not imported yet due to custom `include` :(
 ;@@ need a special macros file
@@ -110,17 +110,23 @@ block-stack: object [
 	; compose/into block buffer-for block
 ; ]
 
-;-- `compose` readability helper variant 2
-when: func [test value] [either :test [do :value][[]]]
-
 ;; parse helper: reshape [ !(expected block!) or !(expected [integer! | float!]) ]
 expected: function ['rule] [
     reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
 ]
 
+flush: function [
+	"Grab a copy of SERIES, clearing the original"
+	series [series!]
+][
+	also copy series clear series
+]
 
-range: func [a [integer!] b [integer!]] [
-	collect [while [a <= b] [keep a  a: a + 1]]
+only: function [
+	"Turn falsy values into unset, eliminating from compose expressions"
+	value [any-type!] "Any truthy value is passed through"
+][
+	any [:value ()]
 ]
 
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
@@ -128,6 +134,133 @@ clip: func [range [block!] value [scalar!]] [
 	range: reduce/into range clear []
 	#assert [any [not number? range/1  range/1 <= range/2]]
 	min range/2 max range/1 value
+]
+
+mix: function [
+	"Impose COLOR onto BGND and return the resulting color"
+	bgnd  [tuple!] "Alpha channel ignored"
+	color [tuple!] "Alpha channel determines blending amount"
+][
+	c3: c4: color + 0.0.0.0
+	c3/4: none
+	bg-amnt: c4/4 / 255
+	bgnd * bg-amnt + (1 - bg-amnt * c3)
+]
+
+#assert [
+	0.0.0   = mix 0.0.0     0.0.0
+	0.0.0   = mix 100.50.10 0.0.0
+	50.25.5 = mix 100.50.10 0.0.0.128
+]
+
+;; https://www.rapidtables.com/convert/color/rgb-to-hsl.html
+;@@ actually these formulas are simplistic and not statisticaly neutral, need improvement
+;@@ when improved, consider inclusion into /common
+RGB2HSL: function [rgb [tuple!]] [
+	R: rgb/1  G: rgb/2  B: rgb/3
+	C+: max max R G B
+	C-: min min R G B
+	D: C+ - C-
+	L: C+ + C- / 510
+	S: either D = 0 [0][D / 255 / (1 - abs L * 2 - 1)]
+	H: 60 * case [
+		D  = 0 [0]
+		C+ = R [G - B / D // 6]
+		C+ = G [B - R / D + 2]
+		"C+=B" [R - G / D + 4]
+	]
+	reduce [H 100% * S 100% * L]
+]
+
+;; https://www.rapidtables.com/convert/color/hsl-to-rgb.html
+HSL2RGB: function [hsl [block!]] [
+	set [H: S: L:] hsl
+	C: (1 - abs L * 2 - 1) * S * 255
+	X: (1 - abs H / 60 // 2 - 1) * C
+	m: 255 * L - (C / 2)
+	n: to integer! H / 60
+	triple: pick [[C X 0] [X C 0] [0 C X] [0 X C] [X 0 C] [C 0 X] [C X 0]] n + 1
+	rgb: 0.0.0
+	repeat i 3 [rgb/:i: clip [0 255] to integer! m + do triple/:i]
+	rgb
+]
+
+;; these mostly fail due to rounding
+; #assert [
+  	; [  0   0%   0%] = RGB2HSL 0.0.0
+  	; [  0   0% 100%] = RGB2HSL 255.255.255
+  	; [  0 100%  50%] = RGB2HSL 255.0.0
+  	; [120 100%  50%] = RGB2HSL 0.255.0
+  	; [240 100%  50%] = RGB2HSL 0.0.255
+  	; [ 60 100%  50%] = RGB2HSL 255.255.0
+  	; [180 100%  50%] = RGB2HSL 0.255.255
+  	; [300 100%  50%] = RGB2HSL 255.0.255
+  	; [  0   0%  75%] = RGB2HSL 191.191.191
+  	; [  0   0%  50%] = RGB2HSL 128.128.128
+  	; [  0 100%  25%] = RGB2HSL 128.0.0
+  	; [ 60 100%  25%] = RGB2HSL 128.128.0
+  	; [120 100%  25%] = RGB2HSL 0.128.0
+  	; [300 100%  25%] = RGB2HSL 128.0.128
+  	; [180 100%  25%] = RGB2HSL 0.128.128
+  	; [240 100%  25%] = RGB2HSL 0.0.128
+; ]
+; #assert [
+  	; (HSL2RGB [  0   0%   0%]) = 0.0.0
+  	; (HSL2RGB [  0   0% 100%]) = 255.255.255
+  	; (HSL2RGB [  0 100%  50%]) = 255.0.0
+  	; (HSL2RGB [120 100%  50%]) = 0.255.0
+  	; (HSL2RGB [240 100%  50%]) = 0.0.255
+  	; (HSL2RGB [ 60 100%  50%]) = 255.255.0
+  	; (HSL2RGB [180 100%  50%]) = 0.255.255
+  	; (HSL2RGB [300 100%  50%]) = 255.0.255
+  	; (HSL2RGB [  0   0%  75%]) = 191.191.191
+  	; (HSL2RGB [  0   0%  50%]) = 128.128.128
+  	; (HSL2RGB [  0 100%  25%]) = 128.0.0
+  	; (HSL2RGB [ 60 100%  25%]) = 128.128.0
+  	; (HSL2RGB [120 100%  25%]) = 0.128.0
+  	; (HSL2RGB [300 100%  25%]) = 128.0.128
+  	; (HSL2RGB [180 100%  25%]) = 0.128.128
+  	; (HSL2RGB [240 100%  25%]) = 0.0.128
+; ]
+#assert [
+  	(HSL2RGB RGB2HSL 0.0.0      ) = 0.0.0      
+  	(HSL2RGB RGB2HSL 255.255.255) = 255.255.255
+  	(HSL2RGB RGB2HSL 255.0.0    ) = 255.0.0    
+  	(HSL2RGB RGB2HSL 0.255.0    ) = 0.255.0    
+  	(HSL2RGB RGB2HSL 0.0.255    ) = 0.0.255    
+  	(HSL2RGB RGB2HSL 255.255.0  ) = 255.255.0  
+  	(HSL2RGB RGB2HSL 0.255.255  ) = 0.255.255  
+  	(HSL2RGB RGB2HSL 255.0.255  ) = 255.0.255  
+  	(HSL2RGB RGB2HSL 191.191.191) = 191.191.191
+  	(HSL2RGB RGB2HSL 128.128.128) = 128.128.128
+  	(HSL2RGB RGB2HSL 128.0.0    ) = 128.0.0    
+  	(HSL2RGB RGB2HSL 128.128.0  ) = 128.128.0  
+  	(HSL2RGB RGB2HSL 0.128.0    ) = 0.128.0    
+  	(HSL2RGB RGB2HSL 128.0.128  ) = 128.0.128  
+  	(HSL2RGB RGB2HSL 0.128.128  ) = 0.128.128  
+  	(HSL2RGB RGB2HSL 0.0.128    ) = 0.0.128    
+]
+
+enhance: function [
+	"Push COLOR further from BGND (alpha channels ignored)"
+	bgnd  [tuple!]
+	color [tuple!]
+	amnt  [number!] "Should be over 100%"
+][
+	bg-hsl: RGB2HSL bgnd
+	fg-hsl: RGB2HSL color
+	sign: pick [1 -1] fg-hsl/3 >= bg-hsl/3
+	fg-hsl/3: clip [0% 100%] fg-hsl/3 + (amnt - 1 / 2 * sign)
+	HSL2RGB fg-hsl
+]
+
+
+
+;-- `compose` readability helper variant 2
+when: func [test value] [only if :test [do :value]]
+
+range: func [a [integer!] b [integer!]] [
+	collect [while [a <= b] [keep a  a: a + 1]]
 ]
 
 ;; constraining is used by `render` to impose soft limits on space sizes
