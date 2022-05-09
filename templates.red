@@ -647,7 +647,8 @@ container-ctx: context [
 		drawn: make [] len * 6
 		items: make [] len
 		repeat i len [append items name: cont/items/pick i]		;@@ use map-each
-		set [size: map:] make-layout type items settings
+		set [size: map: origin:] make-layout type items settings
+		default origin: 0x0
 		i: 0 foreach [name geom] map [					;@@ should be for-each [/i name geom]
 			i: i + 1
 			pos: geom/offset
@@ -667,16 +668,18 @@ container-ctx: context [
 			]
 		]
 		cont/map: map									;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		maybe cont/size: size
-		drawn
+		cont/size: size
+		quietly cont/origin: origin
+		compose/only [translate (negate origin) (drawn)]
 	]
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [items item-list] to word! word [invalidate-cache space]
+		if find [items item-list origin] to word! word [invalidate-cache space]
 	]
 
 	templates/container: make-template 'space [
-		size: none				;-- only available after `draw` because it applies styles
+		size:      none									;-- only available after `draw` because it applies styles
+		origin:    0x0									;-- used by ring layout to center itself around the pointer
 		item-list: []
 		items: function [/pick i [integer!] /size] [
 			either pick [item-list/:i][length? item-list]
@@ -747,7 +750,7 @@ ring-ctx: context [
 		;; minimum distance (pixels) from the center to the nearest point of arranged items
 		radius: 50
 		;; whether items should be considered round, not rectangular
-		round?: yes
+		round?: no
 
 		container-draw: :draw
 		draw: does [container-draw/layout 'ring [angle radius round?]]

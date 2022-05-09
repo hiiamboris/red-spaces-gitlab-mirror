@@ -347,6 +347,10 @@ swap: func [a [word! series!] b [word! series!]] [
 ]
 
 
+polar2cartesian: func [radius [float! integer!] angle [float! integer!]] [
+	(radius * cosine angle) by (radius * sine angle)
+]
+
 ortho: func [
 	"Get axis orthogonal to a given one"
 	xy [word! pair!] "One of [x y 0x1 1x0]"

@@ -178,10 +178,14 @@ do with [
 		ring-menu/ring/round-clickable [
 			function [space] [
 				drawn: space/draw
-				compose/deep/only [
-					box 0x0 (space/size) 50
-					(drawn)
-				]
+				compose/deep/only [box 0x0 (space/size) 50 (drawn)]
+			]
+		]
+		
+		ring-menu/ring/clickable [
+			function [space] [
+				drawn: space/draw
+				compose/deep/only [box 0x0 (space/size) (drawn)]
 			]
 		]
 		

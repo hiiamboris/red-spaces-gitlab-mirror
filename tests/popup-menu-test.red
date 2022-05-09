@@ -67,6 +67,8 @@ view/no-wait reshape [
 				; ]
 				menu: [[radial]
 					"A" (probe 'A)
+					"very long sentence" (probe "oho")
+					"even longer sentence wow" (probe "wow")
 					"BB" (probe 'B)
 					"CCC" (probe 'C)
 					"DDDD" (probe 'D)

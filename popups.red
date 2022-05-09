@@ -153,14 +153,15 @@ show-hint: function [
 	]
 ]
 
-lay-out-menu: function [spec [block!] /local code name tube list flags] reshape [
+lay-out-menu: function [spec [block!] /local code name tube list flags radial? round?] reshape [
 	;@@ preferably VID/S should be used here and in hints above
 	data*:       clear []								;-- consecutive data values
 	row*:        clear []								;-- space names of a single row
 	menu*:       clear []								;-- row names list
 	
 	=menu=:      [opt =flags= any =menu-item= !(expected end)]
-	=flags=:     [ahead block! into ['radial (radial?: yes)]]
+	=flags=:     [ahead block! into [any =flag=]]
+	=flag=:      [set radial? 'radial | set round? 'round]
 	=menu-item=: [=content= (do new-item) ahead !(expected [paren! | block!]) [=code= | =submenu=]]
 	=content=:   [ahead !(expected [word! | string! | char! | image! | logic!]) some [=data= | =space=]]
 	=data=:      [collect into data* some keep [string! | char! | image! | logic!] (do flush-data)]
@@ -173,7 +174,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags] reshape 
 		clear data*
 	]
 	new-item: [
-		name: either radial? ['round-clickable]['clickable]		;@@ better name??
+		name: either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
 		append menu* anonymize name item: make-space 'clickable [
 			margin: 4x4
 			content: anonymize 'tube set 'tube make-space 'tube []
@@ -210,7 +211,8 @@ show-menu: function [
 	face/size:  none									;-- to make render set face/size
 	face/draw:  render face
 	if radial?: has-flag? :menu/1 'radial [				;-- radial menu is centered ;@@ REP #113
-		offset: offset - (face/size / 2)
+		cont: get select get face/space 'content
+		offset: offset + cont/origin
 	]
 	show-popup window level offset face radial?
 ]

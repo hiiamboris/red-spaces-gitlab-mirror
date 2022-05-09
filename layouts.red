@@ -348,30 +348,72 @@ layouts: context [
 			
 			map: make [] 2 * count
 			origin: 0x0
-			size: 0x0
+			total:  0x0
+			step:   360 / count
 			either round? [
-				step: 360 / count
 				repeat i count [
 					space: get name: either func? [spaces/pick i][spaces/:i]
 					drawn: render name
 					center: space/size / 2
 					rad: radius + max center/x center/y
-					pos: (rad * cosine angle) by (rad * sine angle) - center
+					point: (polar2cartesian rad angle) - center
 					compose/only/deep/into [
 						(name) [offset (pos) size (space/size) drawn (drawn)]
 					] tail map
 					origin: min origin pos				;-- find leftmost topmost point
-					size: max size pos + space/size
+					total: max total pos + space/size	;-- find total dimensions
 					angle: angle + step
 				]
 			][
-				ERROR "not impl"
+				items: obtain block! count * period: 7
+				repeat i count [
+					space: get name: either func? [spaces/pick i][spaces/:i]
+					drawn: render name
+					center: space/size / 2
+					pos: (polar2cartesian radius angle) - center
+					dist: vec-length? closest-box-point? pos pos + space/size
+					rad: radius * 2 - dist
+					pos: (polar2cartesian rad angle) - center
+					repend items [i name angle rad pos space/size drawn]
+					angle: angle + step
+				]
+				
+				limit: 2								;-- optimization criterion: 2px of irregularity allowed
+				loop 10 [
+					max-move: 0
+					for-each [item: i name angle rad pos size drawn] items [
+						item-1: skip items i - 2 // count * period
+						item+1: skip items i     // count * period
+						; print [i pos size item-1/5 item-1/6 item+1/5 item+1/6]
+						dist-1: box-distance? pos pos + size item-1/5 item-1/5 + item-1/6
+						dist+1: box-distance? pos pos + size item+1/5 item+1/5 + item+1/6
+						move: dist+1 - dist-1 / rad / 2 * 180 / pi
+						angle: angle + move
+						pos: (polar2cartesian rad angle) - (size / 2)
+						dist: vec-length? closest-box-point? pos pos + size
+						rad: rad + radius - dist
+						pos: (polar2cartesian rad angle) - (size / 2)
+						item/3: angle
+						item/4: rad
+						item/5: pos
+						max-move: max max max-move abs move abs radius - dist
+					]
+					if max-move <= limit [break]		;-- stop optimization attempts
+				]
+				
+				foreach [i name angle rad pos size drawn] items [
+					compose/only/deep/into [
+						(name) [offset (pos) size (size) drawn (drawn)]
+					] tail map
+					origin: min origin pos				;-- find leftmost topmost point
+					total: max total pos + size			;-- find total dimensions
+				]
+				stash items
 			]
 			
-			;; now that origin is known, offset all spaces into positive area
-			size: size - origin
-			foreach [name geom] map [geom/offset: geom/offset - origin]
-			reduce [size map]
+			total: total - origin
+			;; container will auto translate contents if origin is returned
+			reduce [total map origin]
 		]
 	]
 ]
