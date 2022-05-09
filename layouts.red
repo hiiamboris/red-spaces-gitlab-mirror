@@ -350,62 +350,74 @@ layouts: context [
 			origin: 0x0
 			total:  0x0
 			step:   360 / count
+			
 			either round? [
+				;; round items are also considered almost equal in size, so it's easy math
 				repeat i count [
-					space: get name: either func? [spaces/pick i][spaces/:i]
-					drawn: render name
+					space:  get name: either func? [spaces/pick i][spaces/:i]
+					drawn:  render name
 					center: space/size / 2
-					rad: radius + max center/x center/y
-					point: (polar2cartesian rad angle) - center
+					rad:    radius + max center/x center/y
+					point:  (polar2cartesian rad angle) - center
 					compose/only/deep/into [
 						(name) [offset (pos) size (space/size) drawn (drawn)]
 					] tail map
 					origin: min origin pos				;-- find leftmost topmost point
-					total: max total pos + space/size	;-- find total dimensions
-					angle: angle + step
+					total:  max total pos + space/size	;-- find total dimensions
+					angle:  angle + step
 				]
 			][
+				;; measures real distance from the box to 0x0 and pushes `rad` closer to `radius`
+				;; input: [size rad angle radius] output: [rad pos r-move]
+				adjust-radius: [
+					pos:    (polar2cartesian rad angle) - (size / 2)
+					r-move: radius - vec-length? closest-box-point? pos pos + size
+					rad:    rad + r-move
+					pos:    (polar2cartesian rad angle) - (size / 2)
+				]
+						
+				;; initially arrange box centers uniformly around the 0x0 point
 				items: obtain block! count * period: 7
+				#leaving [stash items]
+				
 				repeat i count [
 					space: get name: either func? [spaces/pick i][spaces/:i]
 					drawn: render name
-					center: space/size / 2
-					pos: (polar2cartesian radius angle) - center
-					dist: vec-length? closest-box-point? pos pos + space/size
-					rad: radius * 2 - dist
-					pos: (polar2cartesian rad angle) - center
+					size:  space/size
+					rad:   radius
+					do adjust-radius
 					repend items [i name angle rad pos space/size drawn]
 					angle: angle + step
 				]
 				
+				;; now repeatedly move boxes around (tangentially) until they look equidistant
 				limit: 2								;-- optimization criterion: 2px of irregularity allowed
-				loop 10 [
+				loop 10 [								;-- cap at 10 iterations in case of a bug
 					max-move: 0
-					for-each [item: i name angle rad pos size drawn] items [
+					repeat i count [					;@@ should be for-each but it binds `rad` which adjust-radius modifies
 						item-1: skip items i - 2 // count * period
+						item:   skip items i - 1          * period
 						item+1: skip items i     // count * period
-						dist-1: box-distance? pos pos + size item-1/5 item-1/5 + item-1/6
-						dist+1: box-distance? pos pos + size item+1/5 item+1/5 + item+1/6
-						move: dist+1 - dist-1 / rad / 2 * 180 / pi
-						angle: angle + move
-						pos: (polar2cartesian rad angle) - (size / 2)
-						dist: vec-length? closest-box-point? pos pos + size
-						rad: rad + radius - dist
-						pos: (polar2cartesian rad angle) - (size / 2)
+						set [_: _: angle: rad: pos: size:] item
+						dist-1: box-distance? pos pos + size o: item-1/5 o + item-1/6
+						dist+1: box-distance? pos pos + size o: item+1/5 o + item+1/6
+						a-move: dist+1 - dist-1 / 2 / rad * #do keep [180 / pi]
+						angle:  angle + a-move
+						do adjust-radius
 						change change change at item 3 angle rad pos
-						max-move: max max max-move abs move abs radius - dist
+						max-move: max max max-move abs a-move abs r-move	;@@ should be done with HOFs
 					]
 					if max-move <= limit [break]		;-- stop optimization attempts
 				]
 				
-				foreach [i name angle rad pos size drawn] items [
+				;; lay out boxes into a map and estimate boundaries
+				foreach [_ name _ _ pos size drawn] items [
 					compose/only/deep/into [
 						(name) [offset (pos) size (size) drawn (drawn)]
 					] tail map
 					origin: min origin pos				;-- find leftmost topmost point
-					total: max total pos + size			;-- find total dimensions
+					total:  max total pos + size		;-- find total dimensions
 				]
-				stash items
 			]
 			
 			total: total - origin
