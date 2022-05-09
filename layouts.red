@@ -33,7 +33,7 @@ layouts: context [
 		;; some of the words are also calculated directly in `draw`, so object is a bad fit to pass these
 		;@@ cache should only be not none for unchanged canvas!
 		create: function [
-			"Builds a list layout outo of given spaces and settings as bound words"
+			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [axis margin spacing canvas origin viewport cache]"
 			;; settings - imported locally to speed up and simplify access to them:
@@ -115,7 +115,7 @@ layouts: context [
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas         [none! pair!]   > 0x0, cannot be none as tube needs to know it's width
 		create: function [
-			"Builds a tube layout out of given spaces and settings as bound words"
+			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [axes align margin spacing canvas cache]"
 			;; settings - imported locally to speed up and simplify access to them:
@@ -316,7 +316,63 @@ layouts: context [
 			#assert [size +< infxinf]
 			reduce [size copy map]
 		]
-
+	]
+	
+	ring: context [
+		;; settings for ring layout:
+		;;   angle       [integer! float!]   unrestricted, defaults to 0
+		;;     in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
+		;;   radius      [integer! float!]   >= 0
+		;;     minimum distance (pixels) from the center to the nearest point of arranged items
+		;;   round?      [logic!]   default: false
+		;;     whether items should be considered round, not rectangular
+		create: function [
+			"Build a ring layout out of given spaces and settings as bound words"
+			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+			settings [block!] "Any subset of [angle radius round?]"
+			/local angle radius round?
+		][
+			func?: function? :spaces
+			count: either func? [spaces/size][length? spaces]
+			if count <= 0 [return copy/deep [0x0 []]]	;-- empty layout optimization
+			foreach word settings [						;-- free settings block so it can be reused by the caller
+				set bind word 'local get word			;@@ check that only allowed words are overwritten
+			]
+			#debug [typecheck [
+				angle  [integer! float! none!]
+				radius [integer! float!] (0 <= radius)
+				round? [logic! none!]
+			]]
+			default angle: 0
+			default round?: no
+			
+			map: make [] 2 * count
+			origin: 0x0
+			size: 0x0
+			either round? [
+				step: 360 / count
+				repeat i count [
+					space: get name: either func? [spaces/pick i][spaces/:i]
+					drawn: render name
+					center: space/size / 2
+					rad: radius + max center/x center/y
+					pos: (rad * cosine angle) by (rad * sine angle) - center
+					compose/only/deep/into [
+						(name) [offset (pos) size (space/size) drawn (drawn)]
+					] tail map
+					origin: min origin pos				;-- find leftmost topmost point
+					size: max size pos + space/size
+					angle: angle + step
+				]
+			][
+				ERROR "not impl"
+			]
+			
+			;; now that origin is known, offset all spaces into positive area
+			size: size - origin
+			foreach [name geom] map [geom/offset: geom/offset - origin]
+			reduce [size map]
+		]
 	]
 ]
 
