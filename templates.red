@@ -729,6 +729,34 @@ list-ctx: context [
 	]
 ]
 
+ring-ctx: context [
+	~: self
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		all [
+			find [angle radius round?] to word! word
+			:old <> :new
+			invalidate-cache space
+		]
+		space/container-on-change word :old :new
+	]
+	
+	templates/ring: make-template 'container [
+		;; in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
+		angle:  0
+		;; minimum distance (pixels) from the center to the nearest point of arranged items
+		radius: 50
+		;; whether items should be considered round, not rectangular
+		round?: yes
+
+		container-draw: :draw
+		draw: does [container-draw/layout 'ring [angle radius round?]]
+		
+		container-on-change: :on-change*
+		#on-change-redirect
+	]
+]
+
 
 icon-ctx: context [
 	~: self

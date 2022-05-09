@@ -63,7 +63,16 @@ do with [
 			fill-pen !(svmc/panel)
 			font !(make font! [name: svf/system size: svf/size])
 			line-width 2
-			box 0x0 (any [size 0x0])	;-- makes host background opaque otherwise it loses mouse clicks on most of it's part
+			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
+			;; (except for some popups that must be partially transparent)
+			(compose/deep either space = 'ring-menu [
+				[push [
+					fill-pen !(svmc/panel + 0.0.0.254)
+					box 0x0 (any [size 0x0])
+				]]
+			][
+				[box 0x0 (any [size 0x0])]
+			])
 			pen !(svmc/text)
 		]
 
@@ -161,10 +170,20 @@ do with [
 				compose/deep [push [
 					pen off
 					fill-pen !(svmc/text + 0.0.0.220)
-					box 0x0 (size)
+					box 0x0 (size)						;@@ render to get size?
 				] pen !(enhance svmc/panel svmc/text 125%)]
 			]
 		)]
+		
+		ring-menu/ring/round-clickable [
+			function [space] [
+				drawn: space/draw
+				compose/deep/only [
+					box 0x0 (space/size) 50
+					(drawn)
+				]
+			]
+		]
 		
 		;@@ for this name to work, layout should prefer 'hint' keyword over 'hint' template
 		hint [

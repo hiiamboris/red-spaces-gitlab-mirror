@@ -991,7 +991,7 @@ menu DSL:
 	hotkey as issue is bad: e.g. `Ctrl+,` is not a word type
 	but hotkey can be a string easily, why not? or tag.. let it be string for now until a better idea
 	so 2nd iteration:
-	  menu: a block! [any menu-item]
+	  menu: a block! [opt flags any menu-item]
 	  menu-item: [any content [code | submenu]]
 	  content: [space | data]
 	  data: [string! | char! | image!]	- | logic! ? for list rows/bands
@@ -1000,6 +1000,8 @@ menu DSL:
 	  space: [word!] - refers to an existing named space, e.g. <->
 	  code: [paren!]
 	  submenu: [ahead block! into menu]
+	  flags: [ahead block! into [any flag]]
+	  flag: ['radial] - the only supported flag for now
 	  instead of text, menu/list will use `note` or.. how to name? message? record? all off
 	  ah! label could support multiple lines out of the box!
 	  `line` is a nice name for horizontal divisor, maybe `hline`, but only if `vline` makes sense, which I'm not sure
@@ -1013,6 +1015,18 @@ menu DSL:
 	  data block is not a VID/S block - it doesn't support any space parameters or anything, just a plain list of stuff
 	  data block should likely become a tube, not list, so it will go to the next line gracefully
 is there a difference between tube and row? other than possibly applied style? row is only a VID style then
+on radial menu UX
+	click and drag UX:
+	- on windows, up event is received by the same face that got down event
+	  alt-up is not tied to alt-down though
+	- on linux, both alt-up and up are tied to alt-down and down
+	  so there's platform discrepancy
+	right-click+drag on touchpad is not convenient, needs physical button press
+	  then needs 2nd finger to make downward dragging, as buttons are at the bottom
+	on touchscreen it's quite okay, with pen too
+	I'll go with simple alt-up, as with other menus, for now
+	but TODO: there must be some configurability in this
+	  though how? maybe introduce some higher-level "events" like tap+drag+release gesture?
 		
 
 Timer design:
@@ -3377,4 +3391,30 @@ parts of the prehistoric data-view template, now handled by box and on-change
 		; ]
 	; ]
 ; ]
-		
+
+attempt to make click+drag UX for radial menus - not so good		
+; radial-visible?: no
+; register-finalizer [up down] function [				;-- finalizer so other spaces can eat the event
+	; space [object! none!] path [block!] event [event! none!]
+	; /extern radial-visible?
+; ][
+	; either event/type = 'down [
+		; if all [
+			; menu: find-field path 'menu block!
+			; has-flag? :menu/1 'radial
+		; ][
+			; offset: face-to-window event/offset event/face
+			; reset-hint event
+			; show-menu event/window 1 offset menu
+			; start-drag/with path event/offset
+			; radial-visible?: yes
+		; ]
+	; ][
+		; if radial-visible? [
+			; radial-visible?: no
+			; picked: all [pos: find find path 'radial-menu 'round-clickable]
+			; ?? path
+			; ?? picked
+		; ]
+	; ]
+; ]

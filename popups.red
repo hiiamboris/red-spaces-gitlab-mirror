@@ -7,8 +7,11 @@ Red [
 
 ;; requires events, templates, vid, reshape
 
+;@@ for tooltips:
 ;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
 ;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
+
+;@@ menu command should be able to access the space that opened the menu!
 
 {	;@@ document this
 	Menu DSL - unlike View's default:
@@ -25,7 +28,16 @@ Red [
 
 templates/hint: make-template 'cell [margin: 5x5]		;-- renamed for styling
 
+;@@ use a single stack maybe? not sure if View will handle cross-window face transfer though
 popup-registry: make hash! 2
+
+has-flag?: function [
+	"Test if FLAGS is a block and contains FLAG"
+	flags [any-type!]
+	flag  [word!]
+][
+	none <> all [block? :flags  find flags flag]
+]
 
 is-popup?: function [									;-- must be blazing-fast, used in global event function
 	"Check within WINDOW if FACE is a popup host; return popup level or none"
@@ -77,9 +89,13 @@ show-popup: function [
 	level  [integer!] ">= 0"
 	offset [pair!]    "Desired offset (adjusted to not be clipped)"
 	face   [object!]  "Previously created popup face"
+	clip?  [logic!]   "Allow clipping by window borders or not"
 ][
-	limit: window/size - face/size
-	face/offset: clip [0x0 limit] offset
+	unless clip? [
+		limit: window/size - face/size
+		offset: clip [0x0 limit] offset
+	]
+	face/offset: offset
 	unless level = 0 [									;-- no need to hide the hint - it's reused
 		hide-popups window 0							;-- hide hints if menu was shown
 		hide-popups window level + 1
@@ -133,17 +149,18 @@ show-hint: function [
 		center: window/size / 2
 		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
 		offset: either above? [hint/size * 0x-1 + 8x-8][8x16]	;@@ should these offsets be configurable or can I infer them somehow?
-		show-popup window 0 pointer + offset hint 
+		show-popup window 0 pointer + offset hint no 
 	]
 ]
 
-lay-out-menu: function [spec [block!] /local code name tube list] reshape [
+lay-out-menu: function [spec [block!] /local code name tube list flags] reshape [
 	;@@ preferably VID/S should be used here and in hints above
 	data*:       clear []								;-- consecutive data values
 	row*:        clear []								;-- space names of a single row
 	menu*:       clear []								;-- row names list
 	
-	=menu=:      [any =menu-item= !(expected end)]
+	=menu=:      [opt =flags= any =menu-item= !(expected end)]
+	=flags=:     [ahead block! into ['radial (radial?: yes)]]
 	=menu-item=: [=content= (do new-item) ahead !(expected [paren! | block!]) [=code= | =submenu=]]
 	=content=:   [ahead !(expected [word! | string! | char! | image! | logic!]) some [=data= | =space=]]
 	=data=:      [collect into data* some keep [string! | char! | image! | logic!] (do flush-data)]
@@ -156,18 +173,25 @@ lay-out-menu: function [spec [block!] /local code name tube list] reshape [
 		clear data*
 	]
 	new-item: [
-		append menu* anonymize 'clickable item: make-space 'clickable [
+		name: either radial? ['round-clickable]['clickable]		;@@ better name??
+		append menu* anonymize name item: make-space 'clickable [
 			margin: 4x4
 			content: anonymize 'tube set 'tube make-space 'tube []
 		]
+		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
 		tube/item-list: flush row*
 	]
 	parse spec =menu=
 	
-	layout: anonymize 'menu make-space 'cell [
-		content: anonymize 'list set 'list make-space 'list [axis: 'y margin: 4x4]
+	list: either radial? [
+		make-space name: 'ring []
+	][	make-space name: 'list [axis: 'y margin: 4x4]
 	]
 	list/item-list: flush menu*
+	menu-name: either radial? ['ring-menu]['menu]
+	layout: anonymize menu-name make-space 'cell [
+		content: anonymize name list
+	]
 	layout
 ]
 
@@ -185,7 +209,10 @@ show-menu: function [
 	face/space: lay-out-menu menu
 	face/size:  none									;-- to make render set face/size
 	face/draw:  render face
-	show-popup window level offset face 
+	if radial?: has-flag? :menu/1 'radial [				;-- radial menu is centered ;@@ REP #113
+		offset: offset - (face/size / 2)
+	]
+	show-popup window level offset face radial?
 ]
 
 
@@ -287,6 +314,7 @@ context [
 	register-finalizer [alt-up] function [				;-- finalizer so other spaces can eat the event
 		space [object! none!] path [block!] event [event! none!]
 	][
+		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
 		if menu: find-field path 'menu block! [
 			;; has to be under the pointer, so it won't miss /away? event closing the menu
 			offset: -1x-1 + face-to-window event/offset event/face
@@ -295,6 +323,19 @@ context [
 		]
 	]
 
-	;@@ should context menu eat next click outside of it? I'm not convinced on the necessity
+	;; eats touch events outside the visible menu window
+	register-previewer [down] function [				;-- previewer so it takes precedence on menu things
+		space [object! none!] path [block!] event [event! none!]
+	][
+		stack: get-popups-for event/window
+		if all [
+			menu: stack/2								;-- menu exists
+			find/same event/window/pane menu			;-- menu visible
+			not same? event/face menu					;-- click didn't land on menu host
+		][
+			hide-popups event/window 1
+			stop										;-- eat the event, closing the menu
+		]
+	]
 ]
 

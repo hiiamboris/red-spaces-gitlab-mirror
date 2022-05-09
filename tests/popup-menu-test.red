@@ -60,10 +60,17 @@ view/no-wait reshape [
 			; ]
 			url with [text: https://codeberg.org/hiiamboris/red-spaces limits: 150 .. 200]
 			label with [image: #"🎯" text: "Assigned" hint: "Hint 1"
-				menu: [
-					"calc 1+1" #[true]   (probe 1 + 1)
-					"calc 2*2" #[false]   (probe 2 * 2)
-					"beam me up" (print "Zweeee")
+				; menu: [
+					; "calc 1+1" #[true]   (probe 1 + 1)
+					; "calc 2*2" #[false]   (probe 2 * 2)
+					; "beam me up" (print "Zweeee")
+				; ]
+				menu: [[radial]
+					"A" (probe 'A)
+					"BB" (probe 'B)
+					"CCC" (probe 'C)
+					"DDDD" (probe 'D)
+					"E E E E E" (probe 'E)
 				]
 			]
 			label with [image: #"💬" text: "Participating" hint: "Hint 2"]

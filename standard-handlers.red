@@ -168,10 +168,19 @@ define-handlers [
 						invalidate-cache space
 						update
 					]
-					; probe within? path/2 0x0 space/size
-					; dump-event event
 				]
 			]
+		]
+	]
+
+	ring-menu: [										;@@ name it just menu?
+		on-up [space path event] [
+			if path/5 = 'round-clickable [
+				clickable: get path/5
+				do clickable/command
+			]
+			hide-popups event/window 1					;-- click on a menu item hides all visible menus
+			update
 		]
 	]
 		
