@@ -63,7 +63,7 @@ layouts: context [
 				cache = 'all [[not space/size]]			;-- cache everything, only redraw if never drawn
 				cache = 'invisible [[					;-- cache invisible only, redraw if never drawn or visible
 					not space/size
-					boxes-overlap? 0x0 viewport pos space/size
+					boxes-overlap? 0x0 viewport pos pos + space/size
 				]]
 				'else [[true]]							;-- don't cache, always redraw
 			]
@@ -384,7 +384,6 @@ layouts: context [
 					for-each [item: i name angle rad pos size drawn] items [
 						item-1: skip items i - 2 // count * period
 						item+1: skip items i     // count * period
-						; print [i pos size item-1/5 item-1/6 item+1/5 item+1/6]
 						dist-1: box-distance? pos pos + size item-1/5 item-1/5 + item-1/6
 						dist+1: box-distance? pos pos + size item+1/5 item+1/5 + item+1/6
 						move: dist+1 - dist-1 / rad / 2 * 180 / pi
@@ -393,9 +392,7 @@ layouts: context [
 						dist: vec-length? closest-box-point? pos pos + size
 						rad: rad + radius - dist
 						pos: (polar2cartesian rad angle) - (size / 2)
-						item/3: angle
-						item/4: rad
-						item/5: pos
+						change change change at item 3 angle rad pos
 						max-move: max max max-move abs move abs radius - dist
 					]
 					if max-move <= limit [break]		;-- stop optimization attempts
