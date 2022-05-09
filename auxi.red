@@ -502,6 +502,36 @@ vec-length?: function [v [pair!]] [
 	v/x ** 2 + (v/y ** 2) ** 0.5
 ]
 
+closest-box-point?: function [
+	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
+	B1 [pair!] "inclusive" B2 [pair!] "inclusive"
+	/to origin [pair!] "defaults to 0x0"
+][
+	default origin: 0x0
+	as-pair
+		case [origin/x < B1/x [B1/x] B2/x < origin/x [B2/x] 'else [origin/x]]
+		case [origin/y < B1/y [B1/y] B2/y < origin/y [B2/y] 'else [origin/y]]
+]
+
+box-distance?: function [
+	"Get distance between closest points of box A1-A2 and box B1-B2 (negative if overlap)"
+	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
+	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
+][
+	either isec: boxes-overlap? A1 A2 B1 B2 [			;-- case needed by box arrangement algo
+		negate min isec/x isec/y
+	][
+		AC: A1 + A2 / 2
+		BC: B1 + B2 / 2
+		AP: closest-box-point?/to A1 A2 BC
+		BP: closest-box-point?/to B1 B2 AP
+		vec-length? BP - AP
+	]
+]
+; test for it:
+; view [a: base 100x20 loose b: base 20x100 loose return t: text 100 react [t/text: form box-distance? a/offset a/offset + a/size b/offset b/offset + b/size]]
+
+
 ;-- faster than for-each/reverse, but only correct if series length is a multiple of skip
 ;@@ use for-each when becomes available
 foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
