@@ -181,7 +181,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
 		unless empty? pos: find/tail row* 'text [		;-- stretch first text item by default (to align rows)
-			insert next text in generic '<->			;-- but only if there's another item
+			insert pos in generic '<->					;-- but only if there's another item
 		]
 		tube/item-list: flush row*
 	]
