@@ -177,9 +177,12 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 		name: either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
 		append menu* anonymize name item: make-space 'clickable [
 			margin: 4x4
-			content: anonymize 'tube set 'tube make-space 'tube []
+			content: anonymize 'tube set 'tube make-space 'tube [spacing: 10x5]
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
+		if text: find row* 'text [						;-- stretch first text item by default (to align rows)
+			insert next text in generic '<->
+		]
 		tube/item-list: flush row*
 	]
 	parse spec =menu=

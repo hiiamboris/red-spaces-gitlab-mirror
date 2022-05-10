@@ -113,6 +113,7 @@ templates/timer: make-template 'space [rate: none]		;-- template space for timer
 ;; has to be an object so these words have binding and can be placed as words into content field
 generic: object [										;-- holds commonly used spaces ;@@ experimental
 	empty: make-space 'space []							;-- used when no content is given
+	<->: stretch: none									;-- set after box definition
 ]
 
 rectangle-ctx: context [
@@ -294,6 +295,10 @@ cell-ctx: context [
 	]
 	
 	templates/cell: make-template 'box [margin: 1x1]	;-- same thing just with a border and background ;@@ margin - in style?
+	
+	;; empty stretching space used for alignment (static version and template)
+	generic/stretch: set in generic '<-> make-space 'box [weight: 1]	;@@ affected by #5137
+	templates/stretch: put templates '<-> make-template 'box [weight: 1]
 ]
 
 ;@@ TODO: externalize all functions, make them shared rather than per-object
@@ -831,15 +836,20 @@ switch-ctx: context [
 	~: self
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		all [
-			word = 'state
-			:old <> :new
-			invalidate-cache space
+		switch to word! word [
+			; command [bind space/command space]
+			state [
+				if :old <> :new [
+					; do space/command
+					invalidate-cache space
+				]
+			]
 		]
 	]
 	
 	templates/switch: make-template 'space [
 		state: off
+		; command: []
 		data: make-space 'data-view []
 		draw: does [also data/draw size: data/size]
 		#on-change-redirect
@@ -921,7 +931,7 @@ data-view-ctx: context [
 	~: self
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
+		; print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
 		push-font: [
 			cspace: get space/content
 			if all [in cspace 'font  not cspace/font =? space/font] [
