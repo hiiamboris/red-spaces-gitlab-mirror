@@ -5,7 +5,7 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack), error-macro.red, layout.red
+;-- requires auxi.red (block-stack), styles (to fix svmc/), error-macro.red, layout.red
 
 
 
@@ -18,6 +18,9 @@ system/view/VID/styles/host: [
 	template: [
 		type:   'base
 		size:   100x100
+		;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
+		;; (except for some popups that must be almost transparent)
+		color:  system/view/metrics/colors/panel
 		space:  none
 		flags:  'all-over								;-- else 'over' events won't make sense over spaces
 		rate:   100										;-- for space timers to work

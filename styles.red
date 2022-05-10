@@ -63,16 +63,6 @@ do with [
 			fill-pen !(svmc/panel)
 			font !(make font! [name: svf/system size: svf/size])
 			line-width 2
-			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
-			;; (except for some popups that must be partially transparent)
-			(compose/deep either space = 'ring-menu [
-				[push [
-					fill-pen !(svmc/panel + 0.0.0.254)
-					box 0x0 (any [size 0x0])
-				]]
-			][
-				[box 0x0 (any [size 0x0])]
-			])
 			pen !(svmc/text)
 		]
 
@@ -151,7 +141,7 @@ do with [
 		]
 
 		;; cell is a box with a border around it; while general box is widely used in borderless state
-		menu cell [
+		menu/list cell [
 			function [cell /on canvas] [
 				drawn: cell/draw/on canvas				;-- draw to obtain the size
 				compose/only/deep [
@@ -175,17 +165,17 @@ do with [
 			]
 		)]
 		
-		ring-menu/ring/round-clickable [
-			function [space] [
-				drawn: space/draw
-				compose/deep/only [box 0x0 (space/size) 50 (drawn)]
-			]
-		]
-		
-		ring-menu/ring/clickable [
+		menu/ring/clickable [
 			function [space] [
 				drawn: space/draw
 				compose/deep/only [box 0x0 (space/size) (drawn)]
+			]
+		]
+		
+		menu/ring/round-clickable [
+			function [space] [
+				drawn: space/draw
+				compose/deep/only [box 0x0 (space/size) 50 (drawn)]
 			]
 		]
 		

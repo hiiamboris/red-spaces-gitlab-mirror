@@ -189,8 +189,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 	][	make-space name: 'list [axis: 'y margin: 4x4]
 	]
 	list/item-list: flush menu*
-	menu-name: either radial? ['ring-menu]['menu]
-	layout: anonymize menu-name make-space 'cell [
+	layout: anonymize 'menu make-space 'cell [
 		content: anonymize name list
 	]
 	layout
@@ -213,6 +212,8 @@ show-menu: function [
 	if radial?: has-flag? :menu/1 'radial [				;-- radial menu is centered ;@@ REP #113
 		cont: get select get face/space 'content
 		offset: offset + cont/origin
+		;; radial menu is transparent but should catch clicks that close it
+		face/color: system/view/metrics/colors/panel + 0.0.0.254
 	]
 	show-popup window level offset face radial?
 ]

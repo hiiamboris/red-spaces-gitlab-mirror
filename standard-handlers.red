@@ -140,29 +140,20 @@ define-handlers [
 	
 	;-- *************************************************************************************
 	clickable: [
-		on-down [space path event] [
-			space/pushed?: yes
-			; start-drag path
+		on-click [space path event] [
+			do space/command
 			update
 		]
-		on-up [space path event] [
-			; stop-drag
-			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
-			update
-		]
-		; on-click [space path event] [
-		; 	do space/command
-		; ]
 	]
 	
 	menu: [
 		list: [
 			clickable: extends 'clickable [
-				on-up [space path event] [
-					hide-popups event/window 1			;-- click on a menu item hides all visible menus
-				]
+				; on-up [space path event] [
+					; hide-popups event/window 1			;-- click on a menu item hides all visible menus
+				; ]
 				on-over [space path event] [
-					unless :highlight =? space [
+					unless :highlight =? space [		;@@ this mechanism should be generalized
 						if space? :highlight [invalidate-cache highlight]
 						set 'highlight space
 						invalidate-cache space
@@ -171,20 +162,25 @@ define-handlers [
 				]
 			]
 		]
-	]
-
-	ring-menu: [										;@@ name it just menu?
-		on-up [space path event] [
-			if path/5 = 'round-clickable [
-				clickable: get path/5
-				do clickable/command
+		on-click [space path event] [
+			if find [round-clickable clickable] path/5 [
+				item: get path/5
+				do item/command
 			]
-			hide-popups event/window 1					;-- click on a menu item hides all visible menus
+			hide-popups event/window 1					;-- click on a menu hides all visible menus
 			update
 		]
 	]
-		
-	button: extends 'clickable [						;-- focusable unlike `clickable` space
+
+	button: [											;-- focusable unlike `clickable` space
+		on-down [space path event] [
+			space/pushed?: yes
+			update
+		]
+		on-up [space path event] [
+			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
+			update
+		]
 		on-key [space path event] [
 			either all [
 				find " ^M" event/key
