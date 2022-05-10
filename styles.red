@@ -195,13 +195,20 @@ do with [
 		
 		;@@ for this name to work, layout should prefer 'hint' keyword over 'hint' template
 		hint [
-			function [cell] [
-				drawn: cell/draw						;-- draw to obtain the size
+			function [box] [
+				drawn: box/draw							;-- draw to obtain the size
+				m: box/margin / 2
+				matrix: arrow: []						;-- no arrow if hint was adjusted by window borders
+				if o: box/origin [
+					if o <> 0x0 [matrix: compose/deep [matrix [1 0 0 -1 0 (box/size/y)]]]
+					arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
+				]
 				compose/only/deep [
 					push [
 						line-width 1
 						fill-pen !(svmc/panel)
-						box 1x1 (cell/size - 1x1) 3
+						box (1x1 + m) (box/size - 1 - m) 3
+						(matrix) (arrow)
 					]
 					(drawn)
 				]

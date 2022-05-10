@@ -26,7 +26,7 @@ Red [
 	code:      [paren!]
 }
 
-templates/hint: make-template 'cell [margin: 5x5]		;-- renamed for styling
+templates/hint: make-template 'box [margin: 20x10 origin: 0x0]
 
 ;@@ use a single stack maybe? not sure if View will handle cross-window face transfer though
 popup-registry: make hash! 2
@@ -87,14 +87,9 @@ show-popup: function [
 	"Show a popup in the WINDOW at LEVEL and OFFSET"
 	window [object!]  "Each window has it's own popups stack"
 	level  [integer!] ">= 0"
-	offset [pair!]    "Desired offset (adjusted to not be clipped)"
+	offset [pair!]    "Offset on the window"
 	face   [object!]  "Previously created popup face"
-	clip?  [logic!]   "Allow clipping by window borders or not"
 ][
-	unless clip? [
-		limit: window/size - face/size
-		offset: clip [0x0 limit] offset
-	]
 	face/offset: offset
 	unless level = 0 [									;-- no need to hide the hint - it's reused
 		hide-popups window 0							;-- hide hints if menu was shown
@@ -138,18 +133,30 @@ show-hint: function [
 	text    [string!]
 ][
 	unless text == old-text: hint-text? window [		;-- don't redisplay an already shown hint
+		center: window/size / 2
+		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
+		
 		hint: make-popup window 0						;@@ working around #5131 here, can't use `layout`
 		hint/rate: none									;-- unlike menus, hints should not add timer pressure
 		space: get hint/space: make-space/name 'hint []
 		space/content: make-space/name 'text compose [text: (text)]
+		space/origin: either above? [hint/size * 0x1][0x0]		;-- where will the arrow be
 		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
 		hint/size: none									;-- to make render set face/size
 		hint/draw: render hint
+		;; hint is transparent so it can have an arrow
+		hint/color: system/view/metrics/colors/panel + 0.0.0.254
 		
-		center: window/size / 2
-		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
-		offset: either above? [hint/size * 0x-1 + 8x-8][8x16]	;@@ should these offsets be configurable or can I infer them somehow?
-		show-popup window 0 pointer + offset hint no 
+		offset: pointer + either above? [2 by (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
+		limit: window/size - hint/size
+		fixed: clip [0x0 limit] offset					;-- adjust offset so it's not clipped
+		if fixed <> offset [
+			offset: fixed
+			space/origin: none							;-- disable arrow in this case
+			invalidate-cache space
+			hint/draw: render hint						;-- have to redraw content to remove the arrow
+		]
+		show-popup window 0 offset hint 
 	]
 ]
 
@@ -212,13 +219,16 @@ show-menu: function [
 	face/space: lay-out-menu menu
 	face/size:  none									;-- to make render set face/size
 	face/draw:  render face
-	if radial?: has-flag? :menu/1 'radial [				;-- radial menu is centered ;@@ REP #113
+	either radial?: has-flag? :menu/1 'radial [			;-- radial menu is centered ;@@ REP #113
 		cont: get select get face/space 'content
 		offset: offset + cont/origin
 		;; radial menu is transparent but should catch clicks that close it
 		face/color: system/view/metrics/colors/panel + 0.0.0.254
+	][
+		limit: window/size - face/size
+		offset: clip [0x0 limit] offset					;-- adjust offset so it's not clipped
 	]
-	show-popup window level offset face radial?
+	show-popup window level offset face
 ]
 
 
