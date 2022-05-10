@@ -7,34 +7,6 @@ Red [needs: view]
 
 ;@@ drop-down will need a higher-level list with selected item and interactivity
 
-spaces/templates/popup: make-template 'button [
-	layout:  []
-] 
-
-define-handlers [
-	popup: [
-		on-over [space path event] [
-			point: face-to-window event/offset event/face
-			spaces/ctx/show-hint event/window point "This is a hint!"
-			; host: first layout/only compose/only [
-				; host (space/layout)
-				; on-over [if event/away? [remove find/same event/window/pane face]]
-				; on-over [remove find/same event/window/pane face]
-			; ]
-			; point: face-to-window event/offset event/face
-			; center: event/window/size / 2
-			; ;; it's placed in the direction towards the center (off the edge)
-			; mask: point - center						;-- center-relative offset
-			; mask/x: pick [-1 1] mask/x > 0				;-- direction of face placement
-			; mask/y: pick [-1 1] mask/y > 0
-			; offset: point - (2 * mask) + (host/size - 1 * min 0x0 mask)
-			; offset: clip [0x0 event/window/size - host/size] offset		;-- account for window borders as it cannot stick out
-			; host/offset: offset
-			; append event/window/pane host
-		]
-	]
-]
-
 big-font: make font! [size: 15]
 
 ;; just for fun
@@ -133,7 +105,7 @@ view/no-wait [
 			label with [image: "👩‍🚀" text: "Label with a heading^/and some text^/on two lines" hint: "Not helpful"]
 		]
 	]
-	base 0x0 rate 0:0:5 on-time [prof/show prof/reset print ["mem:" stats]]
+	; base 0x0 rate 0:0:5 on-time [prof/show prof/reset print ["mem:" stats]]
 ]
 
 ; debug-draw 
