@@ -2,9 +2,6 @@ Red [needs: view]
 
 #include %../everything.red
 
-;@@ THIS NEEDS ACTORS DONE FIRST
-;@@ but for now I'm just using a button
-
 ;@@ drop-down will need a higher-level list with selected item and interactivity
 
 big-font: make font! [size: 15]
