@@ -85,8 +85,16 @@ do with [
 
 		; list/item [[pen cyan]]
 		
-		switch [(data/font: fonts/switch data/data: either state ["☒"]["☐"] ())]	;-- clickable
-		logic  [(data/font: fonts/switch data/data: either state ["✓"]["✗"] ())]	;-- readonly
+		switch [(										;-- clickable
+			unless data/font =? fonts/switch [data/font: fonts/switch]
+			maybe data/data: either state ["☒"]["☐"]
+			()
+		)]
+		logic  [(										;-- readonly
+			unless data/font =? fonts/switch [data/font: fonts/switch]
+			maybe data/data: either state ["✓"]["✗"]
+			()
+		)]
 		
 		label [(
 			if spaces/image-box/content = 'sigil [

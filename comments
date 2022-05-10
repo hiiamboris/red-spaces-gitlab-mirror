@@ -3418,3 +3418,10 @@ attempt to make click+drag UX for radial menus - not so good
 		; ]
 	; ]
 ; ]
+
+attempt in on-time to work around #5130, but it's slower, text is not smooth
+and image cannot filled with transparent color using draw (need change/dup which is an extra draw)
+; face/image: any [face/image make image! face/size]
+; draw face/image compose [pen off fill-pen white box 0x0 (face/size)]
+; draw face/image render face
+; maybe face/draw: none

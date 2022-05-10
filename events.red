@@ -319,7 +319,7 @@ events: context [
 					on-time face event						;-- handled by timers.red
 					if any [commands/update? face/dirty?] [	;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
 						#debug profile [prof/manual/start 'drawing]
-						face/draw: render face
+						face/draw: render face				;@@ #5130 is the killer of animations
 						face/dirty?: no
 						unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
