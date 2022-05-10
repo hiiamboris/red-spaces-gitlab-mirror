@@ -91,7 +91,7 @@ do with [
 			()
 		)]
 		logic  [(										;-- readonly
-			unless data/font =? fonts/switch [data/font: fonts/switch]
+			unless data/font =? fonts/switch [data/font: fonts/text]
 			maybe data/data: either state ["✓"]["✗"]
 			()
 		)]
