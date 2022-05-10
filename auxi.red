@@ -43,6 +43,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 
 ;; need this to be able to call event functions recursively with minimum allocations
 ;; can't use a static block but can use one block per recursion level
+;; also used in the layout functions (which can be recursive easily)
 obtain: stash: none
 context [
 	;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
@@ -60,9 +61,9 @@ context [
 			find series! type
 			size >= 1
 		]
-		name: to word! type								;-- datatype is not supported by maps
+		name:   to word! type							;-- datatype is not supported by maps
 		ladder: any [free-list/:name  free-list/:name: make hash! 256]
-		step: round/ceiling/to (log-e size) / log-factor 1
+		step:   round/ceiling/to (log-e size) / log-factor 1
 		either pos: any [
 			find ladder step
 			find ladder step + 1						;-- try little bigger sizes as well
@@ -78,9 +79,9 @@ context [
 		"Put SERIES back into the free list for futher OBTAIN calls"
 		series [series!]
 	][
-		type: type?/word series
+		type:   type?/word series
 		ladder: any [free-list/:type  free-list/:type: make hash! 256]
-		step: round/floor/to (log-e length? series) / log-factor 1
+		step:   round/floor/to (log-e length? series) / log-factor 1
 		repend ladder [step clear series]
 	]
 ]
@@ -89,8 +90,8 @@ context [
 ;; main problem of it: doesn't care about length, may result in lots of reallocations
 block-stack: object [
 	stack: []
-	get: does [any [take/last stack  make [] 100]]
-	put: func [b [block!]] [append/only stack clear head b]
+	get:  does [any [take/last stack  make [] 100]]
+	put:  func [b [block!]] [append/only stack clear head b]
 	hold: func [b [block!]] [at  append get head b  index? b]
 ]
 

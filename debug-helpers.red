@@ -30,6 +30,7 @@ fix-paths: function [
 ]
 				
 ;; helper to work with words as objects in paths
+;@@ can there be a -> operator for select+get+maplookup?
 expand-space-path: function [path [any-word! any-path!] /local coll] [
 	if word? path [path: to path! path]
 	set/any 'coll get/any path/1
