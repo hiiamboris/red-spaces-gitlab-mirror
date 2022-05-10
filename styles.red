@@ -85,11 +85,17 @@ do with [
 
 		; list/item [[pen cyan]]
 		
-		switch [(										;-- clickable
-			unless data/font =? fonts/switch [data/font: fonts/switch]
-			maybe data/data: either state ["☒"]["☐"]
-			()
-		)]
+		;; ☒☐ make lines too big! needs custom draw code, not symbols
+		switch [										;-- clickable
+			function [space] [
+				space/size: 16x16
+				compose [
+					line-width 1
+					box 1x1 (space/size - 1)
+					(when space/state [[line 3x3 13x13 line 13x3 3x13]])
+				]
+			]
+		]
 		logic  [(										;-- readonly
 			unless data/font =? fonts/switch [data/font: fonts/text]
 			maybe data/data: either state ["✓"]["✗"]
