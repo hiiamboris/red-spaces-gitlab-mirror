@@ -685,6 +685,9 @@ container-ctx: context [
 			either pick [item-list/:i][length? item-list]
 		]
 		map: []
+		into: func [xy [pair!] /force name [word! none!]] [
+			into-map map xy + origin name
+		]
 
 		draw: function [
 			/only xy1 [pair! none!] xy2 [pair! none!]
