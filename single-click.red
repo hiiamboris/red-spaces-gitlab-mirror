@@ -23,7 +23,10 @@ context [
 	;@@ or maybe we should schedule some code to be run after the finalizers have finished?
 	register-finalizer [up] function [space [object!] path [block!] event [event!]] [
 		unless event/face [exit]						;@@ partial workaround for #5124 - but can do nothing with View internal bugs
-		if start-offset = event/offset [				;-- it's a click, not a drag
+		if all [
+			start-offset = event/offset					;-- it's a click, not a drag
+			not stop?									;-- up event was not eaten
+		][
 			event/type: 'click							;-- Red allows overriding it
 			;-- either this, but it may call `update` twice, after on-up and after on-click (may not be a bad thing)
 			events/dispatch event/face event
