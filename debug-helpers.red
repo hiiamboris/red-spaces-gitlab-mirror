@@ -313,7 +313,13 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 		][
 			actors: object [
 				on-created: func [face] [
-					face/offset: system/view/screens/1/size - face/size * 1x0
+					face/offset: face/parent/size - face/size * 1x0
+					foreach other face/parent/pane [
+						unless other =? face [
+							other/offset/x: face/offset/x - other/size/x - 5
+							break
+						]
+					]
 				]
 			]
 		]
