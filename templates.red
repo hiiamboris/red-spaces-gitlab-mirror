@@ -921,20 +921,23 @@ data-view-ctx: context [
 	~: self
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
+		push-font: [
+			cspace: get space/content
+			if all [in cspace 'font  not cspace/font =? space/font] [
+				cspace/font: space/font
+				invalidate-cache space
+			]
+		]
 		switch to word! word [
 			spacing [invalidate-cache space]
-			font [
-				cspace: get space/content
-				if all [in cspace 'font  not cspace/font =? space/font] [
-					cspace/font: space/font
-					invalidate-cache space
-				]
-			]
+			font [do push-font]
 			data [
-				space/content: either block? :new [
-					anonymize 'tube lay-out-data new	;@@ use `row`?
+				either block? :new [
+					space/content: anonymize 'tube lay-out-data new	;@@ use `row`?
 				][
-					wrap-value :new
+					space/content: wrap-value :new		;@@ maybe reuse the old space if it's available?
+					do push-font
 				] 
 			]
 		]
