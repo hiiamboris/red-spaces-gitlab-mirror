@@ -116,6 +116,21 @@ expected: function ['rule] [
     reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
 ]
 
+;; MEMO: requires `function` scope or `~~p` will leak out
+#macro [#expect skip] func [[manual] bgn end /local quote? rule error] [
+	quote?: all [word? bgn/2  bgn/2 = 'quote  remove next bgn]
+	rule: reduce [bgn/2]
+	if quote? [insert rule 'quote]						;-- sometimes need to match block literally
+	error: compose/deep [
+		do make error! rejoin [
+			(rejoin ["Expected "mold/flat bgn/2" at: "]) mold/part ~~p 100
+		]
+	]
+	change/only remove bgn compose [(rule) | ~~p: (to paren! error)]
+	bgn 
+]
+
+
 flush: function [
 	"Grab a copy of SERIES, clearing the original"
 	series [series!]

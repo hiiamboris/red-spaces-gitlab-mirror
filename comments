@@ -1027,6 +1027,15 @@ on radial menu UX
 	I'll go with simple alt-up, as with other menus, for now
 	but TODO: there must be some configurability in this
 	  though how? maybe introduce some higher-level "events" like tap+drag+release gesture?
+how different are VID/S widgets from space templates?
+	VIDgets do not introduce a new template, so do not require a separate style defined,
+	which helps keep style sheet clean and efficient
+there's a collision in terms: styles, templates, themes - how to resolve?
+	template is final, it's a space specification block
+	"theme" makes sense to name color sets, i.e. look may be android-like but themed differently
+	"skin" this is smth like stylesheet - a collection of styles (on wikipedia - same as theme)
+	"look n feel" - wider, changes the way of interaction - not supported out of the box in spaces
+	hmm maybe I just write "VID/S style" vs "space style" to make it clear
 		
 
 Timer design:

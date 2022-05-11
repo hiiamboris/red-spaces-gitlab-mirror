@@ -57,48 +57,48 @@ do/expand [
 	#include %../common/do-atomic.red
 	
 	; random/seed now/precise
-	
-	;-- below trickery is used to put all space things into a single context...
-	spaces: #()
-	context [
-		; joined: clear []
-		set 'joined clear []
-		script-dir: what-dir
-		change-dir #do keep [what-dir]
-		include: function [file [file!]] [
-			#debug [print ["loading" mold file]]
-			#debug [append joined compose/deep [print ["#including" (mold file)]]]
-			append joined load/all file
-			; print ["loaded" mold file]
-		]
-	
-		include %auxi.red
-		include %styles.red
-		include %rendering.red
-		include %layouts.red
-		include %templates.red
-		include %vid.red
-		include %events.red
-		include %popups.red
-		include %traversal.red
-		include %focus.red
-		include %tabbing.red
-		include %single-click.red
-		include %timers.red
-		include %standard-handlers.red
-		include %hittest.red
-		include %debug-helpers.red
-	
-		spaces/ctx: do/expand compose/only [context (joined)]
-	
-		;-- makes some things readily available:
-		spaces/events:    spaces/ctx/events
-		spaces/templates: spaces/ctx/templates
-		spaces/styles:    spaces/ctx/styles
-		spaces/layouts:   spaces/ctx/layouts
-		spaces/keyboard:  spaces/ctx/keyboard
+	#local [											;-- don't spill macros into user code
+		;-- below trickery is used to put all space things into a single context...
+		spaces: #()
+		context [
+			joined: clear []
+			script-dir: what-dir
+			change-dir #do keep [what-dir]
+			include: function [file [file!]] [
+				#debug [print ["loading" mold file]]
+				#debug [append joined compose/deep [print ["#including" (mold file)]]]
+				append joined load/all file
+				; print ["loaded" mold file]
+			]
 		
-		change-dir script-dir
+			include %auxi.red
+			include %styles.red
+			include %rendering.red
+			include %layouts.red
+			include %templates.red
+			include %vid.red
+			include %events.red
+			include %popups.red
+			include %traversal.red
+			include %focus.red
+			include %tabbing.red
+			include %single-click.red
+			include %timers.red
+			include %standard-handlers.red
+			include %hittest.red
+			include %debug-helpers.red
+		
+			spaces/ctx: do/expand compose/only [context (joined)]
+		
+			;-- makes some things readily available:
+			spaces/events:    spaces/ctx/events
+			spaces/templates: spaces/ctx/templates
+			spaces/styles:    spaces/ctx/styles
+			spaces/layouts:   spaces/ctx/layouts
+			spaces/keyboard:  spaces/ctx/keyboard
+			
+			change-dir script-dir
+		]
 	]
 ]
 #process on

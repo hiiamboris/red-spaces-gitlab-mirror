@@ -200,6 +200,7 @@ do with [
 				m: box/margin / 2
 				matrix: arrow: []						;-- no arrow if hint was adjusted by window borders
 				if o: box/origin [
+					;@@ TODO: arrow can be placed anywhere really, just more math needed
 					if o <> 0x0 [matrix: compose/deep [matrix [1 0 0 -1 0 (box/size/y)]]]
 					arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
 				]

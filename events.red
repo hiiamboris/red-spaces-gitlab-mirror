@@ -211,10 +211,10 @@ events: context [
 			set name set-word! (name: to word! name)
 			['extends
 				;@@ TODO: allow paths here too
-				set base !(expected [lit-word! | word!]) (base: to word! base)
+				set base #expect [lit-word! | word!] (base: to word! base)
 			|	(base: none)
 			]
-			set body !(expected block!)
+			set body #expect block!
 			(add-style/from name body base)
 		]
 		add-style: function [name body /from base] [
@@ -236,15 +236,15 @@ events: context [
 		=style-body=: [
 			any [
 				not end
-				ahead !(expected [word! | set-word!])
+				ahead #expect [word! | set-word!]
 				=style-def= | =hndlr-def=
 			]
 		]
 
 		=hndlr-def=: [
 			set name word!
-			set spec [ahead !(expected block!) into =spec-def=]
-			set body !(expected block!)
+			set spec [ahead #expect block! into =spec-def=]
+			set body #expect block!
 			(add-handler name spec body)
 		]
 		add-handler: function [name spec body] [
@@ -255,18 +255,20 @@ events: context [
 		]
 
 		=spec-def=: [								;-- just validation, to protect from errors
-			!(expected word!) opt [ahead block! [quote @(expected [object!])] ]
-			!(expected word!) opt [ahead block! [quote @(expected [block!]) ] ]
-			!(expected word!) opt [ahead block!
-				!(expected [quote [event!] | quote [event! none!] | quote [none! event!]])
+			#expect word! opt [ahead block! #expect quote [object!]]	;-- space [object!]
+			#expect word! opt [ahead block! #expect quote [block!]]	;-- path [block!]
+			#expect word! opt [
+				quote [event! none!]
+			|	quote [none! event!]
+			|	ahead block! #expect quote [event!]
 			]
 			opt [if (name = 'on-time) not [refinement! | end]
-				!(expected word!) opt [ahead block! [quote @(expected [percent!])]]
+				#expect word! opt [ahead block! #expect quote [percent!]]
 			]
-			opt [not end !(expected /local) to end]
+			opt [not end #expect /local to end]
 		]
 
-		ok?: parse def [any [not end ahead !(expected set-word!) =style-def=]]		;-- no handlers in the topmost block allowed
+		ok?: parse def [any [not end ahead #expect set-word! =style-def=]]	;-- no handlers in the topmost block allowed
 		#assert [ok?]
 	]
 
