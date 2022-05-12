@@ -342,8 +342,11 @@ context [
 					if function? :draw [
 						spec: spec-of :draw
 						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-						canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
-						canvas': constrain canvas' space/limits
+						canvas': either find spec /on [		;-- must not affect `canvas` used by cache, thus new name
+							constrain canvas space/limits
+						][
+							on: none						;-- don't constrain if no /on refinement
+						]
 						code: case [						;@@ workaround for #4854 - remove me!!
 							all [canvas' only] [[draw/only/on xy1 xy2 canvas']]
 							only               [[draw/only    xy1 xy2        ]]
@@ -360,8 +363,11 @@ context [
 					;@@ this basically cries for FAST `apply` func!!
 					spec: spec-of :style
 					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
-					canvas': either find spec /on [canvas][on: none]	;-- must not affect `canvas` used by cache
-					canvas': constrain canvas' space/limits
+					canvas': either find spec /on [		;-- must not affect `canvas` used by cache, thus new name
+						constrain canvas space/limits
+					][
+						on: none						;-- don't constrain if no /on refinement
+					]
 					code: case [					
 						all [canvas' only] [[style/only/on space xy1 xy2 canvas']]
 						only               [[style/only    space xy1 xy2        ]]
