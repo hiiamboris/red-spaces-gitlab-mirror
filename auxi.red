@@ -457,6 +457,18 @@ quietly: function ['path [set-path!] value [any-type!]] [
 	:value
 ]
 
+;; good addition to do-atomic which holds reactivity
+do-async: function [									;@@ used solely to work around #5132
+	"Evaluate CODE with view/auto-sync off"
+	code [block!]
+][
+	sync: 'system/view/auto-sync?
+	old: get sync
+	set sync off
+	do code
+	set sync old
+]
+
 >>: make op! function [
     "Return series at an offset from head or shift bits to the right"
     data   [series! integer!]

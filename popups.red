@@ -105,13 +105,16 @@ hide-popups: function [
 	level [integer!] ">= 0; if zero, only hint is hidden"
 ][
 	stack: get-popups-for window
-	either level = 0 [
-		remove find/same window/pane stack/1			;-- only hide the hint
-	][
-		foreach face pos: skip stack level [			;-- hide all popups but the hint
-			remove find/same window/pane face
+	do-async [											;@@ workaround for #5132
+		either level = 0 [
+			remove find/same window/pane stack/1		;-- only hide the hint
+		][
+			foreach face pos: skip stack level [		;-- hide all popups but the hint
+				remove find/same window/pane face
+			]
 		]
 	]
+	show window
 ]
 
 hint-text?: function [
