@@ -143,7 +143,7 @@ show-hint: function [
 		hint/rate: none									;-- unlike menus, hints should not add timer pressure
 		space: get hint/space: make-space/name 'hint []
 		space/content: make-space/name 'text compose [text: (text)]
-		space/origin: either above? [hint/size * 0x1][0x0]		;-- where will the arrow be
+		space/origin: either above? [0x1][0x0]			;-- corner where will the arrow be (cannot be absolute - no size yet)
 		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
 		hint/size: none									;-- to make render set face/size
 		hint/draw: render hint
