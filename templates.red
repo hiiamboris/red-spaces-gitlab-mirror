@@ -557,6 +557,9 @@ paragraph-ctx: context [
 		layout: space/layout
 		layout/text: as string! space/text
 		layout/font: space/font						;@@ careful: fonts are not collected by GC, may run out of them easily
+		layout/data: any [layout/data make block! 4]	;-- support of font styles - affects width
+		clear change change layout/data (1 by length? space/text) space/flags
+		
 		either width [									;-- wrap
 			layout/size: (max 1 width - (2 * space/margin/x)) by 2e9	;-- width has to be set to determine height
 			#assert [0 < layout/size/x]						;@@ crashes on 0 - see #4897
@@ -569,6 +572,7 @@ paragraph-ctx: context [
 
 	draw: function [space [object!] canvas [pair! none!]] [
 		layout: space/layout
+		
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
 		new-width: either canvas [canvas/x][0]
 		if any [												;-- redraw if:
@@ -615,6 +619,7 @@ paragraph-ctx: context [
 		text:   ""
 		margin: 0x0										;-- default = no margin
 		font:   none									;-- can be set in style, as well as margin
+		flags:  []										;-- [bold italic underline] supported
 
 		layout: none									;-- internal, text size is kept in layout/extra
 		; cache?: true
@@ -628,7 +633,10 @@ paragraph-ctx: context [
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
-	templates/url: make-template 'paragraph []
+	templates/url: make-template 'paragraph [
+		flags: [underline]
+		color: 50.80.255								;@@ color should be taken from the OS theme
+	]
 ]
 
 

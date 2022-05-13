@@ -83,15 +83,7 @@ do with [
 			]
 		]
 		
-		text paragraph [(when select self 'color [compose [pen (color)]])]
-		
-		url [
-			function [url /on canvas] [
-				drawn: url/draw/on canvas				;-- must create /layout which can otherwise be none
-				url/layout/data: reduce [1 by length? url/text  'underline]
-				compose/only [pen (blue + 50) (drawn)]			;@@ color should be taken from the OS theme
-			]
-		]
+		text paragraph url [(when select self 'color [compose [pen (color)]])]
 
 		; list/item [[pen cyan]]
 		

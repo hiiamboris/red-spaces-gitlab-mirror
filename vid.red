@@ -57,8 +57,8 @@ extend vid-styles [
 			underline [append flags 'underline]
 		)
 	]
-	url    [template: paragraph facets: #(url! text) spec: [underline?: yes color: 50.80.255]]
-	button [template: button    facets: #(string! data block! command)]
+	url    [template: url    facets: #(url! text)]
+	button [template: button facets: #(string! data block! command)]
 ]
 
 ;; grid
