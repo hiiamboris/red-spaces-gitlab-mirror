@@ -10,23 +10,56 @@ Red [
 
 
 vid-styles: make map! 10
-vid-styles/hlist:     [template: list      spec: [margin: spacing: 10x10 axis: 'x]]
-vid-styles/vlist:     [template: list      spec: [margin: spacing: 10x10 axis: 'y]]
-vid-styles/row:       [template: tube      spec: [margin: spacing: 10x10 axes: [e s]]]
-vid-styles/column:    [template: tube      spec: [margin: spacing: 10x10 axes: [s e]]]
-vid-styles/list-view: [template: list-view spec: [list/spacing: 5x5 list/axis: 'y]]	;@@ is there ever a need for horizontal list-view?
-vid-styles/label: [
-	template: label
-	spec: [limits: 100 .. none]
-	facets: #(
-		image! image
-		char! image
-		string! text
-	)
+extend vid-styles [
+	hlist [
+		template: list
+		spec:     [margin: spacing: 10x10 axis: 'x]
+		facets:   #(tight [margin: spacing: 0x0])
+	]
+	vlist [
+		template: list
+		spec:     [margin: spacing: 10x10 axis: 'y]
+		facets:   #(tight [margin: spacing: 0x0])
+	]
+	row [
+		template: tube
+		spec:     [margin: spacing: 10x10 axes: [e s]]
+		facets:   #(tight [margin: spacing: 0x0])
+	]
+	column [
+		template: tube
+		spec:     [margin: spacing: 10x10 axes: [s e]]
+		facets:   #(tight [margin: spacing: 0x0])
+	]
+	list-view [									;@@ is there ever a need for horizontal list-view?
+		template: list-view
+		spec:     [list/spacing: 5x5 list/axis: 'y]
+		facets:   #(tight [list/margin: list/spacing: 0x0])
+	]
+	label [
+		template: label
+		spec:     [limits: 80 .. none]
+		facets:   #(
+			image!    image
+			char!     image
+			string!   text
+			bold      [append flags 'bold]
+			italic    [append flags 'italic]
+			underline [append flags 'underline]
+		)
+	]
+	text [
+		template: text
+		facets:   #(
+			string!   text
+			bold      [append flags 'bold]
+			italic    [append flags 'italic]
+			underline [append flags 'underline]
+		)
+	]
+	url    [template: paragraph facets: #(url! text) spec: [underline?: yes color: 50.80.255]]
+	button [template: button    facets: #(string! data block! command)]
 ]
-vid-styles/text:   [template: text   facets: #(string! text)]
-vid-styles/url:    [template: url    facets: #(url! text)]
-vid-styles/button: [template: button facets: #(string! data block! command)]
 
 ;; grid
 ;; grid-view
@@ -143,7 +176,6 @@ lay-out-vids: function [
 		actors:											;-- unlike event handlers, affects individual space only
 		facets:											;-- facets collected by manual and auto-facet
 		pane:											;-- unless snatched by auto-facet, assigns /content
-		tight?:											;-- sets margin/spacing to zero
 	]
 	
 	commit-style: [
@@ -151,11 +183,9 @@ lay-out-vids: function [
 		#assert [def/style/template "template name must be defined in style specification"]
 		
 		;; may assign non-existing facets like hint= or menu=
-		facets: map-each/eval [facet value] def/facets [
-			[to set-word! facet 'quote :value]
+		facets: map-each [facet value] def/facets [
+			either facet [ reduce [to set-word! facet 'quote :value] ][ value ]
 		]
-		;; tight overrides template but not custom margin= spacing= facets, so comes before
-		if def/tight? [insert facets [margin: spacing: 0x0]]
 		space: make-space def/style/template compose [
 			(any [def/style/spec []])
 			(def/spec)
@@ -178,13 +208,6 @@ lay-out-vids: function [
 				'else [ERROR "Style (def/template) cannot contain other spaces"]
 			]
 		]
-		;; check if tight was applicable - not possible in this pipeline, will always succeed
-		; all [
-			; def/tight? 
-			; not in space 'margin
-			; not in space 'spacing
-			; ERROR "Style (def/template) does not have any margins or spacing to adjust"
-		; ]
 		append pane anonymize def/style/template space
 	]
 	
@@ -211,7 +234,7 @@ lay-out-vids: function [
 		)
 	]
 	
-	=modifier=:   [=spec= | =reaction= | =action= | =tight= | =facet= | =auto-facet= | =color= | =pane= | =size=]
+	=modifier=:   [=spec= | =reaction= | =action= | =facet= | =auto-facet= | =color= | =pane= | =size=]
 	
 	=spec=:       [ahead word! 'with  set b #expect block! (append def/spec b)]	;-- collects multiple `with` blocks
 	
@@ -228,8 +251,6 @@ lay-out-vids: function [
 	|	#expect "actor body"
 	]
 	
-	=tight=:      [ahead word! 'tight (def/tight?: yes)]
-	
 	=facet=:      [=facet-name= =facet-expr=]
 	=facet-name=: [
 		set w word! if (#"=" = last s: form w) (
@@ -239,10 +260,11 @@ lay-out-vids: function [
 	=facet-expr=: [s: e: (append/only def/facets do/next s 'e) :e]
 	
 	=auto-facet=: [
-		ahead set x any-type!
+		set w word! if (attempt [facet: def/style/facets/:w])	;-- flag defined for this style? ;@@ REP #113
+		(repend def/facets [none facet])
+	|	set x any-type!									;-- try to match by value type
 		if (attempt [facet: select def/style/facets type?/word :x])	;@@ REP #113
 		(repend def/facets [facet :x])
-		skip
 	]
 	
 	;; I decided to make a special case because color is in principle applicable to all templates
