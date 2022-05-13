@@ -32,7 +32,7 @@ view/no-wait/options [
 	below
 	host [fps-meter]
 	b: host [
-		grid-view with [
+		grid-view tight with [
 			size: 500x300
 			ratio: 5
 			; cache?: grid/cache?: window/cache?: spaces/templates/cell/cache?: off

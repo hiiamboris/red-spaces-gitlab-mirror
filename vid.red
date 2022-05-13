@@ -14,7 +14,7 @@ vid-styles/hlist:     [template: list      spec: [margin: spacing: 10x10 axis: '
 vid-styles/vlist:     [template: list      spec: [margin: spacing: 10x10 axis: 'y]]
 vid-styles/row:       [template: tube      spec: [margin: spacing: 10x10 axes: [e s]]]
 vid-styles/column:    [template: tube      spec: [margin: spacing: 10x10 axes: [s e]]]
-vid-styles/list-view: [template: list-view spec: [margin: spacing: 10x10 axis: 'y]]	;@@ is there ever a need for horizontal list-view?
+vid-styles/list-view: [template: list-view spec: [list/spacing: 5x5 list/axis: 'y]]	;@@ is there ever a need for horizontal list-view?
 vid-styles/label: [
 	template: label
 	spec: [limits: 100 .. none]
@@ -115,9 +115,10 @@ init-spaces-tree: function [face [object!]] [
 wrap-value: function [
 	"Create a space to represent given VALUE; return it's name"
 	value [any-type!]
+	wrap? [logic!] "How to lay text out: as a line (false) or paragraph (true)"
 ][ 
 	switch/default type?/word :value [
-		string! [make-space/name 'text  [text:  value]]	;@@ text or paragraph??
+		string! [make-space/name pick [paragraph text] wrap? [text:  value]]
 		logic!  [make-space/name 'logic [state: value]]
 		image!  [make-space/name 'image [data:  value]]
 		url!    [make-space/name 'url   [data:  value]]
@@ -129,8 +130,9 @@ lay-out-data: function [
 	"Create a space layout out of DATA block"
 	data [block!] "image, logic, url get special treatment"
 	/only "Return only the spaces list, do not create a layout"
+	/wrap "How to lay text out: as a line (false) or paragraph (true)"
 ][
-	result: map-each value data [wrap-value :value]
+	result: map-each value data [wrap-value :value wrap]
 	either only [
 		result
 	][
@@ -176,8 +178,6 @@ lay-out-vids: function [
 			(def/spec)
 			(facets)
 		]
-		?? def/template
-		??~ space
 		if def/link [set def/link space]
 		; foreach reaction def/reactions [react bind copy/deep reaction space]
 		; def/actors					;@@ TODO: actors

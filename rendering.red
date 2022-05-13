@@ -278,8 +278,9 @@ context [
 			drawn: render-space/only/on face/space xy1 xy2 face/size
 			#assert [block? :drawn]
 			unless face/size [								;-- initial render: define face/size
-				face/size: select get face/space 'size
-				#assert [face/size]
+				space: get face/space
+				#assert [space/size]
+				face/size: space/size
 				style: compose/deep bind get-current-style face	;-- reapply the host style using new size
 			]
 			render: reduce [style drawn]

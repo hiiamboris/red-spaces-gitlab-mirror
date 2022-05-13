@@ -569,7 +569,7 @@ paragraph-ctx: context [
 	draw: function [space [object!] canvas [pair! none!]] [
 		layout: space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
-		new-width: all [canvas canvas/x]
+		new-width: either canvas [canvas/x][0]
 		if any [												;-- redraw if:
 			none = layout										;-- some facet changed
 			old-width <> new-width								;-- canvas width changed
@@ -609,7 +609,7 @@ paragraph-ctx: context [
 	;@@ BUG: not deeply reactive
 	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
 
-	templates/paragraph: make-template 'space [
+ 	templates/paragraph: make-template 'space [
 		size:   none									;-- only valid after `draw` because it applies styles
 		text:   ""
 		margin: 0x0										;-- default = no margin
@@ -623,7 +623,7 @@ paragraph-ctx: context [
 
 	;; unlike paragraph, text is never wrapped
 	templates/text: make-template 'paragraph [
-		draw: does [~/draw self none]
+		draw: does [~/draw self infxinf]
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
@@ -944,9 +944,9 @@ data-view-ctx: context [
 			font [do push-font]
 			data [
 				either block? :new [
-					space/content: anonymize 'tube lay-out-data new	;@@ use `row`?
+					space/content: anonymize 'tube lay-out-data/wrap new space/wrap?	;@@ use `row`?
 				][
-					space/content: wrap-value :new		;@@ maybe reuse the old space if it's available?
+					space/content: wrap-value :new space/wrap?		;@@ maybe reuse the old space if it's available?
 					do push-font
 				] 
 			]
@@ -960,7 +960,8 @@ data-view-ctx: context [
 		spacing: 5x5									;-- used only when data is a block
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
-		font:    none									
+		font:    none
+		wrap?:   off									;-- controls choice between text (off) and paragraph (on)
 		
 		box-on-change: :on-change*
 		#on-change-redirect
@@ -1149,7 +1150,7 @@ list-view-ctx: context [
 		if level < list/margin/:x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
 		;; make canvas infinite otherwise single item will occupy it's size
-		canvas/:x: 2'000'000'000
+		canvas/:x: infxinf/x
 		
 		either empty? list/map [
 			i: 1
@@ -1165,17 +1166,15 @@ list-view-ctx: context [
 		space: list/spacing								;-- return value is named "space"
 		fetch-ith-item: [								;-- sets `item` to size
 			obj: get name: list/items/pick i
-			unless item: obj/size [
-				;; presence of call to `render` here is a tough call
-				;; existing previous size is always preferred here, esp. useful for non-cached items
-				;; but `locate-line` is used by `available?` which is in turn called:
-				;; - when determining initial window extent (from content size)
-				;; - every time window gets scrolled closer to it's borders
-				;; so there's no easy way around requiring render here, and around having a canvas here
-				;; for the purpose of this function, last rendered canvas works, as well as window size
-				render/on name canvas
-				item: obj/size
-			]
+			;; presence of call to `render` here is a tough call
+			;; existing previous size is always preferred here, esp. useful for non-cached items
+			;; but `locate-line` is used by `available?` which is in turn called:
+			;; - when determining initial window extent (from content size)
+			;; - every time window gets scrolled closer to it's borders
+			;; so there's no easy way around requiring render here, and around having a canvas here
+			;; for the purpose of this function, last rendered canvas works, as well as window size
+			render/on name canvas
+			item: obj/size
 		]
 		;@@ should this func use layout or it will only complicate things?
 		;@@ right now it independently of list-layout computes all offsets
@@ -1251,7 +1250,7 @@ list-view-ctx: context [
 	templates/list-view: make-template 'inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; cache?: off
-		
+		size:   none									;-- avoids extra triggers in on-change
 		pages:  10
 		source: []
 		data: function [/pick i [integer!] /size] [		;-- can be overridden
@@ -1259,7 +1258,7 @@ list-view-ctx: context [
 		]
 		
 		wrap-data: function [item-data [any-type!]][
-			spc: make-space 'data-view []
+			spc: make-space 'data-view [wrap?: on]
 			set/any 'spc/data :item-data
 			anonymize 'item spc
 		]
@@ -1283,7 +1282,7 @@ list-view-ctx: context [
 				][data/size]
 			]
 
-			;@@ maybe all this should be part of `list` space itself?
+			;@@ maybe all this should be part of `list` space itself? though it will bloat it..
 			available?: function [axis dir from [integer!] requested [integer!]] [
 				if axis <> self/axis [
 					return either dir < 0 [from][window/max-size/:axis - from]
@@ -1319,9 +1318,13 @@ list-view-ctx: context [
 			;; it's also too general, while this `draw` can be optimized better
 			draw: function [/only xy1 [pair!] xy2 [pair!]] [
 				#assert [all [xy1 xy2]]
+				#assert [window/size/:axis > 0]			;-- some bug in window sizing likely
 				clear map
 				set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
-				unless all [i1 i2] [return []]				;-- no visible items (see locate-range)
+				unless all [i1 i2] [					;-- no visible items (see locate-range)
+					maybe self/size: 0x0
+					return []
+				]
 				#assert [i1 <= i2]
 
 				guide: select [x 1x0 y 0x1] axis
@@ -1383,8 +1386,10 @@ list-view-ctx: context [
 					if :old <> :new [
 						#assert [any [word <> 'axis  find [x y] :new]]
 						clear list/map
-						autosize-window
-						invalidate-cache self
+						if size [						;-- do not trigger during initialization
+							autosize-window
+							invalidate-cache self
+						]
 					]
 				]
 			]
@@ -1990,7 +1995,7 @@ button-ctx: context [
 	]
 	
 	templates/button: make-template 'clickable [		;-- styled with decor
-		margin: 4x4
+		margin: 10x5
 		rounding: 5										;-- box rounding radius in px
 	]
 ]

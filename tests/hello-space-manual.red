@@ -7,7 +7,7 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 
 	item-list: reduce [					;) item-list is a block of NAMES of spaces
 
-		make-space/name 'paragraph [	;) each make-space/name returns a name referring to an object
+		make-space/name 'text [			;) each make-space/name returns a name referring to an object
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
 		make-space/name 'button [
