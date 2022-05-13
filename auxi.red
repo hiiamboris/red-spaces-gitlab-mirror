@@ -5,7 +5,7 @@ Red [
 ]
 
 ; #include %../common/assert.red
-exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap?]
+exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap? infxinf]
 
 ;@@ unfortunately macros are not imported yet due to custom `include` :(
 ;@@ need a special macros file

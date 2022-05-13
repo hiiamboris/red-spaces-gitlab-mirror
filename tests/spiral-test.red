@@ -20,7 +20,7 @@ spaces/templates/spiral: make-template 'space [
 
 	into: function [xy [pair!] /force name [word! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
-		render in field 'paragraph			;-- produce layout 
+		render/on in field 'paragraph infxinf	;-- produce layout 
 		r: field/paragraph/layout
 		#assert [r]
 
@@ -52,7 +52,7 @@ spaces/templates/spiral: make-template 'space [
 		unless r: field/paragraph/layout [
 			;; render is needed to produce layout and cached parents tree
 			;; so on key press paragraph invalidates also spiral itself
-			render in field 'paragraph			;-- produce layout 
+			render/on in field 'paragraph infxinf		;-- produce layout 
 			r: field/paragraph/layout
 			#assert [r]
 		]
