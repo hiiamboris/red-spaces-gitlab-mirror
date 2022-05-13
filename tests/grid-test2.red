@@ -17,7 +17,7 @@ view/no-wait/options [
 			bounds: 10x10
 			; bounds: [x: 10 y: auto]
 			cell-map/(1x2): make-space/name 'button [data: "button1"]
-			cell-map/(2x2): make-space/name 'button [size: 80x80]
+			cell-map/(2x2): make-space/name 'button [limits: 80x80 .. none]
 			cell-map/(1x1): make-space/name 'button [data: "button2"]
 			set-span 1x1 2x1
 			set-span/force 2x2 3x2

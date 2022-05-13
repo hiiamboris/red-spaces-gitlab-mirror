@@ -167,7 +167,7 @@ triplets: append/dup [] triplet (length? icons) / 6
     
 view/no-wait/flags compose/deep [
 	host: host [
-		scrollable size= 600x400 [
+		scrollable 600x400 [
 			tube tight spacing=(triplet-sep by 30) align=[↑] [
 				(triplets)
 			]

@@ -22,14 +22,11 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list-view with [
-			size: 300x400
-			data: function [/pick i /size] [
-				either pick [
-					random/seed i
-					rejoin ["message " i ": " copy/part lorem random length? lorem]
-				][none]									;-- /size = none for unlimited
-			]
+		list-view 300x400 data= function [/pick i /size] [
+			either pick [
+				random/seed i
+				rejoin ["message " i ": " copy/part lorem random length? lorem]
+			][none]									;-- /size = none for unlimited
 		]
 	] with [color: system/view/metrics/colors/panel]
 	on-over [

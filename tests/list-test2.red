@@ -25,7 +25,7 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list-view with [size: 300x400 source: list1d]
+		list-view 300x400 source= list1d
 	]
 	on-over [
 		status/text: form hittest face/space event/offset

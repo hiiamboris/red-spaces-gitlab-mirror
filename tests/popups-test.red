@@ -38,8 +38,8 @@ define-handlers [
 
 view/no-wait [
 	h: host [
-		v: vlist 100 .. 300 spacing= 10x10 [; hint="This is the host face"
-			hl: hlist spacing= 10x0 [
+		v: vlist 100 .. 300 [; hint="This is the host face"
+			hl: hlist [
 				text "Clickable URL:"
 				url 150 .. 200 hint="Click to follow"
 					https://codeberg.org/hiiamboris/red-spaces

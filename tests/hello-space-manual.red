@@ -4,6 +4,7 @@ Red [needs: view]						;) we need the View module to be able to show graphics
 
 list: make-space 'list [				;) make-space is used to instantiate spaces
 	axis: 'y							;) lists can be horizontal(x) or vertical(y)
+	margin: spacing: 10x10				;) list is tight by default, this makes it spacious
 
 	item-list: reduce [					;) item-list is a block of NAMES of spaces
 
@@ -12,7 +13,7 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 		]
 		make-space/name 'button [
 			data: "OK"					;) data can be any Red type
-			width: 80					;) width makes the button bigger than it's data
+			limits: 80 .. 80			;) limit with min=max fixes the button's size
 			command: [unview]			;) code that is evaluated when button is released
 		]
 	]

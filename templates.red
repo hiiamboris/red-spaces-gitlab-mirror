@@ -435,8 +435,9 @@ scrollable-space: context [
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		;@@ TODO: this size to canvas relationship is still tricky - need smth simpler
 		box: either canvas [
-			as-pair either canvas/x < 2e9 [canvas/x][space/size/x]
-					either canvas/y < 2e9 [canvas/y][space/size/y]
+			space/size: as-pair
+				either canvas/x < 2e9 [canvas/x][space/size/x]
+				either canvas/y < 2e9 [canvas/y][space/size/y]
 		][
 			space/size
 		]
@@ -1098,15 +1099,16 @@ inf-scrollable-ctx: context [
 		roll: does [~/roll self]
 
 		autosize-window: function [] [
-			#assert [all [size size/x > 0 size/y > 0]]
-			maybe window/max-size: pages * self/size
+			size: any [self/size self/limits/min]		;@@ rethink how to better hanlde integer or invalid limit
+			#assert [all [pair? size size/x > 0 size/y > 0]]
+			maybe window/max-size: pages * size
 			#debug list-view [#print "autosized window to (window/max-size)"]
 		]
 
 		scrollable-draw: :draw
-		draw: function [] [
+		draw: function [/on canvas [pair! none!]] [
 			unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
-			scrollable-draw
+			scrollable-draw/on canvas
 		]
 	]
 ]
@@ -1316,7 +1318,7 @@ list-view-ctx: context [
 
 			;; container/draw only supports finite number of `items`, infinite needs special handling
 			;; it's also too general, while this `draw` can be optimized better
-			draw: function [/only xy1 [pair!] xy2 [pair!]] [
+			draw: function [/only xy1 [pair!] xy2 [pair!]] [	;-- always uses window for canvas
 				#assert [all [xy1 xy2]]
 				#assert [window/size/:axis > 0]			;-- some bug in window sizing likely
 				clear map
@@ -1362,6 +1364,7 @@ list-view-ctx: context [
 		;; this initializes window size to a multiple of list-view sizes (paragraphs adjust to window then)
 		;; overrides inf-scrollable's own autosize-window because `list-view` has a linear `pages` interpretation
 		autosize-window: function [] [
+			size: any [self/size self/limits/min]		;@@ rethink how to better handle integer or invalid limit
 			unit: axis2pair list/axis
 			;; account for scrollers size, since list-view is meant to always display one along main axis
 			;; this will make window and it's content adapt to list-view width when possible

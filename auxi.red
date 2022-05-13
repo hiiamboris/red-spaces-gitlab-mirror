@@ -5,6 +5,7 @@ Red [
 ]
 
 ; #include %../common/assert.red
+;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
 exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap? infxinf]
 
 ;@@ unfortunately macros are not imported yet due to custom `include` :(
