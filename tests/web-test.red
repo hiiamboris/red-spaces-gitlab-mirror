@@ -66,9 +66,9 @@ append spaces/keyboard/focusable 'web
 view/no-wait/options [
 	below
 	b: host [
-		web with [size: 900x600]
+		web size= 900x600
 		; web with [size: 300x200]
-	] with [color: system/view/metrics/colors/panel]
+	]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

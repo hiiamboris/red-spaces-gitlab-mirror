@@ -57,9 +57,9 @@ tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
 		keep reshape [
 			; cell with [limits: 170x200 .. 170x200] [
-			cell with [limits: none .. 170x200] [
-				list with [axis: 'y] [
-					heading with [data: !(#composite "axes: (mold axes)")]
+			cell none .. 150x200 [
+				vlist [
+					heading data= !(#composite "axes: (mold axes)")
 					; tube with [axes: !(axes) width: 130 item-list: boxes]
 				]
 			]
@@ -71,11 +71,11 @@ tubes: collect [
 ; system/view/auto-sync?: no
 view/no-wait compose/only/deep [
 	h: host [
-		list with [axis: 'y] [
+		vlist [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
-			scrollable with [size: 540x240] [
-				tube with [spacing: 5x10] (tubes)
+			scrollable size= 500x240 [
+				tube spacing= 5x10 (tubes)
 			]
 		]
 	]

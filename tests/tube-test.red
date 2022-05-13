@@ -75,11 +75,11 @@ tubes: collect [
 ; system/view/auto-sync?: no
 view/no-wait compose/only/deep [
 	h: host [
-		list with [axis: 'y] [
+		vlist [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
-			scrollable with [size: 540x500] [
-				list with [axis: 'y margin: spacing: 5x5] (tubes)
+			scrollable size= 540x500 [
+				vlist (tubes)
 			]
 		]
 	]

@@ -5,9 +5,7 @@ Red [
 	needs:   view
 ]
 
-recycle/off
-cd %..
-do %everything.red
+#include %../everything.red
 
 
 ;-- drunken scrollbars animation
@@ -22,7 +20,7 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list with [axis: 'y] [
+		vlist [
 			scrollbar with [size: 400x20 amount: 0.5 axis: 'x]
 			scrollbar with [size: 200x20 amount: 0.5 axis: 'x]
 			scrollbar with [size: 100x20 amount: 0.5 axis: 'x]
@@ -33,7 +31,7 @@ view/no-wait/options [
 			scrollbar with [size: 20x20  amount: 0.5 axis: 'x]
 			scrollbar with [size: 10x20  amount: 0.5 axis: 'x]
 		]
-	] with [color: system/view/metrics/colors/panel]
+	]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]

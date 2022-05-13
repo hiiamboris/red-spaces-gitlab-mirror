@@ -17,8 +17,7 @@ view/no-wait/options [
 	below
 	host [fps-meter]
 	b: host [
-		grid-view with [
-			size: 1000x500
+		grid-view size= 1000x500 with [
 			grid/pinned: 2x1
 			grid/bounds: [x: #[none] y: #[none]]
 			; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]

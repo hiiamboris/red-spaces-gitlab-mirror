@@ -5,29 +5,7 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack), styles (to fix svmc/), error-macro.red, layout.red
-
-
-
-;-- basic event dispatching face
-;@@ DOC it: user can use any face as long as 'space' is defined (serves as a marker for the host-event-func)
-;@@ TODO: get this out somewhere else
-system/view/VID/styles/host: [
-	default-actor: worst-actor-ever						;-- worry not! this is useful
-														;@@ TODO: lay it out
-	template: [
-		type:   'base
-		size:   100x100
-		;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
-		;; (except for some popups that must be almost transparent)
-		color:  system/view/metrics/colors/panel
-		space:  none
-		flags:  'all-over								;-- else 'over' events won't make sense over spaces
-		rate:   100										;-- for space timers to work
-		dirty?: no										;-- for events to mark the host for redraw
-	]
-	init: [init-spaces-tree face]
-]
+;-- requires auxi.red (block-stack), styles (to fix svmc/), error-macro.red, vid.red
 
 
 ;-- event function that pushes events over to each space

@@ -1038,6 +1038,41 @@ there's a collision in terms: styles, templates, themes - how to resolve?
 	hmm maybe I just write "VID/S style" vs "space style" to make it clear
 		
 
+VID Styles: must be documented TODO
+	specification:
+	
+	rule:              [any [style-definition | style-declaration]]
+	style-definition:  ['style new-name style-declaration]
+	new-name:          [set-word!]
+	style-declaration: [opt space-name style-name any modifier]
+	space-name:        [set-word!] - will be set to the instantiated space object
+	style-name:        [word!] - should not end in `=` (I will simply not define such style names)
+	
+	modifier:          [spec | reaction | action | facet | auto-facet | pane | size]
+	
+	spec:              ['with block!] - block is used to build space, before all other modifiers applied
+	
+	reaction:          ['react block!] - block is bound to space
+	
+	action:            [actor-name [block! | get-word! | get-path! | 'function block! block!]]
+	actor-name:        [word!] - should start in `on-`
+	                   unlike event handlers, this affects individual space only
+	                   
+	facet:             [facet-name expression]
+	facet-name:        [word!] - should end in `=`, e.g. text="abc"
+	expression:        anything do/next can swallow
+	
+	auto-facet:        [any-type!] - defined by /facets block in style spec, facet is assigned from it, no expressions
+	
+	pane:              [block!] - unless snatched by auto-facet, assigns /content and /item-list
+	                   cannot be handled by auto-facet because requires a layout effort
+	                   
+	size:              [size-component '.. size-component | size-component]
+	size-component:    [integer! | pair! | 'none | none! | word! | get-word! | paren!]
+	                   paren is evaluated; all can be snatched by auto-facet
+	                   also limits= any expression can be used ofc
+	                   
+
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
   but at the same time we don't want to lock execution in a single timer when it takes longer to process than it's period
@@ -3434,3 +3469,9 @@ and image cannot filled with transparent color using draw (need change/dup which
 ; draw face/image compose [pen off fill-pen white box 0x0 (face/size)]
 ; draw face/image render face
 ; maybe face/draw: none
+ 
+old 'expected' custom parse rule - it lead to very cryptic code I couldn't read myself 
+; ;; parse helper: reshape [ !(expected block!) or !(expected [integer! | float!]) ]
+; expected: function ['rule] [
+    ; reshape [!(rule) | p: (ERROR "Expected (mold quote !(rule)) at: (mold/part p 100)")]
+; ]

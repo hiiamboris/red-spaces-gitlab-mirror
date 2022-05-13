@@ -38,22 +38,15 @@ define-handlers [
 
 view/no-wait [
 	h: host [
-		list with [
-			axis: 'y limits: 100 .. 300 spacing: 10x10
-			; hint: "This is the host face"
-		][
-			list with [spacing: 10x0] [
-				text with [text: "Clickable URL:"]
-				url with [
-					text: https://codeberg.org/hiiamboris/red-spaces
-					limits: 150 .. 200
-					hint: "Click to follow"
-				]
+		v: vlist 100 .. 300 spacing= 10x10 [; hint="This is the host face"
+			hl: hlist spacing= 10x0 [
+				text "Clickable URL:"
+				url 150 .. 200 hint="Click to follow"
+					https://codeberg.org/hiiamboris/red-spaces
 			]
-			tube with [margin: 50x10] [ 
-				rocket with [
+			row tight margin= 50x10 [ 
+				rocket hint="Retro-styled racing space ship" with [
 					rocket: self
-					hint: "Retro-styled racing space ship"
 					menu: reshape [
 						"Approve the course" #[true] (print "On our way") 
 						"Alter the course" #[false] (rocket/angle: random 360 invalidate rocket print "Adjusting...")
@@ -64,9 +57,8 @@ view/no-wait [
 						)
 					]
 				]
-				wheel with [
-					hint: "Just a travelling cog"
-					menu: [[radial]
+				wheel hint="Just a travelling cog"
+					menu=[[radial]
 						"A" (print "A chosen")
 						"very long sentence" (print "okay")
 						"even longer sentence wow" (print "wooow")
@@ -75,36 +67,33 @@ view/no-wait [
 						"DDDD" (print "D chosen")
 						"E E E E E" (print "E chosen")
 					]
-				]
-				rocket with [
-					text: "👽"
-					hint: "Gray can't find his marbles"
-					menu: [[radial round]
+				rocket hint="Gray can't find his marbles"
+					menu=[[radial round]
 						"۶" (print "۶ chosen")
 						"🙣" (print "🙣 chosen")
 						"Ͽ" (print "Ͽ chosen")
 						"ϟ" (print "ϟ chosen")
 						"⚼" (print "⚼ chosen")
 					]
-					set-style 'menu/ring/round-clickable/tube/text [(font: big-font ())]
-				]
+					with [
+						text: "👽"
+						set-style 'menu/ring/round-clickable/tube/text [(font: big-font ())]
+					]
 			]
 			; list [switch switch with [state: on]]
-			label with [image: #"⚡" text: "Zapper here" hint: "Be careful"]
-			label with [image: #"🌐" text: "Funny globe" hint: "No continents"]
-			label with [image: #"💥" text: "Hit" hint: "Score +100"]
-			label with [image: #"💨" text: "Whoosh" hint: "Time to move on"]
-			label with [image: #"💮" text: "Flower store" hint: "50C piece"]
-			label with [text: "Label without a sigil" hint: "Some hint"]
-			label with [image: "" text: "Label with empty sigil" hint: "Other hint"]
-			label with [image: #"🍄" text: "Label with a heading^/and some text" hint: "Yet another hint"]
-			;@@ there must be both image="string" and just #"char" ways of adding an image to the label
-			label with [image: "👩‍🚀" text: "Label with a heading^/and some text^/on two lines" hint: "Not helpful"]
+			label #"⚡" "Zapper here"      hint="Be careful"
+			label #"🌐" "Funny globe"     hint="No continents"
+			label #"💥" "Hit"             hint="Score +100"
+			label #"💨" "Whoosh"          hint="Time to move on"
+			label #"💮" "Flower store"    hint="50C piece"
+			label "Label without a sigil" hint="Some hint"
+			label "Label with empty sigil" hint="Other hint" with [image: ""]
+			label #"🍄" "Label with a heading^/and some text" hint="Yet another hint"
+			label "👩‍🚀" "Label with a heading^/and some text^/on two lines" hint="Not helpful"
 		]
 	]
 	; base 0x0 rate 0:0:5 on-time [prof/show prof/reset print ["mem:" stats]]
 ]
-
 ; debug-draw 
 prof/show prof/reset
 unless system/build/config/gui-console? [do-events]
