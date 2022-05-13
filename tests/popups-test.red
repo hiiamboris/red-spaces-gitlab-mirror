@@ -2,6 +2,8 @@ Red [needs: view]
 
 #include %../everything.red
 
+recycle/off
+
 ;@@ drop-down will need a higher-level list with selected item and interactivity
 
 big-font: make font! [size: 15]
@@ -33,14 +35,15 @@ spaces/templates/rocket: make-template 'wheel [
 ]
 define-handlers [
 	wheel: [on-time [space path event] [invalidate space update]]
+	; wheel: [on-time [space path event] [invalidate <everything> update]]
 	rocket: extends 'wheel []
 ]
 
 view/no-wait [
 	h: host [
-		v: vlist 100 .. 300 [; hint="This is the host face"
-			hl: hlist [
-				text "Clickable URL:"
+		v: vlist 100 .. 300 spacing= 10x5 [; hint="This is the host face"
+			hl: hlist black [
+				text yello "Clickable URL:"
 				url 150 .. 200 hint="Click to follow"
 					https://codeberg.org/hiiamboris/red-spaces
 			]
@@ -81,12 +84,12 @@ view/no-wait [
 					]
 			]
 			; list [switch switch with [state: on]]
-			label #"⚡" "Zapper here"      hint="Be careful"
-			label #"🌐" "Funny globe"     hint="No continents"
-			label #"💥" "Hit"             hint="Score +100"
-			label #"💨" "Whoosh"          hint="Time to move on"
-			label #"💮" "Flower store"    hint="50C piece"
-			label "Label without a sigil" hint="Some hint"
+			label #"⚡" "Zapper here"      hint="Be careful" red
+			label #"🌐" "Funny globe"     hint="No continents" orange
+			label #"💥" "Hit"             hint="Score +100" yellow
+			label #"💨" "Whoosh"          hint="Time to move on" green
+			label #"💮" "Flower store"    hint="50C piece" blue
+			label "Label without a sigil" hint="Some hint" violet
 			label "Label with empty sigil" hint="Other hint" with [image: ""]
 			label #"🍄" "Label with a heading^/and some text" hint="Yet another hint"
 			label "👩‍🚀" "Label with a heading^/and some text^/on two lines" hint="Not helpful"

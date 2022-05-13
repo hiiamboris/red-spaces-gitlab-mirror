@@ -1071,7 +1071,8 @@ VID Styles: must be documented TODO
 	size-component:    [integer! | pair! | 'none | none! | word! | get-word! | paren!]
 	                   paren is evaluated; all can be snatched by auto-facet
 	                   also limits= any expression can be used ofc
-	                   
+	(also rules I recently added to vid.red)
+		                   
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)

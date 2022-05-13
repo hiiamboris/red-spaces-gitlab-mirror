@@ -75,11 +75,21 @@ do with [
 			]
 		]
 		
+		tube list box [									;-- allow color override for containers
+			function [space /on canvas] [
+				drawn: space/draw/on canvas				;-- draw to get the size
+				unless color: select space 'color [return drawn]
+				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]
+			]
+		]
+		
+		text paragraph [(when select self 'color [compose [pen (color)]])]
+		
 		url [
 			function [url /on canvas] [
 				drawn: url/draw/on canvas				;-- must create /layout which can otherwise be none
 				url/layout/data: reduce [1 by length? url/text  'underline]
-				compose/only [pen blue (drawn)]			;@@ color should be taken from the OS theme
+				compose/only [pen (blue + 50) (drawn)]			;@@ color should be taken from the OS theme
 			]
 		]
 
@@ -111,7 +121,8 @@ do with [
 					spaces/sigil/limits/min: 20
 					fonts/sigil
 				] 
-			] ()
+			]
+			when select self 'color [compose [pen (color)]]
 		)]
 		label/text-box/body/text    [(font: fonts/label ())]
 		label/text-box/body/comment [(font: fonts/comment ())]
@@ -158,10 +169,11 @@ do with [
 		menu/list cell [
 			function [cell /on canvas] [
 				drawn: cell/draw/on canvas				;-- draw to obtain the size
+				color: select cell 'color
 				compose/only/deep [
 					push [
+						(when color [compose [fill-pen (color)]])
 						line-width 1
-						fill-pen !(svmc/panel)
 						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
 					]
 					(drawn)
@@ -193,7 +205,6 @@ do with [
 			]
 		]
 		
-		;@@ for this name to work, layout should prefer 'hint' keyword over 'hint' template
 		hint [
 			function [box] [
 				drawn: box/draw							;-- draw to obtain the size
@@ -207,7 +218,6 @@ do with [
 				compose/only/deep [
 					push [
 						line-width 1
-						fill-pen !(svmc/panel)
 						box (1x1 + m) (box/size - 1 - m) 3
 						(matrix) (arrow)
 					]
@@ -230,6 +240,9 @@ do with [
 				; ]
 			; ]
 		; ]
+		
+		;@@ scrollbars should prefer host color
+		;@@ as stylesheet grows, need to automatically check for dupes and report!
 	]
 	
 

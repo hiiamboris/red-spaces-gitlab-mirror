@@ -228,7 +228,7 @@ lay-out-vids: function [
 		)
 	]
 	
-	=modifier=:   [=spec= | =reaction= | =action= | =tight= | =facet= | =auto-facet= | =pane= | =size=]
+	=modifier=:   [=spec= | =reaction= | =action= | =tight= | =facet= | =auto-facet= | =color= | =pane= | =size=]
 	
 	=spec=:       [ahead word! 'with  set b #expect block! (append def/spec b)]	;-- collects multiple `with` blocks
 	
@@ -261,6 +261,11 @@ lay-out-vids: function [
 		(repend def/facets [facet :x])
 		skip
 	]
+	
+	;; I decided to make a special case because color is in principle applicable to all templates
+	;; and adding it into every VID/S style would be tedious, plus raw templates won't support it otherwise
+	;@@ should there be two colors (fg/bg)? (this may complicate styles a lot)
+	=color=:      [set w word! if (tuple? get/any w) (repend def/facets ['color get w])]
 	
 	;@@ rename item-list to content to generalize it
 	=pane=:       [set b block! (def/pane: b)]
