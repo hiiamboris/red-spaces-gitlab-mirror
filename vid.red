@@ -234,7 +234,7 @@ lay-out-vids: function [
 		)
 	]
 	
-	=modifier=:   [=spec= | =reaction= | =action= | =facet= | =auto-facet= | =color= | =pane= | =size=]
+	=modifier=:   [=spec= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
 	
 	=spec=:       [ahead word! 'with  set b #expect block! (append def/spec b)]	;-- collects multiple `with` blocks
 	
@@ -259,10 +259,13 @@ lay-out-vids: function [
 	]
 	=facet-expr=: [s: e: (append/only def/facets do/next s 'e) :e]
 	
-	=auto-facet=: [
+	=flag=: [
 		set w word! if (attempt [facet: def/style/facets/:w])	;-- flag defined for this style? ;@@ REP #113
 		(repend def/facets [none facet])
-	|	set x any-type!									;-- try to match by value type
+	]
+		
+	=auto-facet=: [
+		set x any-type!											;-- try to match by value type
 		if (attempt [facet: select def/style/facets type?/word :x])	;@@ REP #113
 		(repend def/facets [facet :x])
 	]
