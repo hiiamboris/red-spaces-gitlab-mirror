@@ -24,27 +24,10 @@ vid-styles/label: [
 		string! text
 	)
 ]
-vid-styles/text: [
-	template: text
-	facets: #(
-		string! text
-	)
-]
-vid-styles/url: [
-	template: url
-	spec: []
-	facets: #(
-		url! text
-	)
-]
-vid-styles/button: [
-	template: button
-	spec: []
-	facets: #(
-		string! data
-		block! command
-	)
-]
+vid-styles/text:   [template: text   facets: #(string! text)]
+vid-styles/url:    [template: url    facets: #(url! text)]
+vid-styles/button: [template: button facets: #(string! data block! command)]
+
 ;; grid
 ;; grid-view
 ;; timer
