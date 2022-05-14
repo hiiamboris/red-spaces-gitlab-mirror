@@ -872,9 +872,9 @@ label-ctx: context [
 	~: self
 	
 	on-change: function [label [object!] word [any-word!] old [any-type!] new [any-type!]] [
+			spaces: label/spaces
 		switch to word! word [
 			image [
-				spaces: label/spaces
 				spaces/image-box/content: bind case [	;-- invalidated by cell
 					image? label/image [
 						spaces/image/data: label/image
@@ -892,7 +892,6 @@ label-ctx: context [
 				] spaces
 			]
 			text [
-				spaces: label/spaces
 				type: either newline: find label/text #"^/" [
 					spaces/text/text: copy/part label/text newline
 					spaces/comment/text: copy next newline
@@ -902,6 +901,9 @@ label-ctx: context [
 					'text
 				]
 				spaces/body/item-list: spaces/lists/:type	;-- invalidated by container
+			]
+			flags [
+				spaces/text/flags: spaces/comment/flags: label/flags
 			]
 		]
 		label/list-on-change word :old :new				;-- handles axis margin spacing
@@ -913,6 +915,7 @@ label-ctx: context [
 		spacing: 5x0
 		image:   none									;-- can be a string! as well
 		text:    ""
+		flags:   []										;-- transferred to text and comment
 		
 		spaces: object [								;-- all lower level spaces used by label
 			image:      make-space 'image []

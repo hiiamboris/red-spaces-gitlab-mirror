@@ -43,18 +43,18 @@ extend vid-styles [
 			image!    image
 			char!     image
 			string!   text
-			bold      [append flags 'bold]
-			italic    [append flags 'italic]
-			underline [append flags 'underline]
+			bold      [flags: append flags 'bold]
+			italic    [flags: append flags 'italic]
+			underline [flags: append flags 'underline]
 		)
 	]
 	text [
 		template: text
 		facets:   #(
 			string!   text
-			bold      [append flags 'bold]
-			italic    [append flags 'italic]
-			underline [append flags 'underline]
+			bold      [flags: append flags 'bold]
+			italic    [flags: append flags 'italic]
+			underline [flags: append flags 'underline]
 		)
 	]
 	url    [template: url    facets: #(url! text)]
