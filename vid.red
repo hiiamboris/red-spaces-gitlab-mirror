@@ -4,105 +4,94 @@ Red [
 	license: BSD-3
 ]
 
+;@@ I'm not sure about adding containers to native VID!
+;@@ because it won't support spaces syntax and this will cause confusion!
+;@@ but without any facets set it kind of works and eliminates the need for `host` with only a single child
+; create VID styles for basic containers
+; #localize [
+	; foreach name [hlist vlist row column] [
+		; system/view/VID/styles/:name: spec: copy/deep system/view/VID/styles/host
+		; spec/template/space: to lit-word! name
+	; ]
+; ]
 
-vid-styles: make map! [
-	hlist [
-		template: list
-		spec:     [margin: spacing: 10x10 axis: 'x]
-		facets:   #(tight [margin: spacing: 0x0])
-	]
-	vlist [
-		template: list
-		spec:     [margin: spacing: 10x10 axis: 'y]
-		facets:   #(tight [margin: spacing: 0x0])
-	]
-	row [
-		template: tube
-		spec:     [margin: spacing: 10x10 axes: [e s]]
-		facets:   #(
-			tight  [margin: spacing: 0x0]
-			left   [align/x: -1]
-			right  [align/x:  1]
-			center [align/x:  0]
-			top    [align/y: -1]
-			bottom [align/y:  1]
-			middle [align/y:  0]
-		)
-	]
-	column [
-		template: tube
-		spec:     [margin: spacing: 10x10 axes: [s e]]
-		facets:   #(
-			tight  [margin: spacing: 0x0]
-			left   [align/x: -1]
-			right  [align/x:  1]
-			center [align/x:  0]
-			top    [align/y: -1]
-			bottom [align/y:  1]
-			middle [align/y:  0]
-		)
-	]
-	list-view [									;@@ is there ever a need for horizontal list-view?
-		template: list-view
-		spec:     [list/spacing: 5x5 list/axis: 'y]
-		facets:   #(tight [list/margin: list/spacing: 0x0])
-	]
-	label [
-		template: label
-		spec:     [limits: 80 .. none]
-		facets:   #(
-			image!    image
-			char!     image
-			string!   text
-			bold      [flags: append flags 'bold]
-			italic    [flags: append flags 'italic]
-			underline [flags: append flags 'underline]
-		)
-	]
-	text [
-		template: text
-		facets:   #(
-			string!   text
-			bold      [flags: append flags 'bold]
-			italic    [flags: append flags 'italic]
-			underline [flags: append flags 'underline]
-		)
-	]
-	url    [template: url    facets: #(url! text)]
-	button [template: button facets: #(string! data block! command)]
+;@@ add grids somehow
+
+#local [
+	;; these help avoid repetition:
+	#macro [#spacious] func [s e] [[ margin: spacing: 10x10 ]]
+	#macro [#tight]    func [s e] [[ tight [margin: spacing: 0x0] ]]
+	#macro [#align]    func [s e] [[
+		left   [align/x: -1]
+		right  [align/x:  1]
+		center [align/x:  0]
+		top    [align/y: -1]
+		bottom [align/y:  1]
+		middle [align/y:  0]
+	]]
+	#macro [#font-styles] func [s e] [[
+		bold      [flags: append flags 'bold]
+		italic    [flags: append flags 'italic]
+		underline [flags: append flags 'underline]
+	]]
 	
-	box [
-		template: box
-		facets: #(
-			left   [align/x: -1]
-			right  [align/x:  1]
-			center [align/x:  0]
-			top    [align/y: -1]
-			bottom [align/y:  1]
-			middle [align/y:  0]
-		)
-	]
-	cell [
-		template: cell
-		facets: #(
-			left   [align/x: -1]
-			right  [align/x:  1]
-			center [align/x:  0]
-			top    [align/y: -1]
-			bottom [align/y:  1]
-			middle [align/y:  0]
-		)
-	]
-	timer [
-		template: timer
-		facets: #(
-			integer! rate
-			float!   rate
-			time!    rate
-			; block!   ;@@ should be an actor
-		)
-	]
-]
+	;; specifications for VID/S styles available in `lay-out-vids`
+	vid-styles: make map! [
+		hlist [
+			template: list
+			spec:     [#spacious axis: 'x]
+			facets:   [#tight]							;@@ all these should be maps, but see REP #111
+		]
+		vlist [
+			template: list
+			spec:     [#spacious axis: 'y]
+			facets:   [#tight]
+		]
+		row [
+			template: tube
+			spec:     [#spacious axes: [e s]]
+			facets:   [#tight #align]
+		]
+		column [
+			template: tube
+			spec:     [#spacious axes: [s e]]
+			facets:   [#tight #align]
+		]
+		list-view [										;@@ is there ever a need for horizontal list-view?
+			template: list-view
+			spec:     [list/spacing: 5x5 list/axis: 'y]
+			facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
+		]
+		label [
+			template: label
+			spec:     [limits: 80 .. none]
+			facets:   [
+				image!  image
+				char!   image
+				string! text
+				#font-styles
+			]
+		]
+		text   [template: text   facets: [string! text #font-styles]]
+		url    [template: url    facets: [url! text]]
+		button [template: button facets: [string! data block! command]]
+		
+		box    [template: box    facets: [#align]]
+		cell   [template: cell   facets: [#align]]
+		timer [
+			template: timer
+			facets:   [
+				integer! rate
+				float!   rate
+				time!    rate
+				; block!   ;@@ should be an actor
+			]
+		]
+	];; vid-styles
+	
+	for-each [name spec] vid-styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111
+	
+];; #local
 
 ;; grid
 ;; grid-view
@@ -127,16 +116,6 @@ system/view/VID/styles/host: [
 	init: [init-spaces-tree face]
 ]
 
-;@@ I'm not sure about adding containers to native VID!
-;@@ because it won't support spaces syntax and this will cause confusion!
-;@@ but without any facets set it kind of works and eliminates the need for `host` with only a single child
-;; create VID styles for basic containers
-; #localize [
-	; foreach name [hlist vlist row column] [
-		; system/view/VID/styles/:name: spec: copy/deep system/view/VID/styles/host
-		; spec/template/space: to lit-word! name
-	; ]
-; ]
 
 
 ;@@ make it internal? no! rather there must be an exported `layout-spaces` or smth

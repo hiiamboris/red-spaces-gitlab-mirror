@@ -47,7 +47,7 @@ view/no-wait [
 				url hint="Click to follow"
 					https://codeberg.org/hiiamboris/red-spaces
 			]
-			row tight right bottom margin= 40x10 [ 
+			row tight center [ 
 				rocket hint="Retro-styled racing space ship" with [
 					rocket: self
 					menu: reshape [
