@@ -78,7 +78,7 @@ VID: context [
 				]
 			]
 			text   [template: text   facets: [string! text #font-styles]]
-			link   [template: link   facets: [string! text url! text]]
+			link   [template: link   facets: [string! text url! text block! command]]
 			button [template: button facets: [string! data block! command]]
 			
 			box    [template: box    facets: [#align]]
