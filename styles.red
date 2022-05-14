@@ -58,6 +58,7 @@ do with [
 	;-- using paths we get another benefit: we can apply the same style to multiple spaces (e.g. hscroll vscroll [style..])
 	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
 	set 'styles reshape [		;-- styles come before the main drawing code
+		;@@ MEMO: all shared styles suffer from #4854 and need a copy!
 		host [
 			pen off
 			fill-pen !(svmc/panel)
@@ -66,25 +67,36 @@ do with [
 			pen !(svmc/text)
 		]
 
-		#if system/platform = 'Linux [					;@@ GTK fix for #4901
-			text paragraph fps-meter [
-				;-- font can be set in the style!:
-				;-- but impossible to debug it, as probe draw lists font with thousands of parents
-				(font: serif-12 ())
-				; pen blue
-			]
+		text paragraph url fps-meter [
+			(when select self 'color [compose [pen (color)]])
+			#if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
 		]
-		
+
 		tube list box [									;-- allow color override for containers
 			function [space /on canvas] [
-				drawn: space/draw/on canvas				;-- draw to get the size
+				drawn: do copy/deep [space/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
 				unless color: select space 'color [return drawn]
 				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]
 			]
 		]
 		
-		text paragraph url [(when select self 'color [compose [pen (color)]])]
-
+		;; cell is a box with a border around it; while general box is widely used in borderless state
+		menu/list cell [
+			function [cell /on canvas] [
+				drawn: do copy/deep [cell/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
+				color: select cell 'color
+				bgnd: compose/deep [
+					push [
+						(when color [compose [fill-pen (color)]])
+						line-width 1
+						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
+					]
+				]
+				compose/only [(bgnd) (drawn)]
+			]
+		]
+		
+		
 		; list/item [[pen cyan]]
 		
 		;; ☒☐ make lines too big! needs custom draw code, not symbols
@@ -157,22 +169,6 @@ do with [
 			]
 		]
 
-		;; cell is a box with a border around it; while general box is widely used in borderless state
-		menu/list cell [
-			function [cell /on canvas] [
-				drawn: cell/draw/on canvas				;-- draw to obtain the size
-				color: select cell 'color
-				compose/only/deep [
-					push [
-						(when color [compose [fill-pen (color)]])
-						line-width 1
-						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
-					]
-					(drawn)
-				]
-			]
-		]
-		
 		menu/list/clickable [(
 			when self =? :highlight [
 				compose/deep [push [

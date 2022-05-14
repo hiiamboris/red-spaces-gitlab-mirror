@@ -86,7 +86,7 @@ view/no-wait [
 			; list [switch switch with [state: on]]
 			label #"⚡" "Zapper here"      hint="Be careful" red
 			label #"🌐" "Funny globe"     hint="No continents" orange italic
-			box red [label #"💥" "Hit"    hint="Score +100" yellow bold]
+			box align= -1x0 red [label #"💥" "Hit"    hint="Score +100" yellow bold]
 			label #"💨" "Whoosh"          hint="Time to move on" green underline
 			label #"💮" "Flower store"    hint="50C piece" blue
 			label "Label without a sigil" hint="Some hint" violet bold italic
