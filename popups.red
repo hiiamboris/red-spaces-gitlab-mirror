@@ -163,6 +163,7 @@ show-hint: function [
 	]
 ]
 
+;@@ should it be here or in vid.red?
 lay-out-menu: function [spec [block!] /local code name tube list flags radial? round?] reshape [
 	;@@ preferably VID/S should be used here and in hints above
 	data*:       clear []								;-- consecutive data values
@@ -180,7 +181,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 	=code=:      [set code paren! (item/command: code)]
 	
 	flush-data: [
-		append row* lay-out-data/only data*
+		append row* VID/lay-out-data/only data*
 		clear data*
 	]
 	new-item: [

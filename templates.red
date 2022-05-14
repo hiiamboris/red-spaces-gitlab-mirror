@@ -960,7 +960,7 @@ data-view-ctx: context [
 				either block? :new [
 					space/content: anonymize 'tube lay-out-data/wrap new space/wrap?	;@@ use `row`?
 				][
-					space/content: wrap-value :new space/wrap?		;@@ maybe reuse the old space if it's available?
+					space/content: VID/wrap-value :new space/wrap?	;@@ maybe reuse the old space if it's available?
 					do push-font
 				] 
 			]
