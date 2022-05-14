@@ -44,7 +44,7 @@ view/no-wait [
 		v: vlist 100 .. 300 spacing= 10x5 [; hint="This is the host face"
 			hl: row black [
 				text yello "Clickable URL:"
-				url hint="Click to follow"
+				link hint="Click to follow"
 					https://codeberg.org/hiiamboris/red-spaces
 			]
 			row tight center [ 

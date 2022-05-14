@@ -78,7 +78,7 @@ VID: context [
 				]
 			]
 			text   [template: text   facets: [string! text #font-styles]]
-			url    [template: url    facets: [url! text]]
+			link   [template: link   facets: [string! text url! text]]
 			button [template: button facets: [string! data block! command]]
 			
 			box    [template: box    facets: [#align]]
@@ -159,7 +159,7 @@ VID: context [
 			string! [make-space/name pick [paragraph text] wrap? [text:  value]]
 			logic!  [make-space/name 'logic [state: value]]
 			image!  [make-space/name 'image [data:  value]]
-			url!    [make-space/name 'url   [data:  value]]
+			url!    [make-space/name 'link  [data:  value]]
 			;@@ also object & map as grid? and use lay-out-data for block?
 		] [make-space/name 'text [text: mold :value]]
 	]

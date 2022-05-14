@@ -67,7 +67,7 @@ do with [
 			pen !(svmc/text)
 		]
 
-		text paragraph url fps-meter [
+		text paragraph link fps-meter [
 			(when select self 'color [compose [pen (color)]])
 			#if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
 		]

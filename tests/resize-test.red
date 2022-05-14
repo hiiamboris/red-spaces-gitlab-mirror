@@ -169,7 +169,7 @@ view/no-wait/flags compose/deep [
 	host: host [
 		scrollable 600x400 [
 			vlist [
-				row center [text "Mockup of" url https://easings.net 50 .. none text "layout"]	;@@ should be a rich-text style
+				row center [text "Mockup of" link https://easings.net 50 .. none text "layout"]	;@@ should be a rich-text style
 				triplets-row: row tight spacing= triplet-sep by 30 top center [
 					(triplets)
 				]

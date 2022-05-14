@@ -635,7 +635,7 @@ paragraph-ctx: context [
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
-	templates/url: make-template 'paragraph [
+	templates/link: make-template 'paragraph [
 		flags: [underline]
 		color: 50.80.255								;@@ color should be taken from the OS theme
 	]
