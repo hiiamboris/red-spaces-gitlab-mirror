@@ -96,6 +96,7 @@ do/expand [
 			spaces/styles:    spaces/ctx/styles
 			spaces/layouts:   spaces/ctx/layouts
 			spaces/keyboard:  spaces/ctx/keyboard
+			spaces/VID:       spaces/ctx/VID
 			
 			change-dir script-dir
 		]
