@@ -4,13 +4,8 @@ Red [
 	license: BSD-3
 ]
 
-;@@ TODO: a separate host-based style for each high level space
-;@@ also, templates e.g. `vlist` should appear as `list` in the tree but have an `axis: 'y` as default
-;@@ also combine them faces and spaces in one object! or not? `draw` will prove difficult, but we can rename it to render
 
-
-vid-styles: make map! 10
-extend vid-styles [
+vid-styles: make map! [
 	hlist [
 		template: list
 		spec:     [margin: spacing: 10x10 axis: 'x]
@@ -24,12 +19,28 @@ extend vid-styles [
 	row [
 		template: tube
 		spec:     [margin: spacing: 10x10 axes: [e s]]
-		facets:   #(tight [margin: spacing: 0x0])
+		facets:   #(
+			tight  [margin: spacing: 0x0]
+			left   [align/x: -1]
+			right  [align/x:  1]
+			center [align/x:  0]
+			top    [align/y: -1]
+			bottom [align/y:  1]
+			middle [align/y:  0]
+		)
 	]
 	column [
 		template: tube
 		spec:     [margin: spacing: 10x10 axes: [s e]]
-		facets:   #(tight [margin: spacing: 0x0])
+		facets:   #(
+			tight  [margin: spacing: 0x0]
+			left   [align/x: -1]
+			right  [align/x:  1]
+			center [align/x:  0]
+			top    [align/y: -1]
+			bottom [align/y:  1]
+			middle [align/y:  0]
+		)
 	]
 	list-view [									;@@ is there ever a need for horizontal list-view?
 		template: list-view
@@ -59,13 +70,42 @@ extend vid-styles [
 	]
 	url    [template: url    facets: #(url! text)]
 	button [template: button facets: #(string! data block! command)]
+	
+	box [
+		template: box
+		facets: #(
+			left   [align/x: -1]
+			right  [align/x:  1]
+			center [align/x:  0]
+			top    [align/y: -1]
+			bottom [align/y:  1]
+			middle [align/y:  0]
+		)
+	]
+	cell [
+		template: cell
+		facets: #(
+			left   [align/x: -1]
+			right  [align/x:  1]
+			center [align/x:  0]
+			top    [align/y: -1]
+			bottom [align/y:  1]
+			middle [align/y:  0]
+		)
+	]
+	timer [
+		template: timer
+		facets: #(
+			integer! rate
+			float!   rate
+			time!    rate
+			; block!   ;@@ should be an actor
+		)
+	]
 ]
 
 ;; grid
 ;; grid-view
-;; timer
-;; stretch
-;; box
 ;@@ should it also accept raw template names? I think it should, but VID/S styles override templates
 
 

@@ -620,6 +620,7 @@ paragraph-ctx: context [
 		margin: 0x0										;-- default = no margin
 		font:   none									;-- can be set in style, as well as margin
 		flags:  []										;-- [bold italic underline] supported
+		weight: 1
 
 		layout: none									;-- internal, text size is kept in layout/extra
 		; cache?: true
@@ -629,6 +630,7 @@ paragraph-ctx: context [
 
 	;; unlike paragraph, text is never wrapped
 	templates/text: make-template 'paragraph [
+		weight: 0
 		draw: does [~/draw self infxinf]
 	]
 
