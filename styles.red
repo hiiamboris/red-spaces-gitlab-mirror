@@ -73,8 +73,11 @@ do with [
 		]
 
 		tube list box [									;-- allow color override for containers
-			function [space /on canvas] [
-				drawn: do copy/deep [space/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
+			function [space /only xy1 xy2 /on canvas] [
+				drawn: either find spec-of :space/draw /only [	;-- draw to get the size
+					do copy/deep [space/draw/only/on xy1 xy2 canvas]	;@@ #4854 workaround - remove me
+				][	do copy/deep [space/draw/on canvas]			;@@ this needs apply
+				]
 				unless color: select space 'color [return drawn]
 				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]
 			]

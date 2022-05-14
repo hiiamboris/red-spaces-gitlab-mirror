@@ -132,7 +132,7 @@ icons: map-each/eval [name easefn] to [] easings [
 adjust-limits: function [width] [
 	for-each [low limit | high] layouts [
 		unless all [low <= width width < high] [continue]
-		tubes: reduce get expand-space-path 'host/scrollable/tube/item-list
+		tubes: reduce triplets-row/item-list
 		foreach tube tubes [
 			if tube/limits/min <> limit [
 				tube/limits/min: limit
@@ -168,15 +168,18 @@ triplets: append/dup [] triplet (length? icons) / 6
 view/no-wait/flags compose/deep [
 	host: host [
 		scrollable 600x400 [
-			tube tight spacing=(triplet-sep by 30) align=[↑] [
-				(triplets)
+			vlist [
+				row center [text "Mockup of" url https://easings.net 50 .. none text "layout"]	;@@ should be a rich-text style
+				triplets-row: row tight spacing=(triplet-sep by 30) top center [
+					(triplets)
+				]
 			]
 		]
 	] react [
 		face/size: max 0x0 face/parent/size - 20		;-- adjust face size
 		scrollable: get face/space
-		scrollable/size: face/size						;-- adjust scrollable size
-		adjust-limits scrollable/size/x - 16			;-- set triplet lower size limit; 16 for the scroller
+		scrollable/limits: face/size .. face/size		;-- adjust scrollable size
+		adjust-limits face/size/x - 16					;-- set triplet lower size limit; 16 for the scroller
 		face/draw: render face
 	] 
 ] 'resize

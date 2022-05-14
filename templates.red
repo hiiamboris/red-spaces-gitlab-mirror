@@ -1331,7 +1331,8 @@ list-view-ctx: context [
 
 			;; container/draw only supports finite number of `items`, infinite needs special handling
 			;; it's also too general, while this `draw` can be optimized better
-			draw: function [/only xy1 [pair!] xy2 [pair!]] [	;-- always uses window for canvas
+			;; /on canvas is not used - instead always uses window/size (but accepts it to simplify styles)
+			draw: function [/only xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
 				#assert [all [xy1 xy2]]
 				#assert [window/size/:axis > 0]			;-- some bug in window sizing likely
 				clear map
