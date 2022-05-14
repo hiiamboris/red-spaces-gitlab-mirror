@@ -33,7 +33,7 @@ get-current-style: function [
 
 
 context [
-	;; render cache format: [space-object [children] last-write-index 4x [canvas space-size drawn] ...] (a tree of hashes)
+	;; render cache format: [space-object [children] last-write-index 4x [canvas space-size map drawn] ...] (a tree of hashes)
 	;;   it holds rendered draw block of all spaces that have /cache? = true
 	;;   such cache only has slots for 4 canvas sizes, which should be enough for most cases hopefully
 	;;   otherwise we'll have to iterate over all cached canvas sizes which is not great for performance
@@ -54,7 +54,8 @@ context [
 	;@@ TODO: document this in a proper place
 	
 	; hash!: :block!
-	slots:          12									;-- must be x3! triple max number of cache slots per single space
+	period:         4									;-- size occupied by a single cached entry
+	slots:          16									;-- size occupied by cache of single space - a multiple of period!
 	;@@ TODO: both render-cache and parents-list require cleanup on highly dynamic layouts, or they slow down
 	;@@ will need a flat registry of still valid spaces
 	render-cache:   make hash! slots + 3 * 3
@@ -135,7 +136,7 @@ context [
 		r: all [
 			cache: find-cache space								;-- must have a cache
 			find/skip/part skip cache 3
-				any [canvas 'none] 3 slots						;@@ workaround for #5126
+				any [canvas 'none] period slots					;@@ workaround for #5126
 			; find/skip/part skip cache 3 canvas 3 slots			;-- search for the same canvas among 3 options
 			; print mold~ copy/part cache >> 2 slots
 		]
@@ -146,7 +147,7 @@ context [
 				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 40)"
 			][
 				reason: case [
-					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 slots 3]]
+					cache [rejoin ["cache=" mold to [] extract copy/part skip cache 3 slots period]]
 					not space/size ["never drawn"]
 					not select space 'cache? ["cache disabled"]
 					'else ["not cached or invalidated"]
@@ -169,15 +170,15 @@ context [
 		cache: find/same last visited-nodes space
 		#assert [cache]
 		canvas: any [canvas 'none]						;@@ workaround for #5126
-		unless pos: find/skip/part skip cache 3 canvas 3 slots [
-			pos: skip cache 3 + (cache/3 * 3)
-			change at cache 3 cache/3 + 1 % (slots / 3)			;@@ #5120
+		unless pos: find/skip/part skip cache 3 canvas period slots [
+			pos: skip cache 3 + (cache/3 * period)
+			change at cache 3 cache/3 + 1 % (slots / period)	;@@ #5120 ;-- rotate slot for the next canvas
 			; pos/1: canvas								;@@ #5120
 			change pos canvas
 		]
 		; pos/2: drawn									;@@ #5120
 		#assert [pair? space/size]
-		change/only change next pos space/size drawn
+		rechange next pos [space/size select space 'map drawn]
 		#debug cache [
 			name: any [name 'space]
 			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
@@ -196,7 +197,7 @@ context [
 				find/same/only parents node				;-- do not duplicate parents
 				tail parents
 			]
-			change change/only pos node parent			;-- each parent contains different node with this child 
+			rechange pos [node parent]					;-- each parent contains different node with this child 
 		][
 			repend parents-list [child reduce [node parent]]
 		]
@@ -323,9 +324,10 @@ context [
 				not xy1 not xy2							;-- usage of region is not supported by current cache model
 				cache: get-cache name canvas
 			][
-				set [size: render:] next cache
+				set [size: map: render:] next cache
 				#assert [pair? size]
 				maybe space/size: size
+				if in space 'map [space/map: map]
 				set-parent space last visited-spaces	;-- mark it as cached in the new parents tree
 				#debug cache [							;-- add a frame to cached spaces after committing
 					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]

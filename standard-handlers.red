@@ -132,9 +132,10 @@ define-handlers [
 	]
 	
 	;-- *************************************************************************************
-	url: [
-		on-up [space path event] [
-			browse as url! space/text
+	link: [
+		on-click [space path event] [
+			do space/command
+			update
 		]
 	]
 	

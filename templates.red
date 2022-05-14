@@ -638,6 +638,7 @@ paragraph-ctx: context [
 	templates/link: make-template 'paragraph [
 		flags: [underline]
 		color: 50.80.255								;@@ color should be taken from the OS theme
+		command: [browse as url! text]
 	]
 ]
 

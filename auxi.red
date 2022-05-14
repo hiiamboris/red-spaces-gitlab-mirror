@@ -469,6 +469,21 @@ do-async: function [									;@@ used solely to work around #5132
 	set sync old
 ]
 
+rechange: function [
+	"Sequence multiple changes into SERIES"
+	series [series!]
+	values [block!] "Reduced"
+][
+	change series reduce values
+]
+
+#localize [#assert [
+	s: [a b c]
+	e: rechange next s [1 + 1 2 * 3 3 + 4]
+	s == [a 2 6 7]
+	e =? tail s
+]]
+
 >>: make op! function [
     "Return series at an offset from head or shift bits to the right"
     data   [series! integer!]
