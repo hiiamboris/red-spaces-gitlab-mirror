@@ -171,7 +171,8 @@ view/no-wait/flags compose/deep [
 			vlist [
 				r: row center [
 					text "Mockup of" link https://easings.net 50 .. none
-					text "layout" text "on" pair: text text "canvas"]	;@@ should be a rich-text style
+					text "layout" text "on" pair: text text "canvas"
+				]	;@@ should be a rich-text style? although, how to specify the limits in rich-text
 				triplets-row: row tight spacing= triplet-sep by 30 top center [
 					(triplets)
 				]
