@@ -11,7 +11,7 @@ Red [
 ;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
 ;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
 
-;@@ menu command should be able to access the space that opened the menu!
+;@@ menu command should be able to access the space that opened the menu! - bind it!
 
 {	;@@ document this
 	Menu DSL - unlike View's default:
@@ -191,8 +191,12 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 			content: anonymize 'tube set 'tube make-space 'tube [spacing: 10x5]
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
-		unless empty? pos: find/tail row* 'text [		;-- stretch first text item by default (to align rows)
-			insert pos in generic '<->					;-- but only if there's another item
+		;; stretch first text item by default (to align rows), but only if there's another item and no explicit <->
+		any [
+			empty? pos: find/tail row* 'text		
+			find row* '<->
+			find row* 'stretch
+			insert pos in generic '<->
 		]
 		tube/item-list: flush row*
 	]
