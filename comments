@@ -1072,7 +1072,7 @@ VID Styles: must be documented TODO
 	                   paren is evaluated; all can be snatched by auto-facet
 	                   also limits= any expression can be used ofc
 	(also rules I recently added to vid.red)
-		                   
+	(also the quirks of current react kludge)	                   
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)

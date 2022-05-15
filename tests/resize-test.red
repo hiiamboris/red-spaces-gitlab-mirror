@@ -167,18 +167,19 @@ triplets: append/dup [] triplet (length? icons) / 6
     
 view/no-wait/flags compose/deep [
 	host: host [
-		scrollable 600x400 [
+		scr: scrollable 600x400 [
 			vlist [
-				r: row center [text "Mockup of" link https://easings.net 50 .. none text "layout"]	;@@ should be a rich-text style
+				r: row center [
+					text "Mockup of" link https://easings.net 50 .. none
+					text "layout" text "on" pair: text text "canvas"]	;@@ should be a rich-text style
 				triplets-row: row tight spacing= triplet-sep by 30 top center [
 					(triplets)
 				]
 			]
-		]
+		] react [pair/text: form scr/size] 
 	] react [
 		face/size: max 0x0 face/parent/size - 20		;-- adjust face size
-		scrollable: get face/space
-		scrollable/limits: face/size .. face/size		;-- adjust scrollable size
+		scr/limits: face/size .. face/size				;-- adjust scrollable size
 		adjust-limits face/size/x - 16					;-- set triplet lower size limit; 16 for the scroller
 		face/draw: render face
 	]

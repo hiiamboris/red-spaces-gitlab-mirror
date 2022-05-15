@@ -187,7 +187,7 @@ VID: context [
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
 		spec [block!]	;@@ document DSL, leave a link here
-		/local w b x lo hi
+		/local w b x lo hi late?
 	][
 		pane: make block! 8
 		def: construct [								;-- accumulated single style definition
@@ -209,11 +209,12 @@ VID: context [
 			facets: map-each [facet value] def/facets [
 				either facet [ reduce [to set-word! facet 'quote :value] ][ value ]
 			]
-			space: make-space def/style/template compose [
+			spec: compose [
 				(any [def/style/spec []])
 				(def/spec)
 				(facets)
 			]
+			space: make-space def/style/template spec
 			if def/link [set def/link space]
 			; foreach reaction def/reactions [react bind copy/deep reaction space]
 			; def/actors					;@@ TODO: actors
@@ -229,6 +230,14 @@ VID: context [
 					]
 					in space 'item-list [append space/item-list content]
 					'else [ERROR "Style (def/template) cannot contain other spaces"]
+				]
+			]
+			unless empty? def/reactions [
+				insert body-of :space/on-change*
+					with [space :space/on-change*] [system/reactivity/check/only self word]
+				foreach [late? reaction] def/reactions [
+					reaction: bind copy/deep reaction space
+					either late? [react/later reaction][react reaction] 
 				]
 			]
 			append pane anonymize def/style/template space
@@ -261,9 +270,8 @@ VID: context [
 		
 		=spec=:       [ahead word! 'with  set b #expect block! (append def/spec b)]	;-- collects multiple `with` blocks
 		
-		=reaction=:   [ahead word! 'react set b #expect block! (	;@@ TODO: react/later
-			ERROR "Space objects won't be reactive until PR #4529 is merged"
-			append/only def/reactions b
+		=reaction=:   [ahead word! 'react set late? opt [ahead word! 'later] set b #expect block! (
+			repend def/reactions [late? b]
 		)]
 		
 		=action=:     [=actor-name= =actor-body=]
