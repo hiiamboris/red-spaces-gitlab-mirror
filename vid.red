@@ -232,13 +232,15 @@ VID: context [
 					'else [ERROR "Style (def/template) cannot contain other spaces"]
 				]
 			]
-			unless empty? def/reactions [
+			;; make reactive all spaces that define reactions or have a name
+			;@@ this is a kludge for lacking PR #4529, remove me
+			if any [def/link  not empty? def/reactions] [
 				insert body-of :space/on-change*
 					with [space :space/on-change*] [system/reactivity/check/only self word]
-				foreach [late? reaction] def/reactions [
-					reaction: bind copy/deep reaction space
-					either late? [react/later reaction][react reaction] 
-				]
+			]
+			foreach [late? reaction] def/reactions [
+				reaction: bind copy/deep reaction space
+				either late? [react/later reaction][react reaction] 
 			]
 			append pane anonymize def/style/template space
 		]
