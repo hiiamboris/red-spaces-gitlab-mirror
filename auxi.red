@@ -90,10 +90,13 @@ context [
 ;; older (but faster) design - for blocks only - not sure if worth keeping
 ;; main problem of it: doesn't care about length, may result in lots of reallocations
 block-stack: object [
+	size:  100
+	type:  block!
 	stack: []
-	get:  does [any [take/last stack  make [] 100]]
-	put:  func [b [block!]] [append/only stack clear head b]
-	hold: func [b [block!]] [at  append get head b  index? b]
+	get:   function [either tail? p [make type size][p: top stack also :p/1 remove p]]	;@@ workaround for #5066
+	; get:   does [any [take/last stack  make [] size]]
+	put:   func [b [any-block!]] [append/only stack clear head b]
+	hold:  func [b [any-block!]] [at  append get head b  index? b]	;-- get refers to the function above
 ]
 
 
