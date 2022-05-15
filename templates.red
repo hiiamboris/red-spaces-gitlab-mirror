@@ -597,6 +597,7 @@ paragraph-ctx: context [
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
 		compose [text (1x1 * space/margin) (space/layout)]
+		; compose [text (1x1 * space/margin) (copy/deep space/layout)]	;@@ #5139 doesn't let me do this
 	]
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
@@ -619,8 +620,12 @@ paragraph-ctx: context [
 		text:   ""
 		margin: 0x0										;-- default = no margin
 		font:   none									;-- can be set in style, as well as margin
+		;@@ maybe wrap should be a flag too?
 		flags:  []										;-- [bold italic underline] supported
 		weight: 1
+		;@@ cannot be cached or shared because any layout object changes under the draw block
+		;@@ it must be copied ideally, but #5139 prevents that
+		cache?: off
 
 		layout: none									;-- internal, text size is kept in layout/extra
 		; cache?: true
@@ -630,6 +635,9 @@ paragraph-ctx: context [
 
 	;; unlike paragraph, text is never wrapped
 	templates/text: make-template 'paragraph [
+		;@@ see note above about #5139 - but this cached because it doesn't wrap
+		cache?: on 
+		
 		weight: 0
 		draw: does [~/draw self infxinf]
 	]
