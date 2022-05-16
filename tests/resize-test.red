@@ -168,7 +168,7 @@ triplets: append/dup [] triplet (length? icons) / 6
 view/no-wait/flags compose/deep [
 	host: host [
 		scr: scrollable 600x400 [
-			vlist [
+			vlist tight [
 				r: row center [
 					text "Mockup of" link https://easings.net 50 .. none
 					text "layout" text "on" pair: text text "canvas"

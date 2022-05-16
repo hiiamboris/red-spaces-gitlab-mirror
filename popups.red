@@ -77,7 +77,9 @@ make-popup: function [
 	level  [integer!]
 ][
 	stack: get-popups-for window
-	unless face: pick stack level + 1 [
+	either face: pick stack level + 1 [
+		invalidate-face face
+	][
 		change (enlarge stack level none) face: make-face 'host
 	]
 	face
@@ -91,9 +93,9 @@ show-popup: function [
 	face   [object!]  "Previously created popup face"
 ][
 	face/offset: offset
-	unless level = 0 [									;-- no need to hide the hint - it's reused
+	if level > 0 [										;-- no need to hide the hint - it's reused
 		hide-popups window 0							;-- hide hints if menu was shown
-		hide-popups window level + 1
+		hide-popups window level + 1					;-- hide lower level menus
 	]
 	save-popup window level face
 	unless find/same window/pane face [append window/pane face]
@@ -107,14 +109,27 @@ hide-popups: function [
 	stack: get-popups-for window
 	do-async [											;@@ workaround for #5132
 		either level = 0 [
-			remove find/same window/pane stack/1		;-- only hide the hint
+			if stack/1 [
+				invalidate-face stack/1
+				remove find/same window/pane stack/1	;-- only hide the hint
+			]
 		][
 			foreach face pos: skip stack level [		;-- hide all popups but the hint
+				invalidate-face face
 				remove find/same window/pane face
 			]
 		]
 	]
 	show window
+]
+
+invalidate-face: function [
+	"Remove all spaces used by HOST face from cache"
+	host [object!]
+][
+	foreach path list-spaces host/space [
+		invalidate-cache get last path
+	]
 ]
 
 hint-text?: function [

@@ -22,7 +22,7 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list-view 300x400 data= function [/pick i /size] [
+		lv: list-view 300x400 data= function [/pick i /size] [
 			either pick [
 				random/seed i
 				rejoin ["message " i ": " copy/part lorem random length? lorem]
@@ -36,7 +36,7 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
-		invalidate <everything>
+		invalidate lv; <everything>
 		b/draw: render b
 	]
 ] [offset: 10x10]

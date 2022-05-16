@@ -25,7 +25,7 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		list-view 300x400 source= list1d
+		lv: list-view 300x400 source= list1d
 	]
 	on-over [
 		status/text: form hittest face/space event/offset
@@ -34,7 +34,7 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
-		invalidate <everything>
+		invalidate lv; <everything>
 		b/draw: render b
 	]
 ] [offset: 10x10]

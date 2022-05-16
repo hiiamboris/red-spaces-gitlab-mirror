@@ -7,6 +7,7 @@ Red [
 
 ;-- requires export
 
+;@@ use percent for weight globally??
 
 VID: context [
 	;@@ I'm not sure about adding containers to native VID!
@@ -234,6 +235,7 @@ VID: context [
 			]
 			;; make reactive all spaces that define reactions or have a name
 			;@@ this is a kludge for lacking PR #4529, remove me
+			;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
 			if any [def/link  not empty? def/reactions] [
 				insert body-of :space/on-change*
 					with [space :space/on-change*] [system/reactivity/check/only self word]

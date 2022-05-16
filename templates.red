@@ -1364,7 +1364,7 @@ list-view-ctx: context [
 					either size [i2 - i1 + 1][items/pick i + i1 - 1]
 				]
 				set [new-size: new-map:] make-layout 'list :picker settings
-				append clear map new-map
+				self/map: new-map
 				maybe self/size: new-size				;@@ do we even care about the size of the list itself here?
 														;@@ should size/x be that of list-view/size/x ?
 				;@@ make compose-map generate rendered output? or another wrapper
