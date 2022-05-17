@@ -11,7 +11,7 @@ view/no-wait/options [
 	below
 	b: host focus [
 		vlist [
-			button "button 1"
+			button "button 1" focus
 			button "button 2"
 			button "button 3"
 		]

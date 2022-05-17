@@ -86,7 +86,7 @@ find-next-focal-space: function [dir "forth or back"] [
 		(foreach) path next: focus [			;-- default to already focused item (e.g. it's the only focusable)
 			#debug focus [
 				space: get last path 
-				text: any [select space 'text  mold select space 'data] 
+				text: mold any [select space 'text  select space 'data] 
 				#print "find-next-focal-space @(path), text=(text)"
 			]
 			if find keyboard/focusable last path [next: path break]
@@ -103,34 +103,40 @@ focus-space: function [
 	; return: [logic!] "True if focus changed"
 ][
 	path: append clear [] path							;-- make a copy so we can modify it
-	while [name: take/last path] [						;-- reverse order to focus the innermost space possible
+	while [name: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
 		unless find keyboard/focusable name [continue]
 		append path new-name: name
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
-		unless empty? old-path: keyboard/focus [
-			events/with-commands [						;-- init a separate flags for a separate event
-				events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
-				events/do-handlers   old-path none 'unfocus no
-				events/do-finalizers old-path none 'unfocus
+		events/with-update [							;-- provide context to event handlers
+			unless empty? old-path: keyboard/focus [
+				events/with-stop [						;-- init a separate stop flag for a separate event
+					events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
+					events/do-handlers   old-path none 'unfocus no
+					events/do-finalizers old-path none 'unfocus
+				]
 			]
-		]
-
-		foreach name path [								;-- if faces are provided, find the innermost one
-			either is-face? f: get name [face: f][break]
-		]
-		if face [										;-- ..and focus it
-			unless system/view/auto-sync? [
-				show window-of face						;-- otherwise keys won't be detected
+	
+			;@@ with no face in the path, `update?` command is lost!
+			foreach name path [								;-- if faces are provided, find the innermost one
+				either is-face? f: get name [face: f][break]
 			]
+			if face [									;-- ..and focus it
+				unless system/view/auto-sync? [
+					show window-of face					;-- otherwise keys won't be detected
+				]
+			]
+			keyboard/focus: copy path					;-- copy since the path is static
+	
+			events/with-stop [							;-- init a separate stop flag for a separate event
+				events/do-previewers path none 'focus			;-- pass none as 'event' since we don't have any
+				events/do-handlers   path none 'focus no
+				events/do-finalizers path none 'focus
+			]
+			
+			all [events/commands/update? face face/dirty?: yes]
 		]
-		keyboard/focus: copy path						;-- copy since the path is static
-
-		events/do-previewers path none 'focus				;-- pass none as 'event' since we don't have any
-		events/do-handlers   path none 'focus no
-		events/do-finalizers path none 'focus
-
 		return yes
 	]
 	no

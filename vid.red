@@ -22,8 +22,9 @@ VID: context [
 		; ]
 	; ]
 	
+	;@@ add actors!
 	;@@ add grids somehow
-	;@@ focus keyword!
+	;@@ add focus keyword? not possible in current pipeline since focused path does not exist at the time
 	
 	#local [
 		;; these help avoid repetition:
@@ -133,6 +134,14 @@ VID: context [
 		spec: body-of :spec
 		if empty? spec [exit]
 		
+		clear focusing									;-- reset in case it wasn't
+		obj: face
+		until [											;-- collect path prefix of faces
+			insert focusing anonymize obj/type obj
+			not obj: obj/parent							;@@ this has no screen yet! because window is not shown!
+		]
+		insert focusing anonymize 'screen system/view/screens/1
+		
 		pane: lay-out-vids spec
 		if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 		face/space: pane/1
@@ -188,6 +197,9 @@ VID: context [
 	]
 	
 	
+	;@@ not exactly solid design - rethink this! in case errors happen during VID evaluation it may be corrupted
+	focusing: make block! 20							;-- used internally to have a focusable path
+	
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
 		spec [block!]	;@@ document DSL, leave a link here
@@ -206,6 +218,7 @@ VID: context [
 			actors:											;-- unlike event handlers, affects individual space only
 			facets:											;-- facets collected by manual and auto-facet
 			pane:											;-- unless snatched by auto-facet, assigns /content
+			focused?:										;-- to move focus into this space
 		]
 		
 		commit-style: [
@@ -231,8 +244,10 @@ VID: context [
 				]
 				put sheet def/link new-style
 			][
-				space: make-space def/style/template spec
+				space: get name: make-space/name def/style/template spec
 				if def/link [set def/link space]
+				
+				append focusing name					;@@ BUG: not cleared on error
 				; foreach reaction def/reactions [react bind copy/deep reaction space]
 				; def/actors					;@@ TODO: actors
 				if def/pane [	;@@ remove item-list
@@ -249,6 +264,9 @@ VID: context [
 						'else [ERROR "Style (def/template) cannot contain other spaces"]
 					]
 				]
+				if def/focused? [focus-space focusing]
+				remove top focusing
+				
 				;; make reactive all spaces that define reactions or have a name
 				;@@ this is a kludge for lacking PR #4529, remove me
 				;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
@@ -260,7 +278,8 @@ VID: context [
 					reaction: bind copy/deep reaction space
 					either late? [react/later reaction][react reaction] 
 				]
-				append pane anonymize def/style/template space		;-- style is instantiated
+				
+				append pane name
 			]
 		]
 		
@@ -294,7 +313,7 @@ VID: context [
 		
 		=modifier=:   [
 			not [ahead word! 'style]					;-- style is a keyword and can't be faceted
-			[=with= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
+			[=with= | =reaction= | =action= | =focus= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
 		]
 		
 		=with=:       [ahead word! 'with  set b #expect block! (append def/with b)]	;-- collects multiple `with` blocks
@@ -312,6 +331,8 @@ VID: context [
 		|	ahead word! 'function p: #expect [2 block!] (def/actors/:w: function p/1 p/2)
 		|	#expect "actor body"
 		]
+		
+		=focus=:      [ahead word! 'focus (def/focused?: yes)]
 		
 		=facet=:      [=facet-name= =facet-expr=]
 		=facet-name=: [

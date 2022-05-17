@@ -21,6 +21,7 @@ context [
 
 	;@@ is it ok that click event will follow up event for normal handlers? but some finalizers will have it unordered
 	;@@ or maybe we should schedule some code to be run after the finalizers have finished?
+	;@@ this doesn't trigger "click" previewers or finalizers - perhaps it should
 	register-finalizer [up] function [space [object!] path [block!] event [event!]] [
 		unless event/face [exit]						;@@ partial workaround for #5124 - but can do nothing with View internal bugs
 		if all [

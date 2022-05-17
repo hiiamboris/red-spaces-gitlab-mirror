@@ -255,9 +255,15 @@ events: context [
 
 
 
-	;-- stack-like wrapper for `commands` usage
-	with-commands: function [code [block!]] [
-		update?: stop?: no								;-- force logic type
+	;; stack-like wrappers for `commands` usage
+	;; have to be separate because `stop?` is valid until all finalizers are done (e.g. in simulated events)
+	;; but `update?` is valid until `dispatch` handles it
+	with-update: function [code [block!]] [
+		update?: no										;-- force logic type
+		do code
+	]
+	with-stop: function [code [block!]] [
+		stop?: no										;-- force logic type
 		do code
 	]
 
@@ -274,7 +280,7 @@ events: context [
 	;@@ any way to unify these 2 formats?
 	dispatch: function [face [object!] event [event!] /local result /extern resolution last-on-time] [
 		focused?: no
-		with-commands [
+		with-update [with-stop [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
 			buf: cache/get
 			path: switch/default event/type [
@@ -322,7 +328,7 @@ events: context [
 				process-event path event focused?
 			]
 			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
-		]
+		]]
 	]
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
@@ -453,13 +459,13 @@ events: context [
 events/commands: context with events [
 	;-- update shouldn't throw immediately but set a flag
 	;-- but flag is local to each handler's call, so we have to use a hack here
-	update:  does [set bind 'update? :with-commands yes]
-	update?: does [get bind 'update? :with-commands]
+	update:  does [set bind 'update? :with-update yes]
+	update?: does [get bind 'update? :with-update]
 	;@@ question here is what is the default behavior: pass the event further or not?
 	;@@ let's try with 'stop' by default
-	stop:    does [set bind 'stop?   :with-commands yes]	;-- used by previewers/finalizers
-	stop?:   does [get bind 'stop?   :with-commands]
-	pass:    does [set bind 'stop?   :with-commands no]		;-- stop is ignored for timer events ;@@ DOC it
+	stop:    does [set bind 'stop?   :with-stop yes]	;-- used by previewers/finalizers
+	stop?:   does [get bind 'stop?   :with-stop]
+	pass:    does [set bind 'stop?   :with-stop no]		;-- stop is ignored for timer events ;@@ DOC it
 
 	;-- the rest does not require a stack but should be available too
 	dragging?:      :events/dragging?
