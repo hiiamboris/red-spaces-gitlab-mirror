@@ -101,7 +101,7 @@ focus-space: function [
 	"Focus space with a given PATH"
 	path [block!] "May include faces"
 	; return: [logic!] "True if focus changed"
-][
+] with events [
 	path: append clear [] path							;-- make a copy so we can modify it
 	while [name: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
 		unless find keyboard/focusable name [continue]
@@ -109,17 +109,17 @@ focus-space: function [
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
-		events/with-update [							;-- provide context to event handlers
+		with-update [									;-- provide context to event handlers
 			unless empty? old-path: keyboard/focus [
-				events/with-stop [						;-- init a separate stop flag for a separate event
-					events/do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
-					events/do-handlers   old-path none 'unfocus no
-					events/do-finalizers old-path none 'unfocus
+				with-stop [								;-- init a separate stop flag for a separate event
+					do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
+					do-handlers   old-path none 'unfocus no
+					do-finalizers old-path none 'unfocus
 				]
 			]
 	
 			;@@ with no face in the path, `update?` command is lost!
-			foreach name path [								;-- if faces are provided, find the innermost one
+			foreach name path [							;-- if faces are provided, find the innermost one
 				either is-face? f: get name [face: f][break]
 			]
 			if face [									;-- ..and focus it
@@ -129,13 +129,13 @@ focus-space: function [
 			]
 			keyboard/focus: copy path					;-- copy since the path is static
 	
-			events/with-stop [							;-- init a separate stop flag for a separate event
-				events/do-previewers path none 'focus			;-- pass none as 'event' since we don't have any
-				events/do-handlers   path none 'focus no
-				events/do-finalizers path none 'focus
+			with-stop [									;-- init a separate stop flag for a separate event
+				do-previewers path none 'focus					;-- pass none as 'event' since we don't have any
+				do-handlers   path none 'focus no
+				do-finalizers path none 'focus
 			]
 			
-			all [events/commands/update? face face/dirty?: yes]
+			all [commands/update? face face/dirty?: yes]
 		]
 		return yes
 	]
