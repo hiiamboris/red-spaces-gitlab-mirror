@@ -62,7 +62,7 @@ events: context [
 					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
 					word! opt quote [block!]
 					word! opt [quote [event!] | quote [event! object!] | quote [object! event!]]
-					;@@ does not receive delay [percent!] - but should it?
+					opt [word! opt [quote [percent!] | quote [percent! none!] | quote [none! percent!]]]
 					opt [/local to end]
 				]
 				(source handler  none)
@@ -116,24 +116,25 @@ events: context [
 	export [register-previewer register-finalizer delist-previewer delist-finalizer]
 
 
-	do-previewers: func [path [block!] event [event! object!]] [
-		do-global previewers path event event/type
+	do-previewers: func [path [block!] event [event! object!] args [block!]] [
+		do-global previewers path event args
 	]
 
-	do-finalizers: func [path [block!] event [event! object!]] [
-		do-global finalizers path event event/type
+	do-finalizers: func [path [block!] event [event! object!] args [block!]] [
+		do-global finalizers path event args
 	]
 
-	;-- `type` is only required for focus/unfocus events, since we can't construct a fake 'event!' type
-	do-global: function [map [map!] path [block!] event [event! object!]] [
+	do-global: function [map [map!] path [block!] event [event! object!] args [block!]] [
 		unless list: map/(event/type) [exit]
 		space: all [path/1 get path/1]					;-- space can be none if event falls into space-less area of the host ;@@ REP #113
-		foreach fn list [
+		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
+		code: compose/into [handler space pcopy event (args) none] clear []
+		foreach handler list [
 			pcopy: cache/hold path						;-- copy in case user modifies/reduces it, preserve index
-			trap/all/catch [fn space pcopy event] [
+			trap/all/catch code [
 				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
 				kind: either map =? previewers ["previewer"]["finalizer"]
-				#print "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!^/(msg)"
+				#print "*** Failed to evaluate event (kind) (mold/part/flat :handler 100)!^/(msg)"
 			]
 			cache/put pcopy
 		]
@@ -325,17 +326,16 @@ events: context [
 			if path [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
 				#assert [any [not empty? path  event/type = 'over]]	;-- empty when hovering out of the host or over empty area of it
-				process-event path event focused?
+				process-event path event [] focused?
 			]
 			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
 		]]
 	]
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
-	do-handler: function [spc-name [path!] handler [function!] path [block!] args [block!]] [
-		path: cache/hold path							;-- copy in case user modifies/reduces it, preserve index
-		space: get path/1
-		code: compose/into [handler space path (args)] clear []
+	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object!] args [block!]] [
+		space: get first path: cache/hold path			;-- copy in case user modifies/reduces it, preserve index
+		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
 			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
 			#print "*** Failed to evaluate (spc-name)!^/(msg)"
@@ -345,7 +345,7 @@ events: context [
 
 	do-handlers: function [
 		"Evaluate normal event handlers applicable to PATH"
-		path [block!] event [event! object!] focused? [logic!]
+		path [block!] event [event! object!] args [block!] focused? [logic!]
 	][
 		if commands/stop? [exit]
 		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
@@ -371,7 +371,7 @@ events: context [
 				path: skip head path i2 - 1 * unit					;-- position path at the space that receives event
 				foreach handler list [								;-- whole list is called regardless of stop flag change
 					#assert [function? :handler]
-					do-handler template :handler path [event]		;@@ should handler index in the list be reported on error?
+					do-handler template :handler path event args	;@@ should handler index in the list be reported on error?
 				]
 				if commands/stop? [exit]
 			]
@@ -381,17 +381,18 @@ events: context [
 
 	process-event: function [
 		"Process the EVENT calling all respective event handlers"
-		path [block!] "Path on the space tree to lookup handlers in"
+		path  [block!] "Path on the space tree to lookup handlers in"
 		event [event! object!] "View event or simulated"
+		args  [block!]
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][
 		#debug profile [prof/manual/start 'process-event]
 		;; last space is usually the one handler is intereted in, not `screen`
 		;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
 		target: any [find/last path word!  path]
-		do-previewers target event
-		unless commands/stop? [do-handlers path event focused?]
-		do-finalizers target event
+		do-previewers target event args
+		unless commands/stop? [do-handlers path event args focused?]
+		do-finalizers target event args
 		#debug profile [prof/manual/end 'process-event]
 	]
 

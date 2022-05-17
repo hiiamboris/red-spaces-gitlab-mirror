@@ -49,7 +49,7 @@ context [
 	;@@ a bit of an inconsistency: previewers & finalizers are called for all events even in absence of handlers
 	;@@ however for timers they are called only when timers are present..
 	;@@ but should we call them all every time for every damn space? or forbid them for timer events totally?
-	process-timers: function [face [object!] event] [
+	process-timers: function [face [object!] event [event!]] [
 		;-- timer has no target (as is the case with focused space or pointed at)
 		;-- so we'll have to scan the whole tree for `rate` facets; all the time
 		;-- so this code has to be blazing fast
@@ -60,7 +60,9 @@ context [
 			path: as [] path
 			forall path [
 				hpath: as path! compose/into [handlers (path) on-time] clear []	;-- not allocated
-				if empty? list: attempt [get hpath] [continue]					;-- no time handler
+				list: any [attempt [get hpath] []]						;@@ REP #113
+				;; even if no time handler, actors or previewers/finalizers may be defined, so have to continue
+				; if empty? list: attempt [get hpath] [continue]					;-- no time handler
 				#assert [
 					block? list
 					any [time? rate  float? rate  integer? rate]
@@ -72,12 +74,13 @@ context [
 				delay: either pos [difference time prev + rate][0:0]
 				if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call this timer?
 				path: back tail new-line/all path no					;-- position it at the target space (for handlers)
-				events/do-previewers path event event/type
+				args: reduce/into [to 1% delay / rate] clear []
+				events/do-previewers path event args
 				foreach handler list [									;-- call the on-time stack
 					#assert [function? :handler]
-					events/do-handler next hpath :handler path [event to 1% delay / rate]
+					events/do-handler next hpath :handler path event args 
 				]
-				events/do-finalizers path event event/type
+				events/do-finalizers path event args
 				unless pos [pos: insert tail marks space]
 				delay: min delay rate * 5								;-- avoid frame spikes after a lag or sleep
 				change change pos time bias + delay

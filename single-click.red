@@ -29,7 +29,7 @@ context [
 		][
 			event/type: 'click							;-- Red allows overriding it
 			;-- either this, but it may call `update` twice, after on-up and after on-click (may not be a bad thing)
-			events/with-stop [events/process-event event/face event]
+			events/with-stop [events/process-event event/face event [] no]
 			event/type: 'up								;-- restore it for the other finalizers
 		]
 		;@@ TODO: maybe a drag-finished event?

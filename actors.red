@@ -15,7 +15,7 @@ actors: context [
 		dbl-click over wheel
 		key key-down key-up enter
 		focus unfocus click							 	;-- internally generated
-		time											;@@ not used! because previewers don't get time event BUG!
+		time
 	]
 	
 	actor-names: make map! map-each/eval name supported-events [	;-- used to avoid frequent allocations when adding "on-"
@@ -23,14 +23,16 @@ actors: context [
 	]
 
 	;; previewer so it takes priority over event handlers and can stop them
-	register-previewer supported-events function [space [object! none!] path [block!] event [event! object!]] [
+	register-previewer supported-events function [
+		space [object! none!] path [block!] event [event! object!] delay [percent! none!]
+	][
 		; print [event/type mold path]
 		all [
 			space
 			actors: select space 'actors
 			name:   select actor-names event/type
 			actor:  select actors name
-			actor space path event
+			actor space path event delay
 		]
 	]
 	

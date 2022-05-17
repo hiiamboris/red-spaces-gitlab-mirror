@@ -121,7 +121,8 @@ focus-space: function [
 			unless empty? old-path: keyboard/focus [
 				with-stop [								;-- init a separate stop flag for a separate event
 					unfocus-event!/face: face
-					process-event old-path unfocus-event! yes
+					process-event old-path unfocus-event! [] yes
+					unfocus-event!/face: none
 				]
 			]
 	
@@ -134,7 +135,8 @@ focus-space: function [
 	
 			with-stop [									;-- init a separate stop flag for a separate event
 				focus-event!/face: face
-				process-event path focus-event! yes
+				process-event path focus-event! [] yes
+				focus-event!/face: none
 			]
 			
 			all [commands/update? face face/dirty?: yes]
@@ -147,7 +149,7 @@ focus-space: function [
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks may change focus
 	function [space [object!] path [block!] event [event!]] [
-		path: keep-type path word!						;-- for focus path we want style names only
+		path: keep-type head path word!					;-- for focus path we want style names only
 
 		f: event/face									;-- list also all face parents in the path
 		until [
