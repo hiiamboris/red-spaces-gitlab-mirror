@@ -86,6 +86,7 @@ do/expand [
 			include %timers.red
 			include %standard-handlers.red
 			include %hittest.red
+			include %actors.red
 			include %debug-helpers.red
 		
 			spaces/ctx: do/expand compose/only [context (joined)]

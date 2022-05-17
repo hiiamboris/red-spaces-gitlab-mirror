@@ -24,7 +24,6 @@ VID: context [
 	
 	;@@ add actors!
 	;@@ add grids somehow
-	;@@ add focus keyword? not possible in current pipeline since focused path does not exist at the time
 	
 	#local [
 		;; these help avoid repetition:
@@ -134,12 +133,8 @@ VID: context [
 		spec: body-of :spec
 		if empty? spec [exit]
 		
-		clear focusing									;-- reset in case it wasn't
-		obj: face
-		until [											;-- collect path prefix of faces
-			insert focusing anonymize obj/type obj
-			not obj: obj/parent							;@@ this has no screen yet! because window is not shown!
-		]
+		append clear focusing path-from-face face		;-- reset in case it wasn't & collect path prefix of faces
+		;@@ this has no screen yet! because window is not shown!
 		insert focusing anonymize 'screen system/view/screens/1
 		
 		pane: lay-out-vids spec
@@ -227,9 +222,14 @@ VID: context [
 			
 			;; may assign non-existing facets like hint= or menu=
 			facets: map-each [facet value] def/facets [
-				either facet [ reduce [to set-word! facet 'quote :value] ][ value ]
+				either facet [ reduce [to set-word! facet 'system/words/quote :value] ][ value ]
 			]
-			spec: compose [
+			unless empty? def/actors [
+				append facets compose/only [
+					actors: construct (to [] def/actors)
+				]
+			]
+			space-spec: compose [
 				(any [def/style/spec []])
 				(def/with)
 				(facets)
@@ -238,18 +238,16 @@ VID: context [
 			either def/styling? [								;-- new style defined
 				new-style: copy/deep def/style
 				either new-style/spec [
-					new-style/spec: copy/deep spec
+					new-style/spec: copy/deep space-spec
 				][
-					compose/only/into [spec: (spec)] tail new-style
+					compose/only/into [spec: (space-spec)] tail new-style
 				]
 				put sheet def/link new-style
 			][
-				space: get name: make-space/name def/style/template spec
+				space: get name: make-space/name def/style/template space-spec
 				if def/link [set def/link space]
 				
 				append focusing name					;@@ BUG: not cleared on error
-				; foreach reaction def/reactions [react bind copy/deep reaction space]
-				; def/actors					;@@ TODO: actors
 				if def/pane [	;@@ remove item-list
 					content: lay-out-vids/styles def/pane sheet
 					; either block? 
@@ -266,6 +264,11 @@ VID: context [
 				]
 				if def/focused? [focus-space focusing]
 				remove top focusing
+				
+				foreach [_ actor] def/actors [
+					with [events/commands :actor] body-of :actor	;-- bind to commands but don't unbind locals
+				]
+				if actor: :def/actors/on-created [actor space none none]	;@@ need this? or need `on-create`?
 				
 				;; make reactive all spaces that define reactions or have a name
 				;@@ this is a kludge for lacking PR #4529, remove me
@@ -327,7 +330,13 @@ VID: context [
 		=action=:     [=actor-name= =actor-body=]
 		=actor-name=: [set w word! if (find/match form w "on-")]
 		=actor-body=: [
-			set x [block! | get-word! | get-path! | block!] (def/actors/:w: x)
+			set b block! (def/actors/:w: function [space path event] b)
+		|	set x [get-word! | get-path!] (
+				unless function? get/any x [
+					ERROR "(mold x) should refer to a function, not (type? get/any x)"
+				]
+				def/actors/:w: get/any x
+			)
 		|	ahead word! 'function p: #expect [2 block!] (def/actors/:w: function p/1 p/2)
 		|	#expect "actor body"
 		]
