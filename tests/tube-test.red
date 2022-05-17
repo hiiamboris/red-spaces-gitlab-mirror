@@ -38,33 +38,34 @@ set-style 'tube function [tube /on canvas [pair! none!]] [
 
 spaces/templates/heading: make-template 'data-view []
 
-boxes: map-each spec [
-	[size: 60x30 text: "A"]
-	[size: 50x40 text: "B"]
-	[size: 40x50 text: "C"]
-	[size: 30x60 text: "D"]
-	[size: 20x20 text: "E"]
-	[size: 30x10 text: "F"]
-	[size: 10x10 text: "G"]
-][
-	; make-space/name 'rectangle spec
-	make-space/name 'field spec
+boxes: lay-out-vids [
+	field size= 60x30 "A"
+	field size= 50x40 "B"
+	field size= 40x50 "C"
+	field size= 30x60 "D"
+	field size= 20x20 "E"
+	field size= 30x10 "F"
+	field size= 10x10 "G"
 ]
 
 ; aligns: map-each/only x [-1 0 1] [ map-each y [-1 0 1] [as-pair x y] ]
 aligns: map-each/only y [↑ #[none] ↓] [ map-each/only x [← #[none] →] [trim reduce [x y]] ]
 tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
+	keep [
+		style vlist: vlist margin= 5x5 spacing= 5x5
+		style tube:  tube  margin= 5x5 spacing= 5x5 width= 130 item-list= boxes
+	]
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
-		if i > 1 [keep [space with [size: 1x30]]]		;-- delimiter
-		keep compose/deep [heading with [data: (#composite "axes: (mold axes)")]]
+		if i > 1 [keep [<-> 1x30]]		;-- delimiter
+		keep compose [heading data=(#composite "axes: (mold axes)")]
 		for-each group aligns [
-			keep [list with [axis: 'x]]
+			keep [hlist tight]
 			keep/only map-each align group [
 				compose/deep/only [
-					list with [axis: 'y spacing: margin: 5x5] [
-						paragraph with [width: 130 text: (#composite "align: (mold align)")]
-						tube with [spacing: margin: 5x5 axes: (axes) align: (align) width: 130 item-list: boxes]
+					vlist [
+						text text=(#composite "align: (mold align)")
+						tube axes=(axes) align=(align)
 					]
 				]
 			]
@@ -79,7 +80,7 @@ view/no-wait compose/only/deep [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
 			scrollable 540x500 [
-				vlist (tubes)
+				list: vlist (tubes)
 			]
 		]
 	]
@@ -90,7 +91,6 @@ view/no-wait compose/only/deep [
 ]
 
 ; dump-tree
-list: do fix-paths [h/list/scrollable/list]
 out: none
 save %tube-test-output.png out: draw list/size render/on 'list list/size
 if exists? ref: %tube-test-reference.png [

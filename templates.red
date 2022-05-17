@@ -2099,7 +2099,10 @@ templates/rotor: make-template 'space [
 field-ctx: context [
 	~: self
 	
-	draw: function [field [object!]] [
+	draw: function [field [object!] canvas [pair! none!]] [
+		; #assert [pair? canvas]
+		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
+		; maybe field/size: canvas
 		maybe field/paragraph/width: if field/wrap? [field/size/x]
 		maybe field/paragraph/text:  field/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
@@ -2124,7 +2127,7 @@ field-ctx: context [
 		paragraph: make-space 'paragraph []
 		caret: make-space 'rectangle []		;-- caret has to be a separate space so it can be styled
 		content: 'paragraph
-		wrap?: no
+		wrap?: no           ;@@ must be a flag
 		active?: no			;-- whether it should react to keyboard input or pass thru (set on click, Enter)
 		;@@ TODO: render caret only when focused
 		;@@ TODO: auto scrolling when caret is outside the viewport
@@ -2133,7 +2136,7 @@ field-ctx: context [
 			invalidate-cache paragraph
 		]
 	
-		draw: does [~/draw self]
+		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 	]
 ]
 

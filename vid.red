@@ -7,11 +7,12 @@ Red [
 
 ;-- requires export
 
-;@@ use percent for weight globally??
+;@@ use percent for weight globally?? but can be misleading as weights are summed
+;@@ another idea: tag for hint (makes sense if hint is widely used)
 
 VID: context [
-	;@@ I'm not sure about adding containers to native VID!
-	;@@ because it won't support spaces syntax and this will cause confusion!
+	;@@ I'm not sure about adding containers (tubes, lists) to native VID!
+	;@@ because it won't support spaces syntax and this will cause a lot of confusion!
 	;@@ but without any facets set it kind of works and eliminates the need for `host` with only a single child
 	; create VID styles for basic containers
 	; #localize [
@@ -46,7 +47,7 @@ VID: context [
 			hlist [
 				template: list
 				spec:     [#spacious axis: 'x]
-				facets:   [#tight]							;@@ all these should be maps, but see REP #111
+				facets:   [#tight]						;@@ all these should be maps, but see REP #111
 			]
 			vlist [
 				template: list
@@ -63,7 +64,7 @@ VID: context [
 				spec:     [#spacious axes: [s e]]
 				facets:   [#tight #align]
 			]
-			list-view [										;@@ is there ever a need for horizontal list-view?
+			list-view [									;@@ is there ever a need for horizontal list-view?
 				template: list-view
 				spec:     [list/spacing: 5x5 list/axis: 'y]
 				facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
@@ -79,6 +80,7 @@ VID: context [
 				]
 			]
 			text   [template: text   facets: [string! text #font-styles]]
+			field  [template: field  facets: [string! text #font-styles]]
 			link   [template: link   facets: [string! text url! text block! command]]
 			button [template: button facets: [string! data block! command]]
 			
@@ -144,7 +146,7 @@ VID: context [
 		;; user can then explicitly set host size to nonzero, in which case it's not changed
 		if face/size = 0x0 [face/size: none]
 		drawn: render face
-		#assert [face/size]						;-- should be set by `render-face`, `size: none` blows up `layout`
+		#assert [face/size]								;-- should be set by `render-face`, `size: none` blows up `layout`
 		#debug draw [prin "host/draw: " probe~ drawn] 
 		
 		face/draw: drawn
@@ -177,7 +179,7 @@ VID: context [
 			result
 		][
 			make-space 'tube [
-				margin:    0x0								;-- outer space most likely has it's own margin
+				margin:    0x0							;-- outer space most likely has it's own margin
 				spacing:   10x10
 				item-list: result
 			]
@@ -188,12 +190,15 @@ VID: context [
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
 		spec [block!]	;@@ document DSL, leave a link here
+		/styles sheet [map!] "Add custom stylesheet to the global one"
 		/local w b x lo hi late?
 	][
 		pane: make block! 8
+		unless styles [sheet: make map! 4] 
 		def: construct [								;-- accumulated single style definition
+			styling?:										;-- used when defining a new style in VID
 			template: 										;-- should not end in `=` (but not checked)
-			spec:											;-- used to build space, before all other modifiers applied
+			with:											;-- used to build space, before all other modifiers applied
 			link: 											;-- will be set to the instantiated space object
 			style: 											;-- style spec fetched from VID/styles
 			reactions:										;-- bound to space
@@ -212,39 +217,50 @@ VID: context [
 			]
 			spec: compose [
 				(any [def/style/spec []])
-				(def/spec)
+				(def/with)
 				(facets)
 			]
-			space: make-space def/style/template spec
-			if def/link [set def/link space]
-			; foreach reaction def/reactions [react bind copy/deep reaction space]
-			; def/actors					;@@ TODO: actors
-			if def/pane [	;@@ remove item-list
-				content: lay-out-vids def/pane
-				; either block? 
-				case [
-					in space 'content [
-						if 1 < n: length? content [
-							ERROR "Style (def/template) can only contain a single space, given (n)"
-						]
-						if n = 1 [space/content: content/1]
-					]
-					in space 'item-list [append space/item-list content]
-					'else [ERROR "Style (def/template) cannot contain other spaces"]
+			
+			either def/styling? [								;-- new style defined
+				new-style: copy/deep def/style
+				either new-style/spec [
+					new-style/spec: copy/deep spec
+				][
+					compose/only/into [spec: (spec)] tail new-style
 				]
+				put sheet def/link new-style
+			][
+				space: make-space def/style/template spec
+				if def/link [set def/link space]
+				; foreach reaction def/reactions [react bind copy/deep reaction space]
+				; def/actors					;@@ TODO: actors
+				if def/pane [	;@@ remove item-list
+					content: lay-out-vids/styles def/pane sheet
+					; either block? 
+					case [
+						in space 'content [
+							if 1 < n: length? content [
+								ERROR "Style (def/template) can only contain a single space, given (n)"
+							]
+							if n = 1 [space/content: content/1]
+						]
+						in space 'item-list [append space/item-list content]
+						'else [ERROR "Style (def/template) cannot contain other spaces"]
+					]
+				]
+				;; make reactive all spaces that define reactions or have a name
+				;@@ this is a kludge for lacking PR #4529, remove me
+				;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
+				if any [def/link  not empty? def/reactions] [
+					insert body-of :space/on-change*
+						with [space :space/on-change*] [system/reactivity/check/only self word]
+				]
+				foreach [late? reaction] def/reactions [
+					reaction: bind copy/deep reaction space
+					either late? [react/later reaction][react reaction] 
+				]
+				append pane anonymize def/style/template space		;-- style is instantiated
 			]
-			;; make reactive all spaces that define reactions or have a name
-			;@@ this is a kludge for lacking PR #4529, remove me
-			;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
-			if any [def/link  not empty? def/reactions] [
-				insert body-of :space/on-change*
-					with [space :space/on-change*] [system/reactivity/check/only self word]
-			]
-			foreach [late? reaction] def/reactions [
-				reaction: bind copy/deep reaction space
-				either late? [react/later reaction][react reaction] 
-			]
-			append pane anonymize def/style/template space
 		]
 		
 		reset: [
@@ -252,29 +268,39 @@ VID: context [
 			def/actors:    make map!   4
 			def/facets:    make block! 8
 			def/reactions: make block! 2
-			def/spec:      make block! 8
+			def/with:      make block! 8
 		]
-		=vids=:              [any [(do reset) =style-definition= | =style-declaration=]]
-		=style-definition=:  [ahead word! 'style =new-name= =style-declaration=]
-		=new-name=:          [set-word! (ERROR "Not implemented")]		;@@ implement custom styles
-		=style-declaration=: [not end opt =space-name= =style-name= any =modifier= (do commit-style)]
-		=space-name=:        [set w set-word! (def/link: w)]
+		=vids=:              [any [(do reset) =styling= | =instantiating=]]
+		=styling=:           [
+			ahead word! 'style (def/styling?: yes)
+			ahead #expect set-word! =space-name=
+			=style-declaration=
+		]
+		=instantiating=:     [not end opt =space-name= =style-declaration=]
+		=style-declaration=: [=style-name= any =modifier= (do commit-style)]
+		=space-name=:        [set w set-word! (def/link: to word! w)]
 		=style-name=:        [
 			set w #expect word! (
 				def/template: w
 				case [
-					x: styles/:w [def/style: x]
+					x: sheet/:w [def/style: x]
+					x: VID/styles/:w [def/style: x]
 					templates/:w [def/style: reduce ['template w]]
 					'else [ERROR "Unsupported VID/S style: (w)"]
 				]
 			)
 		]
 		
-		=modifier=:   [=spec= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
+		=modifier=:   [
+			not [ahead word! 'style]					;-- style is a keyword and can't be faceted
+			[=with= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
+		]
 		
-		=spec=:       [ahead word! 'with  set b #expect block! (append def/spec b)]	;-- collects multiple `with` blocks
+		=with=:       [ahead word! 'with  set b #expect block! (append def/with b)]	;-- collects multiple `with` blocks
 		
 		=reaction=:   [ahead word! 'react set late? opt [ahead word! 'later] set b #expect block! (
+			;@@ this would likely require reactions run before pane is created, but needs more data for decision
+			if def/styling? [ERROR "Reactions are not supported in style definitions yet"]
 			repend def/reactions [late? b]
 		)]
 		
@@ -311,7 +337,10 @@ VID: context [
 		=color=:      [set w word! if (tuple? get/any w) (repend def/facets ['color get w])]
 		
 		;@@ rename item-list to content to generalize it
-		=pane=:       [set b block! (def/pane: b)]
+		=pane=:       [set b block! (
+			if def/styling? [ERROR "Panes are not supported in style definitions yet"]
+			def/pane: b
+		)]
 		
 		=size=:       [
 			[	ahead [skip ahead word! '.. skip]
@@ -324,7 +353,7 @@ VID: context [
 		=size-component-1=: [
 			set x limit!
 		|	set x [word! | get-word!] if (all [
-				not styles/:x							;-- protect from bugs if style name is set globally to a number
+				not VID/styles/:x						;-- protect from bugs if style name is set globally to a number
 				not templates/:x
 				find limit! type? set/any 'x get/any x
 			])
