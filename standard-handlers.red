@@ -200,6 +200,10 @@ define-handlers [
 				update
 			][pass]
 		]
+		on-focus [space path event] [					;-- paint focus decoration
+			invalidate-cache space
+			update
+		]
 		on-unfocus [space path event] [					;-- remove focus decoration
 			invalidate-cache space
 			update

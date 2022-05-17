@@ -23,6 +23,7 @@ VID: context [
 	; ]
 	
 	;@@ add grids somehow
+	;@@ focus keyword!
 	
 	#local [
 		;; these help avoid repetition:

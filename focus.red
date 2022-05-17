@@ -84,7 +84,11 @@ find-next-focal-space: function [dir "forth or back"] [
 	] dir = 'forth 
 	do compose/only [
 		(foreach) path next: focus [			;-- default to already focused item (e.g. it's the only focusable)
-			#debug focus [#print "find-next-focal-space @(path)"]
+			#debug focus [
+				space: get last path 
+				text: any [select space 'text  mold select space 'data] 
+				#print "find-next-focal-space @(path), text=(text)"
+			]
 			if find keyboard/focusable last path [next: path break]
 		]
 	]
@@ -103,7 +107,7 @@ focus-space: function [
 		unless find keyboard/focusable name [continue]
 		append path new-name: name
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
-		#debug [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
+		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
 		unless empty? old-path: keyboard/focus [
 			events/with-commands [						;-- init a separate flags for a separate event
@@ -117,7 +121,6 @@ focus-space: function [
 			either is-face? f: get name [face: f][break]
 		]
 		if face [										;-- ..and focus it
-			set-focus face
 			unless system/view/auto-sync? [
 				show window-of face						;-- otherwise keys won't be detected
 			]
