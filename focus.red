@@ -96,6 +96,9 @@ find-next-focal-space: function [dir "forth or back"] [
 	new-line/all path no
 ]
 
+;; since I can't create events, but still gotta tell previewers/finalizers what kind of event it is, have to work around
+focus-event!:   object [type: 'focus   face: none]
+unfocus-event!: object [type: 'unfocus face: none]
 
 focus-space: function [
 	"Focus space with a given PATH"
@@ -110,18 +113,18 @@ focus-space: function [
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
 		with-update [									;-- provide context to event handlers
-			unless empty? old-path: keyboard/focus [
-				with-stop [								;-- init a separate stop flag for a separate event
-					do-previewers old-path none 'unfocus		;-- pass none as 'event' since we don't have any
-					do-handlers   old-path none 'unfocus no
-					do-finalizers old-path none 'unfocus
-				]
-			]
-	
 			;@@ with no face in the path, `update?` command is lost!
 			foreach name path [							;-- if faces are provided, find the innermost one
 				either is-face? f: get name [face: f][break]
 			]
+			
+			unless empty? old-path: keyboard/focus [
+				with-stop [								;-- init a separate stop flag for a separate event
+					unfocus-event!/face: face
+					process-event old-path unfocus-event! yes
+				]
+			]
+	
 			if face [									;-- ..and focus it
 				unless system/view/auto-sync? [
 					show window-of face					;-- otherwise keys won't be detected
@@ -130,9 +133,8 @@ focus-space: function [
 			keyboard/focus: copy path					;-- copy since the path is static
 	
 			with-stop [									;-- init a separate stop flag for a separate event
-				do-previewers path none 'focus					;-- pass none as 'event' since we don't have any
-				do-handlers   path none 'focus no
-				do-finalizers path none 'focus
+				focus-event!/face: face
+				process-event path focus-event! yes
 			]
 			
 			all [commands/update? face face/dirty?: yes]

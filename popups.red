@@ -317,7 +317,7 @@ context [
 	
 	;; over event should be tied to spaces and is guaranteed to fire even if no space below
 	register-previewer [over] function [
-		space [object! none!] path [block!] event [event! none!]
+		space [object! none!] path [block!] event [event!]
 		/extern hint-text show-time anchor
 	][
 		; #assert [event/window/type = 'window]
@@ -351,7 +351,7 @@ context [
 	
 	;; context menu display support
 	register-finalizer [alt-up] function [				;-- finalizer so other spaces can eat the event
-		space [object! none!] path [block!] event [event! none!]
+		space [object! none!] path [block!] event [event!]
 	][
 		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
 		if menu: find-field path 'menu block! [
@@ -364,7 +364,7 @@ context [
 
 	;; eats touch events outside the visible menu window
 	register-previewer [down] function [				;-- previewer so it takes precedence on menu things
-		space [object! none!] path [block!] event [event! none!]
+		space [object! none!] path [block!] event [event!]
 	][
 		stack: get-popups-for event/window
 		if all [

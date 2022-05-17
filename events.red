@@ -15,7 +15,7 @@ context [
 		down up  mid-down mid-up  alt-down alt-up  aux-down aux-up
 		dbl-click over wheel
 		key key-down key-up enter
-		focus unfocus
+		; focus unfocus 	-- internally generated ;@@ but maybe these will be required too
 		time
 	]
 	host-event-func: function [host event] [
@@ -61,7 +61,7 @@ events: context [
 				parse spec-of :handler [
 					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
 					word! opt quote [block!]
-					word! opt [quote [event!] | quote [event! none!] | quote [none! event!]]
+					word! opt [quote [event!] | quote [event! object!] | quote [object! event!]]
 					;@@ does not receive delay [percent!] - but should it?
 					opt [/local to end]
 				]
@@ -116,23 +116,23 @@ events: context [
 	export [register-previewer register-finalizer delist-previewer delist-finalizer]
 
 
-	do-previewers: func [path [block!] event [event! none!] type [word!]] [
-		do-global previewers path event type
+	do-previewers: func [path [block!] event [event! object!]] [
+		do-global previewers path event event/type
 	]
 
-	do-finalizers: func [path [block!] event [event! none!] type [word!]] [
-		do-global finalizers path event type
+	do-finalizers: func [path [block!] event [event! object!]] [
+		do-global finalizers path event event/type
 	]
 
 	;-- `type` is only required for focus/unfocus events, since we can't construct a fake 'event!' type
-	do-global: function [map [map!] path [block!] event [event! none!] type [word!]] [
-		unless list: map/:type [exit]
-		kind: either map =? previewers ["previewer"]["finalizer"]
+	do-global: function [map [map!] path [block!] event [event! object!]] [
+		unless list: map/(event/type) [exit]
 		space: all [path/1 get path/1]					;-- space can be none if event falls into space-less area of the host ;@@ REP #113
 		foreach fn list [
 			pcopy: cache/hold path						;-- copy in case user modifies/reduces it, preserve index
 			trap/all/catch [fn space pcopy event] [
 				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
+				kind: either map =? previewers ["previewer"]["finalizer"]
 				#print "*** Failed to evaluate event (kind) (mold/part/flat :fn 100)!^/(msg)"
 			]
 			cache/put pcopy
@@ -236,8 +236,8 @@ events: context [
 			#expect word! opt [ahead block! #expect quote [object!]]	;-- space [object!]
 			#expect word! opt [ahead block! #expect quote [block!]]	;-- path [block!]
 			#expect word! opt [
-				quote [event! none!]
-			|	quote [none! event!]
+				quote [event! object!]
+			|	quote [object! event!]
 			|	ahead block! #expect quote [event!]
 			]
 			opt [if (name = 'on-time) not [refinement! | end]
@@ -345,10 +345,10 @@ events: context [
 
 	do-handlers: function [
 		"Evaluate normal event handlers applicable to PATH"
-		path [block!] event [event! none!] type [word!] focused? [logic!]
+		path [block!] event [event! object!] focused? [logic!]
 	][
 		if commands/stop? [exit]
-		hnd-name: to word! head clear change skip "on-" 3 type		;-- don't allocate
+		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
 		wpath: path  unit: 1										;-- word-only path
 		if pair? second path [
 			wpath: extract/into path unit: 2 clear []				;-- remove pairs
@@ -382,13 +382,16 @@ events: context [
 	process-event: function [
 		"Process the EVENT calling all respective event handlers"
 		path [block!] "Path on the space tree to lookup handlers in"
-		event [event!] "View event"
+		event [event! object!] "View event or simulated"
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][
 		#debug profile [prof/manual/start 'process-event]
-		do-previewers path event event/type
-		unless commands/stop? [do-handlers path event event/type focused?]
-		do-finalizers path event event/type
+		;; last space is usually the one handler is intereted in, not `screen`
+		;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
+		target: any [find/last path word!  path]
+		do-previewers target event
+		unless commands/stop? [do-handlers path event focused?]
+		do-finalizers target event
 		#debug profile [prof/manual/end 'process-event]
 	]
 

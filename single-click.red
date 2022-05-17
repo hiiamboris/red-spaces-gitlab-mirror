@@ -21,7 +21,6 @@ context [
 
 	;@@ is it ok that click event will follow up event for normal handlers? but some finalizers will have it unordered
 	;@@ or maybe we should schedule some code to be run after the finalizers have finished?
-	;@@ this doesn't trigger "click" previewers or finalizers - perhaps it should
 	register-finalizer [up] function [space [object!] path [block!] event [event!]] [
 		unless event/face [exit]						;@@ partial workaround for #5124 - but can do nothing with View internal bugs
 		if all [
@@ -30,11 +29,7 @@ context [
 		][
 			event/type: 'click							;-- Red allows overriding it
 			;-- either this, but it may call `update` twice, after on-up and after on-click (may not be a bad thing)
-			events/dispatch event/face event
-			;-- or this, but we'll need to carry the `update?` flag over
-			; events/with-commands [
-			; 	events/process-event path event no
-			; ]
+			events/with-stop [events/process-event event/face event]
 			event/type: 'up								;-- restore it for the other finalizers
 		]
 		;@@ TODO: maybe a drag-finished event?
