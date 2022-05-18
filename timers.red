@@ -54,38 +54,41 @@ context [
 		;-- so we'll have to scan the whole tree for `rate` facets; all the time
 		;-- so this code has to be blazing fast
 		handlers: events/handlers
+		hpath: as path! []
+		time: now/utc/precise							;-- /utc is 2x faster
 		foreach-space [path space] face/space [
-			unless rate: select space 'rate [continue]					;-- no rate facet
-			if rate <= 0 [continue]										;-- disabled
-			path: as [] path
+			unless all [
+				rate: select space 'rate				;-- no rate facet
+				positive? rate							;-- disabled
+			] [continue]
+			#assert [any [time? rate  float? rate  integer? rate]]
+			if number? rate [rate: 0:0:1 / rate]		;-- turn rate into period
+			
+			pos: find/same/tail marks space
+			set [prev: bias:] any [pos [0:0 0:0]]
+			delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer
+			if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call it?
+			
+			args: reduce/into [to 1% delay / rate] clear []
+			path: new-line/all as [] path no
+			;; even if no time handler, actors or previewers/finalizers may be defined
+			events/do-previewers top path event args
 			forall path [
-				hpath: as path! compose/into [handlers (path) on-time] clear []	;-- not allocated
-				list: any [attempt [get hpath] []]						;@@ REP #113
-				;; even if no time handler, actors or previewers/finalizers may be defined, so have to continue
-				; if empty? list: attempt [get hpath] [continue]					;-- no time handler
-				#assert [
-					block? list
-					any [time? rate  float? rate  integer? rate]
-				]
-				if number? rate [rate: 0:0:1 / rate]					;-- turn rate into period
-				pos: find/same/tail marks space
-				set [prev: bias:] any [pos [0:0 0:0]]
-				time: now/utc/precise									;-- /utc is 2x faster
-				delay: either pos [difference time prev + rate][0:0]
-				if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call this timer?
-				path: back tail new-line/all path no					;-- position it at the target space (for handlers)
-				args: reduce/into [to 1% delay / rate] clear []
-				events/do-previewers path event args
+				compose/into [handlers (path) on-time] clear hpath		;-- not allocated
+				unless block? try [list: get hpath] [continue]			;-- no time handler ;@@ REP #113
 				foreach handler list [									;-- call the on-time stack
 					#assert [function? :handler]
-					events/do-handler next hpath :handler path event args 
+					events/do-handler next hpath :handler top path event args 
 				]
-				events/do-finalizers path event args
-				unless pos [pos: insert tail marks space]
-				delay: min delay rate * 5								;-- avoid frame spikes after a lag or sleep
-				change change pos time bias + delay
-				;@@ TODO: cap bias at some maximum, for 50+ fps cases, so it won't run away
 			]
+			events/do-finalizers top path event args
+			
+			unless pos [pos: tail append marks space]
+			delay: min delay rate * 5					;-- avoid frame spikes after a lag or sleep
+			change change pos time bias + delay			;-- mark last timer call time for this space
+			;@@ TODO: cap bias at some maximum, for 50+ fps cases, so it won't run away
+			
+			time: now/utc/precise						;-- update time after handlers evaluation
 		]
 	]
 
