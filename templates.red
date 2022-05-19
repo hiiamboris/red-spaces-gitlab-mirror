@@ -615,7 +615,7 @@ paragraph-ctx: context [
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		if all [
-			find [text font margin] to word! word
+			find [text font margin flags weight color] to word! word	;@@ maybe put color change into space-object?
 			not :old =? :new
 		][
 			invalidate-cache space
