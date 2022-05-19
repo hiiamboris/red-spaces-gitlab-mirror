@@ -127,6 +127,8 @@ context [
 		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
 		space [object! tag!] "Use <everything> to affect all spaces"
 		/only "Do not invalidate parents (e.g. if they are invalid already)"
+		/forget "Forget also location on the tree (space won't receive timer events until redrawn)"
+		;; /forget should be used to clean up cache from destroyed spaces (e.g. hidden menu)
 	][
 		#debug profile [prof/manual/start 'invalidation]
 		either tag? space [
@@ -135,28 +137,28 @@ context [
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating (any [select space-names space 'unknown])"]
-				if node: find/same render-cache space [
-					;; currently rendered spaces should not be invalidated, or parents get lost
-					unless find/same visited-spaces space [
-						either only [
-							;; this leaves space in the cache - so walk up to the root is still possible later
-							clear node/:slots-index
-						][
-							;; no matter if cache?=yes or no, parents still have to be invalidated
-							#assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
-							#debug cache [
-								;; this may still happen normally, e.g. as a result of a reaction on rendered space
-								#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
-							]
-							append invalidation-stack space
-							foreach [parent _] node/:parents-index [invalidate-cache parent]
-							;@@ can't clear parents, or first timer invalidates smth and all other timers do not fire
-							;@@ but then parents list has to be cleaned up somehow sometimes
-							; clear node/:parents-index		;-- clear parents now
-							clear node/:slots-index			;-- clear cached slots
-							; change node 'free				;-- mark free for claiming (so blocks can be reused)
-							remove top invalidation-stack	;@@ not using take/last for #5066
+				if all [
+					node: find/same render-cache space
+					;; currently rendered spaces should not be invalidated, or parents get lost:
+					not   find/same visited-spaces space
+				][
+					unless only [
+						;; no matter if cache?=yes or no, parents still have to be invalidated
+						#assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
+						#debug cache [
+							;; this may still happen normally, e.g. as a result of a reaction on rendered space
+							#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
 						]
+						append invalidation-stack space
+						either forget					;@@ use apply
+							[foreach [parent _] node/:parents-index [invalidate-cache/forget parent]]
+							[foreach [parent _] node/:parents-index [invalidate-cache parent]]
+						remove top invalidation-stack	;@@ not using take/last for #5066
+					]
+					clear node/:slots-index				;-- clear cached slots
+					if forget [
+						clear node/:parents-index		;-- clear parents now
+						change node 'free				;-- mark free for claiming (so blocks can be reused)
 					]
 				]
 			]

@@ -128,7 +128,7 @@ invalidate-face: function [
 	host [object!]
 ][
 	foreach path list-spaces host/space [
-		invalidate-cache get last path
+		invalidate-cache/forget/only get last path
 	]
 ]
 
