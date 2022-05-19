@@ -1144,7 +1144,10 @@ inf-scrollable-ctx: context [
 
 		autosize-window: function [] [
 			size: any [self/size self/limits/min]		;@@ rethink how to better hanlde integer or invalid limit
-			#assert [all [pair? size size/x > 0 size/y > 0]]
+			#assert [
+				pair? size
+				0x0 +< size
+			]
 			maybe window/max-size: pages * size
 			#debug list-view [#print "autosized window to (window/max-size)"]
 		]
@@ -1332,7 +1335,7 @@ list-view-ctx: context [
 		canvas:   extend-canvas canvas axis
 		viewport: xy2 - xy1
 		origin:   guide * (xy1 - o1 - list/margin)
-		cache:    'invisible
+		cache:    'all
 		settings: with [list 'local] [axis margin spacing canvas viewport origin cache]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
@@ -1933,7 +1936,46 @@ grid-ctx: context [
 
 
 grid-view-ctx: context [
+	~: self
+	
+	;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
+	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
+		#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
+		bounds: grid/bounds
+		#assert [bounds "data/size is none!"]
+		r: case [
+			dir < 0 [from]
+			bounds/:axis [
+				size: grid/calc-size					;@@ optimize calc-size?
+				size/:axis - from
+			]
+			'infinite [requested]
+		]
+		r: clip [0 r] requested
+		#debug grid-view [#print "avail?/(axis) (dir) = (r) of (requested)"]
+		r
+	]
+	
+	on-change: function [gview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			axis size pages [
+				if :old <> :new [
+					#assert [any [word <> 'axis  find [x y] :new]]
+					if gview/size [						;-- do not trigger during initialization
+						gview/autosize-window
+						gview/jump-length: min gview/size/x gview/size/y
+						;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
+						;@@ situation when jump clears a part of a viewport should never happen at runtime
+						invalidate-cache gview
+					]
+				]
+			]
+		]
+		gview/inf-scrollable-on-change word :old :new
+	]
+	
 	templates/grid-view: make-template 'inf-scrollable [
+		size:   none									;-- avoids extra triggers in on-change
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
@@ -1949,37 +1991,6 @@ grid-view-ctx: context [
 			]
 		]
 
-		grid: make-space 'grid [
-			;@@ should `available?` be in *every* grid? (as a placeholder word)
-			available?: function [axis dir from [integer!] requested [integer!]] [	
-				;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
-				#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
-				bounds: self/bounds
-				#assert [bounds "data/size is none!"]
-				r: case [
-					dir < 0 [from]
-					bounds/:axis [
-						size: calc-size		;@@ optimize calc-size?
-						size/:axis - from
-					]
-					'infinite [requested]
-				]
-				r: clip [0 r] requested
-				#debug grid-view [#print "avail?/(axis) (dir) = (r) of (requested)"]
-				r
-			]
-		]
-		grid-cells: :grid/cells
-		grid/cells: func [/pick xy [pair!] /size] [
-			either pick [
-				unless grid/cell-map/:xy [			;@@ need to think when to free this up, maybe when cells get hidden
-					grid/cell-map/:xy: wrap-data xy data/pick xy
-				]
-				grid-cells/pick xy
-			][data/size]
-		]
-		grid/calc-bounds: grid/bounds: does [data/size]
-		
 		wrap-data: function [xy [pair!] item-data [any-type!]] [
 			spc: make-space 'data-view []
 			set/any 'spc/data :item-data
@@ -1989,21 +2000,24 @@ grid-view-ctx: context [
 
 		window/content: 'grid
 
-		setup: function [] [
-			if size [
-				;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
-				;@@ situation when jump clears a part of a viewport should never happen at runtime
-				maybe self/jump-length: min size/x size/y
+		grid: make-space 'grid [
+			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
+				~/available? self axis dir from requested
 			]
 		]
-
-		inf-scrollable-draw: :draw
-		draw: function [] [
-			#debug grid-view [#print "grid-view/draw is called! passing to inf-scrollable"]
-			setup
-			; grid/origin: self/origin		;@@ maybe remove grid/origin and make it inferred from /only xy1 ?
-			inf-scrollable-draw
+		
+		grid/cells: func [/pick xy [pair!] /size] [
+			either pick [
+				any [
+					grid/cell-map/:xy					;@@ need to think when to free this up, maybe when cells get hidden
+					grid/cell-map/:xy: wrap-data xy data/pick xy
+				]
+			][data/size]
 		]
+		grid/calc-bounds: grid/bounds: does [data/size]
+		
+		inf-scrollable-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 

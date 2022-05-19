@@ -28,7 +28,7 @@ view/no-wait/options [
 				rejoin ["message " i ": " copy/part lorem random length? lorem]
 			][none]									;-- /size = none for unlimited
 		]
-	] with [color: system/view/metrics/colors/panel]
+	]
 	on-over [
 		status/text: form hittest face/space event/offset
 	]
