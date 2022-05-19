@@ -4090,3 +4090,20 @@ timers that took 100% CPU time in tube-test
 	
 	; time: now/utc/precise						;-- update time after handlers evaluation
 ; ]
+
+turns out touch-clicks generate `over over down over` event chain, so no need to catch `down` since `over` hides the menu
+actually, I need to catch also `up` and not generate `click`, but doesn't seem worth it
+; ;; eats touch events outside the visible menu window
+; register-previewer [down] function [				;-- previewer so it takes precedence on menu things
+	; space [object! none!] path [block!] event [event!]
+; ][
+	; stack: get-popups-for event/window
+	; if all [
+		; menu: stack/2								;-- menu exists
+		; find/same event/window/pane menu			;-- menu visible
+		; not same? event/face menu					;-- click didn't land on menu host
+	; ][
+		; hide-popups event/window 1
+		; stop										;-- eat the event, closing the menu
+	; ]
+; ]

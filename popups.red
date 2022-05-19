@@ -362,20 +362,5 @@ context [
 		]
 	]
 
-	;@@ why doesn't work?? somehow menu is not on the pane already when clicked!
-	;; eats touch events outside the visible menu window
-	register-previewer [down] function [				;-- previewer so it takes precedence on menu things
-		space [object! none!] path [block!] event [event!]
-	][
-		stack: get-popups-for event/window
-		if all [
-			menu: stack/2								;-- menu exists
-			find/same event/window/pane menu			;-- menu visible
-			not same? event/face menu					;-- click didn't land on menu host
-		][
-			hide-popups event/window 1
-			stop										;-- eat the event, closing the menu
-		]
-	]
 ]
 
