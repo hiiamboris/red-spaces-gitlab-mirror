@@ -1062,6 +1062,19 @@ bug/limitation: adaptive space with a map cannot be shared at all, since map sho
 	- another dark side of sharing: if same spaces are in the same container, or even that container is multiplied
 	  then focus system will go bananas, because it relies on uniqueness of the path
 	  so, another requirement for now: focusable spaces are not shareable
+timers and performance
+	there was a bug in timers that made them jump to the last iteration
+	when it was fixed, timers started taking 99-100% of tube-test time to simply iterate over 8k spaces 65 times per sec
+	foreach-space 8000 items = 69ms wow
+	list-spaces alone = 54ms
+	obviously it's a no-go, how to speed up?
+	need to somehow only iterate across spaces with /rate and have their paths ready and known
+	may utilize it from cache? in this case may make sense to make cache more "official"
+	other option is to hunt for "rate" facet change, but that doesn't give me path
+	and has to be in space's most basic on-change to avoid duplication
+	ok this may work: on-change keeps a registry of "rated" spaces, but paths come from the cache
+	then each path is again tested incrementally against handlers list
+	  
 		
 
 VID Styles: must be documented TODO
@@ -4040,4 +4053,40 @@ what if limits are undefined, but size is fixed anyway?
 	; ][
 		; append/only append parents-list child reduce [parent]
 	; ]
+; ]
+
+timers that took 100% CPU time in tube-test
+; foreach-space [path space] face/space [
+	; unless all [
+		; rate: select space 'rate				;-- no rate facet
+		; positive? rate							;-- disabled
+	; ] [continue]
+	; #assert [any [time? rate  float? rate  integer? rate]]
+	; if number? rate [rate: 0:0:1 / rate]		;-- turn rate into period
+	
+	; pos: find/same/tail marks space
+	; set [prev: bias:] any [pos [0:0 0:0]]
+	; delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer
+	; if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call it?
+	
+	; args: reduce/into [to 1% delay / rate] clear []
+	; path: new-line/all as [] path no
+	; ;; even if no time handler, actors or previewers/finalizers may be defined
+	; events/do-previewers top path event args
+	; forall path [
+		; compose/into [handlers (path) on-time] clear hpath		;-- not allocated
+		; unless block? try [list: get hpath] [continue]			;-- no time handler ;@@ REP #113
+		; foreach handler list [									;-- call the on-time stack
+			; #assert [function? :handler]
+			; events/do-handler next hpath :handler top path event args 
+		; ]
+	; ]
+	; events/do-finalizers top path event args
+	
+	; unless pos [pos: tail append marks space]
+	; delay: min delay rate * 5					;-- avoid frame spikes after a lag or sleep
+	; change change pos time bias + delay			;-- mark last timer call time for this space
+	; ;@@ TODO: cap bias at some maximum, for 50+ fps cases, so it won't run away
+	
+	; time: now/utc/precise						;-- update time after handlers evaluation
 ; ]

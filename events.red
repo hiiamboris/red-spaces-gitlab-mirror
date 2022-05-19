@@ -18,6 +18,7 @@ context [
 		; focus unfocus 	-- internally generated ;@@ but maybe these will be required too
 		time
 	]
+	;; sometimes this gets window as 'host', likely when no face is in focus
 	host-event-func: function [host event] [
 		all [
 			word? w: select host 'space					;-- a host face?
@@ -365,8 +366,7 @@ events: context [
 					clear template 
 					at wpath i1  skip wpath i2						;-- add slice [i1,i2] of path
 					hnd-name
-				if empty? list: attempt [get hpath] [continue]
-				#assert [block? :list]
+				unless block? try [list: get hpath] [continue]
 				commands/stop										;-- stop after current stack unless `pass` gets called
 				path: skip head path i2 - 1 * unit					;-- position path at the space that receives event
 				foreach handler list [								;-- whole list is called regardless of stop flag change

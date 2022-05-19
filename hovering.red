@@ -24,7 +24,7 @@ register-previewer [
 				away-path: clear []
 			#assert [not empty? away-path]
 			event/away?: yes
-			events/process-event away-path event no
+			events/process-event away-path event [] no
 			event/away?: no
 		]
 		append clear last-wpath wpath

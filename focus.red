@@ -127,6 +127,7 @@ focus-space: function [
 			]
 	
 			if face [									;-- ..and focus it
+				set-focus face
 				unless system/view/auto-sync? [
 					show window-of face					;-- otherwise keys won't be detected
 				]

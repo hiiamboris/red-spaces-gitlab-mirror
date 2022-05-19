@@ -121,12 +121,14 @@ rectangle-ctx: context [
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		unless :old =? :new [invalidate-cache space]
+		space/space-on-change word :old :new
 	]
 	
 	templates/rectangle: make-template 'space [
 		size:   20x10
 		margin: 0
 		draw:   does [compose [box (margin * 1x1) (size - margin)]]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -156,6 +158,7 @@ triangle-ctx: context [
 	; ]
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		unless :old =? :new [invalidate-cache space]
+		space/space-on-change word :old :new
 	]
 		
 	templates/triangle: make-template 'space [
@@ -168,6 +171,7 @@ triangle-ctx: context [
 		
 		;@@ need `into` here? or triangle will be a box from the clicking perspective?
 		draw: does [~/draw self]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -214,6 +218,7 @@ image-ctx: context [
 			margin [:old <> :new]
 			data   [true] 								;-- can't know if image bits were changed, better to update
 		] [invalidate-cache space]
+		space/space-on-change word :old :new
 	]
 	
 	templates/image: make-template 'space [
@@ -222,6 +227,7 @@ image-ctx: context [
 		; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
 		data: none										;-- images are not recyclable, so `none` by default
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -248,6 +254,7 @@ cell-ctx: context [
 			;; `weight` invalidates parents by invalidating this cell
 			limits weight content [invalidate-cache space]
 		]
+		space/space-on-change word :old :new
 	]
 	
 	draw: function [space [object!] canvas [pair! none!]] [
@@ -283,6 +290,7 @@ cell-ctx: context [
 		;; cannot be cached, as content may change at any time and we have no way of knowing
 		; cache?:  off
 		
+		space-on-change: :on-change*
 		#on-change-redirect
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
@@ -345,6 +353,7 @@ scrollbar: context [
 	
 	on-change: function [bar [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [offset amount size axis [invalidate-cache bar]]
+		bar/space-on-change word :old :new
 	]
 				
 	templates/scrollbar: make-template 'space [
@@ -369,6 +378,7 @@ scrollbar: context [
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		;@@ TODO: styling/external renderer
 		draw: does [~/draw self]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -491,6 +501,7 @@ scrollable-space: context [
 		invalidate-cache/only space/vscroll
 		
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
+		render in space 'scroll-timer					;@@ scroll-timer has to appear in the tree for timers
 		compose/deep/only [
 			translate (origin) [						;-- special geometry for content
 				clip (0x0 - origin) (box - origin)
@@ -521,6 +532,7 @@ scrollable-space: context [
 				invalidate-cache space
 			]
 		]
+		space/space-on-change word :old :new
 	]
 		
 	templates/scrollable: make-template 'space [
@@ -544,6 +556,7 @@ scrollable-space: context [
 
 		draw: function [/on canvas [none! pair!]] [~/draw self canvas]
 
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -608,6 +621,7 @@ paragraph-ctx: context [
 			invalidate-cache space
 			space/layout: none							;-- will be laid out on next `draw`
 		]
+		space/space-on-change word :old :new
 	]
 	
 	;; every `make font!` brings View closer to it's demise, so it has to use a shared font
@@ -630,6 +644,7 @@ paragraph-ctx: context [
 		layout: none									;-- internal, text size is kept in layout/extra
 		; cache?: true
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 
@@ -700,6 +715,7 @@ container-ctx: context [
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		if find [items item-list origin] to word! word [invalidate-cache space]
+		space/space-on-change word :old :new
 	]
 
 	templates/container: make-template 'space [
@@ -722,6 +738,8 @@ container-ctx: context [
 			#assert [layout "container/draw requires layout to be provided"]
 			~/draw self type settings xy1 xy2
 		]
+
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -865,6 +883,7 @@ switch-ctx: context [
 				]
 			]
 		]
+		space/space-on-change word :old :new
 	]
 	
 	templates/switch: make-template 'space [
@@ -872,6 +891,7 @@ switch-ctx: context [
 		; command: []
 		data: make-space 'data-view []
 		draw: does [also data/draw size: data/size]
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 	
@@ -1042,6 +1062,7 @@ window-ctx: context [
 		switch to word! word [
 			limits content [invalidate-cache space]
 		]
+		space/space-on-change word :old :new
 	]
 		
 	templates/window: make-template 'space [
@@ -1070,6 +1091,7 @@ window-ctx: context [
 			~/draw self xy1 xy2
 		]
 		
+		space-on-change: :on-change*
 		#on-change-redirect
 	]
 ]
@@ -1130,6 +1152,7 @@ inf-scrollable-ctx: context [
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
 			unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
+			render 'roll-timer							;@@ timer has to appear in the tree for timers to work
 			scrollable-draw/on canvas
 		]
 	]

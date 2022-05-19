@@ -362,6 +362,7 @@ context [
 		]
 	]
 
+	;@@ why doesn't work?? somehow menu is not on the pane already when clicked!
 	;; eats touch events outside the visible menu window
 	register-previewer [down] function [				;-- previewer so it takes precedence on menu things
 		space [object! none!] path [block!] event [event!]

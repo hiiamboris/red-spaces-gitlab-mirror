@@ -5,7 +5,7 @@ Red [
 ]
 
 
-render: invalidate: invalidate-cache: none				;-- reserve names in the spaces/ctx context
+render: invalidate: invalidate-cache: paths-from-space: none	;-- reserve names in the spaces/ctx context
 exports: [render invalidate]
 
 current-path: as path! []								;-- used as a stack during draw composition
@@ -33,13 +33,14 @@ get-current-style: function [
 
 
 context [
-	;; render cache format: [space-object [parent-object ...] 4x [canvas space-size map drawn] ...]
+	;; render cache format: [space-object [parent-object name  ...] name [canvas space-size map drawn ...] ...]
 	;;   it holds rendered draw block of all spaces that have /cache? = true
 	;;   space-size is required because `draw` usually changes space/size and if draw is avoided, /size still must be set
 	;;   same for the map: it changes with canvas, has to be fetched from the cache together with the draw block
 	;;   unused slots contain 'free word to distinguish committed canvas=none case from unused cache slot
 	;;   parent list is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
 	;;   it holds rendering tree of parent/child relationships on the last rendered frame
+	;;   name is the space's name in that particular parent, used by paths-from-space which is used by timers
 	
 	;; caching workflow:
 	;; - drawn spaces draw blocks are committed to the cache if they have /cache? enabled
@@ -62,6 +63,45 @@ context [
 	; free-list:      make block-stack [type: hash! size: slots]
 	
 	#debug cache [space-names: make hash! 2048]			;-- used to get space objects names for debug output
+	
+	;@@ WARNING: does not copy! paths may change if not copied by the caller
+	;@@ and in case space was invalidated, this will not return anything - needs design improvement, maybe separate tree
+	set 'paths-from-space function [
+		"Get all paths for SPACE on the last rendered frame"
+		space  [object!]
+		host   [object!]
+		; return: [path! block!] "May return single path! or a block of"
+	][
+		; #assert [is-face? host]
+		result: []
+		path: clear []
+		paths-continue* space host path 'result
+		result: head clear result
+		result
+	]
+		
+	paths-continue*: function [
+		space  [object!]
+		host   [object!]
+		path   [block!]
+		result [word!]
+	][
+		parents: select/same render-cache space
+		case [
+			not parents [exit]							;@@ invalidated space - cannot be traced to the root
+			tail? parents [
+				slot: traversal/reuse-path (result)
+				reverse append append slot head path host/space
+			]
+			'else [
+				foreach [parent child-name] parents [
+					change path child-name
+					paths-continue* parent host next path result
+				]
+				remove path
+			]
+		]
+	]
 	
 	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
 	;@@ but maybe they won't be needed as I'm improving the design?
@@ -109,10 +149,12 @@ context [
 								#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
 							]
 							append invalidation-stack space
-							foreach parent node/:parents-index [invalidate-cache parent]
-							clear node/:parents-index		;-- clear parents now
+							foreach [parent _] node/:parents-index [invalidate-cache parent]
+							;@@ can't clear parents, or first timer invalidates smth and all other timers do not fire
+							;@@ but then parents list has to be cleaned up somehow sometimes
+							; clear node/:parents-index		;-- clear parents now
 							clear node/:slots-index			;-- clear cached slots
-							change node 'free				;-- mark free for claiming (so blocks can be reused)
+							; change node 'free				;-- mark free for claiming (so blocks can be reused)
 							remove top invalidation-stack	;@@ not using take/last for #5066
 						]
 					]
@@ -173,6 +215,7 @@ context [
 	set-parent: function [
 		"Mark parent/child relationship in the parents cache"
 		child  [object!]
+		name   [word!]
 		parent [object! none!]
 	][
 		#assert [not child =? parent]
@@ -181,24 +224,26 @@ context [
 				any [
 					not parent      					;-- no parent for top level spaces = no need to hold it
 					find/same/only parents parent		;-- do not duplicate parents
-					append/only parents parent
+					append append parents parent name	;@@ should name be updated if parent is found?
 				]
 			]
 			node: find render-cache 'free [
 				change node child
-				if parent [append node/:parents-index parent]
+				if parent [append append node/:parents-index parent name]
 			]
 			'else [
-				repend render-cache [child compose [(only parent)] make hash! slot-size * 4]
+				parents: make hash! 2
+				if parent [reduce/into [parent name] parents]
+				repend render-cache [child parents make hash! slot-size * 4]
 			]
 		]
 	]
 	
 	visited-spaces: make block! 50						;-- used to track parent/child relations
 	enter-space: function [
-		space [object!]
+		space [object!] name [word!]
 	][
-		set-parent space last visited-spaces
+		set-parent space name last visited-spaces
 		append visited-spaces space
 	]
 	leave-space: does [remove top visited-spaces]
@@ -303,14 +348,14 @@ context [
 				#assert [pair? size]
 				maybe space/size: size
 				if in space 'map [space/map: map]
-				set-parent space last visited-spaces	;-- mark parent/child relations
+				set-parent space name last visited-spaces	;-- mark parent/child relations
 				#debug cache [							;-- add a frame to cached spaces after committing
 					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]
 				]
 			][
 				; if name = 'list [print ["canvas:" canvas mold space/item-list]]
 				#debug profile [prof/manual/start name]
-				enter-space space						;-- mark parent/child relations
+				enter-space space name					;-- mark parent/child relations
 				
 				either block? :style [
 					style: compose/deep bind style space	;@@ how slow this bind will be? any way not to bind? maybe construct a func?

@@ -75,15 +75,15 @@ do/expand [
 			include %styles.red
 			include %rendering.red
 			include %layouts.red
-			include %templates.red
 			include %vid.red
 			include %events.red
+			include %templates.red
+			include %timers.red							;-- must come after events and templates
 			include %popups.red
 			include %traversal.red
 			include %focus.red
 			include %tabbing.red
 			include %single-click.red
-			include %timers.red
 			include %standard-handlers.red
 			include %hittest.red
 			include %actors.red
