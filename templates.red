@@ -1250,6 +1250,15 @@ list-view-ctx: context [
 		r
 	]
 
+	item-length?: function [list [object!] i [integer!]] [
+		#assert [0 < i]
+		#assert [list/icache/:i]
+		item: get list/icache/:i						;-- must be cached by previous locate-line call
+		r: item/size/(list/axis)
+		#debug list-view [#print "item-length? (i) -> (r)"]
+		r
+	]
+			
 	locate-range: function [
 		"Turn a range along main axis into list item indexes and offsets from their 0x0"
 		list       [object!]  "List object with items"
@@ -1275,7 +1284,7 @@ list-view-ctx: context [
 		;; for the same reason, space/margin after last item belongs to that item
 		;; returned index can be none if high-level lands before the last item's geometry
 		switch h-item [
-			space [h-ofs: h-ofs + list/item-length? h-idx]
+			space [h-ofs: h-ofs + item-length? list h-idx]
 			margin [
 				either h-idx = 1 [
 					h-idx: none
@@ -1284,7 +1293,7 @@ list-view-ctx: context [
 					either h-idx <= 0 [					;-- data/size can be 0, then there's no item to draw
 						h-idx: none
 					][
-						h-ofs: h-ofs + list/item-length? h-idx
+						h-ofs: h-ofs + item-length? list h-idx
 					]
 				]
 			]
@@ -1293,7 +1302,92 @@ list-view-ctx: context [
 		#debug list-view [#print "locate-range (low-level),(high-level) -> (mold r)"]
 		r
 	]
+	
+	available?: function [list [object!] canvas [pair!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+		if axis <> list/axis [
+			return either dir < 0 [from][canvas/:axis - from]
+		]
+		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
+		r: max 0 requested - switch item [
+			space item [0]
+			margin [either idx = 1 [0 - ofs][ofs - list/margin/:axis]]
+		]
+		#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
+		r
+	]
+			
+	;; container/draw only supports finite number of `items`, infinite needs special handling
+	;; it's also too general, while this `draw` can be optimized better
+	list-draw: function [list [object!] canvas [pair!] xy1 [pair!] xy2 [pair!]] [
+		axis: list/axis
+		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
+		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
+		unless all [i1 i2] [							;-- no visible items (see locate-range)
+			maybe list/size: list/margin * 2
+			return list/map: []
+		]
+		#assert [i1 <= i2]
 
+		guide:    select [x 1x0 y 0x1] axis
+		canvas:   extend-canvas canvas axis
+		viewport: xy2 - xy1
+		origin:   guide * (xy1 - o1 - list/margin)
+		cache:    'invisible
+		settings: with [list 'local] [axis margin spacing canvas viewport origin cache]
+		set [new-size: new-map:] make-layout 'list :list-picker settings
+		;@@ make compose-map generate rendered output? or another wrapper
+		;@@ will have to provide canvas directly to it, or use it from geom/size
+		drawn: make [] 3 * (length? new-map) / 2
+		foreach [name geom] new-map [
+			either drw: geom/drawn [					;-- invisible items don't get re-rendered
+				remove/part find geom 'drawn 2			;-- no reason to hold `drawn` in the map anymore
+			][
+				drw: render/on name geom/size
+			]
+			compose/only/into [translate (geom/offset) (drw)] tail drawn
+		]
+		maybe list/size: new-size
+		list/map: new-map
+		drawn
+	]
+
+	;; hack to avoid recreation of this func inside list-draw
+	list-picker: func [/size /pick i] with :list-draw [
+		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
+	]
+	
+	;; this initializes window size to a multiple of list-view sizes (paragraphs adjust to window then)
+	;; overrides inf-scrollable's own autosize-window because `list-view` has a linear `pages` interpretation (not 2D)
+	autosize-window: function [lview [object!]] [
+		size: any [lview/size lview/limits/min]			;@@ rethink how to better handle integer or invalid limit
+		unit: axis2pair lview/list/axis
+		;; account for scrollers size, since list-view is meant to always display one along main axis
+		;; this will make window and it's content adapt to list-view width when possible
+		;@@ it's a bit dumb to _always_ subtract scrollers even if they're not visible
+		;@@ need more dynamic way of adapting window size
+		scrollers: lview/hscroll/size * 0x1 + (lview/vscroll/size * 1x0) * reverse unit
+		#assert [0x0 <> size]
+		maybe lview/window/max-size: lview/pages - 1 * unit + 1 * size - scrollers
+		#assert [0x0 <> lview/window/max-size]
+		#debug list-view [#print "autosized window to (lview/window/max-size)"]
+	]
+
+	on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			axis size pages [
+				if :old <> :new [
+					#assert [any [word <> 'axis  find [x y] :new]]
+					clear lview/list/map
+					if lview/size [						;-- do not trigger during initialization
+						lview/autosize-window
+						invalidate-cache lview
+					]
+				]
+			]
+		]
+		lview/inf-scrollable-on-change word :old :new
+	]
+		
 	templates/list-view: make-template 'inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; cache?: off
@@ -1310,6 +1404,7 @@ list-view-ctx: context [
 			anonymize 'item spc
 		]
 
+		window/content: 'list
 		list: make-space 'list [
 			axis: 'y
 			; cache?: off
@@ -1319,7 +1414,6 @@ list-view-ctx: context [
 			;; an int->word map! - for flexibility in caching strategies (which items to free and when)
 			;@@ when to forget these? and why not keep only focused item?
 			icache: make map! []	
-
 			items: function [/pick i [integer!] /size] [
 				either pick [
 					any [
@@ -1329,121 +1423,20 @@ list-view-ctx: context [
 				][data/size]
 			]
 
-			;@@ maybe all this should be part of `list` space itself? though it will bloat it..
-			available?: function [axis dir from [integer!] requested [integer!]] [
-				if axis <> self/axis [
-					return either dir < 0 [from][window/max-size/:axis - from]
-				]
-				set [item: idx: ofs:] locate-line from + (requested * dir)
-				r: max 0 requested - switch item [
-					space item [0]
-					margin [either idx = 1 [0 - ofs][ofs - margin/:axis]]
-				]
-				#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
-				r
+			;; window/max-size serves as list's canvas everywhere, while /on canvas is not used
+			;@@ window should be reset if list-view is resized!
+			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+				~/available? self window/max-size axis dir from requested
 			]
-			
-			;; window/max-size serves as list's canvas
-			;@@ it should be reset if list-view is resized!
-			locate-line: func [level [integer!]] [
-				~/locate-line self window/max-size level
-			]
-			locate-range: func [low-level [integer!] high-level [integer!]] [
-				~/locate-range self window/max-size low-level high-level
-			]
-
-			item-length?: function [i [integer!]] [
-				#assert [0 < i]
-				#assert [icache/:i]
-				item: get icache/:i							;-- must be cached by previous locate-line call
-				r: item/size/:axis
-				#debug list-view [#print "item-length? (i) -> (r)"]
-				r
-			]
-
-			;; container/draw only supports finite number of `items`, infinite needs special handling
-			;; it's also too general, while this `draw` can be optimized better
-			;; /on canvas is not used - instead always uses window/size (but accepts it to simplify styles)
 			draw: function [/only xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
-				#assert [all [xy1 xy2]]
-				#assert [window/size/:axis > 0]			;-- some bug in window sizing likely
-				clear map
-				set [i1: o1: i2: o2:] locate-range xy1/:axis xy2/:axis
-				unless all [i1 i2] [					;-- no visible items (see locate-range)
-					maybe self/size: 0x0
-					return []
-				]
-				#assert [i1 <= i2]
-
-				guide: select [x 1x0 y 0x1] axis
-				;; make canvas infinite, else single item will occupy it's size
-				canvas: window/max-size
-				canvas/:axis: 2'000'000'000
-				viewport: xy2 - xy1
-				origin: guide * (xy1 - o1 - margin)
-				cache: 'all
-				settings: [axis margin spacing canvas viewport origin cache]
-				picker: func [/size /pick i] [
-					either size [i2 - i1 + 1][items/pick i + i1 - 1]
-				]
-				set [new-size: new-map:] make-layout 'list :picker settings
-				self/map: new-map
-				maybe self/size: new-size				;@@ do we even care about the size of the list itself here?
-														;@@ should size/x be that of list-view/size/x ?
-				;@@ make compose-map generate rendered output? or another wrapper
-				;@@ will have to provide canvas directly to it, or use it from geom/size
-				drawn: make [] 3 * (length? map) / 2
-				foreach [name geom] map [
-					compose/deep/into [
-						translate (geom/offset) [
-							; clip 0x0 (geom/size) (render/on name geom/size)
-							(render/on name geom/size)
-						]
-					] tail drawn
-				]
-				drawn
+				~/list-draw self window/max-size xy1 xy2
 			]
 		]
-		
-		window/content: 'list
 
-		;; this initializes window size to a multiple of list-view sizes (paragraphs adjust to window then)
-		;; overrides inf-scrollable's own autosize-window because `list-view` has a linear `pages` interpretation
-		autosize-window: function [] [
-			size: any [self/size self/limits/min]		;@@ rethink how to better handle integer or invalid limit
-			unit: axis2pair list/axis
-			;; account for scrollers size, since list-view is meant to always display one along main axis
-			;; this will make window and it's content adapt to list-view width when possible
-			;@@ it's a bit dumb to _always_ subtract scrollers even if they're not visible
-			;@@ need more dynamic way of adapting window size
-			scrollers: hscroll/size * 0x1 + (vscroll/size * 1x0) * reverse unit
-			#assert [0x0 <> size]
-			maybe window/max-size: pages - 1 * unit + 1 * size - scrollers
-			#assert [0x0 <> window/max-size]
-			#debug list-view [#print "autosized window to (window/max-size)"]
-		]
-
-		; inf-scrollable-draw: :draw
-		; draw: function [] [
-		; 	inf-scrollable-draw							;-- calls list/draw/only eventually
-		; ]
+		autosize-window: does [~/autosize-window self]
 
 		inf-scrollable-on-change: :on-change*
-		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
-			switch to word! word [
-				axis size pages [
-					if :old <> :new [
-						#assert [any [word <> 'axis  find [x y] :new]]
-						clear list/map
-						if size [						;-- do not trigger during initialization
-							autosize-window
-							invalidate-cache self
-						]
-					]
-				]
-			]
-			inf-scrollable-on-change word :old :new
-		]
+		#on-change-redirect
 	]
 ]
 
