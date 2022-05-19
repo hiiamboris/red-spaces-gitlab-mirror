@@ -5,23 +5,18 @@ Red [
 	needs:   view
 ]
 
-recycle/off
-change-dir %..
-do %everything.red
+#include %../everything.red
 
 
 ;@@ should be cells in the grid map!
 view/no-wait/options [
 	below
 	b: host [
-		grid with [
-			cell-map/(1x2): make-space/name 'button [data: "button1"]
-			; cell-map/(3x3): make-space/name 'space [draw: [] size: 80x80]
-			cell-map/(3x1): make-space/name 'button [data: "button2"]
-			; set-span 2x2 2x2
-			; set-span/force 1x2 2x2
-			heights/default: 'auto
-		]
+		grid [
+			at 1x2 button "button1"
+			; at 3x3 stretch 80x80
+			at 3x1 button "button2"
+		] with [heights/default: 'auto]
 	]
 	on-over [
 		status/text: form hittest face/space event/offset

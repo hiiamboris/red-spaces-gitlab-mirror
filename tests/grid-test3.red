@@ -5,15 +5,14 @@ Red [
 	needs:   view
 ]
 
-recycle/off
-change-dir %..
-do %everything.red
+#include %../everything.red
+
 append spaces/keyboard/focusable 'grid-view
 
 view/no-wait/options [
 	below
 	b: host [
-		grid-view size= 400x400 with [
+		grid-view focus size= 400x400 with [
 			; grid/bounds: 10x10
 			; bounds: [x: 10 y: auto]
 			source/(1x2): "1x2"

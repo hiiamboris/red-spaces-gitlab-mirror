@@ -4107,3 +4107,27 @@ actually, I need to catch also `up` and not generate `click`, but doesn't seem w
 		; stop										;-- eat the event, closing the menu
 	; ]
 ; ]
+
+wanted to use this for grid but reconsidered, decided to support explicit return instead
+; fit-pair: function [
+	; "Fit pair XY into SIZE/X if it sticks out horizontally"
+	; xy   [pair!]
+	; size [pair! none! unset!]
+; ][
+	; if all [
+		; pair? :size
+		; xy/x > size/x
+	; ][
+		; xy/y: xy/y + to integer! xy/x - 1 / size/x
+		; xy/x: xy/x - 1 % size/x + 1
+	; ]
+	; xy
+; ]
+
+; #assert [
+	; 3x2 = fit-pair 3x2 none
+	; 3x2 = fit-pair 3x2 10x10
+	; 3x2 = fit-pair 3x2 3x3
+	; 3x2 = fit-pair 7x1 4x0
+	; 1x3 = fit-pair 3x2 2x3
+; ]

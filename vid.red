@@ -101,6 +101,16 @@ VID: context [
 					])
 				]
 			]
+			grid [
+				template: grid
+				facets:   [
+					pair!  bounds
+					block! !(func [block] [
+						;@@ hacky way to get access to current stylesheet.. any better idea?
+						lay-out-grid/styles block get bind 'sheet :lay-out-vids
+					]) 
+				]
+			]
 		];; styles
 		
 		for-each [name spec] styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111
@@ -200,14 +210,52 @@ VID: context [
 	;@@ not exactly solid design - rethink this! in case errors happen during VID evaluation it may be corrupted
 	focusing: make block! 20							;-- used internally to have a focusable path
 	
+	lay-out-grid: function [
+		"Turn Grid specification block into a facet block"
+		spec [block!] "Same as VID/S, with `as pair!` / `as range!` support"
+		/styles sheet [map! none!] "Add custom stylesheet to the global one"
+		/local x
+	][
+		code: make block! 20
+		xy:   1x1
+		step: 1x0
+		
+		=at-expr=: [s: e: (set/any 'x do/next s 'e) :e]
+		=at=: [
+			ahead word! 'at =at-expr=
+			(case [
+				pair? :x [xy: x]
+				all [range? :x  pair? x/min  pair? x/max] [
+					repend code ['set-span  xy: x/min  x/max + 1 - xy]
+				]
+				'else [ERROR "Expected pair or range of pairs after 'at' keyword, got (type? :x) at (mold/part s 100)"]
+			])
+		]
+		=batch=: [
+			opt =at=
+			s: to [ahead word! ['at | 'return | 'across | 'below] | end] e: (	;-- lay out part between keywords
+				names: lay-out-vids/styles copy/part s e sheet
+				foreach name names [
+					repend code ['put 'cell-map xy to lit-word! name]
+					xy: xy + step
+				]
+			)
+		]
+		=return=: [ahead word! 'return (xy: 1 + multiply xy reverse step)]
+		=across=: [ahead word! 'across (step: 1x0)]
+		=below=:  [ahead word! 'below  (step: 0x1)]
+		parse spec [any [=return= | =across= | =below= | =batch=]]
+		code
+	]
+	
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
 		spec [block!]	;@@ document DSL, leave a link here
-		/styles sheet [map!] "Add custom stylesheet to the global one"
+		/styles sheet [map! none!] "Add custom stylesheet to the global one"
 		/local w b x lo hi late?
 	][
 		pane: make block! 8
-		unless styles [sheet: make map! 4] 
+		sheet: any [sheet make map! 4] 
 		def: construct [								;-- accumulated single style definition
 			styling?:										;-- used when defining a new style in VID
 			template: 										;-- should not end in `=` (but not checked)
