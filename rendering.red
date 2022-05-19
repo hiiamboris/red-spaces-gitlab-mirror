@@ -94,11 +94,15 @@ context [
 				reverse append append slot head path host/space
 			]
 			'else [
+				append invalidation-stack space			;-- defence from cycles ;@@ rename since it's also used here?
 				foreach [parent child-name] parents [
 					change path child-name
-					paths-continue* parent host next path result
+					unless find/same invalidation-stack parent [
+						paths-continue* parent host next path result
+					]
 				]
 				remove path
+				remove top invalidation-stack
 			]
 		]
 	]
