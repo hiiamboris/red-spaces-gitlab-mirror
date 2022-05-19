@@ -365,7 +365,12 @@ VID: context [
 		;; I decided to make a special case because color is in principle applicable to all templates
 		;; and adding it into every VID/S style would be tedious, plus raw templates won't support it otherwise
 		;@@ should there be two colors (fg/bg)? (this may complicate styles a lot)
-		=color=:      [set w word! if (tuple? get/any w) (repend def/facets ['color get w])]
+		=color=:      [
+			[	set w word! if (tuple? get/any w) (x: get w)
+			|	set w issue! if (x: hex-to-rgb w)
+			]
+			(repend def/facets ['color x])
+		]
 		
 		;@@ rename item-list to content to generalize it
 		=pane=:       [set b block! (
