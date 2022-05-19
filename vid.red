@@ -22,7 +22,6 @@ VID: context [
 		; ]
 	; ]
 	
-	;@@ add actors!
 	;@@ add grids somehow
 	
 	#local [
@@ -44,7 +43,7 @@ VID: context [
 		]]
 		
 		;; specifications for VID/S styles available in `lay-out-vids`
-		styles: make map! [
+		styles: make map! reshape [
 			hlist [
 				template: list
 				spec:     [#spacious axis: 'x]
@@ -93,7 +92,13 @@ VID: context [
 					integer! rate
 					float!   rate
 					time!    rate
-					; block!   ;@@ should be an actor
+					block!   !(func [block] [
+						compose/deep/only [
+							actors: object [
+								on-time: function [space path event delay] (block)
+							]
+						]
+					])
 				]
 			]
 		];; styles
@@ -226,7 +231,9 @@ VID: context [
 			]
 			unless empty? def/actors [
 				append facets compose/only [
-					actors: construct (to [] def/actors)
+					actors: either object? :actors			;-- allows block! facet to define an actor too
+						[construct/with (to [] def/actors) actors]
+						[construct      (to [] def/actors)]
 				]
 			]
 			space-spec: compose [
@@ -359,7 +366,7 @@ VID: context [
 		=auto-facet=: [
 			set x any-type!											;-- try to match by value type
 			if (attempt [facet: select def/style/facets type?/word :x])	;@@ REP #113
-			(repend def/facets [facet :x])
+			(repend def/facets pick [[none facet :x] [facet :x]] function? :facet) 
 		]
 		
 		;; I decided to make a special case because color is in principle applicable to all templates
