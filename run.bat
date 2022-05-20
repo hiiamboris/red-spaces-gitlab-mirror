@@ -1,1 +1,1 @@
-red --cli console.red %*
+red console.red %*
