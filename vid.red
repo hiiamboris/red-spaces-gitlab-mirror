@@ -195,15 +195,14 @@ VID: context [
 		/wrap "How to lay text out: as a line (false) or paragraph (true)"
 	][
 		result: map-each value data [wrap-value :value wrap]
-		either only [
-			result
-		][
-			make-space 'tube [
+		unless only [
+			result: make-space 'tube [
 				margin:  0x0							;-- outer space most likely has it's own margin
 				spacing: 10x10
 				content: result
 			]
 		]
+		result
 	]
 	
 	
@@ -279,7 +278,7 @@ VID: context [
 			]
 			unless empty? def/actors [
 				append facets compose/only [
-					actors: either object? :actors			;-- allows block! facet to define an actor too
+					actors: either object? :actors		;-- allows block! facet to define an actor too
 						[construct/with (to [] def/actors) actors]
 						[construct      (to [] def/actors)]
 				]
@@ -290,7 +289,7 @@ VID: context [
 				(facets)
 			]
 			
-			either def/styling? [								;-- new style defined
+			either def/styling? [						;-- new style defined
 				new-style: copy/deep def/style
 				either new-style/spec [
 					new-style/spec: copy/deep space-spec

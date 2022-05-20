@@ -1465,7 +1465,7 @@ grid-ctx: context [
 		spans:   make map! []				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 											;@@ make spans a picker too?? or pointless for infinite data anyway
 		widths:  make map! [default 100]	;-- number of column/row -> it's width/height
-		heights: make map! [default 100]	;-- height can be 'auto (row is auto sized)
+		heights: make map! [default auto]	;-- height can be 'auto (row is auto sized) or integer (px)
 		origin:  0x0						;-- offset of non-pinned cells from 0x0 (negative = to the left and above) (alternatively: offset of pinned cells over non-pinned, but negated)
 		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
 		bounds:  [x: auto y: auto]			;-- max number of rows & cols, auto=bound `cells`, integer=fixed

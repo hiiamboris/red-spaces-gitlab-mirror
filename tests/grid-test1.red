@@ -16,7 +16,7 @@ view/no-wait/options [
 			at 1x2 button "button1"
 			; at 3x3 stretch 80x80
 			at 3x1 button "button2"
-		] with [heights/default: 'auto]
+		]
 	]
 	on-over [
 		status/text: form hittest face/space event/offset

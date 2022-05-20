@@ -20,6 +20,7 @@ view/no-wait/options [
 			grid/set-span 1x1 2x1
 			grid/set-span/force 2x2 3x2
 			; set-span/force 1x1 1x3
+			grid/heights/default: 100
 			grid/heights/2: 200
 			; grid/widths/default: 300
 			; grid/heights/default: 300
