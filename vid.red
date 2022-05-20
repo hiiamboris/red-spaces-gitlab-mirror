@@ -304,18 +304,21 @@ VID: context [
 				
 				append focusing name					;@@ BUG: not cleared on error
 				if def/pane [
-					content: lay-out-vids/styles def/pane sheet
-					; either block? 
 					unless in space 'content [
 						ERROR "Style (def/template) cannot contain other spaces"
 					]
-					space/content: either any-list? space/content [		;-- always trigger on-change just in case
-						content
-					][
-						if 1 < n: length? content [
-							ERROR "Style (def/template) can only contain a single space, given (n)"
+					content: lay-out-vids/styles def/pane sheet
+					space/content: case [				;-- always trigger on-change just in case
+						any-list? :space/content [content]
+						immediate? :space/content [
+							if 1 < n: length? content [
+								ERROR "Style (def/template) can only contain a single space, given (n)"
+							]
+							content/1					;-- can be none if no items
 						]
-						content/1						;-- can be none if no items
+						'else [							;-- e.g. content is a map in grid
+							ERROR "Style (def/template) requires custom content filling function"
+						]
 					]
 				]
 				if def/focused? [focus-space focusing]
