@@ -5,9 +5,7 @@ Red [
 	needs:   view
 ]
 
-; recycle/off
-change-dir %..
-do %everything.red
+#include %../everything.red
 
 append spaces/keyboard/focusable 'grid-view
 ;@@ use (wrapped) data!

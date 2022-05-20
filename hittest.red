@@ -8,18 +8,28 @@ Red [
 
 exports: [hittest]
 
-into-map: function [map [block!] xy [pair!] name [none! word!]] [
+into-map: function [
+	map [block!] xy [pair!] name [none! word!]
+	/only names [block!] "Only try to enter selected space names"
+][
 	either name [
 		#assert [find map name]
 		reduce [name  xy - map/:name/offset]
 	][
-		foreach [name box] map [
-			; #assert [box/offset]
-			; #assert [box/size]
-			; #assert [xy]
-			if within? xy o: box/offset box/size [
-				space: get name
-				return reduce [name  xy - o]
+		either names [
+			foreach name names [
+				box: select map name
+				if within? xy o: box/offset box/size [
+					space: get name
+					return reduce [name  xy - o]
+				]
+			]
+		][
+			foreach [name box] map [
+				if within? xy o: box/offset box/size [
+					space: get name
+					return reduce [name  xy - o]
+				]
 			]
 		]
 		none

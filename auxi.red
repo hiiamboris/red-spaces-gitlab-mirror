@@ -146,6 +146,8 @@ only: function [
 	any [:value ()]
 ]
 
+area?: func [xy [pair!]] [xy/x * xy/y]
+
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
 clip: func [range [block!] value [scalar!]] [
 	range: reduce/into range clear []
