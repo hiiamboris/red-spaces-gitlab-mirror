@@ -199,9 +199,9 @@ VID: context [
 			result
 		][
 			make-space 'tube [
-				margin:    0x0							;-- outer space most likely has it's own margin
-				spacing:   10x10
-				item-list: result
+				margin:  0x0							;-- outer space most likely has it's own margin
+				spacing: 10x10
+				content: result
 			]
 		]
 	]
@@ -303,18 +303,19 @@ VID: context [
 				if def/link [set def/link space]
 				
 				append focusing name					;@@ BUG: not cleared on error
-				if def/pane [	;@@ remove item-list
+				if def/pane [
 					content: lay-out-vids/styles def/pane sheet
 					; either block? 
-					case [
-						in space 'content [
-							if 1 < n: length? content [
-								ERROR "Style (def/template) can only contain a single space, given (n)"
-							]
-							if n = 1 [space/content: content/1]
+					unless in space 'content [
+						ERROR "Style (def/template) cannot contain other spaces"
+					]
+					space/content: either any-list? space/content [		;-- always trigger on-change just in case
+						content
+					][
+						if 1 < n: length? content [
+							ERROR "Style (def/template) can only contain a single space, given (n)"
 						]
-						in space 'item-list [append space/item-list content]
-						'else [ERROR "Style (def/template) cannot contain other spaces"]
+						content/1						;-- can be none if no items
 					]
 				]
 				if def/focused? [focus-space focusing]
@@ -427,7 +428,6 @@ VID: context [
 			(repend def/facets ['color x])
 		]
 		
-		;@@ rename item-list to content to generalize it
 		=pane=:       [set b block! (
 			if def/styling? [ERROR "Panes are not supported in style definitions yet"]
 			def/pane: b

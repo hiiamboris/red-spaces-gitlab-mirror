@@ -121,7 +121,7 @@ do with [
 		
 		label [(
 			if spaces/image-box/content = 'sigil [
-				spaces/sigil/font: either (spaces/body/item-list/2) = 'comment [
+				spaces/sigil/font: either (spaces/body/content/2) = 'comment [
 					spaces/sigil/limits/min: 32
 					fonts/sigil-big
 				][

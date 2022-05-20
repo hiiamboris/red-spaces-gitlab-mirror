@@ -359,7 +359,7 @@ context [
 					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]
 				]
 			][
-				; if name = 'list [print ["canvas:" canvas mold space/item-list]]
+				; if name = 'list [print ["canvas:" canvas mold space/content]]
 				#debug profile [prof/manual/start name]
 				enter-space space name					;-- mark parent/child relations
 				

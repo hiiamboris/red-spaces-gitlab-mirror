@@ -60,7 +60,7 @@ tubes: collect [
 			cell none .. 170x200 [
 				vlist [
 					heading data= !(#composite "axes: (mold axes)")
-					tube with [spacing: 5x5 axes: !(axes) width: 130 item-list: boxes]
+					tube with [spacing: 5x5 axes: !(axes) width: 130 content: boxes]
 				]
 			]
 			; space with [size: 1x30]		/if even? i		;-- delimiter

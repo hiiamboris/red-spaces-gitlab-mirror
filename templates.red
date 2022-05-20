@@ -714,16 +714,16 @@ container-ctx: context [
 	]
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [items item-list origin] to word! word [invalidate-cache space]
+		if find [items content origin] to word! word [invalidate-cache space]
 		space/space-on-change word :old :new
 	]
 
 	templates/container: make-template 'space [
-		size:      none									;-- only available after `draw` because it applies styles
-		origin:    0x0									;-- used by ring layout to center itself around the pointer
-		item-list: []
+		size:    none									;-- only available after `draw` because it applies styles
+		origin:  0x0									;-- used by ring layout to center itself around the pointer
+		content: []
 		items: function [/pick i [integer!] /size] [
-			either pick [item-list/:i][length? item-list]
+			either pick [content/:i][length? content]
 		]
 		map: []
 		into: func [xy [pair!] /force name [word! none!]] [
@@ -829,7 +829,7 @@ icon-ctx: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
 			box:   make-space 'box [content: 'text]	;-- used to align paragraph
-			set 'item-list [image box]
+			set 'content [image box]
 		]
 		
 		list-on-change: :on-change*
@@ -931,7 +931,7 @@ label-ctx: context [
 					spaces/text/text: label/text
 					'text
 				]
-				spaces/body/item-list: spaces/lists/:type	;-- invalidated by container
+				spaces/body/content: spaces/lists/:type	;-- invalidated by container
 			]
 			flags [
 				spaces/text/flags: spaces/comment/flags: label/flags
@@ -954,10 +954,10 @@ label-ctx: context [
 			image-box:  make-space 'box  [content: in generic 'empty]	;-- needed for centering the image/sigil
 			text:       make-space 'text []						;-- 1st line of text
 			comment:    make-space 'text []						;-- lines after the 1st
-			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  item-list: [text comment]]
+			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  content: [text comment]]
 			text-box:   make-space 'box  [content: 'body]		;-- needed for text centering
 			lists: [text: [text] comment: [text comment]]		;-- used to avoid extra bind in on-change
-			set 'item-list [image-box text-box]
+			set 'content [image-box text-box]
 		]
 		
 		list-on-change: :on-change*

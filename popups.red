@@ -213,7 +213,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 			find row* 'stretch
 			insert pos in generic '<->
 		]
-		tube/item-list: flush row*
+		tube/content: flush row*
 	]
 	parse spec =menu=
 	
@@ -221,7 +221,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 		make-space name: 'ring []
 	][	make-space name: 'list [axis: 'y margin: 4x4]
 	]
-	list/item-list: flush menu*
+	list/content: flush menu*
 	layout: anonymize 'menu make-space 'cell [
 		content: anonymize name list
 	]

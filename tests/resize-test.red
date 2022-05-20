@@ -132,7 +132,7 @@ icons: map-each/eval [name easefn] to [] easings [
 adjust-limits: function [width] [
 	for-each [low limit | high] layouts [
 		unless all [low <= width width < high] [continue]
-		tubes: reduce triplets-row/item-list
+		tubes: reduce triplets-row/content
 		foreach tube tubes [
 			if tube/limits/min <> limit [
 				tube/limits/min: limit

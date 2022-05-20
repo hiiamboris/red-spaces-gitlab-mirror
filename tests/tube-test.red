@@ -54,7 +54,7 @@ tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
 	keep [
 		style vlist: vlist margin= 5x5 spacing= 5x5
-		style tube:  tube  margin= 5x5 spacing= 5x5 width= 130 item-list= boxes
+		style tube:  tube  margin= 5x5 spacing= 5x5 width= 130 content= boxes
 	]
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
 		if i > 1 [keep [<-> 1x30]]		;-- delimiter

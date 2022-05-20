@@ -6,7 +6,7 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 	axis: 'y							;) lists can be horizontal(x) or vertical(y)
 	margin: spacing: 10x10				;) list is tight by default, this makes it spacious
 
-	item-list: reduce [					;) item-list is a block of NAMES of spaces
+	content: reduce [					;) content is a block of NAMES of spaces
 
 		make-space/name 'text [			;) each make-space/name returns a name referring to an object
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
