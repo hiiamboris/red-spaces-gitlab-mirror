@@ -63,9 +63,6 @@ view/no-wait/options [
 				size: 500x300
 				; grid/pinned: 2x1
 				; grid/bounds: [x: #[none] y: #[none]]
-				; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
-				; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
-				; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]
 				grid/set-span 6x1 1x5					;-- unify outside cells for more fps
 				grid/set-span 1x6 6x1
 				; grid/set-span 4x4 2x2

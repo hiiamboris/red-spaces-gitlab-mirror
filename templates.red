@@ -1460,7 +1460,7 @@ grid-ctx: context [
 		size:    none				;-- only available after `draw` because it applies styles
 		margin:  5x5
 		spacing: 5x5
-		cell-map: make map! []				;-- XY coordinate -> space-name  ;@@ TODO: maybe rename to `pane`?
+		content: make map! []				;-- XY coordinate -> space-name  ;@@ TODO: maybe rename to `pane`?
 											;@@ or `cmap` for brevity?
 		spans:   make map! []				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 											;@@ make spans a picker too?? or pointless for infinite data anyway
@@ -1491,7 +1491,7 @@ grid-ctx: context [
 		]
 
 		cells: func [/pick xy [pair!] /size] [				;-- up to user to override
-			either pick [cell-map/:xy][calc-bounds]
+			either pick [content/:xy][calc-bounds]
 		]
 
 		calc-bounds: function [] [
@@ -1501,11 +1501,11 @@ grid-ctx: context [
 				return bounds
 			]
 			lim: copy bounds
-			xymax: either empty? cell-map [
+			xymax: either empty? content [
 				0x0
 			][
 				remove find xys: keys-of spans 'default		;-- if `spans` is correct, it contains the lowest rightmost multicell coordinate
-				append xys keys-of cell-map
+				append xys keys-of content
 				second minmax-of xys
 			]
 			if 'auto = lim/x [lim/x: xymax/x]
@@ -2009,8 +2009,8 @@ grid-view-ctx: context [
 		grid/cells: func [/pick xy [pair!] /size] [
 			either pick [
 				any [
-					grid/cell-map/:xy					;@@ need to think when to free this up, maybe when cells get hidden
-					grid/cell-map/:xy: wrap-data xy data/pick xy
+					grid/content/:xy					;@@ need to think when to free this up, maybe when cells get hidden
+					grid/content/:xy: wrap-data xy data/pick xy
 				]
 			][data/size]
 		]

@@ -38,9 +38,6 @@ view/no-wait/options [
 			; cache?: grid/cache?: window/cache?: spaces/templates/cell/cache?: off
 			; grid/pinned: 2x1
 			; grid/bounds: [x: #[none] y: #[none]]
-			; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
-			; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
-			; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]
 			grid/set-span 1x1 3x1
 			grid/set-span 1x2 2x1
 			grid/set-span 4x4 2x1

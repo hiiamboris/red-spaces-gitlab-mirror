@@ -29,13 +29,6 @@ view/no-wait/options [
 			size: 500x300
 			; grid/pinned: 2x1
 			; grid/bounds: [x: #[none] y: #[none]]
-			; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
-			; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
-			; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]
-			; grid/set-span 1x1 2x2
-			; grid/set-span 4x4 2x2
-			; grid/set-span/force 2x2 3x2
-			; set-span/force 1x1 1x3
 			; cell-size: 200x150
 			ratio: 1.2
 			cell-size: size - 5 / ratio - 5		;-- considers margins/spacing

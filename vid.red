@@ -236,7 +236,7 @@ VID: context [
 			s: to [ahead word! ['at | 'return | 'across | 'below] | end] e: (	;-- lay out part between keywords
 				names: lay-out-vids/styles copy/part s e sheet
 				foreach name names [
-					repend code ['put 'cell-map xy to lit-word! name]
+					repend code ['put 'content xy to lit-word! name]
 					xy: xy + step
 				]
 			)

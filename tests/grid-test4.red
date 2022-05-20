@@ -20,9 +20,9 @@ view/no-wait/options [
 		grid-view size= 1000x500 with [
 			grid/pinned: 2x1
 			grid/bounds: [x: #[none] y: #[none]]
-			; grid/cell-map/(1x2): make-space/name 'button [data: "button1"]
-			; grid/cell-map/(2x2): make-space/name 'button  [size: 80x80]
-			; grid/cell-map/(1x1): make-space/name 'button [data: "button2"]
+			; grid/content/(1x2): make-space/name 'button [data: "button1"]
+			; grid/content/(2x2): make-space/name 'button  [size: 80x80]
+			; grid/content/(1x1): make-space/name 'button [data: "button2"]
 			data: func [/pick xy /size] [
 				either pick [xy][[x: #[none] y: #[none]]]
 			]
