@@ -645,9 +645,6 @@ paragraph-ctx: context [
 
 	;; unlike paragraph, text is never wrapped
 	templates/text: make-template 'paragraph [
-		;@@ see note above about #5139 - but this cached because it doesn't wrap
-		cache?: on 
-		
 		weight: 0
 		draw: does [~/draw self infxinf]
 	]
