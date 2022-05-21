@@ -269,8 +269,8 @@ cell-ctx: context [
 		]												;-- no canvas = no alignment, minimal appearance
 		space/size: constrain size space/limits
 		
-		free:   space/size - cspace/size
-		offset: max 0x0 free * (space/align + 1) / 2
+		free:   space/size - cspace/size - (2x2 * space/margin)
+		offset: space/margin + max 0x0 free * (space/align + 1) / 2
 		unless tail? drawn [
 			drawn: compose/only [translate (offset) (drawn)]
 			; drawn: compose/only [clip 0x0 (space/size) translate (offset) (drawn)]
@@ -566,32 +566,29 @@ paragraph-ctx: context [
 	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
-		unless space/layout [space/layout: rtd-layout [""]]
-		layout: space/layout
-		layout/text: as string! space/text
-		layout/font: space/font						;@@ careful: fonts are not collected by GC, may run out of them easily
-		layout/data: any [layout/data make block! 4]	;-- support of font styles - affects width
-		clear change change layout/data (1 by length? space/text) space/flags
+		;; rtd-layout is slow! about 200 times slower than object creation
+		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
+		layout: any [space/layouts/:width  space/layouts/:width: rtd-layout [""]]
+		flags:  compose [(1 by length? space/text) (space/flags)]
+		quietly layout/text: as string! space/text
+		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
+		quietly layout/data: flags						;-- support of font styles - affects width
 		
-		either width [									;-- wrap
-			layout/size: (max 1 width - (2 * space/margin/x)) by 2e9	;-- width has to be set to determine height
-			#assert [0 < layout/size/x]						;@@ crashes on 0 - see #4897
-		][												;-- no wrap
-			layout/size: none
+		quietly layout/size: if width [					;-- wrap canvas, or none (no-wrap)
+			(max 1 width - (2 * space/margin/x)) by infxinf/y	;-- width has to be set to determine height
 		]
 		;; NOTE: #4783 to keep in mind
-		layout/extra: size-text layout					;-- 'size-text' is slow, has to be cached (by using on-change)
+		quietly layout/extra: size-text layout			;-- 'size-text' is slow, has to be cached (by using on-change)
+		quietly space/layout: layout
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
-		layout: space/layout
-		
+		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
 		new-width: either canvas [canvas/x][0]
-		if any [												;-- redraw if:
-			none = layout										;-- some facet changed
-			old-width <> new-width								;-- canvas width changed
-		] [lay-out space new-width]
+		unless all [layout old-width = new-width] [				;-- redraw if: some facet / canvas width changed
+			lay-out space new-width
+		]
 		
 		;; size can be adjusted in various ways:
 		;;  - if rendered < canvas, we can report either canvas or rendered
@@ -601,7 +598,7 @@ paragraph-ctx: context [
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
 		text-size: constrain space/layout/extra space/limits	;-- don't make it narrower than min limit
-		maybe space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
+		quietly space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
 		;; so when layout/text is changed, we don't need to call `draw`
@@ -610,16 +607,16 @@ paragraph-ctx: context [
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
 		compose [text (1x1 * space/margin) (space/layout)]
-		; compose [text (1x1 * space/margin) (copy/deep space/layout)]	;@@ #5139 doesn't let me do this
 	]
 
+	watched: make hash! [text font margin flags weight color]	;@@ maybe put color change into space-object?
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		if all [
-			find [text font margin flags weight color] to word! word	;@@ maybe put color change into space-object?
+			find watched word
 			not :old =? :new
 		][
 			invalidate-cache space
-			space/layout: none							;-- will be laid out on next `draw`
+			quietly space/layout: none					;-- will be laid out on next `draw`
 		]
 		space/space-on-change word :old :new
 	]
@@ -637,12 +634,10 @@ paragraph-ctx: context [
 		;@@ maybe wrap should be a flag too?
 		flags:  []										;-- [bold italic underline] supported
 		weight: 1
-		;@@ cannot be cached or shared because any layout object changes under the draw block
-		;@@ it must be copied ideally, but #5139 prevents that
-		cache?: off
 
-		layout: none									;-- internal, text size is kept in layout/extra
-		; cache?: true
+		;; this is required because rich-text object is shared and every change propagates onto the draw block 
+		layouts: make map! 10							;-- map of width -> rich-text object
+		layout:  none									;-- last chosen layout, text size is kept in layout/extra
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		space-on-change: :on-change*
 		#on-change-redirect
@@ -1044,13 +1039,11 @@ window-ctx: context [
 		o:  geom/offset
 		;; there's no size for infinite spaces so we use `available?` to get the drawing size
 		s:  window/max-size
-		o': window/cached-offset						;-- geom/offset during previous draw
-		if o <> o' [									;-- don't resize window unless it was moved
-			foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
-			window/size: s								;-- limit window size by content size (so we don't scroll over)
-			#debug list-view [#print "window resized to (s)"]
-			set-quiet in window 'cached-offset o
-		]
+		;; safer to call available? every time because window never knows if content size will change
+		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
+		foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
+		window/size: s								;-- limit window size by content size (so we don't scroll over)
+		#debug list-view [#print "window resized to (s)"]
 		default xy1: 0x0
 		default xy2: s
 		geom/size: xy2 - o								;-- enough to cover the visible area
@@ -1086,7 +1079,6 @@ window-ctx: context [
 			~/available? content axis dir from requested
 		]
 	
-		cached-offset: none
 		draw: func [/only xy1 [pair!] xy2 [pair!]] [
 			~/draw self xy1 xy2
 		]
@@ -1497,47 +1489,47 @@ grid-ctx: context [
 		lim
 	]
 
-	break-cell: function [first [pair!]] [
-		if 1x1 <> span: grid/get-span first [
+	break-cell: function [cell1 [pair!]] [
+		if 1x1 <> span: grid/get-span cell1 [
 			#assert [1x1 +<= span]						;-- ensure it's a first cell of multicell
 			xyloop xy span [							;@@ should be for-each
-				remove/key grid/spans xy': first + xy - 1x1
+				remove/key grid/spans xy': cell1 + xy - 1x1
 				;@@ invalidate content within ccache?
 			]
 		]
 	]
 
-	unify-cells: function ["Mark cell range as spanned" grid [object!] first [pair!] span [pair!]] [
-		if 1x1 <> old: grid/get-span first [
+	unify-cells: function ["Mark cell range as spanned" grid [object!] cell1 [pair!] span [pair!]] [
+		if 1x1 <> old: grid/get-span cell1 [
 			if old +< 1x1 [
-				ERROR "Cell (first + old) should be broken before (first)"	;@@ or break silently? probably unexpected move..
+				ERROR "Cell (cell1 + old) should be broken before (cell1)"	;@@ or break silently? probably unexpected move..
 			]
-			grid/break-cell first
+			grid/break-cell cell1
 		]
 		xyloop xy span [								;@@ should be for-each
-			#assert [1x1 = grid/get-span first + xy - 1x1]
-			grid/spans/(first + xy - 1x1): 1x1 - xy
+			#assert [1x1 = grid/get-span cell1 + xy - 1x1]
+			grid/spans/(cell1 + xy - 1x1): 1x1 - xy
 			;@@ invalidate content within ccache?
 		]
-		grid/spans/:first: span
+		grid/spans/:cell1: span
 	]
 	
-	set-span: function [grid [object!] first [pair!] span [pair!] /force] [
-		if span = grid/get-span first [exit]
+	set-span: function [grid [object!] cell1 [pair!] span [pair!] /force] [
+		if span = grid/get-span cell1 [exit]
 		#assert [1x1 +<= span]						;-- forbid setting to span to non-positives
 		xyloop xy span [							;-- break all multicells within the area
-			cell: first + xy - 1
+			cell: cell1 + xy - 1
 			old-span: grid/get-span cell
 			if old-span <> 1x1 [
 				all [
 					not force
-					any [cell <> first  1x1 +<= old-span]	;-- only `first` is broken silently if it's a multicell
-					ERROR "Cell (first + old-span) should be broken before (first)"
+					any [cell <> cell1  1x1 +<= old-span]	;-- only `cell1` is broken silently if it's a multicell
+					ERROR "Cell (cell1 + old-span) should be broken before (cell1)"
 				]
 				grid/break-cell cell + min 0x0 old-span
 			]
 		]
-		unify-cells grid first span
+		unify-cells grid cell1 span
 	]
 
 	get-offset-from: function [grid [object!] c1 [pair!] c2 [pair!]] [
@@ -1667,6 +1659,7 @@ grid-ctx: context [
 
 	row-height?: function [grid [object!] y [integer!]][
 		if 'auto = r: any [grid/heights/:y grid/heights/default] [
+			; r: calc-row-height grid y ;@@@@@
 			r: any [grid/hcache/:y  grid/hcache/:y: calc-row-height grid y]
 		]
 		r
@@ -1685,12 +1678,13 @@ grid-ctx: context [
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
 		hmin: append clear [] grid/min-row-height
 		for x: 1 xlim [
+			canvas: as-pair grid/col-width? x infxinf/y
 			span: grid/get-span xy: as-pair x y
 			if span/x < 0 [continue]					;-- skip cells of negative x span (counted at span = 0 or more)
-			first: grid/get-first-cell xy
+			cell1: grid/get-first-cell xy
 			height1: 0
-			if content: grid/cells/pick first [
-				render grid/wrap-space first content	;-- render to get the size
+			if content: grid/cells/pick cell1 [
+				render/on grid/wrap-space cell1 content canvas	;-- render to get the size
 				cspace: get content
 				height1: cspace/size/y
 			]
@@ -1699,8 +1693,8 @@ grid-ctx: context [
 					#assert [0 < span/x]
 					append hmin height1
 				]
-				span/y + y = first/y [					;-- multi-cell vertically ends after this row
-					for y2: first/y y - 1 [
+				span/y + y = cell1/y [					;-- multi-cell vertically ends after this row
+					for y2: cell1/y y - 1 [
 						height1: height1 - grid/spacing/y - grid/row-height? y2
 					]
 					append hmin height1
@@ -1712,14 +1706,24 @@ grid-ctx: context [
 		second minmax-of hmin							;-- choose biggest of constraints
 	]
 
-	cell-size?: function [grid [object!] xy [pair!]] [
+	;; unlike `cell-height?` this does nothing complex, just sums widths, does not require cached row height
+	cell-width?: function [grid [object!] xy [pair!]] [
 		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
-		#assert [grid/draw-ctx/ccache/:xy]		;-- cell should be rendered already (for row-heights to return immediately)
-		span: grid/get-span xy
-		size: 0x0
-		repeat x span/x [size/x: size/x + grid/col-width?  x - 1 + xy/x]
-		repeat y span/y [size/y: size/y + grid/row-height? y - 1 + xy/y]
-		size + (span - 1 * grid/spacing)
+		xspan: first grid/get-span xy
+		r: 0 repeat x xspan [r: r + grid/col-width? x - 1 + xy/x]
+		r + (xspan - 1 * grid/spacing/x)
+	]
+		
+	cell-height?: function [grid [object!] xy [pair!]] [
+		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
+		#assert [grid/ccache/:xy]				;-- cell should be rendered already (for row-heights to return immediately)
+		yspan: second grid/get-span xy
+		r: 0 repeat y yspan [r: r + grid/row-height? y - 1 + xy/y]
+		r + (yspan - 1 * grid/spacing/y)
+	]
+		
+	cell-size?: function [grid [object!] xy [pair!]] [
+		as-pair  cell-width? grid xy  cell-height? grid xy 
 	]
 		
 	calc-size: function [grid [object!]] [
@@ -1752,17 +1756,20 @@ grid-ctx: context [
 			]
 
 			mcell: grid/get-first-cell cell				;-- row/col of multicell this cell belongs to
-			unless mcell-name: grid/cells/pick mcell [continue]	;-- cell is not defined? skip the draw
-			if done/:mcell [continue]					;-- skip mcells that were drawn for this group
+			if any [
+				done/:mcell								;-- skip mcells that were drawn for this group
+				not content-name: grid/cells/pick mcell		;-- cell is not defined? skip the draw
+			] [continue]
 			done/:mcell: true							;-- mark it as drawn
 			
 			pinned?: grid/is-cell-pinned? cell
 			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
 			
-			render mcname: grid/wrap-space mcell mcell-name	;-- render content to get it's size - in case it was invalidated
-			mcspace: get mcname
-			mcsize: grid/cell-size? mcell				;-- size of all rows/cols it spans = canvas size
+			mcspace: get mcname: grid/wrap-space mcell content-name
+			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
+			render/on mcname canvas						;-- render content to get it's size - in case it was invalidated
+			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			mcdraw: render/on mcname mcsize				;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			compose/deep/into [							;-- map may contain the same space if it's both pinned & normal
@@ -1782,7 +1789,7 @@ grid-ctx: context [
 
 		dc: grid/draw-ctx
 		;@@ TODO: only clear dc & map for the outermost draw (in case grid contains itself)
-		dc/cleanup
+		set dc none
 
 		dc/bounds: grid/cells/size						;-- may call calc-size to estimate number of cells
 		#assert [dc/bounds]
@@ -1837,7 +1844,62 @@ grid-ctx: context [
 			clip !(xy1)       !(xy2)            !(drawn-normal)
 		]
 	]
-
+	
+	;; this should not use hcache, or it will have to be cleared all the time
+	col-height?: function [grid [object!] col [integer!] width [integer! float!] rows [integer!]] [	;-- used by autofit only
+		r: 0
+		canvas: width by infxinf/y
+		repeat i rows [
+			xy: col by i
+			h: any [grid/heights/:i grid/heights/default]		;-- row may be fixed
+			unless integer? h [
+				space: get name: any [grid/ccache/:xy  grid/wrap-space xy grid/cells/pick xy]
+				render/on name canvas
+				h: space/size/y
+			]
+			r: r + h									;-- does not use any spacing or margins
+		]
+		r
+	]
+	
+	;; stochastic content-agnostic column width fitter
+	autofit: function [
+		"Automatically adjust GRID column widths for best look"
+		grid  [object!]
+		width [integer!] "Total grid width to fit into"
+	][
+		#assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
+		;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
+		bounds: grid/cells/size
+		nx: bounds/x  ny: bounds/y
+		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
+		widths: append/dup make [] nx width / nx nx		;-- starting point - uniform
+		min-width: 5									;@@ make it configurable?
+		precision: 10									;-- limit when to stop adjusting
+		h2: col-height? grid 1 widths/1 ny
+		loop 10 [										;-- prevent deadlocks
+			adjustment: 0
+			for x: 2 nx [
+				w1: widths/(x - 1)  w2: widths/:x
+				h1: h2  h2: col-height? grid x w2 ny
+				if h1 = h2 [continue]						;-- balance - don't touch this time
+				dh: min 50% 100% * (h2 - h1) / (1 + min h1 h2)
+				dw: dh * min w1 w2
+				new-h1: col-height? grid x - 1 w1: w1 - dw ny
+				new-h2: col-height? grid x     w2: w2 + dw ny
+				print [h1 h2 '-> new-h1 new-h2]
+				if (max new-h1 new-h2) < max h1 h2 [	;@@ maybe also smaller attempts?
+					h2: new-h2
+					widths/(x - 1): w1
+					widths/:x:      w2
+					adjustment: max adjustment abs dw
+				]
+			]
+			if adjustment <= precision [break]
+		]
+		repeat i nx [grid/widths/:i: to integer! widths/:i]
+		invalidate grid									;-- also clears hcache
+	]
 	
 	templates/grid: make-template 'space [
 		size:    none				;-- only available after `draw` because it applies styles
@@ -1857,6 +1919,7 @@ grid-ctx: context [
 		;@@ maybe heights/min ?
 		min-row-height: 0					;-- used in autosizing in case no other constraints apply; set to >0 to prevent rows of 0 size
 		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
+		ccache:  make map! 20				;-- cached `cell` spaces (persistency required by the focus model: cells must retain sameness)
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
@@ -1864,12 +1927,9 @@ grid-ctx: context [
 		map: []
 
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
-			name: any [
-				draw-ctx/ccache/:xy
-				draw-ctx/ccache/:xy: make-space/name 'cell []
-			]
+			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
 			cell: get name
-			unless cell/content =? space [cell/content: space]	;-- prevent unnecessary invalidation
+			maybe/same cell/content: space				;-- prevent unnecessary invalidation
 			name
 		]
 
@@ -1969,14 +2029,10 @@ grid-ctx: context [
 			~/calc-size self
 		]
 
-		;-- due to the number of parameters this space has,
-		;-- a special context is required to minimize the number of wasted calculations
-		;-- however a care should be taken so that grid can contain itself (draw has to be reentrant)
-		draw-ctx: context [
-			ccache: make map! []		;-- cached `cell` spaces (persistency required by the focus model: cells must retain sameness)
+		;; care should be taken so that grid can contain itself (draw has to be reentrant)
+		draw-ctx: context [								;-- used by draw & others to avoid extra recalculations
 			bounds: none
 			size:   none
-			cleanup: does [size: bounds: none]
 		]
 
 		;@@ need to think more about this.. I don't like it
@@ -1994,7 +2050,7 @@ grid-ctx: context [
 		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
 			switch to word! word [
 				;@@ TODO: think on what other words incur cache invalidation
-				cells [draw-ctx/cleanup]			;-- cache becomes invalid
+				cells [set draw-ctx none]
 			]
 		]
 	]
@@ -2015,15 +2071,20 @@ grid-view-ctx: context [
 	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 		#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
 		bounds: grid/bounds
-		#assert [bounds "data/size is none!"]
+		#assert [
+			bounds "data/size is none!"
+			from >= 0
+			requested >= 0
+		]
 		r: case [
 			dir < 0 [from]
 			bounds/:axis [
 				size: grid/calc-size					;@@ optimize calc-size?
-				size/:axis - from
+				max 0 size/:axis - from
 			]
 			'infinite [requested]
 		]
+		#assert [r >= 0]
 		r: clip [0 r] requested
 		#debug grid-view [#print "avail?/(axis) (dir) = (r) of (requested)"]
 		r
@@ -2065,10 +2126,10 @@ grid-view-ctx: context [
 		]
 
 		wrap-data: function [xy [pair!] item-data [any-type!]] [
-			spc: make-space 'data-view []
+			spc: make-space 'data-view [wrap?: on margin: 3x3 align: -1x0]
 			set/any 'spc/data :item-data
-			spc/width: (grid/col-width? xy/x) - (spc/margin/x * 2)
-			anonymize 'item spc
+			spc/width: (grid/col-width? xy/x) - (spc/margin/x * 2)	;@@ deal with width!
+			anonymize 'cell spc
 		]
 
 		window/content: 'grid
@@ -2076,6 +2137,9 @@ grid-view-ctx: context [
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 				~/available? self axis dir from requested
 			]
+			
+			;; no need to wrap data-view because it's already a box/cell
+			wrap-space: function [xy [pair!] space [word!]] [ccache/:xy: space]
 		]
 		
 		grid/cells: func [/pick xy [pair!] /size] [

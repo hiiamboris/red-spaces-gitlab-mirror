@@ -99,6 +99,21 @@ do with [
 			]
 		]
 		
+		grid/cell [										;-- has no frame since frame is drawn by grid itself
+			function [cell /on canvas] [
+				drawn: cell/draw/on canvas
+				color: select cell 'color
+				bgnd: compose/deep [
+					push [
+						pen off
+						(when color [compose [fill-pen (color)]])
+						box 0x0 (cell/size)
+					]
+				]
+				compose/only [(bgnd) (drawn)]
+			]
+		]
+		
 		
 		; list/item [[pen cyan]]
 		
@@ -114,7 +129,7 @@ do with [
 			]
 		]
 		logic  [(										;-- readonly
-			unless data/font =? fonts/switch [data/font: fonts/text]
+			maybe/same data/font: fonts/text
 			maybe data/data: either state ["✓"]["✗"]
 			()
 		)]
@@ -216,21 +231,6 @@ do with [
 				]
 			]
 		]
-		
-		; grid/cell [
-			; function [cell /on canvas] [
-				; drawn: cell/draw/on canvas				;-- draw to obtain the size ;@@ TODO
-				; drawn: cell/draw						;-- draw to obtain the size
-				; compose/only/deep [
-					; push [
-						; line-width 1
-						; fill-pen !(svmc/panel)
-						; box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
-					; ]
-					; (drawn)
-				; ]
-			; ]
-		; ]
 		
 		;@@ scrollbars should prefer host color
 		;@@ as stylesheet grows, need to automatically check for dupes and report!
