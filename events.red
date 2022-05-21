@@ -5,7 +5,7 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack), styles (to fix svmc/), error-macro.red, vid.red
+;-- requires auxi.red (make-free-list), styles (to fix svmc/), error-macro.red, vid.red
 
 
 ;-- event function that pushes events over to each space
@@ -35,7 +35,7 @@ context [
 
 
 events: context [
-	cache: copy/deep block-stack
+	cache: make-free-list block! [make [] 100]
 
 	on-time: none										;-- set by timers.red
 
@@ -131,7 +131,7 @@ events: context [
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
 		code: compose/into [handler space pcopy event (args) none] clear []
 		foreach handler list [
-			pcopy: cache/hold path						;-- copy in case user modifies/reduces it, preserve index
+			pcopy: clone path cache/get					;-- copy in case user modifies/reduces it, preserve index
 			trap/all/catch code [
 				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
 				kind: either map =? previewers ["previewer"]["finalizer"]
@@ -335,7 +335,7 @@ events: context [
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
 	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object!] args [block!]] [
-		space: get first path: cache/hold path			;-- copy in case user modifies/reduces it, preserve index
+		space: get first path: clone path cache/get			;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
 			msg: form/part thrown 400					;@@ should be formed immediately - see #4538

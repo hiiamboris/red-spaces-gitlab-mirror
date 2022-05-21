@@ -5,7 +5,7 @@ Red [
 ]
 
 
-;-- requires auxi.red (block-stack), export
+;-- requires auxi.red (make-free-list), export
 
 list-spaces:    none									;-- reserve names in the spaces/ctx context
 list-*aces:     none
@@ -109,7 +109,7 @@ traversal: context [
 
 
 context [
-	cache: copy/deep block-stack
+	cache: make-free-list block! [make [] 100]
 
 	;-- break & continue will work!
 	foreach*: function [					;-- tree iterator

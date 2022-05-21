@@ -60,7 +60,6 @@ context [
 	;@@ TODO: render-cache requires cleanup on highly dynamic layouts, or they slow down
 	;@@ will need a flat registry of still valid spaces
 	render-cache:   make hash! slots-index * 1024
-	; free-list:      make block-stack [type: hash! size: slots]
 	
 	#debug cache [space-names: make hash! 2048]			;-- used to get space objects names for debug output
 	

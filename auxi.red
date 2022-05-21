@@ -87,16 +87,28 @@ context [
 	]
 ]
 
-;; older (but faster) design - for blocks only - not sure if worth keeping
-;; main problem of it: doesn't care about length, may result in lots of reallocations
-block-stack: object [
-	size:  100
-	type:  block!
-	stack: []
-	get:   function [] [either tail? stack [make type size][p: top stack also :p/1 remove p]]	;@@ workaround for #5066
-	; get:   does [any [take/last stack  make [] size]]
-	put:   func [b [any-block!]] [append/only stack clear head b]
-	hold:  func [b [any-block!]] [at  append get head b  index? b]	;-- get refers to the function above
+;; main problem of this faster design: doesn't care about length, may result in lots of reallocations
+make-free-list: function [
+	"Create a free list of things with GET and PUT methods defined"
+	type [datatype!] "Type of thing"
+	init [block!]    "Code to create a new thing"
+][
+	object compose/deep [
+		stack: []
+		get: function [] [
+			either tail? stack [(init)][p: tail stack also :p/-1 clear back p]	;@@ workaround for #5066
+		]
+		put: func [x [(type)]] [
+			append/only stack (either find series! type [ [clear head x] ][ [:x] ])
+		]
+	]
+]
+
+clone: function [
+	"Make TARGET series a (shallow) clone of SOURCE series"
+	source [series!] target [series!]
+][
+	at append clear head target head source index? source
 ]
 
 
@@ -137,6 +149,25 @@ flush: function [
 	series [series!]
 ][
 	also copy series clear series
+]
+
+set-after: function [
+	"Set PATH to VALUE and return the previous value of PATH"
+	path [path! word!]
+	value [any-type!]
+][
+	also get/any path set/any path :value 
+]
+
+;@@ make a REP with this? (need use cases)
+;@@ this is no good, because it treats paths as series
+native-swap: :system/words/swap
+swap: func [a [word! series!] b [word! series!]] [
+	either series? a [
+		native-swap a b
+	][
+		set a set-after b get a
+	]
 ]
 
 only: function [
@@ -355,16 +386,6 @@ closest-number: function [n [number!] list [block!]] [
 	4 = closest-number 3 [1 4 5 0]
 ]
 
-;@@ make a REP with this? (need use cases)
-native-swap: :system/words/swap
-swap: func [a [word! series!] b [word! series!]] [
-	either series? a [
-		native-swap a b
-	][
-		set a also get b set b get a
-	]
-]
-
 
 polar2cartesian: func [radius [float! integer!] angle [float! integer!]] [
 	(radius * cosine angle) by (radius * sine angle)
@@ -456,11 +477,15 @@ dump-event: function [event] [
 
 top: func [series [series!]] [back tail series]
 
-quietly: function ['path [set-path!] value [any-type!]] [
-	obj: get append/part as path! clear [] path top path
-	set-quiet in obj last path :value
-	:value
+;; macro allows to avoid a lot of runtime overhead, thus allows using `quietly` in critical code
+#macro ['quietly set-path!] func [s e] [
+	compose [set-quiet in (to path! copy/part s/2 back tail s/2) (to lit-word! last s/2)]
 ]
+; quietly: function ['path [set-path!] value [any-type!]] [
+	; obj: get append/part as path! clear [] path top path
+	; set-quiet in obj last path :value
+	; :value
+; ]
 
 ;; good addition to do-atomic which holds reactivity
 do-async: function [									;@@ used solely to work around #5132
