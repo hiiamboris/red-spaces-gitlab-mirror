@@ -205,10 +205,10 @@ image-ctx: context [
 		; ]
 		; probe self/size: 2x2 * margin + size
 		either image? image/data [
-			maybe image/size: 2x2 * image/margin + image/data/size
+			quietly image/size: 2x2 * image/margin + image/data/size
 			reduce ['image image/data 1x1 * image/margin image/data/size + image/margin]
 		][
-			maybe image/size: 2x2 * image/margin
+			quietly image/size: 2x2 * image/margin
 			[]
 		]
 	]
@@ -267,7 +267,7 @@ cell-ctx: context [
 			mask: 1x1 - (canvas / infxinf)				;-- 0x0 (infinite) to 1x1 (finite)
 			size: max size canvas * mask
 		]												;-- no canvas = no alignment, minimal appearance
-		space/size: constrain size space/limits
+		quietly space/size: constrain size space/limits
 		
 		free:   space/size - cspace/size - (2x2 * space/margin)
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
@@ -445,7 +445,7 @@ scrollable-space: context [
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		;@@ TODO: this size to canvas relationship is still tricky - need smth simpler
 		box: either canvas [
-			space/size: as-pair
+			quietly space/size: as-pair
 				either canvas/x < 2e9 [canvas/x][space/size/x]
 				either canvas/y < 2e9 [canvas/y][space/size/y]
 		][
@@ -699,8 +699,8 @@ container-ctx: context [
 				] tail drawn
 			]
 		]
-		cont/map: map									;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		cont/size: size
+		cont/map: map				;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
+		quietly cont/size: size
 		quietly cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
@@ -1039,7 +1039,7 @@ window-ctx: context [
 		;; safer to call available? every time because window never knows if content size will change
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
 		foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
-		window/size: s								;-- limit window size by content size (so we don't scroll over)
+		quietly window/size: s							;-- limit window size by content size (so we don't scroll over)
 		#debug list-view [#print "window resized to (s)"]
 		default xy1: 0x0
 		default xy2: s
@@ -1315,7 +1315,7 @@ list-view-ctx: context [
 		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			maybe list/size: list/margin * 2
+			quietly list/size: list/margin * 2
 			return list/map: []
 		]
 		#assert [i1 <= i2]
@@ -1338,7 +1338,7 @@ list-view-ctx: context [
 			]
 			compose/only/into [translate (geom/offset) (drw)] tail drawn
 		]
-		maybe list/size: new-size
+		quietly list/size: new-size
 		list/map: new-map
 		drawn
 	]
@@ -1442,7 +1442,6 @@ list-view-ctx: context [
 ;;   (by "infinite" I mean "big enough that it's unreasonable to scan it to infer the size (or UI becomes sluggish)")
 ;; * grid is better for big empty cells that user is supposed to fill,
 ;;   while list is better for known autosized content
-;@@ TODO: height & width inferrence
 ;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
 	~: self
@@ -1805,8 +1804,8 @@ grid-ctx: context [
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
 		all [none? dc/size  not grid/infinite?  dc/size: grid/calc-size]
-		; unless grid/size [maybe grid/size: dc/size]
-		maybe grid/size: dc/size
+		; unless grid/size [quietly grid/size: dc/size]
+		quietly grid/size: dc/size
 
 		;@@ create a grid layout?
 		stash grid/map
@@ -2237,7 +2236,7 @@ templates/rotor: make-template 'space [
 		spc: get content
 		drawn: render content		;-- render before reading the size
 		r1: to 1 spc/size/x ** 2 + (spc/size/y ** 2) / 4 ** 0.5
-		self/size: r1 + 10 * 2x2
+		quietly self/size: r1 + 10 * 2x2
 		compose/deep/only [
 			push [
 				line-width 10
@@ -2267,14 +2266,14 @@ field-ctx: context [
 	draw: function [field [object!] canvas [pair! none!]] [
 		; #assert [pair? canvas]
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
-		; maybe field/size: canvas
+		; quietly field/size: canvas
 		maybe field/paragraph/width: if field/wrap? [field/size/x]
 		maybe field/paragraph/text:  field/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
 		pdrawn: render/on in field 'paragraph field/size
 		xy1: caret-to-offset       field/paragraph/layout field/caret-index + 1
 		xy2: caret-to-offset/lower field/paragraph/layout field/caret-index + 1
-		field/caret/size: as-pair field/caret-width xy2/y - xy1/y
+		maybe field/caret/size: as-pair field/caret-width xy2/y - xy1/y
 		cdrawn: []
 		if field/active? [
 			cdrawn: compose/only [translate (xy1) (render in field 'caret)]
