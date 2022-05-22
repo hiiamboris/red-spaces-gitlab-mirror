@@ -1570,30 +1570,9 @@ grid-ctx: context [
 		;@@ also - pinned!? or not here?
 		def: array/default
 		whole: 0			;@@ what if lim = 0?
-		sub: func [n size] [	;@@ TODO: get this out
-			if lim [n: min n lim - 1 - whole]
-			n: min n to 1 level / size
-			whole: whole + n
-			level: level - (n * size)
-			#debug grid-view [#print "sub (n) (size) -> whole: (whole) level: (level)"]
-			n
-		]
-		sub-def: func [from n /local r j] [
-			#debug grid-view [#print "sub-def (from) (n) def: (def)"]
-			either integer? def [
-				if n <> sub n sp + def [size: def throw 1]	;-- point is within a row/col of default size
-			][											;-- `default: auto` case where each row size is different
-				#assert [array =? grid/heights]
-				repeat j n [
-					size: grid/row-height? from + j
-					if 0 = sub 1 sp + size [throw 1]	;-- point is within the last considered row (size is valid)
-				]
-			]
-		]
-
 		size: none
 		either 1 = len: length? array [					;-- 1 = special case - all cells are of their default size
-			catch [sub-def 0 level]						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
+			catch [sub-def* 0 level]						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
 		][
 			keys: sort keys-of array
 			remove find keys 'default
@@ -1607,15 +1586,15 @@ grid-ctx: context [
 					key: keys/:i
 					
 					before: key - 1 - prev-key			;-- default-sized cells to subtract (may be 'auto)
-					if before > 0 [sub-def prev-key before]
+					if before > 0 [sub-def* prev-key before]
 					
 					if 'auto = size: array/:key [		;-- row is marked for autosizing
 						#assert [array =? heights]
 						size: grid/row-height? key		;-- try to fetch it from the cache or calculate
 					]
-					if 0 = sub 1 size + sp [throw 1]	;-- this cell contains level
+					if 0 = sub* 1 size + sp [throw 1]	;-- this cell contains level
 				]
-				sub-def key level						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
+				sub-def* key level						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
 			]
 		]
 		unless size [
@@ -1628,6 +1607,28 @@ grid-ctx: context [
 		]
 	]
 		
+	;; funcs used internally by locate-line (to avoid recreation of them every time)
+	sub*: func [n size] with :locate-line [
+		if lim [n: min n lim - 1 - whole]
+		n: min n to 1 level / size
+		whole: whole + n
+		level: level - (n * size)
+		#debug grid-view [#print "sub (n) (size) -> whole: (whole) level: (level)"]
+		n
+	]
+	sub-def*: func [from n /local r j] with :locate-line [
+		#debug grid-view [#print "sub-def (from) (n) def: (def)"]
+		either integer? def [
+			if n <> sub* n sp + def [size: def throw 1]	;-- point is within a row/col of default size
+		][											;-- `default: auto` case where each row size is different
+			#assert [array =? grid/heights]
+			repeat j n [
+				size: grid/row-height? from + j
+				if 0 = sub* 1 sp + size [throw 1]	;-- point is within the last considered row (size is valid)
+			]
+		]
+	]
+
 	locate-point: function [grid [object!] xy [pair!]] [
 		r: copy [0x0 0x0]
 		foreach [x array wh?] reduce [					;@@ use reduce-in-place?
@@ -1785,7 +1786,6 @@ grid-ctx: context [
 		#assert [any [not grid/infinite?  all [xy1 xy2]]]	;-- bounds must be defined for an infinite grid
 
 		dc: grid/draw-ctx
-		;@@ TODO: only clear dc & map for the outermost draw (in case grid contains itself)
 		set dc none
 
 		dc/bounds: grid/cells/size						;-- may call calc-size to estimate number of cells
