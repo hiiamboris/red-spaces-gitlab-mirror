@@ -8,6 +8,10 @@ Red [
 #include %../everything.red
 
 
+;; this makes grid/cell look like generic cell, i.e. with a frame
+;; otherwise it's hard to visually analyze the layout
+remove-style 'grid/cell
+	
 view/no-wait/options [
 	below
 	b: host [
