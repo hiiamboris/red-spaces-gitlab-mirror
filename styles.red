@@ -8,15 +8,27 @@ Red [
 
 
 styles: none											;-- reserve names in the spaces/ctx context
-exports: [set-style]
+exports: [set-style remove-style]
 
-set-style: function [name [word! path!] style [block! function!]] [
+set-style: function [
+	"Define a named style"
+	name [word! path!]
+	style [block! function!]
+][
 	name: to path! name
 	pos: any [											;-- `put` does not support paths/blocks so have to reinvent it
 		find/only/tail styles name
 		insert/only tail styles name
 	]
 	change/only pos :style
+]
+
+remove-style: function [
+	"Forget a named style"
+	name [word! path!]
+][
+	name: to path! name
+	remove/part find/only styles name 2
 ]
 
 do with [
