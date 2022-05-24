@@ -242,21 +242,6 @@ cell-ctx: context [
 		 1x-1  1x0  1x1
 	]
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			align [
-				unless find allowed-alignments :new [	;@@ this is just an idea, not sure if worth it (maybe #debug?)
-					set-quiet in space word :old
-					ERROR "Invalid alignment specified: (mold/part :new 100)"
-				]
-				invalidate-cache space
-			]
-			;; `weight` invalidates parents by invalidating this cell
-			limits weight content [invalidate-cache space]
-		]
-		space/space-on-change word :old :new
-	]
-	
 	draw: function [space [object!] canvas [pair! none!]] [
 		#assert [space/content]
 		drawn:  render/on space/content if canvas [subtract-canvas canvas 2x2 * space/margin]
@@ -275,10 +260,23 @@ cell-ctx: context [
 			drawn: compose/only [translate (offset) (drawn)]
 			; drawn: compose/only [clip 0x0 (space/size) translate (offset) (drawn)]
 		]
-		space/map/1: space/content
-		space/map/2/offset: offset
-		space/map/2/size: space/size
+		space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
 		drawn
+	]
+	
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			align [
+				unless find allowed-alignments :new [	;@@ this is just an idea, not sure if worth it (maybe #debug?)
+					set-quiet in space word :old
+					ERROR "Invalid alignment specified: (mold/part :new 100)"
+				]
+				invalidate-cache space
+			]
+			;; `weight` invalidates parents by invalidating this cell
+			limits weight content [invalidate-cache space]
+		]
+		space/space-on-change word :old :new
 	]
 	
 	templates/box: make-template 'space [
@@ -290,9 +288,6 @@ cell-ctx: context [
 		;; cannot be cached, as content may change at any time and we have no way of knowing
 		; cache?:  off
 		
-		space-on-change: :on-change*
-		#on-change-redirect
-		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
@@ -300,6 +295,9 @@ cell-ctx: context [
 		draw: function [/on canvas [pair! none!]] [
 			~/draw self canvas
 		]
+		
+		space-on-change: :on-change*
+		#on-change-redirect
 	]
 	
 	templates/cell: make-template 'box [margin: 1x1]	;-- same thing just with a border and background ;@@ margin - in style?
@@ -1030,16 +1028,18 @@ window-ctx: context [
 	draw: function [window [object!] xy1 [pair! none!] xy2 [pair! none!]] [
 		#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
 		#assert [word? window/content]
-		window/map/1: window/content					;-- rename it properly
 		geom: window/map/2
 		cspace: get window/content
-		o:  geom/offset
+		o: geom/offset
 		;; there's no size for infinite spaces so we use `available?` to get the drawing size
-		s:  window/max-size
+		s: window/max-size
 		;; safer to call available? every time because window never knows if content size will change
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
 		foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
 		quietly window/size: s							;-- limit window size by content size (so we don't scroll over)
+		quietly window/map: compose/deep [
+			(window/content) [offset: 0x0 size: (s)]
+		]
 		#debug list-view [#print "window resized to (s)"]
 		default xy1: 0x0
 		default xy2: s
@@ -1064,7 +1064,6 @@ window-ctx: context [
 		;; window does not require content's size, so content can be an infinite space!
 		content: make-space/name 'space []
 		map: [space [offset 0x0 size 0x0]]				;-- 'space' will be replaced by space content refers to
-		map/1: content
 
 		available?: func [
 			"Should return number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
@@ -1446,13 +1445,9 @@ list-view-ctx: context [
 grid-ctx: context [
 	~: self
 	
-	into: func [grid [object!] xy [pair!] name [word! none!] origin [pair!]] [	;-- faster than generic map-based into
+	into: func [grid [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
 		if name [return into-map grid xy name]
-		unless (pinned: grid/pinned) +<= pinned-area: 0x0 [		;-- nonzero pinned rows or cols?
-			pinned-area: grid/spacing + grid/get-offset-from 1x1 (pinned + 1x1)
-		]
-		if pinned-area +<= xy [xy: xy - origin]					;-- translate to the moveable cells
-		set [cell: offset:] locate-point grid xy
+		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
 		if cell <> mcell [
 			offset: offset + grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
@@ -1465,6 +1460,7 @@ grid-ctx: context [
 	]
 	
 	calc-bounds: function [grid [object!]] [
+		if lim: grid/size-cache/bounds [return lim]		;-- already calculated
 		bounds: grid/bounds								;-- call it in case it's a function
 		unless any ['auto = bounds/x  'auto = bounds/y] [	;-- no auto limit set (but can be none)
 			#debug grid-view [#print "grid/calc-bounds [no auto] -> (bounds)"]
@@ -1476,21 +1472,19 @@ grid-ctx: context [
 		][
 			remove find xys: keys-of grid/spans 'default	;-- if `spans` is correct, it contains the lowest rightmost multicell coordinate
 			append xys keys-of grid/content
-			second minmax-of xys
+			second minmax-of xys						;@@ should be `accumulate`
 		]
-		if 'auto = lim/x [lim/x: xymax/x]
+		if 'auto = lim/x [lim/x: xymax/x]				;-- pass `none` as is
 		if 'auto = lim/y [lim/y: xymax/y]
-		#assert [all [lim/x lim/y]]
 		#debug grid-view [#print "grid/calc-bounds [auto] -> (lim)"]
 		lim
 	]
 
-	break-cell: function [cell1 [pair!]] [
+	break-cell: function [cell1 [pair!]] [				;-- `cell1` must be the starting cell
 		if 1x1 <> span: grid/get-span cell1 [
 			#assert [1x1 +<= span]						;-- ensure it's a first cell of multicell
 			xyloop xy span [							;@@ should be for-each
 				remove/key grid/spans xy': cell1 + xy - 1x1
-				;@@ invalidate content within ccache?
 			]
 		]
 	]
@@ -1500,20 +1494,19 @@ grid-ctx: context [
 			if old +< 1x1 [
 				ERROR "Cell (cell1 + old) should be broken before (cell1)"	;@@ or break silently? probably unexpected move..
 			]
-			grid/break-cell cell1
+			break-cell grid cell1
 		]
 		xyloop xy span [								;@@ should be for-each
 			#assert [1x1 = grid/get-span cell1 + xy - 1x1]
-			grid/spans/(cell1 + xy - 1x1): 1x1 - xy
-			;@@ invalidate content within ccache?
+			grid/spans/(cell1 + xy - 1x1): 1x1 - xy		;-- each span points to the first cell
 		]
 		grid/spans/:cell1: span
 	]
 	
-	set-span: function [grid [object!] cell1 [pair!] span [pair!] /force] [
+	set-span: function [grid [object!] cell1 [pair!] span [pair!] force [logic!]] [
 		if span = grid/get-span cell1 [exit]
-		#assert [1x1 +<= span]						;-- forbid setting to span to non-positives
-		xyloop xy span [							;-- break all multicells within the area
+		#assert [1x1 +<= span]							;-- forbid setting of span to non-positives
+		xyloop xy span [								;-- break all multicells within the area
 			cell: cell1 + xy - 1
 			old-span: grid/get-span cell
 			if old-span <> 1x1 [
@@ -1522,7 +1515,7 @@ grid-ctx: context [
 					any [cell <> cell1  1x1 +<= old-span]	;-- only `cell1` is broken silently if it's a multicell
 					ERROR "Cell (cell1 + old-span) should be broken before (cell1)"
 				]
-				grid/break-cell cell + min 0x0 old-span
+				break-cell grid cell + min 0x0 old-span
 			]
 		]
 		unify-cells grid cell1 span
@@ -1535,51 +1528,53 @@ grid-ctx: context [
 			x2: max c1/:x c2/:x
 			if x1 = x2 [continue]
 			wh?: get/any wh?							;@@ workaround for #4988
-			for xi: x1 x2 - 1 [r/:x: r/:x + wh? xi]		;@@ should be sum map-each
+			for xi: x1 x2 - 1 [r/:x: r/:x + wh? xi]		;@@ should be sum map
 			r/:x: r/:x + (x2 - x1 * grid/spacing/:x)
 			if x1 > x2 [r/:x: negate r/:x]
 		]
 		r
 	]
 		
-	;-- fast row/col locator assuming that array size is smaller than the row/col number
-	;-- returns any of:
-	;--   [margin 1 offset] - within the left margin (or if point is negative, then to the left of it)
-	;--   [cell   1 offset] - within 1st cell
-	;--   [space  1 offset] - within space between 1st and 2nd cells
-	;--   [cell   2 offset] - within 2nd cell
-	;--   [space  2 offset]
-	;--   ...
-	;--   [cell   N offset]
-	;--   [margin 2 offset] - within the right margin (only when limit is defined),
-	;--                       offset can be bigger(!) than right margin if point is outside the space's size
+	;; fast row/col locator assuming that widths/heights array size is smaller than the row/col number
+	;; returns any of:
+	;;   [margin 1 offset] - within the left margin (or if point is negative, then to the left of it)
+	;;   [cell   1 offset] - within 1st cell
+	;;   [space  1 offset] - within space between 1st and 2nd cells
+	;;   [cell   2 offset] - within 2nd cell
+	;;   [space  2 offset]
+	;;   ...
+	;;   [cell   N offset]
+	;;   [margin 2 offset] - within the right margin (only when limit is defined),
+	;;                       offset can be bigger(!) than right margin if point is outside the space's size
 	;@@ TODO: maybe cache offsets for faster navigation on bigger data
+	;; doesn't care about pinned cells, treats grid as continuous
 	locate-line: function [
 		grid  [object!]
 		level [integer!] "pixels from 0"
-		array [map!] "widths or heights"
-		axis  [word!] "x or y"
+		array [map!]     "widths or heights"
+		axis  [word!]    "x or y"
 	][
 		mg: grid/margin/:axis
 		if level < mg [return reduce ['margin 1 level]]		;-- within the first margin case
 		level: level - mg
 
-		sp:  grid/spacing/:axis
-		lim: grid/draw-ctx/bounds/:axis
-		;@@ also - pinned!? or not here?
-		def: array/default
-		whole: 0			;@@ what if lim = 0?
-		size: none
-		either 1 = len: length? array [					;-- 1 = special case - all cells are of their default size
-			catch [sub-def* 0 level]						;@@ assumes default size > 0 (at least 1 px) - need to think about 0
+		bounds: grid/calc-bounds
+		sp:     grid/spacing/:axis
+		lim:    bounds/:axis
+		def:    array/default
+		#assert [def]									;-- must always be defined
+		whole:  0				;@@ what if lim = 0?	;-- number of whole rows/columns subtracted
+		size:   none
+		keys:   sort keys-of array
+		remove find keys 'min
+		either 1 = len: length? keys [					;-- 1 = special case - all cells are of their default size
+			catch [sub-def* 0 level]					;@@ assumes default size > 0 (at least 1 px) - need to think about 0
 		][
 			keys: sort keys-of array
 			remove find keys 'default
 			#assert [0 < keys/1]						;-- no zero or negative row/col numbers expected
 			key: 0
-
 			catch [
-				also no
 				repeat i len - 1 [						;@@ should be for-each/stride [/i prev-key key]
 					prev-key: key
 					key: keys/:i
@@ -1628,7 +1623,15 @@ grid-ctx: context [
 		]
 	]
 
-	locate-point: function [grid [object!] xy [pair!]] [
+	locate-point: function [grid [object!] xy [pair!] screen? [logic!]] [
+		if screen? [
+			unless (pinned: grid/pinned) +<= pinned-area: 0x0 [	;-- nonzero pinned rows or cols?
+				pinned-area: grid/spacing + grid/get-offset-from 1x1 (pinned + 1x1)
+			]
+			if pinned-area +<= xy [xy: xy - grid/origin]		;-- translate to the moveable cells
+		]
+		
+		bounds: grid/calc-bounds
 		r: copy [0x0 0x0]
 		foreach [x array wh?] reduce [					;@@ use reduce-in-place?
 			'x grid/widths  :grid/col-width?
@@ -1642,7 +1645,7 @@ grid-ctx: context [
 					either idx = 1 [
 						ofs: ofs - grid/margin/:x
 					][
-						idx: grid/draw-ctx/bounds/:x
+						idx: bounds/:x
 						ofs: ofs + wh? idx
 						#assert [idx]			;-- 2nd margin is only possible if bounds are known
 					]
@@ -1669,11 +1672,11 @@ grid-ctx: context [
 		grid [object!] y [integer!]
 	][
 		#assert ['auto = any [grid/heights/:y grid/heights/default]]	;-- otherwise why call it?
-		bounds: any [grid/draw-ctx/bounds grid/draw-ctx/bounds: grid/cells/size]	;-- may be none if called from calc-bounds before grid/draw
-		; #assert [draw-ctx/bounds]
+		bounds: grid/calc-bounds
+		; #assert [size-cache/bounds]
 		xlim: bounds/x
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
-		hmin: append clear [] grid/min-row-height
+		hmin: append clear [] any [grid/heights/min 0]
 		for x: 1 xlim [
 			canvas: as-pair grid/col-width? x infxinf/y
 			span: grid/get-span xy: as-pair x y
@@ -1696,7 +1699,7 @@ grid-ctx: context [
 					]
 					append hmin height1
 				]
-				;-- else just ignore this and use min-row-height
+				;-- else just ignore this and use heights/min
 			]
 			x: x + max 0 span/x - 1						;-- skip horizontal span
 		]
@@ -1713,7 +1716,9 @@ grid-ctx: context [
 		
 	cell-height?: function [grid [object!] xy [pair!]] [
 		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
-		#assert [grid/ccache/:xy]				;-- cell should be rendered already (for row-heights to return immediately)
+		#debug grid-view [						;-- assertion doesn't hold for self-containing grids
+			#assert [grid/ccache/:xy]			;-- cell should be rendered already (for row-heights to return immediately)
+		]
 		yspan: second grid/get-span xy
 		r: 0 repeat y yspan [r: r + grid/row-height? y - 1 + xy/y]
 		r + (yspan - 1 * grid/spacing/y)
@@ -1726,8 +1731,9 @@ grid-ctx: context [
 	calc-size: function [grid [object!]] [
 		#debug grid-view [#print "grid/calc-size is called!"]
 		#assert [not grid/infinite?]
-		bounds: any [grid/draw-ctx/bounds grid/draw-ctx/bounds: grid/cells/size]	;@@ optimize this? cache bounds?
-		bounds: bounds/x by bounds/y
+		bounds: grid/calc-bounds
+		bounds: bounds/x by bounds/y					;-- turn block into pair
+		#debug grid-view [#assert [0 <> area? bounds]]
 		r: grid/margin * 2 + (grid/spacing * max 0x0 bounds - 1)
 		repeat x bounds/x [r/x: r/x + grid/col-width?  x]
 		repeat y bounds/y [r/y: r/y + grid/row-height? y]
@@ -1784,14 +1790,14 @@ grid-ctx: context [
 		;@@ keep this in sync with `list/draw`
 		#assert [any [not grid/infinite?  all [xy1 xy2]]]	;-- bounds must be defined for an infinite grid
 
-		dc: grid/draw-ctx
-		set dc none
+		cache: grid/size-cache
+		set cache none
 
-		dc/bounds: grid/cells/size						;-- may call calc-size to estimate number of cells
-		#assert [dc/bounds]
+		cache/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
+		#assert [cache/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
 		default xy1: 0x0
-		unless xy2 [dc/size: xy2: grid/calc-size]
+		unless xy2 [cache/size: xy2: grid/calc-size]
 
 		;; affects xy1 so should come before locate-point
 		map: []
@@ -1803,9 +1809,9 @@ grid-ctx: context [
 
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
-		all [none? dc/size  not grid/infinite?  dc/size: grid/calc-size]
-		; unless grid/size [quietly grid/size: dc/size]
-		quietly grid/size: dc/size
+		all [none? cache/size  not grid/infinite?  cache/size: grid/calc-size]
+		; unless grid/size [quietly grid/size: cache/size]
+		quietly grid/size: cache/size
 
 		;@@ create a grid layout?
 		stash grid/map
@@ -1842,7 +1848,7 @@ grid-ctx: context [
 	]
 	
 	;; this should not use hcache, or it will have to be cleared all the time
-	col-height?: function [grid [object!] col [integer!] width [integer! float!] rows [integer!]] [	;-- used by autofit only
+	col-height?: function [grid [object!] col [integer!] width [integer!] rows [integer!]] [	;-- used by autofit only
 		r: 0
 		canvas: width by infxinf/y
 		repeat i rows [
@@ -1869,51 +1875,81 @@ grid-ctx: context [
 		bounds: grid/cells/size
 		nx: bounds/x  ny: bounds/y
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
-		widths: append/dup make [] nx width / nx nx		;-- starting point - uniform
-		min-width: 5									;@@ make it configurable?
-		precision: 10									;-- limit when to stop adjusting
-		h2: col-height? grid 1 widths/1 ny
+		
+		widths: grid/widths
+		w0: to integer! width / nx
+		repeat i nx [widths/:i: w0]						;-- starting point - uniform
+		
+		min-width: any [grid/widths/min 5]
+		precision: 5									;-- limit when to stop adjusting (pixels)
 		loop 10 [										;-- prevent deadlocks
 			adjustment: 0
+			h2: col-height? grid 1 widths/1 ny
 			for x: 2 nx [
 				w1: widths/(x - 1)  w2: widths/:x
 				h1: h2  h2: col-height? grid x w2 ny
-				if h1 = h2 [continue]						;-- balance - don't touch this time
-				dh: min 50% 100% * (h2 - h1) / (1 + min h1 h2)
-				dw: dh * min w1 w2
-				new-h1: col-height? grid x - 1 w1: w1 - dw ny
-				new-h2: col-height? grid x     w2: w2 + dw ny
-				print [h1 h2 '-> new-h1 new-h2]
-				if (max new-h1 new-h2) < max h1 h2 [	;@@ maybe also smaller attempts?
+				if h1 = h2 [continue]					;-- balanced - don't touch this time
+				;@@ maybe make a few attempts? e.g. 50% 100% 150% 200% of dw, or a few random points?
+				;@@ random might be bad for result stability, but more reliable in case of big spaces within
+				dh: clip [5% 50%] 50% * (h2 - h1) / (max 1 min h1 h2)
+				dw: to integer! (min w1 w2) * dh
+				w1: max min-width w1 - dw
+				w2: max min-width w2 + dw
+				new-h1: col-height? grid x - 1 w1 ny
+				new-h2: col-height? grid x     w2 ny
+				; print [h1 h2 '-> new-h1 new-h2]
+				if positive? win: (max h1 h2) - (max new-h1 new-h2) [	;@@ maybe also smaller attempts?
 					h2: new-h2
 					widths/(x - 1): w1
 					widths/:x:      w2
-					adjustment: max adjustment abs dw
+					adjustment: max adjustment win
 				]
 			]
+			; ?? adjustment
 			if adjustment <= precision [break]
 		]
-		repeat i nx [grid/widths/:i: to integer! widths/:i]
 		invalidate grid									;-- also clears hcache
 	]
 	
+	;; called by global invalidate
+	invalidate*: function [grid [object!] cell [pair! none!]] [
+		either cell [
+			remove/key grid/hcache cell/y
+			remove/key grid/ccache cell
+			grid/size-cache/size: none
+		][
+			clear grid/hcache							;-- clear should never be called on big datasets
+			set grid/size-cache none					;-- reset calculated bounds
+		]
+	]
+	
+	on-change: function [grid [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
+		;@@ protect widths, spans, heights? - not for tampering
+		switch to word! word [
+			cells margin spacing pinned bounds [invalidate grid]
+		]
+		grid/space-on-change word :old :new
+	]
+		
 	templates/grid: make-template 'space [
 		size:    none				;-- only available after `draw` because it applies styles
 		margin:  5x5
 		spacing: 5x5
-		content: make map! []				;-- XY coordinate -> space-name  ;@@ TODO: maybe rename to `pane`?
-											;@@ or `cmap` for brevity?
+		origin:  0x0						;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin
+		content: make map! []				;-- XY coordinate -> space-name
 		spans:   make map! []				;-- XY coordinate -> it's XY span (not user-modifiable!!)
-											;@@ make spans a picker too?? or pointless for infinite data anyway
-		widths:  make map! [default 100]	;-- number of column/row -> it's width/height
-		heights: make map! [default auto]	;-- height can be 'auto (row is auto sized) or integer (px)
+		;@@ all this should be in the reference docs instead
+		;; widths/min used in `autofit` to ensure no column gets zero size even if it's empty
+		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
+		;; heights/min used when heights/default = auto, in case no other constraints apply
+		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
+		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
 		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
+		;@@ bounds/.. = none means unlimited, but it will render scrollers useless
+		;@@ and cannot be drawn without /only - will need a window over it anyway (used by grid-view)
 		bounds:  [x: auto y: auto]			;-- max number of rows & cols, auto=bound `cells`, integer=fixed
 											;-- 'auto will have a problem inside infinite grid with a sliding window
-											;@@ none for unlimited here, but it will render scrollers useless and cannot be drawn without /only - will need a window over it anyway
 
-		;@@ maybe heights/min ?
-		min-row-height: 0					;-- used in autosizing in case no other constraints apply; set to >0 to prevent rows of 0 size
 		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
 		ccache:  make map! 20				;-- cached `cell` spaces (persistency required by the focus model: cells must retain sameness)
 		
@@ -1933,7 +1969,7 @@ grid-ctx: context [
 			either pick [content/:xy][calc-bounds]
 		]
 
-		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name 0x0]
+		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		
 		;-- userspace functions for `spans` reading & modification
 		;-- they are required to be able to get any particular cell's multi-cell without full `spans` traversal
@@ -1953,20 +1989,13 @@ grid-ctx: context [
 			xy
 		]
 
-		break-cell: function [
-			"Break multicell FIRST into singular cells"
-			first [pair!]
-		][
-			~/break-cell self first
-		]
-		
 		set-span: function [
 			"Set the SPAN of a FIRST cell, breaking it if needed"
 			first [pair!] "Starting cell of a multicell or normal cell that should become a multicell"
 			span  [pair!] "1x1 for normal cell, more to span multiple rows/columns"
 			/force "Also break all multicells that intersect with the given area"
 		][
-			~/set-span self first span
+			~/set-span self first span force
 		]
 		
 		get-offset-from: function [
@@ -1979,9 +2008,10 @@ grid-ctx: context [
 		locate-point: function [
 			"Map XY point on a grid into a cell it lands on, return [cell-xy offset]"
 			xy [pair!]
+			/screen "Point is on rendered viewport, not on the grid"
 			; return: [block!] "offset can be negative for leftmost and topmost cells"
 		][
-			~/locate-point self xy
+			~/locate-point self xy screen
 		]
 
 		row-height?: function [
@@ -2017,6 +2047,7 @@ grid-ctx: context [
 			not all [bounds/x bounds/y]
 		]
 
+		;; returns a block [x: y:] with possibly `none` (unlimited) values ;@@ REP #116 could solve this
 		calc-bounds: function ["Estimate total size of the grid in cells (in case bounds set to 'auto)"] [
 			~/calc-bounds self
 		]
@@ -2025,16 +2056,23 @@ grid-ctx: context [
 			~/calc-size self
 		]
 
+		;; used by draw & others to avoid extra recalculations
+		;; valid up to the next `draw` or `invalidate` call
 		;; care should be taken so that grid can contain itself (draw has to be reentrant)
-		draw-ctx: context [								;-- used by draw & others to avoid extra recalculations
+		size-cache: context [
 			bounds: none
 			size:   none
 		]
 
-		;@@ need to think more about this.. I don't like it
-		invalidate: func [/only row [integer!]] [
-			either only [remove/key hcache row][clear hcache]	;-- clear should never be called on big datasets
-			;@@ ccache?
+		;; since there's absolutely no way grid can track changes in the data or spaces within itself
+		;; invalidate should be used to mark those changes
+		;@@ interface is messy though: global invalidate calls this and invalidate-cache
+		;@@ but this doesn't call the latter... so tangled if one wants to inval only /cell
+		invalidate: func [
+			"Clear the internal cache of the grid to redraw it anew"
+			/cell xy [pair!] "Only for a particular cell"
+		][
+			~/invalidate* self xy
 		]
 
 
@@ -2043,12 +2081,8 @@ grid-ctx: context [
 			~/draw self xy1 xy2
 		]
 	
-		on-change*: function [word [word! set-word!] old [any-type!] new [any-type!]] [
-			switch to word! word [
-				;@@ TODO: think on what other words incur cache invalidation
-				cells [set draw-ctx none]
-			]
-		]
+		space-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 
@@ -2059,7 +2093,7 @@ grid-view-ctx: context [
 	into: func [gview [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
 		any [
 			into-map/only gview/map xy name with gview [hscroll vscroll]
-			grid-ctx/into gview/grid xy name gview/origin
+			grid-ctx/into gview/grid xy name
 		]
 	]
 	
@@ -2088,7 +2122,7 @@ grid-view-ctx: context [
 	
 	on-change: function [gview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
-			axis size pages [
+			size pages [
 				if :old <> :new [
 					#assert [any [word <> 'axis  find [x y] :new]]
 					if gview/size [						;-- do not trigger during initialization
@@ -2100,6 +2134,7 @@ grid-view-ctx: context [
 					]
 				]
 			]
+			origin [gview/grid/origin: new]
 		]
 		gview/inf-scrollable-on-change word :old :new
 	]
@@ -2130,12 +2165,15 @@ grid-view-ctx: context [
 
 		window/content: 'grid
 		grid: make-space 'grid [
+			;; grid-view does not use ccache, but sets it for the grid
+			ccache: content
+			
+			;; no need to wrap data-view because it's already a box/cell
+			wrap-space: function [xy [pair!] space [word!]] [space]
+			
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 				~/available? self axis dir from requested
 			]
-			
-			;; no need to wrap data-view because it's already a box/cell
-			wrap-space: function [xy [pair!] space [word!]] [ccache/:xy: space]
 		]
 		
 		grid/cells: func [/pick xy [pair!] /size] [
@@ -2146,7 +2184,7 @@ grid-view-ctx: context [
 				]
 			][data/size]
 		]
-		grid/calc-bounds: grid/bounds: does [data/size]
+		grid/calc-bounds: grid/bounds: does [grid/cells/size]
 		
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		
