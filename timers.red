@@ -83,7 +83,7 @@ context [
 		handlers: events/handlers
 		hpath: as path! []
 		foreach [space rate] rated-spaces [
-			paths: paths-from-space space face			;-- static, not copied, but it's ok since timer is not reentrant
+			paths: paths-from-space space				;-- static, not copied, but it's ok since timer is not reentrant
 			foreach path paths [
 				pos: find/same/tail marks space
 				set [prev: bias:] any [pos [0:0 0:0]]

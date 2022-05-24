@@ -1074,8 +1074,38 @@ timers and performance
 	and has to be in space's most basic on-change to avoid duplication
 	ok this may work: on-change keeps a registry of "rated" spaces, but paths come from the cache
 	then each path is again tested incrementally against handlers list
-	  
-		
+	made a tree inside render-cache but it went badly: 2 hosts appear to have the same tree, timer events broken
+	because top level spaces have no parent
+	trying to introduce host parents.. nah this is too fragile.. as expected, I have to make a separate tree
+	thing is, for timers invalidation should not affect the tree, but for further invalidation?
+	if e.g. there was invalidate/only - next full invalidate should not be stopped
+	if there was a full invalidate, child spaces of invalidated parents still may be invalidated
+	so tree has to persist, and invalidation should go up to the root without any shortcuts
+	if tree is not affected by invalidation, it then can be discrarded by render-face, swapped to a new tree
+	the only trouble is how to at the same time, build a new tree and keep the old one for relations check
+	if "emerging" tree is used by the builder, new relations will not be reflected on the old one
+	have to at the same time add relations to both trees, then later discard the old one
+	at least this will make cache more stable, though also slower
+	another issue: emerging tree will not include cached (not rendered) subtrees, how to copy them?
+	ideally it should be just a node that is attached together with it's children, but it's way more bookkeeping
+	funny, both for invalidation and for timers all I need is path
+	so if I have a path, I've no need for recursive calls
+	and those paths can be generated in a way similar to list-spaces, just with added key and metadata
+	and list-spaces can just reuse this tree, while foreach-space doesn't even have to copy it
+	though single key will correspond to multiple paths (in rare cases), hashtable should handle it fine
+	or maybe it's reasonable to group all paths into a single node?
+	first need more high level path api to abstract the low level parts
+	the question is one of ordering.. listed tree is ordered by map order
+	but rendered tree is ordered by render call order, which is no good for tabbing
+	so list-spaces will not reuse the render tree?
+	or render may create ordered nodes for children, since it has access to the map?
+	bigger question is, whether such complication of render is worth simplification of invalidation? quite unlikely
+	during render no event should ever happen, so it invalidates only isolated immediate children
+	they may be in the old cache, not in the new, but they have to be moved into the new anyway
+	so all cached stuff will be moved, and nobody knows if it's still valid, so trees grow anyway dammit
+	
+	
+	
 
 VID Styles: must be documented TODO
 	specification:

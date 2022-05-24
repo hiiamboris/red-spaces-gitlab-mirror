@@ -68,41 +68,36 @@ context [
 	set 'paths-from-space function [
 		"Get all paths for SPACE on the last rendered frame"
 		space  [object!]
-		host   [object!]
 		; return: [path! block!] "May return single path! or a block of"
 	][
 		; #assert [is-face? host]
 		result: []
 		path: clear []
-		paths-continue* space host path 'result
+		paths-continue* space path 'result
 		result: head clear result
 		result
 	]
 		
 	paths-continue*: function [
 		space  [object!]
-		host   [object!]
 		path   [block!]
 		result [word!]
 	][
 		parents: select/same render-cache space
-		case [
-			not parents [exit]							;@@ invalidated space - cannot be traced to the root
-			tail? parents [
-				slot: traversal/reuse-path (result)
-				reverse append append slot head path host/space
-			]
-			'else [
-				append invalidation-stack space			;-- defence from cycles ;@@ rename since it's also used here?
-				foreach [parent child-name] parents [
-					change path child-name
-					unless find/same invalidation-stack parent [
-						paths-continue* parent host next path result
-					]
+		either empty? parents [
+			unless is-face? space [exit]				;-- not rendered space - cannot be traced to the root
+			slot: traversal/reuse-path (result)
+			reverse append slot head path
+		][
+			append invalidation-stack space				;-- defence from cycles ;@@ rename since it's also used here?
+			foreach [parent child-name] parents [
+				change path child-name
+				unless find/same invalidation-stack parent [
+					paths-continue* parent next path result
 				]
-				remove path
-				remove top invalidation-stack
 			]
+			remove path
+			remove top invalidation-stack
 		]
 	]
 	
@@ -136,7 +131,8 @@ context [
 		#debug profile [prof/manual/start 'invalidation]
 		either tag? space [
 			#assert [space = <everything>]
-			clear render-cache							;@@ what method to prefer? parse or radical (clear)?
+			;@@ what method to prefer? parse or radical (clear)? clear is dangerous - breaks timers by destroying parents tree
+			clear render-cache
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating (any [select space-names space 'unknown])"]
@@ -223,11 +219,13 @@ context [
 		name   [word!]
 		parent [object! none!]
 	][
+		;; `none` may happen during init phase, e.g. autofit calls render to estimate row sizes
+		;; in this case cache slot has still to be created
 		#assert [not child =? parent]
 		case [
 			parents: select/same render-cache child [
 				any [
-					not parent      					;-- no parent for top level spaces = no need to hold it
+					not parent							;-- happens only when render is called without host
 					find/same/only parents parent		;-- do not duplicate parents
 					append append parents parent name	;@@ should name be updated if parent is found?
 				]
@@ -296,6 +294,7 @@ context [
 		]
 
 		host: face										;-- required for `same-paths?` to have a value (used by cache)
+		append visited-spaces host
 		with-style 'host [
 			style: compose/deep bind get-current-style face	;-- host style can only be a block
 			drawn: render-space/only/on face/space xy1 xy2 face/size
@@ -308,6 +307,7 @@ context [
 			]
 			render: reduce [style drawn]
 		]
+		clear visited-spaces
 		; #debug cache [#print "cache size=(cache-size?)"]
 		; #print "cache size=(cache-size?)"
 		any [render copy []]
