@@ -41,6 +41,6 @@ view/no-wait/options [
 ; spaces/ctx/grid-ctx/autofit gv/grid 200
 ; b/dirty?: yes
 			
-dump-tree
+; dump-tree
 either system/build/config/gui-console? [print "---"][do-events]
 

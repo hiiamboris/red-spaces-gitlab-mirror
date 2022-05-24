@@ -31,7 +31,7 @@ view/no-wait/options [
 			; grid/bounds: [x: #[none] y: #[none]]
 			; cell-size: 200x150
 			ratio: 1.2
-			cell-size: size - 5 / ratio - 5		;-- considers margins/spacing
+			cell-size: size - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
 			grid/widths/default:  cell-size/x
 			grid/heights/default: cell-size/y
 			grid-view: self
@@ -64,7 +64,7 @@ view/no-wait/options [
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]
 	text hidden rate 50 on-time [						;-- can't set host/rate to none; used to delay full render after layout display
-		face/rate: none max-depth: 4 b/draw: render b
+		face/rate: none max-depth: 3 b/draw: render b
 	]
 ] [offset: 10x10]
 

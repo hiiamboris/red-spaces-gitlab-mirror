@@ -17,6 +17,7 @@ Red [
 	CPU load of profiled code: 100%
 }
 
+; #do [disable-space-cache?: yes] 
 #include %../everything.red
 
 append spaces/keyboard/focusable 'grid-view
@@ -56,10 +57,10 @@ spaces/ctx/traversal/depth-limit: 4
 t0: now/utc/precise
 view/no-wait/options [
 	below
-	host [fps-meter]
+	host [fm: fps-meter]
 	b: host [
-		zoomer [
-			grid-view with [
+		z: zoomer [
+			gv: grid-view with [
 				size: 500x300
 				; grid/pinned: 2x1
 				; grid/bounds: [x: #[none] y: #[none]]
@@ -76,8 +77,8 @@ view/no-wait/options [
 				grid/cells: func [/pick xy /size] [
 					either pick ['grid-view][1x1 * ratio + 1]
 				]
-				set-style 'cell function [cell /on canvas] reshape [
-					drawn: cell/draw/on size				;-- constant size to ensure caching
+				set-style 'grid/grid-view function [gview] reshape [
+					drawn: gview/draw
 					compose/only [
 						fill-pen !(system/view/metrics/colors/panel) box 0x0 (cell-size)
 						scale (cell-size/x / size/x) (cell-size/y / size/y) (drawn)
@@ -95,8 +96,8 @@ view/no-wait/options [
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 						append clear r old-draw
 						prof/manual/start 'truncation
-						; r: copy-deep-limit r 36			;-- 3 levels
-						r: copy-deep-limit r 23				;-- 2 levels
+						; r: copy-deep-limit r 30				;-- 3 levels - 15625 grids
+						r: copy-deep-limit r 20				;-- 2 levels - 625 grids
 						prof/manual/end 'truncation
 					]
 					depth: depth - 1
@@ -111,20 +112,15 @@ view/no-wait/options [
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]
 	text hidden rate 99 on-time [
-		z: get b/space
 		elapsed: to float! difference now/utc/precise t0
-		gv: get z/content
 		z/zoom/x: exp (1 * elapsed) // log-e (gv/size/x / gv/cell-size/x)
 		z/zoom/y: z/zoom/x * (gv/size/y / gv/cell-size/y) / (gv/size/x / gv/cell-size/x)
 		invalidate z
-		prof/manual/start 'drawing
-		b/draw: render b
-		prof/manual/end 'drawing
-		; unless exists? %drawn.txt [save %drawn.txt b/draw]
 	]
 ] [offset: 10x10]
-
 prof/show
 prof/reset
-; foreach-*ace/next path system/view/screens/1 [probe path]
+; ??~ z
+; dump-tree
+; debug-draw
 either system/build/config/gui-console? [print "---"][do-events]

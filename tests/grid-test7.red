@@ -51,29 +51,18 @@ view/no-wait/options [
 				either pick [xy][1x1 * ratio + 1]
 			]
 			old-cells: :grid/cells
-			grid/cells: func [/pick xy /size] [			;-- cells picker that injects grid itself
+			grid/cells: func [/pick xy /size] [			;-- cells picker that injects grid into itself
 				case [
 					size [old-cells/size]
-					ratio / 2 + 1x1 = xy ['grid-view]
+					ratio / 2 + 1x1 = xy [grid/content/:xy: 'grid-view]
 					'else [old-cells/pick xy]
 				]
 			]
 			old-draw: :draw
 			depth: 0
 			;; trick: this cell style uses the same canvas size to ensure cache hits
-			set-style 'cell function [cell /on canvas] reshape [
-				unless grid-view =? get cell/content [
-					drawn: cell/draw/on canvas				;-- draw to obtain the size
-					return compose/only/deep [
-						push [
-							fill-pen !(system/view/metrics/colors/panel)
-							pen off
-							box 0x0 (cell/size)
-						]
-						(drawn)
-					]
-				]
-				drawn: cell/draw/on size				;-- constant size to ensure caching
+			set-style 'grid/grid-view function [gview] reshape [
+				drawn: gview/draw
 				compose/only [scale (cell-size/x / size/x) (cell-size/y / size/y) (drawn)]
 			]
 			;; this calls draw recursively and creates a self-containing draw block
@@ -95,8 +84,8 @@ view/no-wait/options [
 							(r)
 						]
 						; 100
-						55
-						; 40
+						44
+						; 33
 						; 23
 				]
 				depth: depth - 1
