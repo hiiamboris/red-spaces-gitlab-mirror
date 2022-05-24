@@ -58,7 +58,7 @@ context [
 		type [datatype!] "Any series type"
 		size [integer!]  "Minimal length before reallocation, >= 1"
 	][
-		#assert [find series! type]
+		#assert [any [map! = type find series! type]]
 		size:   max 1 size								;-- else log will be infinite
 		name:   to word! type							;-- datatype is not supported by maps
 		ladder: any [free-list/:name  free-list/:name: make hash! 256]
@@ -76,7 +76,7 @@ context [
 	
 	set 'stash function [
 		"Put SERIES back into the free list for futher OBTAIN calls"
-		series [series!]
+		series [series! map!]
 	][
 		type:   type?/word series
 		ladder: any [free-list/:type  free-list/:type: make hash! 256]
