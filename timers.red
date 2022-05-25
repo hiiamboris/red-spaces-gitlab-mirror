@@ -31,7 +31,7 @@ context [
 		]
 	]
 	
-	space-object!/on-change*: function [word [any-word!] old [any-type!] new [any-type!]] with space-object! [
+	quietly space-object!/on-change*: function [word [any-word!] old [any-type!] new [any-type!]] with space-object! [
 		on-rate-change self word :old :new
 	]
 	

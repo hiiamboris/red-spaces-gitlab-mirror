@@ -205,10 +205,10 @@ image-ctx: context [
 		; ]
 		; probe self/size: 2x2 * margin + size
 		either image? image/data [
-			quietly image/size: 2x2 * image/margin + image/data/size
+			maybe image/size: 2x2 * image/margin + image/data/size
 			reduce ['image image/data 1x1 * image/margin image/data/size + image/margin]
 		][
-			quietly image/size: 2x2 * image/margin
+			maybe image/size: 2x2 * image/margin
 			[]
 		]
 	]
@@ -252,7 +252,7 @@ cell-ctx: context [
 			mask: 1x1 - (canvas / infxinf)				;-- 0x0 (infinite) to 1x1 (finite)
 			size: max size canvas * mask
 		]												;-- no canvas = no alignment, minimal appearance
-		quietly space/size: constrain size space/limits
+		maybe space/size: constrain size space/limits
 		
 		free:   space/size - cspace/size - (2x2 * space/margin)
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
@@ -442,8 +442,9 @@ scrollable-space: context [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		;@@ TODO: this size to canvas relationship is still tricky - need smth simpler
+		#assert [space/size "Somehow scrollable has no size!"]
 		box: either canvas [
-			quietly space/size: as-pair
+			maybe space/size: as-pair
 				either canvas/x < 2e9 [canvas/x][space/size/x]
 				either canvas/y < 2e9 [canvas/y][space/size/y]
 		][
@@ -598,7 +599,7 @@ paragraph-ctx: context [
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
 		text-size: constrain space/layout/extra space/limits	;-- don't make it narrower than min limit
-		quietly space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
+		maybe space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
 		;; so when layout/text is changed, we don't need to call `draw`
@@ -699,8 +700,8 @@ container-ctx: context [
 			]
 		]
 		cont/map: map				;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		quietly cont/size: size
-		quietly cont/origin: origin
+		maybe cont/size: size
+		maybe cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
 	
@@ -978,7 +979,7 @@ data-view-ctx: context [
 			font [do push-font]
 			data [
 				either block? :new [
-					space/content: anonymize 'tube lay-out-data/wrap new space/wrap?	;@@ use `row`?
+					space/content: anonymize 'row VID/lay-out-data/wrap new space/wrap?
 				][
 					space/content: VID/wrap-value :new space/wrap?	;@@ maybe reuse the old space if it's available?
 					do push-font
@@ -1037,7 +1038,7 @@ window-ctx: context [
 		;; safer to call available? every time because window never knows if content size will change
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
 		foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
-		quietly window/size: s							;-- limit window size by content size (so we don't scroll over)
+		maybe window/size: s							;-- limit window size by content size (so we don't scroll over)
 		quietly window/map: compose/deep [
 			(window/content) [offset: 0x0 size: (s)]
 		]
@@ -1315,7 +1316,7 @@ list-view-ctx: context [
 		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			quietly list/size: list/margin * 2
+			maybe list/size: list/margin * 2
 			return list/map: []
 		]
 		#assert [i1 <= i2]
@@ -1338,7 +1339,7 @@ list-view-ctx: context [
 			]
 			compose/only/into [translate (geom/offset) (drw)] tail drawn
 		]
-		quietly list/size: new-size
+		maybe list/size: new-size
 		list/map: new-map
 		drawn
 	]
@@ -1811,7 +1812,7 @@ grid-ctx: context [
 		set [cell2: offs2:] grid/locate-point xy2
 		all [none? cache/size  not grid/infinite?  cache/size: grid/calc-size]
 		; unless grid/size [quietly grid/size: cache/size]
-		quietly grid/size: cache/size
+		maybe grid/size: cache/size
 
 		;@@ create a grid layout?
 		stash grid/map
@@ -2146,7 +2147,7 @@ grid-view-ctx: context [
 			switch type?/word :source [
 				block! [
 					case [
-						pick [source/(xy/2)/(xy/1)]
+						pick [:source/(xy/2)/(xy/1)]
 						0 = n: length? source [0x0]
 						'else [as-pair length? :source/1 n]
 					]
@@ -2274,7 +2275,7 @@ templates/rotor: make-template 'space [
 		spc: get content
 		drawn: render content		;-- render before reading the size
 		r1: to 1 spc/size/x ** 2 + (spc/size/y ** 2) / 4 ** 0.5
-		quietly self/size: r1 + 10 * 2x2
+		maybe self/size: r1 + 10 * 2x2
 		compose/deep/only [
 			push [
 				line-width 10

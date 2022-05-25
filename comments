@@ -1103,6 +1103,10 @@ timers and performance
 	during render no event should ever happen, so it invalidates only isolated immediate children
 	they may be in the old cache, not in the new, but they have to be moved into the new anyway
 	so all cached stuff will be moved, and nobody knows if it's still valid, so trees grow anyway dammit
+note on size and reactivity:
+	I wanted to put `quietly` before each /size: setting, but it disables reactive relations obv
+	and those are used in VID quite a lot
+	so, using `maybe` now 
 	
 	
 	

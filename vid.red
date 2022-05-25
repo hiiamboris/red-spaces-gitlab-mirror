@@ -252,6 +252,7 @@ VID: context [
 		spec [block!]	;@@ document DSL, leave a link here
 		/styles sheet [map! none!] "Add custom stylesheet to the global one"
 		/local w b x lo hi late?
+		/extern with									;-- gets collected from `def`
 	][
 		pane: make block! 8
 		sheet: any [sheet make map! 4] 
@@ -333,7 +334,9 @@ VID: context [
 				;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
 				if any [def/link  not empty? def/reactions] [
 					insert body-of :space/on-change*
-						with [space :space/on-change*] [system/reactivity/check/only self word]
+						with [space :space/on-change*] [		;-- newlines are imporant here for mold readability
+							system/reactivity/check/only self word
+						]
 				]
 				foreach [late? reaction] def/reactions [
 					reaction: bind copy/deep reaction space
