@@ -568,6 +568,7 @@ paragraph-ctx: context [
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		layout: any [space/layouts/:width  space/layouts/:width: rtd-layout [""]]
 		flags:  compose [(1 by length? space/text) (space/flags)]
+		remove find flags 'wrap							;-- otherwise rich-text throws an error
 		quietly layout/text: as string! space/text
 		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
 		quietly layout/data: flags						;-- support of font styles - affects width
@@ -581,6 +582,7 @@ paragraph-ctx: context [
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
+		unless find space/flags 'wrap [canvas: infxinf]
 		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
 		new-width: either canvas [canvas/x][0]
@@ -629,8 +631,7 @@ paragraph-ctx: context [
 		text:   ""
 		margin: 0x0										;-- default = no margin
 		font:   none									;-- can be set in style, as well as margin
-		;@@ maybe wrap should be a flag too?
-		flags:  []										;-- [bold italic underline] supported
+		flags:  [wrap]									;-- [bold italic underline wrap] supported
 		weight: 1
 
 		;; this is required because rich-text object is shared and every change propagates onto the draw block 
@@ -644,13 +645,13 @@ paragraph-ctx: context [
 	;; unlike paragraph, text is never wrapped
 	templates/text: make-template 'paragraph [
 		weight: 0
-		draw: does [~/draw self infxinf]
+		flags:  []
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
 	templates/link: make-template 'paragraph [
-		flags: [underline]
-		color: 50.80.255								;@@ color should be taken from the OS theme
+		flags:   [wrap underline]
+		color:   50.80.255								;@@ color should be taken from the OS theme
 		command: [browse as url! text]
 	]
 ]
@@ -1441,7 +1442,6 @@ list-view-ctx: context [
 ;;   (by "infinite" I mean "big enough that it's unreasonable to scan it to infer the size (or UI becomes sluggish)")
 ;; * grid is better for big empty cells that user is supposed to fill,
 ;;   while list is better for known autosized content
-;@@ think on styling: spaces grid should not have visible delimiters, while data grid should
 grid-ctx: context [
 	~: self
 	
@@ -1633,7 +1633,7 @@ grid-ctx: context [
 		
 		bounds: grid/calc-bounds
 		r: copy [0x0 0x0]
-		foreach [x array wh?] reduce [					;@@ use reduce-in-place?
+		foreach [x array wh?] reduce [
 			'x grid/widths  :grid/col-width?
 			'y grid/heights :grid/row-height?
 		][
@@ -1659,7 +1659,6 @@ grid-ctx: context [
 
 	row-height?: function [grid [object!] y [integer!]][
 		if 'auto = r: any [grid/heights/:y grid/heights/default] [
-			; r: calc-row-height grid y ;@@@@@
 			r: any [grid/hcache/:y  grid/hcache/:y: calc-row-height grid y]
 		]
 		r
@@ -1748,8 +1747,9 @@ grid-ctx: context [
 	][
 		size:  cell2 - cell1 + 1
 		drawn: make [] size: area? size
-		map:   make [] size * 2
-		done:  make map! size							;-- local to this range of cells
+		map:   obtain block! size * 2					;-- draw appends it, so it can be obtained
+		done:  obtain map! size							;-- local to this range of cells
+		#leaving [stash done]
 														;-- sometimes the same mcell may appear in pinned & normal part
 		for cell: cell1 cell2 [
 			cell1-to-cell: either cell/x = cell1/x [	;-- pixels from cell1 to this cell
@@ -1816,28 +1816,28 @@ grid-ctx: context [
 		;@@ create a grid layout?
 		stash grid/map
 		new-map: obtain block! 2 * area? cell2 - cell1 + 1
-		append new-map map								;-- add previously drawn pinned corner
+		append new-map map  stash map					;-- add previously drawn pinned corner
 		
 		if pinned/x > 0 [
 			set [map: drawn-row-header:] draw-range grid
 				(1 by cell1/y) (pinned/x by cell2/y)
 				xy0/x by (xy1/y - offs1/y)
-			append new-map map
+			append new-map map  stash map
 		]
 		if pinned/y > 0 [
 			set [map: drawn-col-header:] draw-range grid
 				(cell1/x by 1) (cell2/x by pinned/y)
 				(xy1/x - offs1/x) by xy0/y
-			append new-map map
+			append new-map map  stash map
 		]
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
-		append new-map map
+		append new-map map  stash map
 		;-- note: draw order (common -> headers -> normal) is important
 		;-- because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;-- as such, map doesn't need clipping, but draw code does
 
-		append clear grid/map new-map					;-- this trick allows grid to contain itself
+		quietly grid/map: new-map
 		reshape [
 			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
 			clip  0x0         !(xy1)            !(drawn-common-header)	/if drawn-common-header

@@ -8,24 +8,22 @@ Red [
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
 exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap? infxinf]
 
-;@@ unfortunately macros are not imported yet due to custom `include` :(
-;@@ need a special macros file
-; ;; readability helper instead of reduce/into [] clear [] ugliness
-; #macro [#static-reduce block!] func [[manual] s e] [
-	; change/only s 'reduce/into
-	; insert/only insert e 'clear copy []
-	; s
-; ]
+;; readability helper instead of reduce/into [] clear [] ugliness
+#macro [#reduce-in-place block!] func [[manual] s e] [
+	change/only s 'reduce/into
+	insert/only insert e 'clear copy []
+	s
+]
 
-; ;@@ watch out for #5009 for a better way to specify refinements
-; #macro [#static-compose any refinement! block!] func [[manual] s e /local path] [
-	; path: copy 'compose/into
-	; e: next s
-	; while [refinement? :e/1] [append path to word! take e]
-	; change/only s path
-	; insert/only insert e 'clear copy []
-	; s
-; ]
+;@@ watch out for #5009 for a better way to specify refinements
+#macro [#compose-in-place any refinement! block!] func [[manual] s e /local path] [
+	path: copy 'compose/into
+	e: next s
+	while [refinement? :e/1] [append path to word! take e]
+	change/only s path
+	insert/only insert e 'clear copy []
+	s
+]
 
 by: make op! :as-pair
 abs: :absolute

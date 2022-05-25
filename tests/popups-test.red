@@ -2,7 +2,7 @@ Red [needs: view]
 
 #include %../everything.red
 
-recycle/off
+; recycle/off
 
 ;@@ drop-down will need a higher-level list with selected item and interactivity
 
