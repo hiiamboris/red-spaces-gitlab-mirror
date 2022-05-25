@@ -22,7 +22,7 @@ view/no-wait/options [
 			; return
 			; button "button2"
 			at 1x2 button "button1"
-			at 2x2 .. 4x3 button 80x80 .. none
+			at 2x2 .. 4x3 button 80x80
 			at 1x1 .. 2x1 button "button2"
 		] heights= #(2 100 default 40)
 	]

@@ -162,8 +162,8 @@ do with [
 		label/text-box/body/comment [(font: fonts/comment ())]
 
 		button [
-			function [btn] [
-				drawn: btn/draw
+			function [btn /on canvas] [
+				drawn: btn/draw/on canvas
 				bgnd: either btn/pushed? [svmc/text + 0.0.0.120]['off]
 				if focused? [
 					focus: compose/deep [
