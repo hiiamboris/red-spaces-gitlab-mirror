@@ -445,15 +445,14 @@ normalize-alignment: function [
 
 
 extend-canvas: function [canvas [pair! none!] axis [word!]] [
-	if canvas [
-		canvas/:axis: infxinf/x
-		all [canvas <> infxinf canvas]					;-- normalize infxinf to `none`
-	]
+	default canvas: 0x0
+	canvas/:axis: infxinf/x
+	canvas
 ]
 
 ;; useful to subtract margins, but only from finite dimensions
 subtract-canvas: function [canvas [pair! none!] pair [pair!]] [
-	if canvas [
+	if canvas [											;-- none = 0x0 - nothing to subtract from
 		mask: 1x1 - (canvas / infxinf)					;-- 0x0 (infinite) to 1x1 (finite)
 		max 0x0 canvas - (pair * mask)
 	]
