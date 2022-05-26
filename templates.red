@@ -1098,7 +1098,8 @@ inf-scrollable-ctx: context [
 	roll: function [space [object!]] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
-		wo: wo0: 0x0 - window/map/(window/content)/offset	;-- (positive) offset of window within it's content
+		;; /2 is hardcoded because `content` may change while map still will reflect the previous frame
+		wo: wo0: 0x0 - window/map/2/offset				;-- (positive) offset of window within it's content
 		#assert [window/size]
 		ws:     window/size
 		before: 0x0 - space/origin
@@ -1118,7 +1119,8 @@ inf-scrollable-ctx: context [
 			]
 		]
 		maybe space/origin: space/origin + (wo - wo0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
-		maybe window/map/(window/content)/offset: 0x0 - wo
+		;; since this is not a change of canvas, direct map manipulation is allowed:
+		window/map/2/offset: 0x0 - wo
 		if wo <> wo0 [invalidate-cache window]
 		wo <> wo0								;-- should return true when updates origin - used by event handlers
 	]
@@ -1133,7 +1135,6 @@ inf-scrollable-ctx: context [
 		content: 'window
 
 		roll-timer: make-space 'timer [rate: 4]			;-- how often to call `roll` when dragging
-		append map [roll-timer [offset 0x0 size 0x0]]
 
 		roll: does [~/roll self]
 
@@ -1150,8 +1151,9 @@ inf-scrollable-ctx: context [
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
 			unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
-			render 'roll-timer							;@@ timer has to appear in the tree for timers to work
-			scrollable-draw/on canvas
+			render 'roll-timer							;-- timer has to appear in the tree for timers to work
+			also scrollable-draw/on canvas
+			append map [roll-timer [offset 0x0 size 0x0]]	;-- scrollable/draw removes it
 		]
 	]
 ]
