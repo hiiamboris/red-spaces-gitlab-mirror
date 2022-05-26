@@ -1807,7 +1807,6 @@ grid-ctx: context [
 		unless xy2 [cache/size: xy2: grid/calc-size]
 
 		;; affects xy1 so should come before locate-point
-		map: []
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
 			set [map: drawn-common-header:] draw-range grid 1x1 pinned (grid/margin + xy1)
 			xy1: (xy0: xy1 + grid/margin) + grid/get-offset-from 1x1 (pinned + 1x1)
@@ -1823,7 +1822,7 @@ grid-ctx: context [
 		;@@ create a grid layout?
 		stash grid/map
 		new-map: obtain block! 2 * area? cell2 - cell1 + 1
-		append new-map map  stash map					;-- add previously drawn pinned corner
+		if map [append new-map map  stash map]			;-- add previously drawn pinned corner
 		
 		if pinned/x > 0 [
 			set [map: drawn-row-header:] draw-range grid
@@ -1944,8 +1943,8 @@ grid-ctx: context [
 		margin:  5x5
 		spacing: 5x5
 		origin:  0x0						;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin
-		content: make map! []				;-- XY coordinate -> space-name
-		spans:   make map! []				;-- XY coordinate -> it's XY span (not user-modifiable!!)
+		content: make map! 8				;-- XY coordinate -> space-name
+		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;@@ all this should be in the reference docs instead
 		;; widths/min used in `autofit` to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
