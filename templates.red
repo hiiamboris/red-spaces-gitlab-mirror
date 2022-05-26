@@ -293,7 +293,8 @@ cell-ctx: context [
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
 		draw: function [/on canvas [pair! none!]] [
-			~/draw self canvas
+also			~/draw self canvas
+print ["box with" content "on" canvas "->" size]
 		]
 		
 		space-on-change: :on-change*
@@ -317,6 +318,19 @@ scrollbar: context [
 		into-map space/map xy name
 	]
 	
+	arrange: function [content [block!]] [				;-- like list layout but simpler/faster
+		map: make block! 2 * length? content
+		pos: 0x0
+		foreach name content [	;@@ should be map-each
+			size: select get name 'size
+			append map compose/deep [
+				(name) [offset: (pos) size: (size)]
+			]
+			pos: size * 1x0 + pos
+		]
+		map
+	]
+	
 	draw: function [space [object!]] [
 		size2: either space/axis = 'x [space/size][reverse space/size]
 		h: size2/y  w-full: size2/x
@@ -331,16 +345,14 @@ scrollbar: context [
 		]
 		w-pgup:  w-inner - w-thumb + (w-inner * space/amount) * space/offset
 		w-pgdn:  w-inner - w-pgup - w-thumb
-		space/map/back-arrow/size:  quietly space/back-arrow/size:   sz: as-pair w-arrow h
-		space/map/back-page/offset: o: sz * 1x0		;@@ TODO: this space filling algorithm can be externalized probably
-		space/map/back-page/size:   quietly space/back-page/size:    sz: as-pair w-pgup  h
-		space/map/thumb/offset:     o: sz * 1x0 + o
-		space/map/thumb/size:       quietly space/thumb/size:        sz: as-pair w-thumb h
-		space/map/forth-page/offset:   sz * 1x0 + o
-		space/map/forth-page/size:  quietly space/forth-page/size:   sz: as-pair w-inner - w-thumb - w-pgup h	;-- compensates for previous rounding errors
-		space/map/forth-arrow/offset:  w-full - w-arrow * 1x0		;-- arrows should stick to sides even for uneven sizes
-		space/map/forth-arrow/size: quietly space/forth-arrow/size:  as-pair w-arrow h
-		foreach [name _] space/map [invalidate-cache/only get name]
+		quietly space/back-arrow/size:  w-arrow by h
+		quietly space/back-page/size:   w-pgup  by h
+		quietly space/thumb/size:       w-thumb by h
+		quietly space/forth-page/size:  w-inner - w-thumb - w-pgup by h	;-- compensates for previous rounding errors
+		quietly space/forth-arrow/size: w-arrow by h
+		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
+		
+		foreach name list [invalidate-cache/only get name]
 		compose/deep [
 			push [
 				matrix [(select [x [1 0 0 1] y [0 1 1 0]] space/axis) 0 0]
@@ -853,7 +865,8 @@ tube-ctx: context [
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
 			if width [canvas: width * 1x1]				;-- override canvas if width is set (only 1 dimension matters)
 			settings: [margin spacing align axes canvas]
-			container-draw/layout/only 'tube settings xy1 xy2
+also			container-draw/layout/only 'tube settings xy1 xy2
+print ["tube on" canvas "->" size]
 		]
 
 		container-on-change: :on-change*
@@ -1866,6 +1879,7 @@ grid-ctx: context [
 	]
 	
 	;; stochastic content-agnostic column width fitter
+	;@@ should also account for minimum cell width - don't make columns less than that (at least optionally)
 	autofit: function [
 		"Automatically adjust GRID column widths for best look"
 		grid  [object!]
