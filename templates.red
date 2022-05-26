@@ -1324,7 +1324,7 @@ list-view-ctx: context [
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
 			maybe list/size: list/margin * 2
-			return list/map: []
+			return quietly list/map: []
 		]
 		#assert [i1 <= i2]
 
@@ -1347,7 +1347,7 @@ list-view-ctx: context [
 			compose/only/into [translate (geom/offset) (drw)] tail drawn
 		]
 		maybe list/size: new-size
-		list/map: new-map
+		quietly list/map: new-map
 		drawn
 	]
 
@@ -1377,7 +1377,6 @@ list-view-ctx: context [
 			axis size pages [
 				if :old <> :new [
 					#assert [any [word <> 'axis  find [x y] :new]]
-					clear lview/list/map
 					if lview/size [						;-- do not trigger during initialization
 						lview/autosize-window
 						invalidate-cache lview
