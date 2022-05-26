@@ -478,7 +478,7 @@ scrollable-space: context [
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
-		maybe space/origin: max origin box - scrollers - csz
+		maybe space/origin: clip [origin 0x0] box - scrollers - csz
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
@@ -2141,7 +2141,7 @@ grid-view-ctx: context [
 					]
 				]
 			]
-			origin [gview/grid/origin: new]
+			origin [gview/grid/origin: new ?? new]
 		]
 		gview/inf-scrollable-on-change word :old :new
 	]
