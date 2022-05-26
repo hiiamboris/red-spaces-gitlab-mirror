@@ -114,15 +114,27 @@ do with [
 		grid/cell [										;-- has no frame since frame is drawn by grid itself
 			function [cell /on canvas] [
 				drawn: cell/draw/on canvas
-				color: select cell 'color
+				;; when cell content is not compressible, cell/size may be bigger than canvas
+				if canvas [canvas: min canvas cell/size]
+				color: any [
+					select cell 'color
+					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
+				]
 				bgnd: compose/deep [
 					push [
 						pen off
 						(when color [compose [fill-pen (color)]])
-						box 0x0 (cell/size)
+						box 0x0 (canvas)
 					]
 				]
 				compose/only [(bgnd) (drawn)]
+			]
+		]
+		
+		grid/cell/paragraph grid/cell/text [			;-- make pinned text bold
+			function [text /on canvas] [
+				maybe/same text/flags: either grid-ctx/pinned? [ [bold] ][ [] ]
+				text/draw/on canvas
 			]
 		]
 		
