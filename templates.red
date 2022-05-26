@@ -463,7 +463,7 @@ scrollable-space: context [
 			space/size
 		]
 		origin: space/origin
-		cspace: get space/map/1: space/content
+		cspace: get space/content
 		#debug grid-view [
 			#print "scrollable/draw: renders content from (max 0x0 0x0 - origin) to (box - origin); box=(box)"
 		]
@@ -499,20 +499,21 @@ scrollable-space: context [
 		quietly space/vscroll/amount: min 100% - ofs 100% * box/y / full/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
-		space/map/(space/content)/size: box
-		space/map/hscroll/offset: box * 0x1
-		space/map/vscroll/offset: box * 1x0
 		space/hscroll/size/x: either hdraw? [box/x][0]
 		space/vscroll/size/y: either vdraw? [box/y][0]
-		space/map/hscroll/size: space/hscroll/size
-		space/map/vscroll/size: space/vscroll/size
+		quietly space/map: compose/deep [				;@@ should be reshape (to remove scrollers) but it's too slow
+			(space/content) [offset: 0x0 size: (box)]
+			(in space 'hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
+			(in space 'vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
+			(in space 'scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
+		]
+		render in space 'scroll-timer					;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
 		invalidate-cache/only space/hscroll
 		invalidate-cache/only space/vscroll
 		
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
-		render in space 'scroll-timer					;@@ scroll-timer has to appear in the tree for timers
 		compose/deep/only [
 			translate (origin) [						;-- special geometry for content
 				clip (0x0 - origin) (box - origin)
@@ -532,16 +533,13 @@ scrollable-space: context [
 				#debug grid-view [#print "on-change origin: (mold :old) -> (mold :new)"]
 				if all [pair? :new  word? space/content] [
 					cspace: get space/content
-					new: clip [(space/map/(space/content)/size - cspace/size) 0x0] new 
-					set-quiet in space 'origin new
+					new: clip [(space/map/2/size - cspace/size) 0x0] new	;-- hardcoded 2 offset, because content may change 
+					quietly space/origin: new
 					#debug grid-view [#print "on-change clipped to: (space/origin)"]
 					invalidate-cache space
 				]
 			]
-			content [
-				space/map/1: :new
-				invalidate-cache space
-			]
+			content [invalidate-cache space]
 		]
 		space/space-on-change word :old :new
 	]
@@ -549,17 +547,12 @@ scrollable-space: context [
 	templates/scrollable: make-template 'space [
 		; cache?: off
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
-		content: make-space/name 'space []			;-- should be defined (overwritten) by the user
+		content: generic/empty						;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
 		scroll-timer: make-space 'timer [rate: 16]	;-- how often it scrolls when user presses & holds one of the arrows
 
-		map: compose [
-			(content) [offset 0x0 size 0x0]
-			hscroll   [offset 0x0 size 0x0]
-			vscroll   [offset 0x0 size 0x0]
-			scroll-timer [offset 0x0 size 0x0]		;-- timer currently has to be in the map to fire, else can't have a path
-		]
+		map: reduce [content [offset: 0x0 size: 0x0]]
 
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
@@ -711,7 +704,7 @@ container-ctx: context [
 				] tail drawn
 			]
 		]
-		cont/map: map				;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
+		quietly cont/map: map	;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
 		maybe cont/size: size
 		maybe cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
@@ -1077,8 +1070,8 @@ window-ctx: context [
 		; cache?: off
 
 		;; window does not require content's size, so content can be an infinite space!
-		content: make-space/name 'space []
-		map: [space [offset 0x0 size 0x0]]				;-- 'space' will be replaced by space content refers to
+		content: generic/empty
+		map: reduce [content [offset 0x0 size 0x0]]
 
 		available?: func [
 			"Should return number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
@@ -1138,7 +1131,6 @@ inf-scrollable-ctx: context [
 
 		window: make-space 'window [size: none]			;-- size is set by window/draw
 		content: 'window
-		#assert [map/1 = 'window]						;-- set by on-change
 
 		roll-timer: make-space 'timer [rate: 4]			;-- how often to call `roll` when dragging
 		append map [roll-timer [offset 0x0 size 0x0]]

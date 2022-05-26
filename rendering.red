@@ -352,7 +352,7 @@ context [
 				set [size: map: render:] next cache
 				#assert [pair? size]
 				maybe space/size: size
-				if in space 'map [space/map: map]
+				if in space 'map [quietly space/map: map]
 				set-parent space name last visited-spaces	;-- mark parent/child relations
 				#debug cache [							;-- add a frame to cached spaces after committing
 					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]
