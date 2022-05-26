@@ -547,10 +547,10 @@ scrollable-space: context [
 	templates/scrollable: make-template 'space [
 		; cache?: off
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
-		content: generic/empty						;-- should be defined (overwritten) by the user
+		content: in generic 'empty						;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
-		scroll-timer: make-space 'timer [rate: 16]	;-- how often it scrolls when user presses & holds one of the arrows
+		scroll-timer: make-space 'timer [rate: 16]		;-- how often it scrolls when user presses & holds one of the arrows
 
 		map: reduce [content [offset: 0x0 size: 0x0]]
 
