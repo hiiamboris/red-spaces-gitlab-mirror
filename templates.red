@@ -261,6 +261,7 @@ cell-ctx: context [
 			; drawn: compose/only [clip 0x0 (space/size) translate (offset) (drawn)]
 		]
 		space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
+		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
 		drawn
 	]
 	
@@ -293,8 +294,7 @@ cell-ctx: context [
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
 		draw: function [/on canvas [pair! none!]] [
-also			~/draw self canvas
-print ["box with" content "on" canvas "->" size]
+			~/draw self canvas
 		]
 		
 		space-on-change: :on-change*
@@ -367,24 +367,16 @@ scrollbar: context [
 	]
 				
 	templates/scrollbar: make-template 'space [
-		size: 100x16										;-- opposite axis defines thickness
-		axis: 'x
+		size:   100x16									;-- opposite axis defines thickness
+		axis:   'x
 		offset: 0%
 		amount: 100%
-		;@@ TODO: `init-map` func that fills all these from spaces found in the object!
-		;@@ and document what a map is and how to create it manually or using init-map
-		map: [												;-- clickable areas:
-			back-arrow  [offset 0x0 size 0x0]				;-- go back a step
-			back-page   [offset 0x0 size 0x0]				;-- go back a page
-			thumb       [offset 0x0 size 0x0]				;-- draggable
-			forth-page  [offset 0x0 size 0x0]				;-- go forth a page
-			forth-arrow [offset 0x0 size 0x0]				;-- go forth a step
-		]
-		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w]
-		back-page:   make-space 'rectangle [draw: []]
-		thumb:       make-space 'rectangle [margin: 2x1]
-		forth-page:  make-space 'rectangle [draw: []]
-		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e]
+		map:    []
+		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] ;-- go back a step
+		back-page:   make-space 'rectangle [draw: []]           ;-- go back a page
+		thumb:       make-space 'rectangle [margin: 2x1]        ;-- draggable
+		forth-page:  make-space 'rectangle [draw: []]           ;-- go forth a page
+		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] ;-- go forth a step
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		;@@ TODO: styling/external renderer
 		draw: does [~/draw self]
@@ -546,6 +538,7 @@ scrollable-space: context [
 		
 	templates/scrollable: make-template 'space [
 		; cache?: off
+		weight: 1
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: in generic 'empty						;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
@@ -858,8 +851,9 @@ tube-ctx: context [
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
 			if width [canvas: width * 1x1]				;-- override canvas if width is set (only 1 dimension matters)
 			settings: [margin spacing align axes canvas]
-also			container-draw/layout/only 'tube settings xy1 xy2
-print ["tube on" canvas "->" size]
+			drawn: container-draw/layout/only 'tube settings xy1 xy2
+			#debug sizing [print ["tube with" content "on" canvas "->" size]]
+			drawn
 		]
 
 		container-on-change: :on-change*
@@ -1125,6 +1119,16 @@ inf-scrollable-ctx: context [
 		wo <> wo0								;-- should return true when updates origin - used by event handlers
 	]
 		
+	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			pages size [
+				all [space/size  0x0 +< space/size  space/autosize-window]
+				invalidate-cache space
+			]
+		]
+		space/scrollable-on-change word :old :new
+	]
+	
 	templates/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
@@ -1150,11 +1154,17 @@ inf-scrollable-ctx: context [
 
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
-			unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
+			; unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
+			; autosize-window
 			render 'roll-timer							;-- timer has to appear in the tree for timers to work
-			also scrollable-draw/on canvas
+			drawn: scrollable-draw/on canvas
 			append map [roll-timer [offset 0x0 size 0x0]]	;-- scrollable/draw removes it
+			#debug sizing [print ["inf-scrollable with" content "on" canvas "->" size "window:" window/size]]
+			drawn
 		]
+		
+		scrollable-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 
@@ -1453,7 +1463,7 @@ grid-ctx: context [
 	~: self
 	
 	into: func [grid [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
-		if name [return into-map grid xy name]
+		if name [return into-map grid/map xy name]
 		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
 		if cell <> mcell [
@@ -1635,7 +1645,8 @@ grid-ctx: context [
 			unless (pinned: grid/pinned) +<= pinned-area: 0x0 [	;-- nonzero pinned rows or cols?
 				pinned-area: grid/spacing + grid/get-offset-from 1x1 (pinned + 1x1)
 			]
-			if pinned-area +<= xy [xy: xy - grid/origin]		;-- translate to the moveable cells
+			;; translate heading coordinates into the beginning of the grid
+			unless (pinned-area - grid/origin) +<= xy [xy: xy + grid/origin]
 		]
 		
 		bounds: grid/calc-bounds
@@ -1792,6 +1803,12 @@ grid-ctx: context [
 		reduce [map drawn]
 	]
 		
+	;@@ this hack allows styles to know whether this cell is pinned or not
+	;@@ otherwise I would have to make `content` a hash which will uglify everything
+	;@@ this however will not affect `available?` and other render calls,
+	;@@ so pinned cells cannot currently have different size
+	pinned?: does [get bind 'pinned? :draw]
+		
 	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
 		;@@ keep this in sync with `list/draw`
@@ -1807,6 +1824,7 @@ grid-ctx: context [
 		unless xy2 [cache/size: xy2: grid/calc-size]
 
 		;; affects xy1 so should come before locate-point
+		pinned?: yes
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
 			set [map: drawn-common-header:] draw-range grid 1x1 pinned (grid/margin + xy1)
 			xy1: (xy0: xy1 + grid/margin) + grid/get-offset-from 1x1 (pinned + 1x1)
@@ -1837,6 +1855,7 @@ grid-ctx: context [
 			append new-map map  stash map
 		]
 
+		pinned?: no
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
 		append new-map map  stash map
 		;-- note: draw order (common -> headers -> normal) is important
@@ -2097,13 +2116,6 @@ grid-ctx: context [
 grid-view-ctx: context [
 	~: self
 	
-	into: func [gview [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
-		any [
-			into-map/only gview/map xy name with gview [hscroll vscroll]
-			grid-ctx/into gview/grid xy name
-		]
-	]
-	
 	;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
 	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 		#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
@@ -2141,7 +2153,7 @@ grid-view-ctx: context [
 					]
 				]
 			]
-			origin [gview/grid/origin: new ?? new]
+			origin [gview/grid/origin: new]
 		]
 		gview/inf-scrollable-on-change word :old :new
 	]
@@ -2192,8 +2204,6 @@ grid-view-ctx: context [
 			][data/size]
 		]
 		grid/calc-bounds: grid/bounds: does [grid/cells/size]
-		
-		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		
 		inf-scrollable-on-change: :on-change*
 		#on-change-redirect

@@ -20,6 +20,7 @@ do/expand [
 	; #debug set draw										;-- turn on to see what space produces draw errors
 	#debug set profile									;-- turn on to see rendering times
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
+	; #debug set sizing 									;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus
 	; #debug set events
 	; #debug set styles
