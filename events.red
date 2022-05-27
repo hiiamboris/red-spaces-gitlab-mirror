@@ -352,7 +352,7 @@ events: context [
 		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
 		wpath: path  unit: 1										;-- word-only path
 		if pair? second path [
-			wpath: extract/into path unit: 2 clear []				;-- remove pairs
+			wpath: extract/into path unit: 2 clear []				;-- remove pairs ;@@ should be `map` - extract is slow
 		]
 		#assert [not find wpath pair!]
 		len: length? wpath
@@ -360,21 +360,28 @@ events: context [
 		template: next as path! [handlers]							;-- static, not allocated
 		;@@ TODO: this is O(len^2) and should be optimized...
 		while [i2 <= len] [											;-- walk from the outermost spaces to the innermost
-			repeat i1 i2 [											;-- walk from the longest path to the shortest
-				hpath:												;-- construct full path to the handler
-					append append/part
-					clear template 
-					at wpath i1  skip wpath i2						;-- add slice [i1,i2] of path
-					hnd-name
-				unless block? try [list: get hpath] [continue]
-				commands/stop										;-- stop after current stack unless `pass` gets called
-				path: skip head path i2 - 1 * unit					;-- position path at the space that receives event
-				foreach handler list [								;-- whole list is called regardless of stop flag change
-					#assert [function? :handler]
-					do-handler template :handler path event args	;@@ should handler index in the list be reported on error?
+			;; last space is usually the one handler is intereted in, not `screen`
+			;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
+			target: skip head path i2 - 1 * unit					;-- position path at the space that receives event
+			do-previewers target event args
+			
+			unless commands/stop? [
+				repeat i1 i2 [										;-- walk from the longest path to the shortest
+					hpath:											;-- construct full path to the handler
+						append append/part
+						clear template 
+						at wpath i1  skip wpath i2					;-- add slice [i1,i2] of path
+						hnd-name
+					unless block? try [list: get hpath] [continue]
+					commands/stop									;-- stop after current stack unless `pass` gets called
+					foreach handler list [							;-- whole list is called regardless of stop flag change
+						#assert [function? :handler]
+						do-handler template :handler target event args	;@@ should handler index in the list be reported on error?
+					]
 				]
-				if commands/stop? [exit]
 			]
+			
+			do-finalizers target event args
 			i2: i2 + 1
 		]
 	]
@@ -387,12 +394,7 @@ events: context [
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][
 		#debug profile [prof/manual/start 'process-event]
-		;; last space is usually the one handler is intereted in, not `screen`
-		;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
-		target: any [find/last path word!  path]
-		do-previewers target event args
 		unless commands/stop? [do-handlers path event args focused?]
-		do-finalizers target event args
 		#debug profile [prof/manual/end 'process-event]
 	]
 
