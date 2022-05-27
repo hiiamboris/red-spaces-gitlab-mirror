@@ -133,7 +133,9 @@ do with [
 		
 		grid/cell/paragraph grid/cell/text [			;-- make pinned text bold
 			function [text /on canvas] [
-				maybe/same text/flags: either grid-ctx/pinned? [ [bold] ][ [] ]
+				maybe text/flags: either grid-ctx/pinned?
+					[union   text/flags [bold]]
+					[exclude text/flags [bold]]
 				text/draw/on canvas
 			]
 		]
