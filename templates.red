@@ -114,6 +114,7 @@ templates/timer: make-template 'space [rate: none]		;-- template space for timer
 generic: object [										;-- holds commonly used spaces ;@@ experimental
 	empty: make-space 'space []							;-- used when no content is given
 	<->: stretch: none									;-- set after box definition
+	too-deep: none										;-- used by data-view to contain recursion
 ]
 
 rectangle-ctx: context [
@@ -446,7 +447,7 @@ scrollable-space: context [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		;@@ TODO: this size to canvas relationship is still tricky - need smth simpler
-		#assert [space/size "Somehow scrollable has no size!"]
+		#assert [any [space/size all [canvas canvas +< infxinf]] "Somehow scrollable has no size!"]
 		box: either canvas [
 			maybe space/size: as-pair
 				either canvas/x < 2e9 [canvas/x][space/size/x]
@@ -961,9 +962,28 @@ label-ctx: context [
 
 ;; a polymorphic style: given `data` creates a visual representation of it
 ;; `content` can be used directly to put a space into it (useful in clickable, button)
-;@@ TODO: complex types should leverage table style
 data-view-ctx: context [
 	~: self
+
+	generic/too-deep: make-space 'paragraph [
+		text: "(data is too deep to display)"
+	]
+	
+	;; to avoid infinite draw blocks during render of cyclic data:
+	;@@ maybe this should be in the style? but styls is a place for visual things, not depth control..
+	limit: 6
+	depth: 0
+	
+	draw: function [space [object!] canvas [none! pair!] /extern depth] [
+		if limit < depth: depth + 1 [
+			saved: space/content
+			quietly space/content: in generic 'too-deep
+		]
+		trap/catch [drawn: space/box-draw/on canvas] [error: thrown]
+		depth: depth - 1
+		if saved [quietly space/content: saved]
+		either error [do error][drawn]
+	]
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		; print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
@@ -997,6 +1017,9 @@ data-view-ctx: context [
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
 		font:    none
 		wrap?:   off									;-- controls choice between text (off) and paragraph (on)
+		
+		box-draw: :draw
+		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		
 		box-on-change: :on-change*
 		#on-change-redirect
@@ -1143,19 +1166,13 @@ inf-scrollable-ctx: context [
 		roll: does [~/roll self]
 
 		autosize-window: function [] [
-			size: any [self/size self/limits/min]		;@@ rethink how to better hanlde integer or invalid limit
-			#assert [
-				pair? size
-				0x0 +< size
-			]
-			maybe window/max-size: pages * size
+			size: any [self/size if self/limits [self/limits/min]]
+			if 0x0 +< size [maybe window/max-size: pages * size]	;-- don't ever make window empty
 			#debug list-view [#print "autosized window to (window/max-size)"]
 		]
 
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
-			; unless window/size [autosize-window]		;-- 1st draw call automatically sizes the window
-			; autosize-window
 			render 'roll-timer							;-- timer has to appear in the tree for timers to work
 			drawn: scrollable-draw/on canvas
 			append map [roll-timer [offset 0x0 size 0x0]]	;-- scrollable/draw removes it
