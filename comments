@@ -1107,8 +1107,19 @@ note on size and reactivity:
 	I wanted to put `quietly` before each /size: setting, but it disables reactive relations obv
 	and those are used in VID quite a lot
 	so, using `maybe` now 
-	
-	
+fast hittesting over grid - how?
+	problem: `cell` is a generic name, within a map search is linear, even if it was a hash
+	thus into-map will be slow with thousands of cells
+	to fix it, need some map of cell-object -> cell-offset
+	tried to introduce scache (object->geom or object->offset) for this exactly
+	but scache can't just return geometry or offset, because that may change with canvas!
+	may make it return index into the map, but that has the same pitfall:
+	last drawn map may not be the one render fetched from cache
+	and though I may rely on it's length being unchanged, this is rather fragile and will fire back at me
+	so for now, until a better idea, hittest on grid is slow 
+	nor scache worked for pinned-or-not cell identification, because grid/cell style has no access to grid!
+	as a result, pinned cells cannot have different size (only colors),
+	because grid-ctx/pinned? does not affect rendering from calc-height (and locate-line)
 	
 
 VID Styles: must be documented TODO

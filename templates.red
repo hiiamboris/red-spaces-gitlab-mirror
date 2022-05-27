@@ -1463,15 +1463,7 @@ grid-ctx: context [
 	~: self
 	
 	into: func [grid [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
-		;; into-map is slow: linear search over map; but to fix it, need some map of cell-object -> cell-offset
-		;; or at least cell-object -> cell-xy, and even making content a hash won't help since value is a word
-		;; had to introduce scache for this exactly
-		if name [
-			geom: select/same grid/scache get name
-			#assert [geom]
-			return reduce [name xy - geom/offset]
-		]
-		
+		if name [return into-map grid/map xy name]		;-- let into-map handle it ;@@ slow! need a better solution!
 		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
 		if cell <> mcell [
@@ -1806,28 +1798,12 @@ grid-ctx: context [
 			compose/only/into [							;-- compose-map calls extra render, so let's not use it here
 				translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
 			] tail drawn
-			;; mark it in scache for further reverse search
-			either pos: find/same/tail grid/scache mcspace [
-				pos/1: geom
-			][
-				repend grid/scache [mcspace geom]
-			]
 		]
 		reduce [map drawn]
 	]
 		
 	;@@ this hack allows styles to know whether this cell is pinned or not
-	;@@ otherwise I would have to make `content` a hash which will uglify everything
-	;@@ this however will not affect `available?` and other render calls,
-	;@@ so pinned cells cannot currently have different size
-	;@@ unfortunately, having scache doesn't help here, as grid/cell style doesn't have access to grid object
-	;@@ so it doesn't know where to look for the cell
 	pinned?: does [get bind 'pinned? :draw]
-	; pinned?: function [grid [object!] space [object!]] [
-		; xy: select/same grid/scache space
-		; #assert [xy]
-		; not grid/pinned +< xy
-	; ]
 		
 	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
@@ -1961,14 +1937,10 @@ grid-ctx: context [
 	invalidate*: function [grid [object!] cell [pair! none!]] [
 		either cell [
 			remove/key grid/hcache cell/y
-			if name: grid/ccache/:cell [
-				remove/key grid/ccache cell
-				fast-remove find/same grid/scache get name 2
-			]
+			remove/key grid/ccache cell
 			grid/size-cache/size: none
 		][
 			clear grid/hcache							;-- clear should never be called on big datasets
-			clear grid/scache
 			set grid/size-cache none					;-- reset calculated bounds
 		]
 	]
@@ -2001,12 +1973,9 @@ grid-ctx: context [
 											;-- 'auto will have a problem inside infinite grid with a sliding window
 
 		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
-		;; "cell cache" and "space cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
-		;; first, a persistency required by the focus model: cells must retain sameness, i.e. XY -> name
-		;; second, for fast hittesting and pinned detection, cell-object -> it's offset and it's cell XY on the grid
-		;; not unified to keep interface simple, and compatible with `grid-view/content`
-		ccache:  make map!  20							;-- filled by render and height estimator
-		scache:  make hash! 20							;-- filled by render
+		;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
+		;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
+		ccache:  make map!  20				;-- filled by render and height estimator
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
@@ -2025,13 +1994,6 @@ grid-ctx: context [
 		]
 
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
-		
-		; pinned?: func [
-			; "True if CELL is pinned"
-			; cell [object!]
-		; ][
-			; ~/pinned? self cell
-		; ]
 		
 		;-- userspace functions for `spans` reading & modification
 		;-- they are required to be able to get any particular cell's multi-cell without full `spans` traversal
