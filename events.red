@@ -404,7 +404,16 @@ events: context [
 	]
 	
 
-	dragging?: does [not empty? drag-in/head]
+	dragging?: function [
+		"True if in dragging mode"
+		/from space [object!] "Only if SPACE started it"
+	][
+		case [
+			empty? drag-in/head [no]
+			not from [yes]
+			name: drag-in/path/1 [space =? get name]
+		]
+	]
 	
 	stop-drag: function [
 		"Stop dragging; return truthy if stopped, none otherwise"
@@ -446,7 +455,7 @@ events: context [
 		set [spc': ofs':] path'
 		set [spc:  ofs: ] path
 		#assert [
-			spc = spc'							;-- only makes sense to track it within the same space
+			spc =? spc'									;-- only makes sense to track it within the same space
 			word? spc
 			pair? ofs
 			pair? ofs'

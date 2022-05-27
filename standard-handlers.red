@@ -26,30 +26,27 @@ define-handlers [
 					]
 					start-drag/with path space/origin
 				]
-				item = space/content [
-					start-drag/with path space/origin
-					pass
-				]
+				item = space/content [pass]				;-- let content handle it
 			]
 		]
 		on-up [space path event] [stop-drag pass]
 		on-over [space path event] [
-			unless dragging? [pass exit]			;-- let inner spaces handle it
+			unless dragging?/from space [pass exit]		;-- let inner spaces handle it
 			set [_: _: item: _: subitem:] path
 			either find [hscroll vscroll] item [
-				unless subitem = 'thumb [exit]		;-- do not react to drag of arrows (used by timer)
+				unless subitem = 'thumb [exit]			;-- do not react to drag of arrows (used by timer)
 				scroll: get item
-				map: scroll/map
-				x: scroll/axis
-				size1: scroll/size/:x - map/back-arrow/size/x - map/forth-arrow/size/x - map/thumb/size/x
+				map:    scroll/map
+				x:      scroll/axis
+				size1:  scroll/size/:x - map/back-arrow/size/x - map/forth-arrow/size/x - map/thumb/size/x
 				cspace: get space/content
-				scs: cspace/size
-				size2: scs/:x - space/map/(space/content)/size/:x
-				ofs: drag-offset skip path 2		;-- get offset relative to the scrollbar
-				ofs: ofs * select [x 1x0 y 0x1] x	;-- project offset onto the axis
+				scs:    cspace/size
+				size2:  scs/:x - space/map/2/size/:x
+				ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
+				ofs: ofs * select [x 1x0 y 0x1] x		;-- project offset onto the axis
 				ofs: ofs * -1 * size2 / (max 1 size1)	;-- scale scrollbar inner part to the whole content
 			][
-				ofs: drag-offset path				;-- content is dragged directly
+				ofs: drag-offset path					;-- content is dragged directly
 			]
 			space/origin: drag-parameter + ofs
 			update
