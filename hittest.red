@@ -14,7 +14,8 @@ into-map: function [
 ][
 	either name [
 		#assert [find map name]
-		reduce [name  xy - map/:name/offset]
+		geom: select/same map name
+		reduce [name  xy - geom/offset]
 	][
 		either names [
 			foreach name names [
