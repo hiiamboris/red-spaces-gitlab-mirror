@@ -335,17 +335,17 @@ scrollbar: context [
 	draw: function [space [object!]] [
 		size2: either space/axis = 'x [space/size][reverse space/size]
 		h: size2/y  w-full: size2/x
-		w-arrow: to 1 size2/y * 0.9
+		w-arrow: to integer! size2/y * 0.9
 		w-inner: w-full - (2 * w-arrow)
 		;-- in case size is too tight to fit the scrollbar - compress inner first, arrows next
 		if w-inner < 0 [w-arrow: to integer! w-full / 2  w-inner: 0]
-		w-thumb: case [						;-- 3 strategies for the thumb
+		w-thumb: to integer! case [						;-- 3 strategies for the thumb
 			w-inner >= (2 * h) [max h w-inner * space/amount]	;-- make it big enough to aim at
 			w-inner >= 8       [      w-inner * space/amount]	;-- better to have tiny thumb than none at all
 			'else              [0]								;-- hide thumb, leave just the arrows
 		]
-		w-pgup:  w-inner - w-thumb + (w-inner * space/amount) * space/offset
-		w-pgdn:  w-inner - w-pgup - w-thumb
+		w-pgup: to integer! w-inner - w-thumb + (w-inner * space/amount) * space/offset
+		w-pgdn: w-inner - w-pgup - w-thumb
 		quietly space/back-arrow/size:  w-arrow by h
 		quietly space/back-page/size:   w-pgup  by h
 		quietly space/thumb/size:       w-thumb by h
