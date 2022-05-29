@@ -264,6 +264,11 @@ do with [
 	
 
 	map-each/only/self [w [word! ]] styles [to path! w]	;-- replace words with paths
+	do with [paths: block: none] [						;-- separate grouped styles
+		mapparse [copy paths some path! set block block!] styles [
+			map-each/eval path paths [[path copy/deep block]]	;@@ copy/deep works around #4854
+		] 
+	]
 	map-each/only/self [b [block!]] styles [			;-- extract blocks, construct functions
 		either 'function = first b [do b][b]
 	]

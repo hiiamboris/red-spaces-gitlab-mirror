@@ -22,11 +22,10 @@ get-current-style: function [
 	#assert [not head? path]
 	until [												;-- look for the most specific fitting style
 		p: back path
-		style: any [find/only styles p  style]
+		style: any [select/only/skip styles p 2  :style]
 		head? path: p
 	]
-	unless style [return []]
-	style: first find style style-typeset!				;-- style groups support
+	default style: []
 	#debug styles [#print "Style for (p) is (mold/flat :style)"]
 	:style
 ]

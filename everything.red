@@ -52,6 +52,7 @@ do/expand [
 	; #include %../common/keep-type.red
 	#include %../common/typecheck.red
 	; #include %../common/selective-catch.red
+	#include %../common/mapparse.red
 	#include %../common/reshape.red
 	#include %../common/do-queued-events.red
 	#include %../common/show-trace.red
