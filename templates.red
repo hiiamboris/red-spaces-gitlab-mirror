@@ -245,6 +245,7 @@ cell-ctx: context [
 	
 	draw: function [space [object!] canvas [pair! none!]] [
 		#assert [space/content]
+		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
 		drawn:  render/on space/content if canvas [subtract-canvas canvas 2x2 * space/margin]
 		cspace: get space/content
 		size: 2x2 * space/margin + cspace/size
@@ -446,14 +447,18 @@ scrollable-space: context [
 	draw: function [space [object!] canvas [none! pair!]] [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
-		;@@ TODO: this size to canvas relationship is still tricky - need smth simpler
-		#assert [any [space/size all [canvas canvas +< infxinf]] "Somehow scrollable has no size!"]
-		box: either canvas [
-			maybe space/size: as-pair
-				either canvas/x < 2e9 [canvas/x][space/size/x]
-				either canvas/y < 2e9 [canvas/y][space/size/y]
-		][
-			space/size
+		box: default canvas: 0x0
+		foreach x [x y] [
+			box/:x: any [
+				if canvas/:x < infxinf/:x [canvas/:x]
+				all [space/limits space/limits/min space/limits/min/:x]	;@@ REP #113
+				0
+			]
+		]
+		maybe space/size: box
+		if zero? area? box [
+			#assert [false "Somehow scrollable has no size!"]
+			return quietly space/map: []
 		]
 		origin: space/origin
 		cspace: get space/content
@@ -526,7 +531,9 @@ scrollable-space: context [
 				#debug grid-view [#print "on-change origin: (mold :old) -> (mold :new)"]
 				if all [pair? :new  word? space/content] [
 					cspace: get space/content
-					new: clip [(space/map/2/size - cspace/size) 0x0] new	;-- hardcoded 2 offset, because content may change 
+					;; hardcoded 2 offset, because content may change and get out of sync with the frame
+					visible-size: either empty? space/map [0x0][space/map/2/size]
+					new: clip [(visible-size - cspace/size) 0x0] new 
 					quietly space/origin: new
 					#debug grid-view [#print "on-change clipped to: (space/origin)"]
 					invalidate-cache space
@@ -539,6 +546,8 @@ scrollable-space: context [
 		
 	templates/scrollable: make-template 'space [
 		; cache?: off
+		;@@ make limits a block to save some RAM?
+		limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		weight: 1
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: in generic 'empty						;-- should be defined (overwritten) by the user
@@ -621,16 +630,14 @@ paragraph-ctx: context [
 		space/space-on-change word :old :new
 	]
 	
-	;; every `make font!` brings View closer to it's demise, so it has to use a shared font
-	;; styles may override `/font` with another font created in advance 
-	;@@ BUG: not deeply reactive
-	shared-font: make font! [name: system/view/fonts/sans-serif size: system/view/fonts/size]
-
  	templates/paragraph: make-template 'space [
 		size:   none									;-- only valid after `draw` because it applies styles
 		text:   ""
 		margin: 0x0										;-- default = no margin
+		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
+		;; styles may override `/font` with another font created in advance 
 		font:   none									;-- can be set in style, as well as margin
+		; font:   none									;-- can be set in style, as well as margin
 		flags:  [wrap]									;-- [bold italic underline wrap] supported
 		weight: 1
 
@@ -882,8 +889,11 @@ switch-ctx: context [
 	templates/switch: make-template 'space [
 		state: off
 		; command: []
-		data: make-space 'data-view []
-		draw: does [also data/draw size: data/size]
+		data: make-space 'data-view []					;-- general viewer to be able to use text/images
+		draw: func [/on canvas [none! pair!]] [
+			also data/draw/on canvas
+			size: data/size
+		]
 		space-on-change: :on-change*
 		#on-change-redirect
 	]
@@ -965,25 +975,29 @@ label-ctx: context [
 data-view-ctx: context [
 	~: self
 
-	generic/too-deep: make-space 'paragraph [
-		text: "(data is too deep to display)"
-	]
+	generic/too-deep: make-space 'paragraph [text: "(depth limit reached)"]
 	
-	;; to avoid infinite draw blocks during render of cyclic data:
-	;@@ maybe this should be in the style? but styls is a place for visual things, not depth control..
-	limit: 6
-	depth: 0
+	; ;; to avoid infinite draw blocks during render of cyclic data:
+	; ;@@ maybe this should be in the style? but styls is a place for visual things, not depth control..
+	; limit: 3
+	; depth: 0
 	
-	draw: function [space [object!] canvas [none! pair!] /extern depth] [
-		if limit < depth: depth + 1 [
-			saved: space/content
-			quietly space/content: in generic 'too-deep
-		]
-		trap/catch [drawn: space/box-draw/on canvas] [error: thrown]
-		depth: depth - 1
-		if saved [quietly space/content: saved]
-		either error [do error][drawn]
-	]
+	; deep-types: make typeset! [object! map! function! all-word! any-block!]	;@@ what else? should it even be here??
+	
+	; draw: function [space [object!] canvas [none! pair!] /extern depth] [
+		; depth: depth + 1
+		; if all [
+			; limit < depth
+			; find deep-types type? :space/data
+		; ][
+			; saved: space/content
+			; quietly space/content: in generic 'too-deep
+		; ]
+		; trap/catch [drawn: space/box-draw/on canvas] [error: thrown]
+		; depth: depth - 1
+		; if saved [quietly space/content: saved]
+		; either error [do error][drawn]
+	; ]
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		; print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
@@ -1018,8 +1032,8 @@ data-view-ctx: context [
 		font:    none
 		wrap?:   off									;-- controls choice between text (off) and paragraph (on)
 		
-		box-draw: :draw
-		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
+		; box-draw: :draw
+		; draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		
 		box-on-change: :on-change*
 		#on-change-redirect

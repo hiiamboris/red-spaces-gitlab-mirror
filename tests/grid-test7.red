@@ -30,8 +30,7 @@ view/no-wait/options [
 	below
 	host [fps-meter]
 	b: host [
-		grid-view with [
-			size: 500x300
+		grid-view 500x300 with [
 			ratio: 5
 			; cache?: grid/cache?: window/cache?: spaces/templates/cell/cache?: off
 			; grid/pinned: 2x1
@@ -43,7 +42,7 @@ view/no-wait/options [
 			; grid/set-span/force 2x2 3x2
 			; set-span/force 1x1 1x3
 			; cell-size: 200x150
-			cell-size: size - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
+			cell-size: limits/min - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
 			grid/widths/default:  cell-size/x
 			grid/heights/default: cell-size/y
 			grid-view: self
@@ -63,16 +62,16 @@ view/no-wait/options [
 			;; trick: this cell style uses the same canvas size to ensure cache hits
 			set-style 'grid/grid-view function [gview] reshape [
 				drawn: gview/draw
-				compose/only [scale (cell-size/x / size/x) (cell-size/y / size/y) (drawn)]
+				compose/only [scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)]
 			]
 			;; this calls draw recursively and creates a self-containing draw block
 			;; but at the top level it is clipped at certain depth level,
 			;; so face/draw receives a truncated draw tree which it is able to render without deadlocking
 			;; copying depth has to be adjusted manually to a reasonable amount
-			draw: function [/extern depth] [
+			draw: function [/on canvas /extern depth] [
 				r: []
 				if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
-					append clear r old-draw
+					append clear r old-draw/on canvas
 					elapsed: to float! difference now/precise t0
 					zx: exp elapsed // log-e (size/x / cell-size/x)
 					zy: zx * (size/y / cell-size/y) / (size/x / cell-size/x)

@@ -26,7 +26,6 @@ actors: context [
 	register-previewer supported-events function [
 		space [object! none!] path [block!] event [event! object!] delay [percent! none!]
 	][
-		; print [event/type mold path]
 		all [
 			space
 			actors: select space 'actors
@@ -34,6 +33,8 @@ actors: context [
 			actor:  select actors name
 			actor space path event delay
 		]
+		; if event/type <> 'time [print [event/type mold path] ??~ space]
+		; if event/type = 'key [print [event/type mold path] ??~ actors]
 	]
 	
 ];; actors

@@ -60,8 +60,7 @@ view/no-wait/options [
 	host [fm: fps-meter]
 	b: host [
 		z: zoomer [
-			gv: grid-view with [
-				size: 500x300
+			gv: grid-view 500x300 with [
 				; grid/pinned: 2x1
 				; grid/bounds: [x: #[none] y: #[none]]
 				grid/set-span 6x1 1x5					;-- unify outside cells for more fps
@@ -70,7 +69,7 @@ view/no-wait/options [
 				; grid/set-span/force 2x2 3x2
 				; set-span/force 1x1 1x3
 				ratio: 5
-				cell-size: size - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
+				cell-size: limits/min - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
 				grid/widths/default:  cell-size/x
 				grid/heights/default: cell-size/y
 				grid-view: self
@@ -81,7 +80,7 @@ view/no-wait/options [
 					drawn: gview/draw
 					compose/only [
 						fill-pen !(system/view/metrics/colors/panel) box 0x0 (cell-size)
-						scale (cell-size/x / size/x) (cell-size/y / size/y) (drawn)
+						scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)
 					]
 				]
 				old-draw: :draw
@@ -91,10 +90,10 @@ view/no-wait/options [
 				;; copying depth has to be adjusted manually to a reasonable amount
 				;; with 6x6=36 cells, at depth 2 it becomes 1296 (~40fps), at depth 3 - 46656 cells (~1fps)
 				depth: 0
-				draw: function [/extern depth] [
+				draw: function [/on canvas /extern depth] [
 					r: []
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
-						append clear r old-draw
+						append clear r old-draw/on canvas
 						prof/manual/start 'truncation
 						; r: copy-deep-limit r 30				;-- 3 levels - 15625 grids
 						r: copy-deep-limit r 20				;-- 2 levels - 625 grids

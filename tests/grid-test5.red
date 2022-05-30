@@ -25,13 +25,12 @@ view/no-wait/options [
 	below
 	text 500 center white red font-size 20 "Rendering this should take a while..."
 	b: host [
-		grid-view with [
-			size: 500x300
+		grid-view 500x300 with [
 			; grid/pinned: 2x1
 			; grid/bounds: [x: #[none] y: #[none]]
 			; cell-size: 200x150
 			ratio: 1.2
-			cell-size: size - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
+			cell-size: limits/min - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
 			grid/widths/default:  cell-size/x
 			grid/heights/default: cell-size/y
 			grid-view: self
@@ -40,13 +39,13 @@ view/no-wait/options [
 			]
 			depth: 0
 			old-draw: :draw
-			draw: function [/extern depth] [
+			draw: function [/on canvas /extern depth] [
 				r: []
 				;-- this gets quite slow to render :)
 				;-- depth<=7 even if 4 cells are visible means 4**7=16384 cells! and about ~1G of RAM
 				if depth < max-depth [
 					depth: depth + 1
-					r: old-draw
+					r: old-draw/on canvas
 					depth: depth - 1
 					if depth > 0 [
 						zx: cell-size/x / size/x

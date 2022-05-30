@@ -183,7 +183,6 @@ VID: context [
 			logic!  [make-space/name 'logic [state: value]]
 			image!  [make-space/name 'image [data:  value]]
 			url!    [make-space/name 'link  [data:  value]]
-			;@@ also object & map as grid? and use lay-out-data for block?
 		] [make-space/name 'text [text: mold :value]]
 	]
 	
@@ -286,8 +285,8 @@ VID: context [
 			]
 			space-spec: compose [
 				(any [def/style/spec []])
-				(def/with)
 				(facets)
+				(def/with)
 			]
 			
 			either def/styling? [						;-- new style defined
