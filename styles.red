@@ -21,6 +21,7 @@ set-style: function [
 		insert/only tail styles name
 	]
 	change/only pos :style
+	:style
 ]
 
 remove-style: function [
