@@ -56,6 +56,7 @@ do with [
 	;@@ fill this with some more ;@@ should it be part of system/view/metrics/fonts?
 	fonts: make map! reduce [
 		'text      make font! [name: svf/system size: svf/size]
+		'code      make font! [name: svf/fixed  size: svf/size]
 		'label     make font! [name: svf/system size: svf/size + 1]
 		'switch    make font! [name: svf/system size: svf/size + 6]
 		'sigil     make font! [name: svf/system size: svf/size + 1]
@@ -74,13 +75,14 @@ do with [
 		host [
 			pen off
 			fill-pen !(svmc/panel)
-			font !(make font! [name: svf/system size: svf/size])
+			font !(fonts/text)
 			line-width 2
 			pen !(svmc/text)
 		]
 
 		text paragraph link fps-meter [
 			(when select self 'color [compose [pen (color)]])
+			(maybe/same font: fonts/text ())					;@@ hate this syntax! find a better one
 			#if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
 		]
 
