@@ -181,33 +181,10 @@ image-ctx: context [
 	~: self
 	
 	draw: function [image [object!] canvas [pair! none!]] [
-		;@@ haven't figured out image stretching yet... and limits - who should enforce them? and how should it be scaled?
-		;@@ besides such stretching may be harmful: image has it's optimum size
-		;@@ and stretching it by default would require one to work around it in most cases
-		;@@ using fixed /size is a viable option but is a bit of a hack and I'm worried about consistency with other spaces
-		; case [
-			; not image? data [size: 0x0]
-			; canvas [
-				; size: subtract-canvas canvas 2x2 * margin
-				; ?? size
-				; case [
-					; canvas +< infxinf ['nothing]
-					; size/x >= infxinf/x [
-						; size/x: either size/y = 0 [data/size/x][round/ceiling/to size/y * data/size/x / data/size/y 1]
-					; ]
-					; size/y >= infxinf/y [
-						; size/y: either size/x = 0 [data/size/y][round/ceiling/to size/x * data/size/y / data/size/x 1]
-					; ]
-				; ]
-				; ?? size
-				; #assert [size +< infxinf]
-			; ]
-			; 'else [size: data/size]
-		; ]
-		; probe self/size: 2x2 * margin + size
 		either image? image/data [
-			maybe image/size: 2x2 * image/margin + image/data/size
-			reduce ['image image/data 1x1 * image/margin image/size - image/margin]
+			mrg: 1x1 * image/margin
+			maybe image/size: constrain 2 * mrg + image/data/size image/limits
+			reduce ['image image/data mrg image/size - mrg]
 		][
 			maybe image/size: 2x2 * image/margin
 			[]
