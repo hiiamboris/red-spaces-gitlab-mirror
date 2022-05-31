@@ -1699,7 +1699,9 @@ grid-ctx: context [
 		; #assert [size-cache/bounds]
 		xlim: bounds/x
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
-		hmin: append clear [] any [grid/heights/min 0]
+		hmin: obtain block! xlim + 1					;-- can't be static because has to be reentrant!
+		#leaving [stash hmin]
+		append hmin any [grid/heights/min 0]
 		for x: 1 xlim [
 			canvas: as-pair grid/col-width? x infxinf/y
 			span: grid/get-span xy: as-pair x y
@@ -1726,7 +1728,9 @@ grid-ctx: context [
 			]
 			x: x + max 0 span/x - 1						;-- skip horizontal span
 		]
-		second minmax-of hmin							;-- choose biggest of constraints
+		height: second minmax-of hmin					;-- choose biggest of constraints
+		#debug grid-view [#print "calc-row-height (y) -> (height)"]
+		height
 	]
 
 	;; unlike `cell-height?` this does nothing complex, just sums widths, does not require cached row height
