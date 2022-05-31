@@ -207,7 +207,7 @@ image-ctx: context [
 		; probe self/size: 2x2 * margin + size
 		either image? image/data [
 			maybe image/size: 2x2 * image/margin + image/data/size
-			reduce ['image image/data 1x1 * image/margin image/data/size + image/margin]
+			reduce ['image image/data 1x1 * image/margin image/size - image/margin]
 		][
 			maybe image/size: 2x2 * image/margin
 			[]
@@ -480,7 +480,7 @@ scrollable-space: context [
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
-		full: max 1x1 csz + (max 0x0 origin)
+		full: max 1x1 max box - origin csz + (max 0x0 origin)
 		clip-p1: max 0x0 p1
 		loop 2 [										;-- each scrollbar affects another's visibility
 			clip-p2: min box p2
@@ -491,9 +491,9 @@ scrollable-space: context [
 		
 		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
 		;; (else may stack up to 99% of all rendering time)
-		quietly space/hscroll/offset: ofs: 100% * (clip-p1/x - p1/x) / max 1 csz/x
+		quietly space/hscroll/offset: ofs: 100% * (clip-p1/x - p1/x) / max 1 full/x
 		quietly space/hscroll/amount: min 100% - ofs 100% * box/x / full/x
-		quietly space/vscroll/offset: ofs: 100% * (clip-p1/y - p1/y) / max 1 csz/y
+		quietly space/vscroll/offset: ofs: 100% * (clip-p1/y - p1/y) / max 1 full/y
 		quietly space/vscroll/amount: min 100% - ofs 100% * box/y / full/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
@@ -534,7 +534,7 @@ scrollable-space: context [
 					;; hardcoded 2 offset, because content may change and get out of sync with the frame
 					visible-size: either empty? space/map [0x0][space/map/2/size]
 					new: clip [(visible-size - cspace/size) 0x0] new 
-					quietly space/origin: new
+					maybe space/origin: new				;-- can't set quietly - watched by grid-view to set grid/origin
 					#debug grid-view [#print "on-change clipped to: (space/origin)"]
 					invalidate-cache space
 				]
@@ -1067,29 +1067,25 @@ window-ctx: context [
 	draw: function [window [object!] xy1 [pair! none!] xy2 [pair! none!]] [
 		#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
 		#assert [word? window/content]
-		geom: window/map/2
 		cspace: get window/content
-		o: geom/offset
+		org:  window/origin
 		;; there's no size for infinite spaces so we use `available?` to get the drawing size
-		s: window/max-size
+		size: window/max-size
 		;; safer to call available? every time because window never knows if content size will change
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
-		foreach x [x y] [s/:x: window/available? x 1 (0 - o/:x) s/:x]
-		maybe window/size: s							;-- limit window size by content size (so we don't scroll over)
-		quietly window/map: compose/deep [
-			(window/content) [offset: 0x0 size: (s)]
-		]
-		#debug list-view [#print "window resized to (s)"]
+		foreach x [x y] [size/:x: window/available? x 1 negate org/:x size/:x]
+		maybe window/size: size							;-- limit window size by content size (so we don't scroll over)
+		#debug list-view [#print "window resized to (size)"]
 		default xy1: 0x0
-		default xy2: s
-		geom/size: xy2 - o								;-- enough to cover the visible area
-		cdraw: render/only/on window/content xy1 - o xy2 - o xy2 - xy1
-		compose/only [translate (o) (cdraw)]
+		default xy2: size
+		cdraw: render/only/on window/content xy1 - org xy2 - org xy2 - xy1
+		quietly window/map: compose/deep [(window/content) [offset: (org) size: (xy2 - org)]]
+		compose/only [translate (org) (cdraw)]
 	]
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
-			limits content [invalidate-cache space]
+			origin limits content [invalidate-cache space]
 		]
 		space/space-on-change word :old :new
 	]
@@ -1100,9 +1096,11 @@ window-ctx: context [
 		max-size: 1000x1000
 		; cache?: off
 
+		origin:   0x0									;-- content's offset (negative)
+		
 		;; window does not require content's size, so content can be an infinite space!
 		content: generic/empty
-		map: reduce [content [offset 0x0 size 0x0]]
+		map: []
 
 		available?: func [
 			"Should return number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
@@ -1130,30 +1128,30 @@ inf-scrollable-ctx: context [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
 		;; /2 is hardcoded because `content` may change while map still will reflect the previous frame
-		wo: wo0: 0x0 - window/map/2/offset				;-- (positive) offset of window within it's content
+		wofs: wofs0: negate window/origin				;-- (positive) offset of window within it's content
 		#assert [window/size]
-		ws:     window/size
-		before: 0x0 - space/origin
-		after:  ws - (before + space/map/window/size)
+		wsize:  window/size
+		before: negate space/origin
+		#assert [space/map/window]
+		after:  wsize - (before + space/map/window/size)
 		foreach x [x y] [
 			any [		;-- prioritizes left/up jump over right/down
 				all [
 					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wo/:x space/jump-length
-					wo/:x: wo/:x - avail
+					0 < avail: window/available? x -1 wofs/:x space/jump-length
+					wofs/:x: wofs/:x - avail
 				]
 				all [
 					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wo/:x + ws/:x space/jump-length
-					wo/:x: wo/:x + avail
+					0 < avail: window/available? x  1 wofs/:x + wsize/:x space/jump-length
+					wofs/:x: wofs/:x + avail
 				]
 			]
 		]
-		maybe space/origin: space/origin + (wo - wo0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
+		maybe space/origin: space/origin + (wofs - wofs0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
 		;; since this is not a change of canvas, direct map manipulation is allowed:
-		window/map/2/offset: 0x0 - wo
-		if wo <> wo0 [invalidate-cache window]
-		wo <> wo0								;-- should return true when updates origin - used by event handlers
+		maybe window/origin: negate wofs
+		wofs <> wofs0								;-- should return true when updates origin - used by event handlers
 	]
 		
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
