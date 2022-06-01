@@ -76,7 +76,7 @@ hittest: function [
 				name
 				space: get name
 				any [
-					none? space/size			;-- infinite spaces include any point
+					none? space/size			;-- infinite spaces include any point ;@@ but should none mean infinite?
 					within? xy 0x0 space/size
 				]
 			]

@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;@@ needs: map-each, anonymize, reshape, export, contrast-with
+;; needs: map-each, anonymize, reshape, export, contrast-with
 
 
 styles: none											;-- reserve names in the spaces/ctx context
@@ -72,7 +72,6 @@ do with [
 	;-- using paths we get another benefit: we can apply the same style to multiple spaces (e.g. hscroll vscroll [style..])
 	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
 	set 'styles reshape [		;-- styles come before the main drawing code
-		;@@ MEMO: all shared styles suffer from #4854 and need a copy!
 		host [
 			pen off
 			fill-pen !(svmc/panel)
@@ -90,8 +89,8 @@ do with [
 		tube list box [									;-- allow color override for containers
 			function [space /only xy1 xy2 /on canvas] [
 				drawn: either find spec-of :space/draw /only [	;-- draw to get the size
-					do copy/deep [space/draw/only/on xy1 xy2 canvas]	;@@ #4854 workaround - remove me
-				][	do copy/deep [space/draw/on canvas]			;@@ this needs apply
+					space/draw/on/only canvas xy1 xy2			;@@ this needs apply
+				][	space/draw/on      canvas
 				]
 				unless color: select space 'color [return drawn]
 				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]

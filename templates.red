@@ -114,7 +114,7 @@ templates/timer: make-template 'space [rate: none]		;-- template space for timer
 generic: object [										;-- holds commonly used spaces ;@@ experimental
 	empty: make-space 'space []							;-- used when no content is given
 	<->: stretch: none									;-- set after box definition
-	too-deep: none										;-- used by data-view to contain recursion
+	; too-deep: none										;-- used by data-view to contain recursion
 ]
 
 rectangle-ctx: context [
@@ -200,10 +200,11 @@ image-ctx: context [
 	]
 	
 	templates/image: make-template 'space [
-		size: none										;@@ should fixed size be used as an override?
+		size:   none									;@@ should fixed size be used as an override?
 		margin: 0
 		; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
-		data: none										;-- images are not recyclable, so `none` by default
+		data:   none									;-- images are not recyclable, so `none` by default
+		; scale?: off										;-- scale to given canvas or not
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		space-on-change: :on-change*
 		#on-change-redirect
@@ -952,7 +953,7 @@ label-ctx: context [
 data-view-ctx: context [
 	~: self
 
-	generic/too-deep: make-space 'paragraph [text: "(depth limit reached)"]
+	; generic/too-deep: make-space 'paragraph [text: "(depth limit reached)"]
 	
 	; ;; to avoid infinite draw blocks during render of cyclic data:
 	; ;@@ maybe this should be in the style? but styls is a place for visual things, not depth control..
