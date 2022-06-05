@@ -309,6 +309,14 @@ range: func [a [integer!] b [integer!]] [
 	collect [while [a <= b] [keep a  a: a + 1]]
 ]
 
+min-safe: function [a [scalar! none!] b [scalar! none!]] [
+	any [all [a b min a b] a b]
+]
+
+max-safe: function [a [scalar! none!] b [scalar! none!]] [
+	any [all [a b max a b] a b]
+]
+
 ;; constraining is used by `render` to impose soft limits on space sizes
 ;; constraining logic:
 ;; no canvas (unlimited) and no limits (unlimited) => return `none` (also unlimited)

@@ -1120,6 +1120,42 @@ fast hittesting over grid - how?
 	nor scache worked for pinned-or-not cell identification, because grid/cell style has no access to grid!
 	as a result, pinned cells cannot have different size (only colors),
 	because grid-ctx/pinned? does not affect rendering from calc-height (and locate-line)
+infinite canvas bores me to death already
+	main reason - I'm treating infinite dimensions somewhere as 0, somewhere as alias to limits/max, it's a mess
+	can I get rid of it? use only finite and 0?
+	main actors:	
+	- scrollables (incl. list-view, grid-view)
+	  these either have min/max limits defining their size, 
+	  otherwise should fill the available finite dimensions
+	  infinite dimensions not applicable, use zero instead to minimize
+	- cell/box
+	  same as scrollables
+	- paragraph/area
+	  paragraph assumes finite width, so no problem here
+	  height is ignored? should never assume height lesser than the text,
+	  but may be made to expand vertically when canvas allows
+	- text
+	  for text the distinction between 0 and inf width is clear - sets wrapping margin
+	  height is irrelevant/ignored
+	  none is treated as inf canvas by rich-text, but not by spaces
+	- tube/row/column
+	  same as paragraph/text, 0 makes sense to stretch vertically, inf to stretch horizontally
+	  fixed width to assume the wrap margin
+	- hlist/vlist
+	  ignore canvas size along main axis
+	  finite secondary axis is filled, infinite makes no sense, at best works as zero
+	- image
+	  inf makes no sense, but should mean 1:1 display, that is different from 0x0
+	  0x0 should mean either 1:1 or downscaled to 0 (preferably, because who wants an image with scrollers?)
+	  current algo just downscales if canvas requires, but not upscales unless /min is not met
+	so inf canvas is only applicable to flow layout, theoretically
+	in practice, is it useful?
+	rows are made to stretch to fixed width
+	text? intent is to not wrap it, and get the actually needed size
+	so infinity stays but must be treated by most spaces as zero
+	exceptions: flow and image
+	0xINF canvas is used by tube to hint the rendered item across what axis it should minimize itself
+	grid/cell renders items on WIDTHxINF and items should minimize across inf but fill width
 	
 
 VID Styles: must be documented TODO

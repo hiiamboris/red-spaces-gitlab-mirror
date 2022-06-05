@@ -179,10 +179,11 @@ VID: context [
 		wrap? [logic!] "How to lay text out: as a line (false) or paragraph (true)"
 	][ 
 		switch/default type?/word :value [
-			string! [make-space/name pick [paragraph text] wrap? [text:  value]]
+			string! [make-space/name pick [paragraph text] wrap? [text: value]]
 			logic!  [make-space/name 'logic [state: value]]
 			image!  [make-space/name 'image [data:  value]]
 			url!    [make-space/name 'link  [data:  value]]
+			block!  [anonymize 'row either wrap? [lay-out-data/wrap new][lay-out-data new]]
 		] [make-space/name 'text [text: mold :value]]
 	]
 	

@@ -134,6 +134,7 @@ rectangle-ctx: context [
 	]
 ]
 
+;@@ maybe this should be called `arrow`? because it doesn't have to be triangle-styled
 triangle-ctx: context [
 	~: self
 	draw: function [space [object!]] [
@@ -150,25 +151,15 @@ triangle-ctx: context [
 		]
 	]
 		
-	; on-change*: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		; any [
-			; :old =? :new
-			; find select space 'quiet-words word			;@@ better name? 
-			; set-quiet 'cache? 'invalid					;@@ reconsider if reactivity becomes possible
-		; ]
-	; ]
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		unless :old =? :new [invalidate-cache space]
 		space/space-on-change word :old :new
 	]
 		
 	templates/triangle: make-template 'space [
-		size:    16x10						;@@ use canvas instead?
+		size:    16x10
 		dir:     'n
 		margin:  0
-		;@@ after the design is settled, maybe make cache the default and remove from everywhere?
-		;@@ and provide a default on-change?
-		; cache?:  off
 		
 		;@@ need `into` here? or triangle will be a box from the clicking perspective?
 		draw: does [~/draw self]
@@ -182,8 +173,28 @@ image-ctx: context [
 	
 	draw: function [image [object!] canvas [pair! none!]] [
 		either image? image/data [
-			mrg: 1x1 * image/margin
-			maybe image/size: constrain 2 * mrg + image/data/size image/limits
+			default canvas: 0x0
+			mrg:       image/margin * 1x1 
+			limits:    image/limits
+			isize:     image/data/size
+			;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
+			low-lim:   any [if limits [limits/min] 0x0]			;-- default to 0x0 as min size
+			;; infinite canvas is fine here - it just won't affect the scale
+			high-lim:  min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be zero
+			;; for uniform scaling, compute min/max scale applicable
+			lim:       max 1x1 low-lim - mrg - mrg
+			min-scale: max  lim/x / isize/x  lim/y / isize/y
+			if high-lim [
+				lim: max 1x1 high-lim - mrg - mrg
+				max-scale: min  lim/x / isize/x  lim/y / isize/y
+			]
+			;; then choose
+			scale: case [
+				min-scale > 1 [min-scale]						;-- upscale if limits/min requires only
+				all [max-scale max-scale < 1] [max-scale]		;-- downscale if canvas or limits/max requires
+				'unconstrained [1]
+			]
+			maybe image/size: isize * scale
 			reduce ['image image/data mrg image/size - mrg]
 		][
 			maybe image/size: 2x2 * image/margin
@@ -228,7 +239,7 @@ cell-ctx: context [
 		cspace: get space/content
 		size: 2x2 * space/margin + cspace/size
 		if pair? canvas [								;-- canvas is already constrained by render
-			;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size
+			;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 			mask: 1x1 - (canvas / infxinf)				;-- 0x0 (infinite) to 1x1 (finite)
 			size: max size canvas * mask
 		]												;-- no canvas = no alignment, minimal appearance
@@ -347,6 +358,7 @@ scrollbar: context [
 	]
 				
 	templates/scrollbar: make-template 'space [
+		;@@ maybe leverage canvas size?
 		size:   100x16									;-- opposite axis defines thickness
 		axis:   'x
 		offset: 0%
@@ -426,6 +438,7 @@ scrollable-space: context [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		box: default canvas: 0x0
+		;; stretch to finite dimensions of the canvas, but minimize across the infinite
 		foreach x [x y] [
 			box/:x: any [
 				if canvas/:x < infxinf/:x [canvas/:x]
@@ -572,7 +585,7 @@ paragraph-ctx: context [
 		unless find space/flags 'wrap [canvas: infxinf]
 		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
-		new-width: either canvas [canvas/x][0]
+		new-width: either canvas [canvas/x][0]					;-- no canvas is treated as 0x0
 		unless all [layout old-width = new-width] [				;-- redraw if: some facet / canvas width changed
 			lay-out space new-width
 		]
@@ -615,6 +628,7 @@ paragraph-ctx: context [
 		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
 		;; styles may override `/font` with another font created in advance 
 		font:   none									;-- can be set in style, as well as margin
+		; color:  none									;-- placeholder for user to control
 		; font:   none									;-- can be set in style, as well as margin
 		flags:  [wrap]									;-- [bold italic underline wrap] supported
 		weight: 1
@@ -990,12 +1004,8 @@ data-view-ctx: context [
 			spacing [invalidate-cache space]
 			font [do push-font]
 			data [
-				either block? :new [
-					space/content: anonymize 'row VID/lay-out-data/wrap new space/wrap?
-				][
-					space/content: VID/wrap-value :new space/wrap?	;@@ maybe reuse the old space if it's available?
-					do push-font
-				] 
+				space/content: VID/wrap-value :new space/wrap?	;@@ maybe reuse the old space if it's available?
+				do push-font
 			]
 		]
 		space/box-on-change word :old :new
@@ -1338,6 +1348,7 @@ list-view-ctx: context [
 	list-draw: function [list [object!] canvas [pair!] xy1 [pair!] xy2 [pair!]] [
 		axis: list/axis
 		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
+		#assert [canvas +< infxinf]						;-- window is never infinite
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
 			maybe list/size: list/margin * 2
@@ -1802,6 +1813,7 @@ grid-ctx: context [
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
 			render/on mcname canvas						;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
+			invalidate-cache/only mcspace
 			mcdraw: render/on mcname mcsize				;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
@@ -1816,6 +1828,7 @@ grid-ctx: context [
 	;@@ this hack allows styles to know whether this cell is pinned or not
 	pinned?: does [get bind 'pinned? :draw]
 		
+	;@@ this could leverage canvas but I have no idea how
 	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
 		;@@ keep this in sync with `list/draw`
@@ -2220,11 +2233,6 @@ grid-view-ctx: context [
 ]
 
 
-
-; spacer: make-space 'space [				;-- empty space, used for padding
-; 	draw: []
-; ]
-
 button-ctx: context [
 	~: self
 	
@@ -2322,7 +2330,7 @@ templates/rotor: make-template 'space [
 ]
 
 
-;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go
+;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go (margin can also become a kind of frame)
 ;@@ if embedded, map composition should be a reverse of hittest: if something is drawn first then it's at the bottom of z-order
 field-ctx: context [
 	~: self

@@ -83,7 +83,7 @@ layouts: context [
 			]
 			unless canvas2 [canvas2: 0x0]
 			canvas2/:x: max canvas2/:x size/:x			;-- only extend the canvas to max item's size, but not contract
-			if canvas2 <> canvas1 [					;-- second render cycle - only if canvas changed
+			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
 					space: get name: either func? [spaces/pick i][spaces/:i]
@@ -165,16 +165,12 @@ layouts: context [
 			;;  2. to expand it horizontally (changes row height) - only for items with nonzero weight
 			;;  3. to fully fill row height
 			;; quite a rendering torture, but there's no way around it
-			;@@ this will require cache size of none, 0x2e9, widthx0, widthxheight - total of 4 at least
 			
 			;; constraints question is also a tricky one
 			;; I decided to estimate min. size of each space by using 0x2e9 and 2e9x0 canvases (best fit for text/tube)
 			;; then each space will report the "narrowest" possible form of it, suiting tube needs
 			;; when limits/min is set, it overrides the half-unlimited canvas
 			;; when only limits/max is set, it's "height" overrides the infinite 2e9, "width" stays zero
-			;@@ for this to work, buttons/radios/etc must never wrap or ellipsize their text,
-			;@@ and single-line generic text style is desirable with the option to: always show full text, ellipsize it, or clip
-			;@@ this may also require 4th cached canvas!
 			
 			;; obtain constraints info
 			;; `info` can't be static since render may call another build-map; same for other arrays here
@@ -278,6 +274,7 @@ layouts: context [
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
+			;@@ maybe it should affect (contract) row widths?
 			foreach [row-size row] rows [
 				repeat i (length? row) / 5 [			;@@ use for-each
 					set [name: space:] item: skip row i - 1 * 5
