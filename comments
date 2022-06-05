@@ -1156,6 +1156,9 @@ infinite canvas bores me to death already
 	exceptions: flow and image
 	0xINF canvas is used by tube to hint the rendered item across what axis it should minimize itself
 	grid/cell renders items on WIDTHxINF and items should minimize across inf but fill width
+shit! timers are still a bottleneck, because e.g. `inspect system` creates 428 rated spaces (scroll/roll timers)
+	and the culprit is paths-from-space, surprisingly
+	anyway, not optimizable - have to turn off unused timers (when scrollbars are hidden)
 	
 
 VID Styles: must be documented TODO

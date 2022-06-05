@@ -62,6 +62,8 @@ context [
 	
 	#debug cache [space-names: make hash! 2048]			;-- used to get space objects names for debug output
 	
+	memoized-paths: make hash! 2 * 1024					;-- [space paths] - necessary to lighten the timers code!
+	
 	;@@ WARNING: does not copy! paths may change if not copied by the caller
 	;@@ and in case space was invalidated, this will not return anything - needs design improvement, maybe separate tree
 	set 'paths-from-space function [
@@ -70,10 +72,13 @@ context [
 		; return: [path! block!] "May return single path! or a block of"
 	][
 		; #assert [is-face? host]
-		result: []
-		path: clear []
-		paths-continue* space path 'result
-		result: head clear result
+		unless result: select/same memoized-paths space [
+			result: []
+			path: clear []
+			paths-continue* space path 'result
+			result: copy/deep head clear result
+			repend memoized-paths [space result]
+		]
 		result
 	]
 		
@@ -132,9 +137,11 @@ context [
 			#assert [space = <everything>]
 			;@@ what method to prefer? parse or radical (clear)? clear is dangerous - breaks timers by destroying parents tree
 			clear render-cache
+			clear memoized-paths
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating (any [select space-names space 'unknown])"]
+				if pos: find/same memoized-paths space [fast-remove pos 2]
 				if all [
 					node: find/same render-cache space
 					;; currently rendered spaces should not be invalidated, or parents get lost:

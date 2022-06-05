@@ -496,6 +496,7 @@ scrollable-space: context [
 			(in space 'vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
 			(in space 'scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
 		]
+		maybe space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
 		render in space 'scroll-timer					;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
@@ -544,7 +545,9 @@ scrollable-space: context [
 		content: in generic 'empty						;-- should be defined (overwritten) by the user
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
-		scroll-timer: make-space 'timer [rate: 16]		;-- how often it scrolls when user presses & holds one of the arrows
+		;; timer that scrolls when user presses & holds one of the arrows
+		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
+		scroll-timer: make-space 'timer [rate: 0]
 
 		map: reduce [content [offset: 0x0 size: 0x0]]
 
@@ -1141,6 +1144,23 @@ inf-scrollable-ctx: context [
 		maybe window/origin: negate wofs
 		wofs <> wofs0								;-- should return true when updates origin - used by event handlers
 	]
+	
+	draw: function [space [object!] canvas [none! pair!]] [
+		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
+		drawn: space/scrollable-draw/on canvas
+		any-scrollers?: 0 < add area? space/hscroll/size area? space/vscroll/size
+		maybe space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		append space/map compose [
+			(in space 'roll-timer) [offset 0x0 size 0x0]	;-- scrollable/draw removes it
+		]
+		#debug sizing [
+			print [
+				"inf-scrollable with" space/content
+				"on" canvas "->" space/size "window:" space/window/size
+			]
+		]
+		drawn
+	]
 		
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
@@ -1161,7 +1181,9 @@ inf-scrollable-ctx: context [
 		window: make-space 'window [size: none]			;-- size is set by window/draw
 		content: 'window
 
-		roll-timer: make-space 'timer [rate: 4]			;-- how often to call `roll` when dragging
+		;; timer that calls `roll` when dragging
+		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
+		roll-timer: make-space 'timer [rate: 0]
 
 		roll: does [~/roll self]
 
@@ -1172,13 +1194,7 @@ inf-scrollable-ctx: context [
 		]
 
 		scrollable-draw: :draw
-		draw: function [/on canvas [pair! none!]] [
-			render 'roll-timer							;-- timer has to appear in the tree for timers to work
-			drawn: scrollable-draw/on canvas
-			append map [roll-timer [offset 0x0 size 0x0]]	;-- scrollable/draw removes it
-			#debug sizing [print ["inf-scrollable with" content "on" canvas "->" size "window:" window/size]]
-			drawn
-		]
+		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		
 		scrollable-on-change: :on-change*
 		#on-change-redirect
