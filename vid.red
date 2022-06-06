@@ -79,6 +79,7 @@ VID: context [
 					#font-styles
 				]
 			]
+			paragraph [template: paragraph facets: [string! text #font-styles]]
 			text   [template: text   facets: [string! text #font-styles]]
 			field  [template: field  facets: [string! text #font-styles]]
 			link   [template: link   facets: [string! text url! text block! command]]
