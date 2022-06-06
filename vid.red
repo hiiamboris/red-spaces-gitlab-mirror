@@ -355,7 +355,7 @@ VID: context [
 			def/reactions: make block! 2
 			def/with:      make block! 8
 		]
-		=vids=:              [any [(do reset) =styling= | =instantiating=]]
+		=vids=:              [any [(do reset) =do= | =styling= | =instantiating=]]
 		=styling=:           [
 			ahead word! 'style (def/styling?: yes)
 			ahead #expect set-word! =space-name=
@@ -382,6 +382,7 @@ VID: context [
 		]
 		
 		=with=:       [ahead word! 'with  set b #expect block! (append def/with b)]	;-- collects multiple `with` blocks
+		=do=:         [ahead word! 'do    set b #expect block! (do b)]
 		
 		=reaction=:   [ahead word! 'react set late? opt [ahead word! 'later] set b #expect block! (
 			;@@ this would likely require reactions run before pane is created, but needs more data for decision
