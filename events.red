@@ -352,8 +352,10 @@ events: context [
 		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
 		wpath: path  unit: 1										;-- word-only path
 		if pair? second path [
-			wpath: extract/into path unit: 2 clear []				;-- remove pairs ;@@ should be `map` - extract is slow
+			hodl: obtain block! (length? path) / unit: 2			;-- need reentrancy because some events generate others
+			wpath: extract/into path unit hodl						;-- remove pairs ;@@ should be `map` - extract is slow
 		]
+		#leaving [if hodl [stash hodl]]
 		#assert [not find wpath pair!]
 		len: length? wpath
 		i2: either focused? [len][1]								;-- keyboard events should only go into the focused space
