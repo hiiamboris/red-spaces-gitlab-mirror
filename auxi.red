@@ -480,20 +480,6 @@ dump-event: function [event] [
 
 top: func [series [series!]] [back tail series]
 
-;; macro allows to avoid a lot of runtime overhead, thus allows using `quietly` with paths in critical code
-#macro ['quietly set-path!] func [s e] [
-	; compose [set-quiet in (to path! copy/part s/2 back tail s/2) (to lit-word! last s/2)]
-	compose [quietly in (to path! copy/part s/2 back tail s/2) (to lit-word! last s/2)]
-]
-quietly: function [word [word!] value [any-type!]] [	;-- unlike set-quiet, returns value, not word!
-	set-quiet word :value :value
-]
-; quietly: function ['path [set-path!] value [any-type!]] [
-	; obj: get append/part as path! clear [] path top path
-	; set-quiet in obj last path :value
-	; :value
-; ]
-
 ;; good addition to do-atomic which holds reactivity
 do-async: function [									;@@ used solely to work around #5132
 	"Evaluate CODE with view/auto-sync off"
