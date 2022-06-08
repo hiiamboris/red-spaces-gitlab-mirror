@@ -73,10 +73,9 @@ context [
 	][
 		; #assert [is-face? host]
 		unless result: select/same memoized-paths space [
-			result: []
+			result: make [] 10
 			path: clear []
-			paths-continue* space path 'result
-			result: copy/deep head clear result
+			paths-continue* space path result
 			repend memoized-paths [space result]
 		]
 		result
@@ -85,18 +84,17 @@ context [
 	paths-continue*: function [
 		space  [object!]
 		path   [block!]
-		result [word!]
+		result [block!]
 	][
 		parents: select/same render-cache space
 		either empty? parents [
 			unless is-face? space [exit]				;-- not rendered space - cannot be traced to the root
-			slot: traversal/reuse-path (result)
-			reverse append slot head path
+			append/only result reverse copy head path
 		][
 			append invalidation-stack space				;-- defence from cycles ;@@ rename since it's also used here?
 			foreach [parent child-name] parents [
-				change path child-name
 				unless find/same invalidation-stack parent [
+					change path child-name
 					paths-continue* parent next path result
 				]
 			]
