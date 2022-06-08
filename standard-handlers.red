@@ -276,7 +276,7 @@ define-handlers [
 					find "^[^H" k						;-- use only Esc and BS
 					event/ctrl?
 				]
-			] [exit]
+			] [pass exit]
 
 			len: length? t: space/text
 			ci: clip [0 len] space/caret-index			;-- may be >len if text was changed
@@ -288,9 +288,8 @@ define-handlers [
 				delete [remove skip t ci]
 				#"^H"  [remove skip t ci: ci - 1]		;-- backspace
 				#"^["  [maybe space/active?: no]		;-- Esc = deactivate
-			][exit]										;-- not supported yet key
+			][exit]									;-- not supported yet key
 			maybe space/caret-index: clip reduce [0 length? t] ci		;-- length may have changed, <> len
-			space/invalidate						;@@ TODO: should be caught maybe automatically?
 			update
 		]
 
@@ -298,13 +297,13 @@ define-handlers [
 
 		on-click [space path event] [
 			#assert [space/paragraph/layout]
-			space/caret-index: offset-to-caret space/paragraph/layout path/2
-			space/active?: yes							;-- activate, so Enter is not required
+			maybe space/caret-index: offset-to-caret space/paragraph/layout path/2
+			maybe space/active?: yes					;-- activate, so Enter is not required
 			update										;-- let styles update
 		]
 
 		on-unfocus [space path event] [
-			space/active?: no							;-- deactivate so it won't catch Tab when next tabbed in
+			maybe space/active?: no						;-- deactivate so it won't catch Tab when next tabbed in
 			update										;-- update the look (remove caret, decoration, etc)
 		]
 	]

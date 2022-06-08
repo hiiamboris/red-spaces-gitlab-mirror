@@ -2355,10 +2355,12 @@ field-ctx: context [
 		; #assert [pair? canvas]
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
 		; quietly field/size: canvas
-		maybe field/paragraph/width: if field/wrap? [field/size/x]
+		size: canvas * (1 - (canvas / infxinf))
+		maybe field/paragraph/width: if field/wrap? [size/x]
 		maybe field/paragraph/text:  field/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
-		pdrawn: render/on in field 'paragraph field/size
+		pdrawn: render/on in field 'paragraph size
+		maybe field/size: max size field/paragraph/size
 		xy1: caret-to-offset       field/paragraph/layout field/caret-index + 1
 		xy2: caret-to-offset/lower field/paragraph/layout field/caret-index + 1
 		maybe field/caret/size: as-pair field/caret-width xy2/y - xy1/y
@@ -2369,13 +2371,19 @@ field-ctx: context [
 		compose [(cdrawn) clip 0x0 (field/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
 	]
 		
+	watched: make hash! [text selected caret-index caret-width wrap? active?]
+	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if find watched word [field/invalidate]
+		field/scrollable-on-change word :old :new
+	]
+	
 	;@@ TODO: only area should be scrollable
 	templates/field: make-template 'scrollable [
 		text: ""
 		selected: none		;@@ TODO
 		caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
 		caret-width: 1		;-- in px
-		size: 100x25		;@@ good enough idea or not?
+		limits: 60x20 .. none
 		paragraph: make-space 'paragraph []
 		caret: make-space 'rectangle []		;-- caret has to be a separate space so it can be styled
 		content: 'paragraph
@@ -2389,6 +2397,9 @@ field-ctx: context [
 		]
 	
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		
+		scrollable-on-change: :on-change*
+		#on-change-redirect
 	]
 ]
 
