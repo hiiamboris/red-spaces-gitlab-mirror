@@ -40,7 +40,7 @@ do with [
 	unless svmc/text [svmc/text: black]					;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
-	serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
+	; serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
 
 	;-- very experimental `either` shortener: logic | true-result | false-result
 	|: make op! func [a b] [
@@ -83,9 +83,21 @@ do with [
 		text paragraph link fps-meter [
 			(when select self 'color [compose [pen (color)]])
 			(maybe/same font: fonts/text ())					;@@ hate this syntax! find a better one
-			#if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
+			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
 		]
 
+		field [
+			(when select self 'color [compose [pen (color)]])
+			(maybe/same font: fonts/text ())
+		]
+		field/caret [
+			; pen off fill-pen !(contrast-with svmc/panel)
+			pen off fill-pen !(svmc/text)
+		]
+		field/selection [
+			pen off fill-pen !(svmc/text + 0.0.0.200)
+		]
+		
 		tube list box [									;-- allow color override for containers
 			function [space /only xy1 xy2 /on canvas] [
 				drawn: either find spec-of :space/draw /only [	;-- draw to get the size

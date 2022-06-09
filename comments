@@ -4215,3 +4215,85 @@ wanted to use this for grid but reconsidered, decided to support explicit return
 	; 3x2 = fit-pair 7x1 4x0
 	; 1x3 = fit-pair 3x2 2x3
 ; ]
+
+original field handlers
+; field: [
+	; ;-- `key-down` supports key-combos like Ctrl+Tab, `key` does not seem to
+	; ;-- OTOH `key` properly reflects Shift state in chars
+	; ;-- so we have to use both
+	; on-key [space path event] [				;-- char keys branch (inserts stuff as you type)
+		; k: event/key
+		; either space/active? [					;-- normal input when active
+			; unless all [
+				; char? k
+				; any [
+					; k >= #" "						;-- printable char
+					; k = #"^-"						;-- Tab
+					; if k = #"^M" [k: #"^/"]			;-- Enter -> NL
+				; ]
+			; ] [exit]
+			; ;@@ allow new-line char only when multiline?
+			; ;@@ TODO: input validation / filtering
+			; t: space/text
+			; ci: space/caret-index:
+				; 1 + clip reduce [0 length? t]		;-- caret-index may be >len if text was changed
+					; space/caret-index
+			; insert at t ci  k
+			; space/invalidate						;@@ TODO: should be caught maybe automatically?
+			; update
+		; ][										;-- has to handle Enter, or both key-down and key will handle it, twice
+			; either k = #"^M" [
+				; maybe space/active?: yes			;-- activate it on Enter
+				; update								;-- let styles change
+			; ][
+				; pass								;-- pass keys in inactive state (esp. tab)
+			; ]
+		; ]
+	; ]
+	
+	; on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
+		; k: event/key
+		; unless space/active? [pass exit]			;-- keys should be passed thru (tab, arrows, ...); Enter is in on-key
+													; ;-- else, keys should be used on content (e.g. arrows)
+		; if all [
+			; char? k									;-- ignore chars without mod keys
+			; not any [
+				; find "^[^H" k						;-- use only Esc and BS
+				; event/ctrl?
+			; ]
+		; ] [pass exit]
+
+		; len: length? t: space/text
+		; ci: clip [0 len] space/caret-index			;-- may be >len if text was changed
+		; switch/default k: event/key [
+			; left   [ci: ci - 1]			;@@ TODO: ctrl-arrow etc logic
+			; right  [ci: ci + 1]
+			; home   [ci: 0]
+			; end    [ci: len]
+			; delete [remove skip t ci]
+			; #"^H"  [remove skip t ci: ci - 1]		;-- backspace
+			; #"^["  [maybe space/active?: no]		;-- Esc = deactivate
+		; ][exit]									;-- not supported yet key
+		; maybe space/caret-index: clip reduce [0 length? t] ci		;-- length may have changed, <> len
+		; update
+	; ]
+
+	; on-key-up [space path event] []				;-- eats the event so it's not passed forth
+
+	; on-click [space path event] [
+		; #assert [space/paragraph/layout]
+		; maybe space/caret-index: offset-to-caret space/paragraph/layout path/2
+		; maybe space/active?: yes					;-- activate, so Enter is not required
+		; update										;-- let styles update
+	; ]
+
+	; on-focus [space path event] [
+		; maybe space/caret/visible?: yes
+		; update
+	; ]
+
+	; on-unfocus [space path event] [
+		; maybe space/caret/visible?: no
+		; update
+	; ]
+; ]

@@ -136,7 +136,7 @@ context [
 			]
 			if next? [remove pos]
 			unless head? pos [
-				move/part  head pos  tail pos  -1 + index? pos	;-- rearrange to cover the whole tree
+				move/part  head pos  tail pos  skip? pos	;-- rearrange to cover the whole tree
 			]
 		][
 			#debug focus [

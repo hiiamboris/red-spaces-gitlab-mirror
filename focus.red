@@ -16,7 +16,7 @@ keyboard: object [
 	;-- which spaces should receive focus? affects tabbing & clicking
 	;-- class should not matter, name should - then we'll be able to override/extend classes
 	;@@ TODO: should paths be allowed here? e.g. if some spaces are only focusable in some bigger context?
-	focusable: make hash! [scrollable button field table list-view grid-view]
+	focusable: make hash! [scrollable button field area list-view grid-view]
 
 	focus: []	;-- a path (descending list of spaces)
 	;@@ DOC: focus is a path because we want to be able to go up the tree when tabbing

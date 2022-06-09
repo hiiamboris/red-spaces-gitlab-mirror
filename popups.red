@@ -45,7 +45,7 @@ is-popup?: function [									;-- must be blazing-fast, used in global event fun
 ][
 	all [
 		found: find/same select/same popup-registry window face
-		-1 + index? found
+		skip? found
 	]
 ]
 

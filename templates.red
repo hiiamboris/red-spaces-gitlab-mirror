@@ -121,7 +121,11 @@ rectangle-ctx: context [
 	~: self
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		unless :old =? :new [invalidate-cache space]
+		all [
+			find [size margin] word
+			not :old =? :new
+			invalidate-cache space
+		]
 		space/space-on-change word :old :new
 	]
 	
@@ -618,8 +622,7 @@ paragraph-ctx: context [
 			find watched word
 			not :old =? :new
 		][
-			invalidate-cache space
-			quietly space/layout: none					;-- will be laid out on next `draw`
+			invalidate space
 		]
 		space/space-on-change word :old :new
 	]
@@ -640,6 +643,7 @@ paragraph-ctx: context [
 		layouts: make map! 10							;-- map of width -> rich-text object
 		layout:  none									;-- last chosen layout, text size is kept in layout/extra
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		invalidate: does [quietly layout: none]			;-- will be laid out on next `draw`
 		space-on-change: :on-change*
 		#on-change-redirect
 	]
@@ -2346,39 +2350,254 @@ templates/rotor: make-template 'space [
 ]
 
 
+caret-ctx: context [
+	~: self
+	
+	on-change: function [caret [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		unless :old =? :new [
+			switch to word! word [
+				width [maybe caret/size: new by caret/size/y]	;-- rectangle invalidates itself
+				visible? [invalidate-cache caret]
+				index [if caret/visible? [invalidate-cache caret]]
+			]
+		]
+		caret/rectangle-on-change word :old :new
+	]
+	
+	templates/caret: make-template 'rectangle [		;-- caret has to be a separate space so it can be styled
+		width: 1
+		index: 0				;-- should be kept even when not focused, so tabbing in leaves us where we were
+		visible?: no
+		
+		rectangle-draw: :draw
+		draw: does [when visible? [rectangle-draw]]
+		
+		rectangle-on-change: :on-change*
+		#on-change-redirect 
+	]
+]
+
 ;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go (margin can also become a kind of frame)
 ;@@ if embedded, map composition should be a reverse of hittest: if something is drawn first then it's at the bottom of z-order
 field-ctx: context [
 	~: self
 	
-	draw: function [field [object!] canvas [pair! none!]] [
+	non-ws: negate ws: charset " ^-"
+		
+	find-prev-word: function [field [object!] from [integer!]] [
+		rev: reverse append/part clear {} field/text from
+		parse rev [any ws some non-ws rev: (return from + skip? rev)]
+	]
+	
+	find-next-word: function [field [object!] from [integer!]] [
+		pos: skip field/text from
+		parse pos [any ws some non-ws pos: (return skip? pos)]
+	]
+	
+	mark-history: function [field [object!]] [
+		field/history: clear rechange field/history [copy field/text field/caret/index]
+	]
+	
+	undo: function [field [object!]] [
+		unless head? field/history [
+			set [text: index:] field/history: back back field/history
+			append clear field/text text
+			maybe field/caret/index: index
+		]
+	]
+	
+	redo: function [field [object!]] [
+		unless tail? field/history [
+			set [text: index:] field/history
+			field/history: next next field/history
+			append clear field/text text
+			maybe field/caret/index: index
+		]
+	]
+	
+	edit: function [field [object!] plan [block!] /local n p] [
+		len: length? text: field/text
+		pos: skip text ci: field/caret/index
+		sel: field/selected
+		
+		?? plan
+		parse/case plan [any [plan:
+			['undo (undo field) | 'redo (redo field)] (
+				pos: skip text ci: field/caret/index
+				len: length? text: field/text
+			)
+			
+		|	'select [(n: none)
+				'none (sel: none)
+			|	'all  (sel: 0 by ci: len)
+			|	'head (n: negate ci)
+			|	'tail (n: len - ci)
+			|	set p pair! (sel: p  ci: p/1)
+			|	set n integer!
+			] (
+				if n [									;-- this only works if caret is at selection edge
+					other: case [
+						not sel    [ci]
+						ci = sel/1 [sel/2]
+						ci = sel/2 [sel/1]
+						'else      [ci]					;-- shouldn't happen, but just in case
+					]
+					ci: clip [0 len] ci + n
+					sel: (min ci other) by (max ci other)
+				]
+				maybe field/caret/index: ci
+				maybe field/selected: sel
+			)
+			
+		|	'copy [
+				set p pair! 
+			|	'selected (p: sel)
+			] (if p [write-clipboard copy/part text p + 1])
+			
+		|	'move [
+				'head (ci: 0)
+			|	'tail (ci: len)
+			|	'prev-word (ci: find-prev-word field ci)
+			|	'next-word (ci: find-next-word field ci)
+			|	'sel-bgn   (if sel [ci: sel/1])
+			|	'sel-end   (if sel [ci: sel/2])
+			|	set n integer! (ci: clip [0 len] ci + n)
+			] (
+				pos: skip text maybe field/caret/index: ci
+				maybe field/selected: sel: none			;-- `select` should be used to keep selection
+			)
+			
+		|	'insert [set s string!] (
+				unless empty? s [
+					mark-history field
+					field/caret/index: ci: skip? pos: insert pos s
+					len: length? text
+				]
+			)
+			
+		|	'remove [
+				'prev-word (n: (find-prev-word field ci) - ci)
+			|	'next-word (n: (find-next-word field ci) - ci)
+			|	'selected  (n: 0  if sel [
+					n: sel/2 - ci: sel/1
+					sel: field/selected: none
+				])
+			|	set n integer!
+			] (
+				if n < 0 [								;-- reverse negative removal
+					ci: ci - n: abs n
+					if ci < 0 [n: n + ci  ci: 0]		;-- don't let it go past the head
+				]
+				n: min n len - ci						;-- don't let it go past the tail
+				if n <> 0 [
+					mark-history field
+					maybe field/caret/index: ci
+					remove/part pos: skip text ci n
+					len: length? text
+				]
+			)
+		|	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
+		]]
+	]
+	
+	draw: function [field [object!] canvas [none! pair!]] [
+		drawn: field/text-draw/on infxinf				;-- this sets the size
+		default canvas: 0x0
+		if canvas/x < infxinf/x [
+			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
+			maybe field/origin: clip [field/origin 0] canvas/x - field/size/x
+			maybe field/size: canvas/x by field/size/y	;-- width may be smaller/bigger than that of text
+		]
+		ci: field/caret/index + 1
+		cxy1: caret-to-offset       field/layout ci
+		cxy2: caret-to-offset/lower field/layout ci
+		csize: field/caret/width by (cxy2/y - cxy1/y)
+		unless field/caret/size = csize [
+			quietly field/caret/size: csize
+			invalidate-cache/only field/caret
+		]
+		if sel: field/selected [
+			sxy1: caret-to-offset       field/layout sel/1 + 1
+			sxy2: caret-to-offset/lower field/layout sel/2
+			maybe field/selection/size: sxy2 - sxy1
+			sdrawn: compose/only [translate (sxy1) (render in field 'selection)]
+		]
+		cdrawn: render in field 'caret
+		compose/only/deep [
+			clip (mrg: field/margin * 1x1) (field/size - mrg) [
+				(only sdrawn)
+				translate (field/origin by 0) (drawn)
+				translate (cxy1) (cdrawn)
+			]
+		]
+	]
+		
+	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		switch to word! word [
+			origin   [invalidate-cache field]
+			text     [field/caret/index: length? new]	;-- auto position at the tail; invalidated by text
+			selected [invalidate-cache field]
+		]
+		field/text-on-change word :old :new
+	]
+	
+	;; based directly on text to expose /text facet which would be hard to sync both ways otherwise
+	templates/field: make-template 'text [
+		weight:    1
+		origin:    0
+		selected:  none
+		history:   make block! 100						;-- saved states
+		
+		caret:     make-space 'caret []
+		selection: make-space 'rectangle []				;-- can be styled
+		
+		edit: func [
+			"Apply a sequence of edits to the text"		;@@ document edit dsl
+			plan [block!]
+		][
+			~/edit self plan
+		]
+		
+		text-draw: :draw
+		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
+		
+		text-on-change: :on-change*
+		#on-change-redirect
+	]
+	
+]
+
+area-ctx: context [
+	~: self
+	
+	draw: function [area [object!] canvas [pair! none!]] [
 		; #assert [pair? canvas]
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
-		; quietly field/size: canvas
+		; quietly area/size: canvas
 		size: canvas * (1 - (canvas / infxinf))
-		maybe field/paragraph/width: if field/wrap? [size/x]
-		maybe field/paragraph/text:  field/text
+		maybe area/paragraph/width: if area/wrap? [size/x]
+		maybe area/paragraph/text:  area/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
-		pdrawn: render/on in field 'paragraph size
-		maybe field/size: max size field/paragraph/size
-		xy1: caret-to-offset       field/paragraph/layout field/caret-index + 1
-		xy2: caret-to-offset/lower field/paragraph/layout field/caret-index + 1
-		maybe field/caret/size: as-pair field/caret-width xy2/y - xy1/y
+		pdrawn: render/on in area 'paragraph size
+		maybe area/size: max size area/paragraph/size
+		xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
+		xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
+		maybe area/caret/size: as-pair area/caret-width xy2/y - xy1/y
 		cdrawn: []
-		if field/active? [
-			cdrawn: compose/only [translate (xy1) (render in field 'caret)]
+		if area/active? [
+			cdrawn: compose/only [translate (xy1) (render in area 'caret)]
 		]
-		compose [(cdrawn) clip 0x0 (field/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
+		compose [(cdrawn) clip 0x0 (area/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
 	]
 		
 	watched: make hash! [text selected caret-index caret-width wrap? active?]
-	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find watched word [field/invalidate]
-		field/scrollable-on-change word :old :new
+	on-change: function [area [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		if find watched word [area/invalidate]
+		area/scrollable-on-change word :old :new
 	]
 	
 	;@@ TODO: only area should be scrollable
-	templates/field: make-template 'scrollable [
+	templates/area: make-template 'scrollable [
 		text: ""
 		selected: none		;@@ TODO
 		caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
@@ -2401,6 +2620,7 @@ field-ctx: context [
 		scrollable-on-change: :on-change*
 		#on-change-redirect
 	]
+	
 ]
 
 templates/fps-meter: make-template 'text [

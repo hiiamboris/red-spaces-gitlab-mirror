@@ -236,75 +236,90 @@ define-handlers [
 		;-- `key-down` supports key-combos like Ctrl+Tab, `key` does not seem to
 		;-- OTOH `key` properly reflects Shift state in chars
 		;-- so we have to use both
-		on-key [space path event] [				;-- char keys branch (inserts stuff as you type)
-			k: event/key
-			either space/active? [					;-- normal input when active
-				unless all [
-					char? k
-					any [
-						k >= #" "						;-- printable char
-						k = #"^-"						;-- Tab
-						if k = #"^M" [k: #"^/"]			;-- Enter -> NL
-					]
-				] [exit]
-				;@@ allow new-line char only when multiline?
-				;@@ TODO: input validation / filtering
-				t: space/text
-				ci: space/caret-index:
-					1 + clip reduce [0 length? t]		;-- caret-index may be >len if text was changed
-						space/caret-index
-				insert at t ci  k
-				space/invalidate						;@@ TODO: should be caught maybe automatically?
-				update
-			][										;-- has to handle Enter, or both key-down and key will handle it, twice
-				either k = #"^M" [
-					maybe space/active?: yes			;-- activate it on Enter
-					update								;-- let styles change
-				][
-					pass								;-- pass keys in inactive state (esp. tab)
-				]
+		on-key [space path event] [					;-- char keys branch (inserts stuff as you type)
+			char: event/key
+			unless all [
+				char? char
+				char >= #" "							;-- printable char
+				not event/ctrl?							;-- handled by on-key-down (e.g. ctrl+BS=#"^~")
+			][
+				if char = #"^-" [pass]					;-- let tab pass thru
+				exit									;@@ what about enter key / on-enter event?
 			]
+			;@@ TODO: input validation / filtering
+			pos: insert skip space/text ci: space/caret/index char	;-- invalidated by index change
+			space/caret/index: offset? space/text pos
+			invalidate space							;-- has to reconstruct layout in order to measure caret location
+			update
 		]
 		
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
-			k: event/key
-			unless space/active? [pass exit]			;-- keys should be passed thru (tab, arrows, ...); Enter is in on-key
-														;-- else, keys should be used on content (e.g. arrows)
+			key: event/key
 			if all [
-				char? k									;-- ignore chars without mod keys
+				char? key								;-- ignore chars without mod keys
 				not any [
-					find "^[^H" k						;-- use only Esc and BS
+					key = #"^H"							;-- use only BS
 					event/ctrl?
 				]
 			] [pass exit]
 
-			len: length? t: space/text
-			ci: clip [0 len] space/caret-index			;-- may be >len if text was changed
-			switch/default k: event/key [
-				left   [ci: ci - 1]			;@@ TODO: ctrl-arrow etc logic
-				right  [ci: ci + 1]
-				home   [ci: 0]
-				end    [ci: len]
-				delete [remove skip t ci]
-				#"^H"  [remove skip t ci: ci - 1]		;-- backspace
-				#"^["  [maybe space/active?: no]		;-- Esc = deactivate
-			][exit]									;-- not supported yet key
-			maybe space/caret-index: clip reduce [0 length? t] ci		;-- length may have changed, <> len
+			plan: switch/default key: event/key [
+				left   [reduce [
+					pick [select move]  event/shift?
+					pick [prev-word -1] event/ctrl?
+				]]
+				right  [reduce [
+					pick [select move]  event/shift?
+					pick [next-word 1]  event/ctrl?
+				]]
+				home   [reduce [
+					pick [select move]  event/shift?
+					'head
+				]]
+				end    [reduce [
+					pick [select move]  event/shift?
+					'tail
+				]]
+				delete [compose [
+					remove selected
+					remove (pick [next-word  1] event/ctrl?)
+				]]
+				#"^H"  [compose [						;-- backspace 
+					remove selected
+					remove (pick [prev-word -1] event/ctrl?)
+				]]
+				#"A" [[select all]]
+				#"C" [[copy selected]]
+				#"X" [[copy selected remove selected]]
+				#"V" [
+					if string? new: read-clipboard [
+						compose [remove selected insert (new)]
+					]
+				]
+				#"Z" [pick [[redo] [undo]] event/shift?]
+			] [exit]									;-- not supported yet key
+			
+			space/edit plan
+			invalidate space							;-- has to reconstruct layout in order to measure caret location
 			update
 		]
 
-		on-key-up [space path event] []				;-- eats the event so it's not passed forth
+		on-key-up [space path event] []					;-- eats the event so it's not passed forth
 
 		on-click [space path event] [
-			#assert [space/paragraph/layout]
-			maybe space/caret-index: offset-to-caret space/paragraph/layout path/2
-			maybe space/active?: yes					;-- activate, so Enter is not required
+			#assert [space/layout]
+			maybe space/caret/index: offset-to-caret space/layout path/2
 			update										;-- let styles update
 		]
 
+		on-focus [space path event] [
+			maybe space/caret/visible?: yes
+			update
+		]
+
 		on-unfocus [space path event] [
-			maybe space/active?: no						;-- deactivate so it won't catch Tab when next tabbed in
-			update										;-- update the look (remove caret, decoration, etc)
+			maybe space/caret/visible?: no
+			update
 		]
 	]
 

@@ -170,10 +170,12 @@ only: function [
 	"Turn falsy values into unset, eliminating from compose expressions"
 	value [any-type!] "Any truthy value is passed through"
 ][
-	any [:value ()]
+	any [:value []]		;-- block is better than unset here because can be used in set-word assignments
 ]
 
 area?: func [xy [pair!]] [xy/x * xy/y]
+
+skip?: func [series [series!]] [-1 + index? series]
 
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
 clip: func [range [block!] value [scalar!]] [
