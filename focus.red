@@ -59,15 +59,13 @@ keyboard: object [
 ;-- for use within styles
 focused?: function [
 	"Check if current style is the one in focus"
-	/parent "Rather check if parent style is the one in focus"
-	;@@ will /parent be enough or need more levels?
+	/above n "Rather check if space N levels above is the one in focus"
+	/parent  "Shortcut for /above 1"
 ][
+	n: any [n if parent [1] 0]
 	all [
-		name1: last keyboard/focus						;-- order here: from likely empty..
-		name2: either parent [							;-- ..to rarely empty (performance)
-			pick tail current-path -2
-		][	last current-path
-		]
+		name1: last keyboard/focus
+		name2: pick tail current-path -1 - n
 		(get name1) =? get name2
 	]													;-- result: true or none
 ]
