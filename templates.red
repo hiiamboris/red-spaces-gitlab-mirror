@@ -2289,6 +2289,7 @@ templates/rotor: make-template 'space [
 	angle: 0
 
 	ring: make-space 'space [size: 360x10]
+	tight?: no
 	;@@ TODO: zoom for round spaces like spiral
 
 	map: [							;-- unused, required only to tell space iterators there's inner faces
@@ -2327,7 +2328,11 @@ templates/rotor: make-template 'space [
 		map/1: content				;-- expose actual name of inner face to iterators
 		spc: get content
 		drawn: render content		;-- render before reading the size
-		r1: to 1 spc/size/x ** 2 + (spc/size/y ** 2) / 4 ** 0.5
+		r1: to 1 either tight? [
+			(min spc/size/x spc/size/y) + 30 / 2
+		][
+			distance? 0x0 spc/size / 2
+		]
 		maybe self/size: r1 + 10 * 2x2
 		compose/deep/only [
 			push [

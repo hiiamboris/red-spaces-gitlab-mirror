@@ -20,8 +20,8 @@ spaces/templates/spiral: make-template 'space [
 
 	into: function [xy [pair!] /force name [word! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
-		render/on in field 'paragraph infxinf	;-- produce layout 
-		r: field/paragraph/layout
+		render/on 'field infxinf	;-- produce layout 
+		r: field/layout
 		#assert [r]
 
 		len: length? text: field/text
@@ -47,13 +47,11 @@ spaces/templates/spiral: make-template 'space [
 	]
 
 	draw: function [] [
-		maybe field/paragraph/width: none		;-- disable wrap
-		maybe field/paragraph/text: field/text
-		unless r: field/paragraph/layout [
+		unless r: field/layout [
 			;; render is needed to produce layout and cached parents tree
 			;; so on key press paragraph invalidates also spiral itself
-			render/on in field 'paragraph infxinf		;-- produce layout 
-			r: field/paragraph/layout
+			render/on 'field infxinf			;-- produce layout 
+			r: field/layout
 			#assert [r]
 		]
 
@@ -74,8 +72,8 @@ spaces/templates/spiral: make-template 'space [
 			cycles: bgn/x / 2 / pi / rmid
 			scale: decay ** cycles
 			box: []
-			if all [field/active?  i - 1 = field/caret-index] [
-				box: compose [box (p) (p + as-pair field/caret-width full/y)]
+			if all [i - 1 = field/caret/index] [
+				box: compose [box (p) (p + as-pair field/caret/width full/y)]
 			]
 			compose/deep/into [
 				push [
@@ -99,16 +97,14 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		rotor [
+		rotor with [tight?: yes] [
 			spiral with [
 				field/text: lorem10
-				size: 300x300
+				size: 400x400
 			]
 		]
 	]
-	on-over [
-		status/text: form hittest face/space event/offset
-	]
+	on-over [status/text: form hittest face/space event/offset]
 	status: text 300x40
 ] [offset: 10x10]
 
