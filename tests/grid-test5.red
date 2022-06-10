@@ -63,7 +63,7 @@ view/no-wait/options [
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]
 	text hidden rate 50 on-time [						;-- can't set host/rate to none; used to delay full render after layout display
-		face/rate: none max-depth: 3 b/draw: render b
+		face/rate: none max-depth: 4 b/draw: render b
 	]
 ] [offset: 10x10]
 
