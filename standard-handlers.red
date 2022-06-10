@@ -84,6 +84,16 @@ define-handlers [
 				absolute amount * 4
 			update		;@@ TODO: only update when move succeeded
 		]
+		on-focus [space path event] [
+			invalidate space/hscroll/thumb
+			invalidate space/vscroll/thumb
+			update
+		]
+		on-unfocus [space path event] [
+			invalidate space/hscroll/thumb
+			invalidate space/vscroll/thumb
+			update
+		]
 		scroll-timer: [
 			on-time [space path event delay [percent!]] [	;-- press & hold way of scrolling
 				unless dragging? [exit]

@@ -40,6 +40,13 @@ do with [
 	unless svmc/text [svmc/text: black]					;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
+	checkered-pen: reshape [							;-- used for focus indication
+		pen pattern 4x4 [
+			scale 0.5 0.5 pen off
+			fill-pen !(svmc/text)  box 0x0  8x8
+			fill-pen !(svmc/panel) box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
+		]
+	]
 	; serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
 
 	;-- very experimental `either` shortener: logic | true-result | false-result
@@ -197,9 +204,7 @@ do with [
 					focus: compose/deep [
 						line-width 1
 						fill-pen off
-				        ; pen pattern 6x6 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0 12x12 fill-pen (svmc/panel) box 3x0 9x3 box 3x9 9x12 box 0x3 3x9 box 9x3 12x9]
-				        pen pattern 4x4 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0  8x8  fill-pen (svmc/panel) box 1x0 5x1 box 1x5 5x8  box 0x1 1x5 box 5x1  8x5]
-				        ; pen pattern 2x2 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0  4x4  fill-pen (svmc/panel) box 1x0 3x1 box 1x3 3x4  box 0x1 1x3 box 3x1  4x3]
+				        (checkered-pen)
 						box 4x4 (btn/size - 4) (max 0 btn/rounding - 2)
 					]
 				]
@@ -208,8 +213,24 @@ do with [
 					push (drawn)
 					fill-pen (bgnd)
 					box 1x1 (btn/size - 1) (btn/rounding)
-					(any [focus ()])
+					(only focus)
 				]
+			]
+		]
+		
+		hscroll/thumb vscroll/thumb [
+			function [thumb] [
+				drawn: thumb/draw
+				if focused?/above 2 [
+					focus: compose/deep [
+						push [
+							line-width 1
+							(checkered-pen)
+							box 4x3 (thumb/size - 4x3)
+						]
+					]
+				]
+				compose/only [(drawn) (only focus)]
 			]
 		]
 
