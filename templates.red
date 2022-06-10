@@ -217,9 +217,7 @@ image-ctx: context [
 	templates/image: make-template 'space [
 		size:   none									;@@ should fixed size be used as an override?
 		margin: 0
-		; data: make image! 1x1			;@@ 0x0 dummy image is probably better but triggers too many crashes
 		data:   none									;-- images are not recyclable, so `none` by default
-		; scale?: off										;-- scale to given canvas or not
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		space-on-change: :on-change*
 		#on-change-redirect
