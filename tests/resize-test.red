@@ -159,7 +159,7 @@ layouts: reduce [
 ;; VID code for a tube containing 3 icons
 triplet: compose/only [
 	tube with [limits: 300 .. none  margin: 0x0  spacing: img-sep by 20  align: [↑]]
-	(append/dup [] [icon with [text: take icons  image: take icons]] 3)
+	(append/dup [] [icon with [limits: 100 .. 100 text: take icons  image: take icons]] 3)
 ]
 
 ;; VID code for all triplets together
