@@ -2420,7 +2420,6 @@ field-ctx: context [
 		pos: skip text ci: field/caret/index
 		sel: field/selected
 		
-		?? plan
 		parse/case plan [any [plan:
 			['undo (undo field) | 'redo (redo field)] (
 				pos: skip text ci: field/caret/index
