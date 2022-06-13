@@ -294,7 +294,16 @@ context [
 			[:value]
 	]	
 	
+	last-offset: none
+	last-host: none
 	reset-hint: func [event [event!]] [
+		all [
+			event/offset = last-offset
+			event/face =? last-host
+			exit										;-- don't reset if not moved (e.g. multiple events on the same path)
+		]
+		last-offset: event/offset
+		last-host:   event/face
 		if hint-text [
 			hint-text: none
 			anchor: face-to-window event/offset event/face
@@ -351,7 +360,6 @@ context [
 	][
 		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
 		if menu: has-field path 'menu block! [
-		?? path
 			;; has to be under the pointer, so it won't miss /away? event closing the menu
 			offset: -1x-1 + face-to-window event/offset event/face
 			reset-hint event
