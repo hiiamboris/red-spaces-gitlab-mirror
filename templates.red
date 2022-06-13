@@ -2360,9 +2360,10 @@ caret-ctx: context [
 	]
 	
 	templates/caret: make-template 'rectangle [		;-- caret has to be a separate space so it can be styled
-		width: 1
-		index: 0				;-- should be kept even when not focused, so tabbing in leaves us where we were
-		visible?: no
+		width:       1
+		look-around: 10				;-- how close caret is allowed to come to field borders
+		index:       0				;-- should be kept even when not focused, so tabbing in leaves us where we were
+		visible?:    no
 		
 		rectangle-draw: :draw
 		draw: does [when visible? [rectangle-draw]]
@@ -2496,16 +2497,22 @@ field-ctx: context [
 	
 	draw: function [field [object!] canvas [none! pair!]] [
 		drawn: field/text-draw/on infxinf				;-- this sets the size
+		txt-size: field/layout/extra
 		default canvas: infxinf
-		if canvas/x < field/size/x [
-			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
-			maybe field/origin: clip [field/origin 0] canvas/x - field/size/x
-			maybe field/size: canvas/x by field/size/y	;-- width may be smaller/bigger than that of text
-		]
+		#assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		ci: field/caret/index + 1
 		cxy1: caret-to-offset       field/layout ci
 		cxy2: caret-to-offset/lower field/layout ci
 		csize: field/caret/width by (cxy2/y - cxy1/y)
+		cmargin: field/caret/look-around
+		if canvas/x - (2 * cmargin) < txt-size/x [		;-- field width may be smaller/bigger than that of text
+			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
+			;; aim is: have caret always visible, ideally with a few chars of look-around
+			min-org: min 0 cmargin - cxy1/x
+			max-org: min 0 canvas/x - cxy2/x - cmargin
+			maybe field/origin: clip [min-org max-org] field/origin
+			; print [min-org max-org field/origin]
+		]
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
 			invalidate-cache/only field/caret
@@ -2519,9 +2526,11 @@ field-ctx: context [
 		cdrawn: render in field 'caret
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
-				(only sdrawn)
-				translate (field/origin by 0) (drawn)
-				translate (cxy1) (cdrawn)
+				translate (field/origin by 0) [
+					(only sdrawn)
+					(drawn)
+					translate (cxy1) (cdrawn)
+				]
 			]
 		]
 	]
