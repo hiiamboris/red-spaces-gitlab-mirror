@@ -21,18 +21,16 @@ context [
 
 	;@@ is it ok that click event will follow up event for normal handlers? but some finalizers will have it unordered
 	;@@ or maybe we should schedule some code to be run after the finalizers have finished?
-	register-finalizer [up] function [space [object!] path [block!] event [event!]] [
-		unless event/face [exit]						;@@ partial workaround for #5124 - but can do nothing with View internal bugs
+	register-finalizer [up] function [space [object! none!] path [block!] event [event!]] [
 		if all [
+			event/face							;@@ partial workaround for #5124 - but can do nothing with View internal bugs
 			start-offset = event/offset					;-- it's a click, not a drag
 			not stop?									;-- up event was not eaten
+			head? path									;-- original event, not replicated for children
+			;; note: can't leverage children replication here, since `stop` flag has to be shared by the whole stack
 		][
 			event/type: 'click							;-- Red allows overriding it
-			;; this avoids multiple on-click events on the same space by discarding children
-			;; since up events will be generated for children too, they will be visited later
-			;; focused=true to avoid multiple events on the parents
-			path: append/part clear [] head path skip path 2
-			events/with-stop [events/process-event path event [] yes]
+			events/with-stop [events/process-event path event [] no]
 			event/type: 'up								;-- restore it for the other finalizers
 		]
 		;@@ TODO: maybe a drag-finished event?
