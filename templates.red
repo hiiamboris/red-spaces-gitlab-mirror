@@ -177,14 +177,14 @@ image-ctx: context [
 	
 	draw: function [image [object!] canvas [pair! none!]] [
 		either image? image/data [
-			default canvas: 0x0
+			default canvas: infxinf
 			mrg:       image/margin * 1x1 
 			limits:    image/limits
 			isize:     image/data/size
 			;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
 			low-lim:   any [if limits [limits/min] 0x0]			;-- default to 0x0 as min size
 			;; infinite canvas is fine here - it just won't affect the scale
-			high-lim:  min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be zero
+			high-lim:  min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be unscaled
 			;; for uniform scaling, compute min/max scale applicable
 			lim:       max 1x1 low-lim - mrg - mrg
 			min-scale: max  lim/x / isize/x  lim/y / isize/y
@@ -237,17 +237,15 @@ cell-ctx: context [
 	draw: function [space [object!] canvas [pair! none!]] [
 		#assert [space/content]
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
-		drawn:  render/on space/content if canvas [subtract-canvas canvas 2x2 * space/margin]
+		mrg2:   2x2 * space/margin
+		drawn:  render/on space/content subtract-canvas canvas mrg2
 		cspace: get space/content
-		size: 2x2 * space/margin + cspace/size
-		if pair? canvas [								;-- canvas is already constrained by render
-			;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
-			mask: 1x1 - (canvas / infxinf)				;-- 0x0 (infinite) to 1x1 (finite)
-			size: max size canvas * mask
-		]												;-- no canvas = no alignment, minimal appearance
+		size:   mrg2 + cspace/size
+		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
+		size:   max size finite-canvas canvas
 		maybe space/size: constrain size space/limits
 		
-		free:   space/size - cspace/size - (2x2 * space/margin)
+		free:   space/size - cspace/size - mrg2
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
 		unless tail? drawn [
 			drawn: compose/only [translate (offset) (drawn)]
@@ -286,9 +284,7 @@ cell-ctx: context [
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
-		draw: function [/on canvas [pair! none!]] [
-			~/draw self canvas
-		]
+		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		
 		space-on-change: :on-change*
 		#on-change-redirect
@@ -379,14 +375,20 @@ scrollbar: context [
 	]
 ]
 
-;@@ rename this to just `scrollable`?
+;@@ rename this to just `scrollable`? definitely need standardization in these context names
 ;; it's not `-ctx` because move-by and move-to functions are meant of outside use
 scrollable-space: context [
 	~: self
 
 	;@@ or /line /page /forth /back /x /y ?
 	;@@ TODO: less awkward spec
-	move-by: function [spc amnt "'line or 'page or offset in px" dir "forth or back" axis "x or y" /scale factor "1 by default"] [
+	move-by: function [
+		spc
+		amnt "'line or 'page or offset in px"
+		dir "forth or back"
+		axis "x or y"
+		/scale factor "1 by default"
+	][
 		if word? spc [spc: get spc]
 		dir:  select [forth 1 back -1] dir
 		unit: select [x 1x0 y 0x1] axis
@@ -398,8 +400,10 @@ scrollable-space: context [
 
 	move-to: function [
 		"ensure point XY of content is visible, scroll only if required"
-		spc [object!] xy [pair! word!] "offset or: head, tail"
-		/margin "how much space to reserve around XY" mrg [integer! pair!] "default: 0"
+		spc [object!]
+		xy [pair! word!] "offset or: head, tail"
+		/margin "how much space to reserve around XY"
+			mrg [integer! pair!] "default: 0"
 	][
 		if word? spc [spc: get spc]
 		mrg: 1x1 * any [mrg 0]
@@ -439,16 +443,9 @@ scrollable-space: context [
 	draw: function [space [object!] canvas [none! pair!]] [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
-		box: default canvas: 0x0
+		default canvas: infxinf
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
-		foreach x [x y] [
-			box/:x: any [
-				if canvas/:x < infxinf/:x [canvas/:x]
-				all [space/limits space/limits/min space/limits/min/:x]	;@@ REP #113
-				0
-			]
-		]
-		maybe space/size: box
+		maybe space/size: box: finite-canvas canvas
 		if zero? area? box [
 			#assert [false "Somehow scrollable has no size!"]
 			return quietly space/map: []
@@ -460,7 +457,7 @@ scrollable-space: context [
 		]
 		;; scroller's area is reserved, otherwise we'll see X scroller on vertical lists and vice versa:
 		scrollers: space/vscroll/size/x by space/hscroll/size/y
-		ccanvas: subtract-canvas max 1x1 box scrollers			;-- don't subtract from "infinite" pair
+		ccanvas: max 0x0 box - scrollers				;-- valid since box is finite
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		cdraw: render/only/on space/content		
 			max 0x0 0x0 - origin
@@ -590,7 +587,7 @@ paragraph-ctx: context [
 		unless find space/flags 'wrap [canvas: infxinf]
 		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
-		new-width: either canvas [canvas/x][0]					;-- no canvas is treated as 0x0
+		new-width: either canvas [canvas/x][infxinf/x]			;-- no canvas is treated as infinity
 		unless all [layout old-width = new-width] [				;-- redraw if: some facet / canvas width changed
 			lay-out space new-width
 		]
@@ -838,7 +835,7 @@ tube-ctx: context [
 	~: self
 
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [margin spacing axes align width] word [invalidate-cache space]
+		if find [margin spacing axes align] word [invalidate-cache space]
 		space/container-on-change word :old :new
 	]
 	
@@ -847,14 +844,9 @@ tube-ctx: context [
 		spacing: 0x0
 		axes:    [e s]
 		align:   -1x-1
-		width:   none			;@@ this seems required, but maybe a mandatory cell can replace it? or limits?
-		; cache?:  off
 		
 		container-draw: :draw
-		;; canvas for tube cannot be none as it controls tube's width
-		;@@ or we need an explicit width
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
-			if width [canvas: width * 1x1]				;-- override canvas if width is set (only 1 dimension matters)
 			settings: [margin spacing align axes canvas]
 			drawn: container-draw/layout/only 'tube settings xy1 xy2
 			#debug sizing [print ["tube with" content "on" canvas "->" size]]
@@ -1002,7 +994,7 @@ data-view-ctx: context [
 			cspace: get space/content
 			if all [in cspace 'font  not cspace/font =? space/font] [
 				cspace/font: space/font
-				invalidate-cache space
+				invalidate space
 			]
 		]
 		switch to word! word [
@@ -1144,7 +1136,7 @@ inf-scrollable-ctx: context [
 		maybe space/origin: space/origin + (wofs - wofs0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
 		;; since this is not a change of canvas, direct map manipulation is allowed:
 		maybe window/origin: negate wofs
-		wofs <> wofs0								;-- should return true when updates origin - used by event handlers
+		wofs <> wofs0									;-- should return true when updates origin - used by event handlers
 	]
 	
 	draw: function [space [object!] canvas [none! pair!]] [
@@ -1241,8 +1233,8 @@ list-view-ctx: context [
 		x: list/axis
 		if level < list/margin/:x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
-		;; make canvas infinite otherwise single item will occupy it's size
-		canvas/:x: infxinf/x
+		;; make canvas zero to outline compression intent, otherwise single item will occupy it's size
+		canvas/:x: 0
 		
 		either empty? list/map [
 			i: 1
@@ -1350,7 +1342,7 @@ list-view-ctx: context [
 	
 	available?: function [list [object!] canvas [pair!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 		if axis <> list/axis [
-			return either dir < 0 [from][canvas/:axis - from]
+			return either dir < 0 [from][min requested canvas/:axis - from]
 		]
 		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
 		r: max 0 requested - switch item [
@@ -1374,8 +1366,8 @@ list-view-ctx: context [
 		]
 		#assert [i1 <= i2]
 
-		guide:    select [x 1x0 y 0x1] axis
-		canvas:   extend-canvas canvas axis
+		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
+		guide:    axis2pair axis
 		viewport: xy2 - xy1
 		origin:   guide * (xy1 - o1 - list/margin)
 		cache:    'all
@@ -2504,8 +2496,8 @@ field-ctx: context [
 	
 	draw: function [field [object!] canvas [none! pair!]] [
 		drawn: field/text-draw/on infxinf				;-- this sets the size
-		default canvas: 0x0
-		if canvas/x < infxinf/x [
+		default canvas: infxinf
+		if canvas/x < field/size/x [
 			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
 			maybe field/origin: clip [field/origin 0] canvas/x - field/size/x
 			maybe field/size: canvas/x by field/size/y	;-- width may be smaller/bigger than that of text
@@ -2576,7 +2568,7 @@ area-ctx: context [
 		; #assert [pair? canvas]
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
 		; quietly area/size: canvas
-		size: canvas * (1 - (canvas / infxinf))
+		size: finite-canvas canvas
 		maybe area/paragraph/width: if area/wrap? [size/x]
 		maybe area/paragraph/text:  area/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style

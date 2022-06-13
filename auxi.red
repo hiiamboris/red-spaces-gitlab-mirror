@@ -332,7 +332,7 @@ max-safe: function [a [scalar! none!] b [scalar! none!]] [
 infxinf: 2000000000x2000000000							;-- used too often to always type it numerically
 constrain: function [
 	"Clip SIZE within LIMITS (allows none for both)"
-	size    [none! pair!]   "none if unlimited"
+	size    [none! pair!]   "none if unlimited (same as infxinf)"
 	limits  [none! object!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
@@ -355,7 +355,7 @@ constrain: function [
 			;; no /max leaves unlimited size as `none`
 		]
 	]
-	unless size =? infxinf [size]						;-- normalization
+	unless size =? infxinf [size]						;-- normalization ;@@ need it?
 ]
 
 for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code [block!]] [
@@ -454,15 +454,22 @@ normalize-alignment: function [
 ]
 
 
+finite-canvas: function [
+	"Turn infinite dimensions of CANVAS into zero"
+	canvas [pair! none!]
+][
+	remainder any [canvas 0x0] infxinf
+]
+
+#assert [0x20 = finite-canvas infxinf/x by 20]
+
 extend-canvas: function [canvas [pair! none!] axis [word!]] [
-	default canvas: 0x0
-	canvas/:axis: infxinf/x
-	canvas
+	if canvas [canvas/:axis: infxinf/x  canvas]
 ]
 
 ;; useful to subtract margins, but only from finite dimensions
 subtract-canvas: function [canvas [pair! none!] pair [pair!]] [
-	if canvas [											;-- none = 0x0 - nothing to subtract from
+	if canvas [											;-- none = infxinf - nothing to subtract
 		mask: 1x1 - (canvas / infxinf)					;-- 0x0 (infinite) to 1x1 (finite)
 		max 0x0 canvas - (pair * mask)
 	]

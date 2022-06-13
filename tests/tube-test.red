@@ -15,17 +15,24 @@ Red [needs: view]
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
 set-style 'heading function [self /on canvas [pair! none!]] [
-	self/font: bigfont
+	maybe/same self/font: bigfont
 	drawn: self/draw/on canvas
-	width: either canvas [canvas/x][self/size/x]
 	compose [
 		fill-pen (svmc/text + 0.0.0.200)
-		pen off box 0x0 (width by self/size/y)
+		pen off box 0x0 (self/size)
 		(drawn) 
 	]
 ]
-set-style 'field [push [fill-pen (c: contrast-with svmc/text) pen (contrast-with c) line-width 1 box 0x0 (size)]]
-set-style 'field/caret [fill-pen (svmc/text)]
+set-style 'field function [field /on canvas] [
+	drawn: field/draw/on canvas
+	compose/deep/only [push [
+		fill-pen (c: contrast-with svmc/text)
+		pen (contrast-with c)
+		line-width 1
+		box 0x0 (field/size)
+	] (drawn)]
+]
+; set-style 'field/caret [fill-pen (svmc/text)]
 set-style 'tube function [tube /on canvas [pair! none!]] [
 	drawn: tube/draw/on canvas
 	#assert [drawn]
@@ -39,24 +46,30 @@ set-style 'tube function [tube /on canvas [pair! none!]] [
 spaces/templates/heading: make-template 'data-view []
 
 boxes: lay-out-vids [
-	field size= 60x30 "A"
-	field size= 50x40 "B"
-	field size= 40x50 "C"
-	field size= 30x60 "D"
-	field size= 20x20 "E"
-	field size= 30x10 "F"
-	field size= 10x10 "G"
+	field 60x30 "A"
+	field 50x40 "B"
+	field 40x50 "C"
+	field 30x60 "D"
+	field 20x20 "E"
+	field 30x10 "F"
+	field 10x10 "G"
 ]
 
+width: 130
 ; aligns: map-each/only x [-1 0 1] [ map-each y [-1 0 1] [as-pair x y] ]
 aligns: map-each/only y [↑ #[none] ↓] [ map-each/only x [← #[none] →] [trim reduce [x y]] ]
 tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
-	keep [
+	keep compose [
 		style vlist: vlist margin= 5x5 spacing= 5x5
-		style tube:  tube  margin= 5x5 spacing= 5x5 width= 130 content= boxes
+		style tube:  tube  margin= 5x5 spacing= 5x5 content= boxes
 	]
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
+		do with spaces/ctx [
+			lim2: extend-canvas
+				lim1: width by width
+				anchor2axis axes/2
+		]
 		if i > 1 [keep [<-> 1x30]]		;-- delimiter
 		keep compose [heading data=(#composite "axes: (mold axes)")]
 		for-each group aligns [
@@ -65,7 +78,7 @@ tubes: collect [
 				compose/deep/only [
 					vlist [
 						text text=(#composite "align: (mold align)")
-						tube axes=(axes) align=(align)
+						tube axes=(axes) align=(align) limits=(lim1 .. lim2) 
 					]
 				]
 			]

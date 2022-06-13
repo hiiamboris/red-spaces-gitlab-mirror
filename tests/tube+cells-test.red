@@ -21,7 +21,7 @@ set-style 'heading function [self /on canvas [pair! none!]] [
 	]
 ]
 set-style 'field [fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]
-set-style 'field/caret [fill-pen (svmc/text)]
+; set-style 'field/caret [fill-pen (svmc/text)]
 set-style 'tube function [tube /on canvas [pair! none!]] [
 	drawn: tube/draw/on canvas
 	#assert [drawn]
@@ -35,35 +35,35 @@ set-style 'tube function [tube /on canvas [pair! none!]] [
 spaces/templates/heading: make-template 'data-view []
 
 boxes: map-each spec [
-	[size: 60x30 text: "A"]
-	[size: 50x40 text: "B"]
-	[size: 40x50 text: "C"]
-	[size: 30x60 text: "D"]
-	[size: 20x20 text: "E"]
-	[size: 30x10 text: "F"]
-	[size: 10x10 text: "G"]
+	[60x30 "A"]
+	[50x40 "B"]
+	[40x50 "C"]
+	[30x60 "D"]
+	[20x20 "E"]
+	[30x10 "F"]
+	[10x10 "G"]
 ][
 	; make-space/name 'rectangle spec
 	; make-space/name 'field spec
-	make-space/name 'cell [
-		weight: 1
-		content: make-space/name 'field spec
-	]
+	compose/deep [cell [field (spec)]]
 ]
 
+width: 130
 tubes: collect [
 	; for-each [/i axes] [ [→ ↓] ][;] [→ ↑] ][;] [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
-	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
+		do with spaces/ctx [
+			lim2: extend-canvas
+				lim1: width by width
+				anchor2axis axes/2
+		]
 		keep reshape [
-			; cell with [limits: 170x200 .. 170x200] [
 			cell none .. 170x200 [
 				vlist [
 					heading data= !(#composite "axes: (mold axes)")
-					tube with [spacing: 5x5 axes: !(axes) width: 130 content: boxes]
+					row tight spacing= 5x5 axes= !(axes) limits= !(lim1 .. lim2) !(boxes)
 				]
 			]
-			; space with [size: 1x30]		/if even? i		;-- delimiter
 		]
 	]
 ]
@@ -72,7 +72,7 @@ tubes: collect [
 view/no-wait compose/only/deep [
 	h: host [
 		vlist [
-			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
+			fps-meter		;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
 			scrollable 540x500 [
 				tube spacing= 5x10 (tubes)

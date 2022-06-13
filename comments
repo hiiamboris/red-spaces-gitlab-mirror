@@ -1156,6 +1156,19 @@ infinite canvas bores me to death already
 	exceptions: flow and image
 	0xINF canvas is used by tube to hint the rendered item across what axis it should minimize itself
 	grid/cell renders items on WIDTHxINF and items should minimize across inf but fill width
+	ok, the issue I found was that row was rendering it's items on 0xN canvas, while list - on INFxN canvas
+	made list same as row, but now how to lay out menus? vlist sets x size to 0, row follows suit, results in 2 rows
+	somehow vlist must set x size to inf, but when? how?
+	vlist's default canvas maybe none, but if it's inside a row, it will get 0x0 anyway, so I have to work with that
+	some "wide" flag that would ignore the canvas width, set to inf? not good for resizeability
+	default none to infxinf canvas and let row pass none to items too?
+	ok so let vlist draw items on infx0
+	let row on infx0 draw on infxinf - resulting in almost hlist-like layout
+	while row on Nx0 will work as it does today - start from 0xinf, stretch, align
+	vlist has alignment too, that doesn't break
+	row in a row? normally, outer row will draw on 0xinf then stretch, this also works fine
+	row within hlist? hlist will render it on 0xinf, and never stretches, and that's fine, use row in a row instead
+	scrollables? should use infxinf, so rows don't wrap 
 shit! timers are still a bottleneck, because e.g. `inspect system` creates 428 rated spaces (scroll/roll timers)
 	and the culprit is paths-from-space, surprisingly
 	anyway, not optimizable - have to turn off unused timers (when scrollbars are hidden)

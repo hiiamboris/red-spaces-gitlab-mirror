@@ -55,6 +55,7 @@ layouts: context [
 				cache    [none! word! (find [all invisible] cache)]
 			]]
 			default origin: 0x0
+			default canvas: infxinf						;-- none to pair normalization
 			x: ortho y: axis
 			guide: axis2pair y
 			pos: pos': origin + (1x1 * margin)
@@ -70,7 +71,8 @@ layouts: context [
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: extend-canvas if canvas [subtract-canvas canvas 2x2 * margin] axis
+			canvas1: canvas2: extend-canvas subtract-canvas canvas 2x2 * margin axis
+			; canvas1: canvas2: (subtract-canvas canvas 2x2 * margin) * reverse guide
 			
 			map: make [] 2 * count
 			repeat i count [							;-- first render cycle
@@ -81,8 +83,10 @@ layouts: context [
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
-			unless canvas2 [canvas2: 0x0]
-			canvas2/:x: max canvas2/:x size/:x			;-- only extend the canvas to max item's size, but not contract
+			;; only extend the canvas to max item's size, but not contract if it's finite
+			;; do contract if X is infinite
+			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]
+			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
@@ -110,10 +114,9 @@ layouts: context [
 		;;                                  default = [e s] - left-to-right items, top-down rows
 		;;   align         [block! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
 		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
-		;@@ maybe support ↑↓→← and nsew for alignment too?
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
-		;;   canvas         [none! pair!]   > 0x0, cannot be none as tube needs to know it's width
+		;;   canvas         [none! pair!]   > 0x0 or none=inf (width determined by widest item)
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
@@ -147,7 +150,7 @@ layouts: context [
 			]]
 			default axes:  [e s]
 			default align: -1x-1
-			y: ortho x: anchor2axis axes/1
+			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
 			ox: anchor2pair axes/1
 			oy: anchor2pair axes/2
 			align: normalize-alignment align ox oy
@@ -168,6 +171,7 @@ layouts: context [
 			
 			;; constraints question is also a tricky one
 			;; I decided to estimate min. size of each space by using 0x2e9 and 2e9x0 canvases (best fit for text/tube)
+			;; (or 0xN / Nx0 when canvas is of fixed width)
 			;; then each space will report the "narrowest" possible form of it, suiting tube needs
 			;; when limits/min is set, it overrides the half-unlimited canvas
 			;; when only limits/max is set, it's "height" overrides the infinite 2e9, "width" stays zero
@@ -178,7 +182,15 @@ layouts: context [
 			info: obtain block! count * 5
 			#leaving [stash info]
 			
-			stripe: infxinf * abs oy					;-- thinnest canvas possible, used to estimate min. space/size
+			default canvas: infxinf						;-- none to pair normalization
+			; stripe: (subtract-canvas canvas 2x2 * margin) * oy
+			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
+			;; along Y canvas stays as is, let items fill it
+			; stripe: round/to subtract-canvas canvas 2x2 * margin infxinf * ox		;@@ #5151
+			stripe: subtract-canvas canvas 2x2 * margin
+			stripe/:x: round/to stripe/:x infxinf/x
+			#debug sizing [print ["tube c=" canvas "stripe=" stripe]]
+			
 			repeat i count [
 				space: get name: either func? [spaces/pick i][spaces/:i]
 				drawn: render/on name stripe			;-- 1st render needed to obtain min *real* space/size, which may be > limits/max
@@ -290,7 +302,7 @@ layouts: context [
 			shift: min 0x0 oxy: ox + oy					;-- offset correction for negative axes
 			row-shift:    align/1 + 1 / 2
 			in-row-shift: align/2 + 1 / 2
-			total-width:  either allowed-row-width >= infxinf/x [peak-row-width][allowed-row-width] 
+			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
 			total-length: 0
 			foreach [row-size row] rows [
 				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
@@ -310,6 +322,7 @@ layouts: context [
 				shift: size * abs shift
 				foreach [name geom] map [geom/offset: geom/offset + shift]
 			]
+			#debug sizing [print ["tube c=" canvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
 			reduce [size copy map]
 		]
