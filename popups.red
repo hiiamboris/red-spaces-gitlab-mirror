@@ -285,17 +285,13 @@ context [
 	]
 
 	;; searches the path for a defined field (lowest one wins)
-	find-field: function [path [block!] name [word!] types [datatype! typeset!]] [
-		path: tail path
-		type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types
-		until [											;@@ use for-each/reverse
-			path: skip path -2
-			space: get path/1
-			value: select space name
-			if do type-check [return :value]
-			head? path
-		]
-		none
+	has-field: function [path [block!] name [word!] types [datatype! typeset!]] [
+		space: get path/1
+		value: select space name
+		if either datatype? types
+			[types =? type? value]
+			[find types type? value]
+			[:value]
 	]	
 	
 	reset-hint: func [event [event!]] [
@@ -333,7 +329,7 @@ context [
 			either all [
 				space
 				not event/away?
-				text: find-field path 'hint string!		;-- hint is enabled for this space or one of it's parents
+				text: has-field path 'hint string!		;-- hint is enabled for this space or one of it's parents
 			][
 				hint-text: text
 				anchor: face-to-window event/offset event/face
@@ -354,7 +350,8 @@ context [
 		space [object! none!] path [block!] event [event!]
 	][
 		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
-		if menu: find-field path 'menu block! [
+		if menu: has-field path 'menu block! [
+		?? path
 			;; has to be under the pointer, so it won't miss /away? event closing the menu
 			offset: -1x-1 + face-to-window event/offset event/face
 			reset-hint event
