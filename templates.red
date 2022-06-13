@@ -2530,9 +2530,9 @@ field-ctx: context [
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
 				translate (field/origin by 0) [
-					(only sdrawn)
+					(when sdrawn [compose/only [translate (mrg) (sdrawn)]])
 					(drawn)
-					translate (cxy1) (cdrawn)
+					translate (cxy1 + mrg) (cdrawn)
 				]
 			]
 		]
