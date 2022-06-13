@@ -94,8 +94,16 @@ do with [
 		]
 
 		field [
-			(when select self 'color [compose [pen (color)]])
-			(when not font [font: fonts/text ()])
+			function [field /on canvas] [
+				drawn: field/draw/on canvas
+				unless field/font [field/font: fonts/text]
+				compose/only [
+					(when select field 'color [compose [pen (field/color)]])	;@@ REP #113
+					line-width 1
+					box 0x0 (field/size)
+					(drawn)
+				]
+			]
 		]
 		field/caret [
 			; pen off fill-pen !(contrast-with svmc/panel)
