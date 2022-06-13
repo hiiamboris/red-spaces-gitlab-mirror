@@ -95,9 +95,9 @@ do with [
 
 		field [
 			function [field /on canvas] [
-				drawn: field/draw/on canvas
 				unless field/font [field/font: fonts/text]
-				maybe field/margin: 3x0					;-- better default when having a frame
+				maybe  field/margin: 3x0					;-- better default when having a frame
+				drawn: field/draw/on canvas
 				compose/only [
 					(when select field 'color [compose [pen (field/color)]])	;@@ REP #113
 					line-width 1
