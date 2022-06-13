@@ -5,7 +5,7 @@ view [
 	host focus [						;) create a Host face that can contain spaces
 		vlist [							;) draw a vertical list on the Host
 			text "Hello, space!"
-			button "OK" 80 [unview]
+			button "OK" 80 [unview]		;) unview generates an error - #5124 :)
 		]
 	]
 ]
