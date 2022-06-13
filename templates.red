@@ -2295,7 +2295,11 @@ templates/rotor: make-template 'space [
 	into: function [xy [pair!] /force name [word! none!]] [
 		unless content [return none]
 		spc: get content
-		r1: to 1 spc/size/x ** 2 + (spc/size/y ** 2) / 4 ** 0.5
+		r1: to 1 either tight? [
+			(min spc/size/x spc/size/y) + 50 / 2
+		][
+			distance? 0x0 spc/size / 2
+		]
 		r2: r1 + 10
 		c: cosine angle  s: negate sine angle
 		p0: p: xy - (size / 2)
@@ -2319,7 +2323,7 @@ templates/rotor: make-template 'space [
 		spc: get content
 		drawn: render content		;-- render before reading the size
 		r1: to 1 either tight? [
-			(min spc/size/x spc/size/y) + 30 / 2
+			(min spc/size/x spc/size/y) + 50 / 2
 		][
 			distance? 0x0 spc/size / 2
 		]
@@ -2512,8 +2516,9 @@ field-ctx: context [
 			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
 			;; aim is: have caret always visible, ideally with a few chars of look-around
 			min-org: min 0 cmargin - cxy1/x
-			max-org: min 0 canvas/x - cxy2/x - cmargin
+			max-org: clip [min-org 0] canvas/x - cxy2/x - cmargin
 			maybe field/origin: clip [min-org max-org] field/origin
+			#assert [field/layout]						;-- must not invalidate the layout
 			; print [min-org max-org field/origin]
 		]
 		unless field/caret/size = csize [
@@ -2527,6 +2532,7 @@ field-ctx: context [
 			sdrawn: compose/only [translate (sxy1) (render in field 'selection)]
 		]
 		cdrawn: render in field 'caret
+		#assert [field/layout]							;-- should be set after draw, others may rely
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
 				translate (field/origin by 0) [
@@ -2540,9 +2546,8 @@ field-ctx: context [
 		
 	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
-			origin   [invalidate-cache field]
-			text     [field/caret/index: length? new]	;-- auto position at the tail; invalidated by text
-			selected [invalidate-cache field]
+			origin selected [invalidate-cache field]	;-- invalidating just cache in enough since text is the same
+			text [field/caret/index: length? new]		;-- auto position at the tail; invalidated by text
 		]
 		field/text-on-change word :old :new
 	]
