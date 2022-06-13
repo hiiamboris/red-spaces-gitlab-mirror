@@ -293,7 +293,7 @@ events: context [
 						face/space
 						event/offset
 						if dragging? [head drag-path]
-						clear []							;-- use a static buffer since `over` events can be populous (process-event ensures copy)
+						make block! 12
 				]
 				key key-down key-up enter [
 					focused?: yes							;-- event should not be detected by parent spaces
@@ -359,7 +359,9 @@ events: context [
 		#assert [not find wpath pair!]
 		len: length? wpath
 		i2: either focused? [len][1]								;-- keyboard events should only go into the focused space
-		template: next as path! [handlers]							;-- static, not allocated
+		;; this also needs reentrancy or e.g. up event closes the menu face, over event slips in and changes template
+		template: change obtain path! 8 'handlers 
+		#leaving [stash template] 
 		;@@ TODO: this is O(len^2) and should be optimized...
 		while [i2 <= len] [											;-- walk from the outermost spaces to the innermost
 			;; last space is usually the one handler is intereted in, not `screen`
@@ -374,7 +376,7 @@ events: context [
 						clear template 
 						at wpath i1  skip wpath i2					;-- add slice [i1,i2] of path
 						hnd-name
-					unless block? try [list: get hpath] [continue]
+					unless block? try [list: get hpath] [continue]	;@@ REP #113
 					commands/stop									;-- stop after current stack unless `pass` gets called
 					foreach handler list [							;-- whole list is called regardless of stop flag change
 						#assert [function? :handler]
