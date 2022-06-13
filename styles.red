@@ -89,13 +89,13 @@ do with [
 
 		text paragraph link fps-meter [
 			(when select self 'color [compose [pen (color)]])
-			(maybe/same font: fonts/text ())					;@@ hate this syntax! find a better one
+			(when not font [font: fonts/text ()])				;@@ hate this syntax! find a better one
 			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
 		]
 
 		field [
 			(when select self 'color [compose [pen (color)]])
-			(maybe/same font: fonts/text ())
+			(when not font [font: fonts/text ()])
 		]
 		field/caret [
 			; pen off fill-pen !(contrast-with svmc/panel)
@@ -112,6 +112,7 @@ do with [
 				][	space/draw/on      canvas
 				]
 				unless color: select space 'color [return drawn]
+				#assert [space/size]
 				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]
 			]
 		]
@@ -128,15 +129,16 @@ do with [
 						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
 					]
 				]
-				compose/only [(bgnd) (drawn)]
+				reduce [bgnd drawn]
 			]
 		]
 		
 		grid/cell [										;-- has no frame since frame is drawn by grid itself
 			function [cell /on canvas] [
+				#assert [canvas]						;-- grid should provide finite canvas
 				drawn: cell/draw/on canvas
 				;; when cell content is not compressible, cell/size may be bigger than canvas
-				if canvas [canvas: min canvas cell/size]
+				canvas: min canvas cell/size
 				color: any [
 					select cell 'color
 					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
@@ -148,7 +150,7 @@ do with [
 						box 0x0 (canvas)
 					]
 				]
-				compose/only [(bgnd) (drawn)]
+				reduce [bgnd drawn]
 			]
 		]
 		
@@ -237,6 +239,7 @@ do with [
 		grid-view/window [
 			function [window /only xy1 xy2] [
 				drawn: window/draw/only xy1 xy2
+				#assert [window/size]
 				bgnd: compose/deep [
 					push [
 						fill-pen !(svmc/text + 0.0.0.120)
