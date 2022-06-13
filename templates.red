@@ -2499,7 +2499,10 @@ field-ctx: context [
 		drawn: field/text-draw/on infxinf				;-- this sets the size
 		txt-size: field/layout/extra
 		default canvas: infxinf
-		#assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
+		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
+		if canvas/x < infxinf/x [						;-- fill the provided canvas, even if text is larger
+			maybe field/size: canvas/x by field/size/y
+		]
 		ci: field/caret/index + 1
 		cxy1: caret-to-offset       field/layout ci
 		cxy2: caret-to-offset/lower field/layout ci

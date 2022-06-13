@@ -5,7 +5,7 @@ recycle/off
 view [
 	host [
 		vlist [
-			field focus 300x30 "edit abc def"
+			field focus 300 "edit abc def"
 			field
 		]
 	]
