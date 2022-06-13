@@ -294,16 +294,7 @@ context [
 			[:value]
 	]	
 	
-	last-offset: none
-	last-host: none
 	reset-hint: func [event [event!]] [
-		all [
-			event/offset = last-offset
-			event/face =? last-host
-			exit										;-- don't reset if not moved (e.g. multiple events on the same path)
-		]
-		last-offset: event/offset
-		last-host:   event/face
 		if hint-text [
 			hint-text: none
 			anchor: face-to-window event/offset event/face
@@ -320,12 +311,16 @@ context [
 		distance? anchor face-to-window event/offset event/face
 	]
 	
+	last-offset: none
 	;; over event should be tied to spaces and is guaranteed to fire even if no space below
 	register-previewer [over] function [
 		space [object! none!] path [block!] event [event!]
-		/extern hint-text show-time anchor
+		/extern hint-text show-time anchor last-offset
 	][
 		; #assert [event/window/type = 'window]
+		unless event/offset = last-offset [exit]		;-- don't react if not moved (e.g. multiple events on the same path)
+		last-offset: face-to-screen event/offset event/face
+		
 		either level: is-popup? window: event/window host: event/face [	;-- hovering over a popup face
 			either level = 0 [
 				reset-hint event						;-- no hint can trigger other hint
