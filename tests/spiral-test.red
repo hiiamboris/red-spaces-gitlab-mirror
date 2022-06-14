@@ -22,7 +22,7 @@ spaces/templates/spiral: make-template 'space [
 		;@@ TODO: unify this with `draw` code somehow
 		render/on 'field infxinf	;-- produce layout 
 		r: field/layout
-		#assert [r]
+		assert [r]
 
 		len: length? text: field/text
 		if empty? text [return none]		;-- case of empty string
@@ -52,7 +52,7 @@ spaces/templates/spiral: make-template 'space [
 			;; so on key press paragraph invalidates also spiral itself
 			render/on 'field infxinf			;-- produce layout 
 			r: field/layout
-			#assert [r]
+			assert [r]
 		]
 
 		len: length? text: field/text
