@@ -1172,6 +1172,20 @@ infinite canvas bores me to death already
 shit! timers are still a bottleneck, because e.g. `inspect system` creates 428 rated spaces (scroll/roll timers)
 	and the culprit is paths-from-space, surprisingly
 	anyway, not optimizable - have to turn off unused timers (when scrollbars are hidden)
+field origin is tricky!
+	can't modify it in the draw func, because every draw on zero canvas (in a row/list) will anchor origin to the beginning
+	can't modify it in key events purely, because resizing would put caret out of view (though acceptable tradeoff)
+	maybe fixate it in key events, but temporarily adjust during draw?
+	now the problem is, a few key events may be processed in a row, 
+	one invalidates the layout, others have no access to it now
+	requiring a render cycle would slow down key input (which is already not so great)
+	also, layout is not guaranteed to be aligned with /size - size may be fetched from cache
+	possible to fix by tracking /size change and ensuring a layout exists or created
+	OTOH, field is always single-line, so this problem only exists for `area`, which can wait
+	layout invalidation without setting it to none?
+	oh ez fix: look in /layouts for an existing one?
+	nope, canvas can be 2e9, but size will be determined by the limits
+	ok, it's a bug that canvas is not the same as size? no it's not, since it is used to determine if redraw is needed
 	
 
 VID Styles: must be documented TODO

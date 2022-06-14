@@ -566,7 +566,8 @@ paragraph-ctx: context [
 	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
-		;; rtd-layout is slow! about 200 times slower than object creation
+		;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
+		;@@ find  a way to create a rich-text face without rtd-layout
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		layout: any [space/layouts/:width  space/layouts/:width: rtd-layout [""]]
 		flags:  compose [(1 by length? space/text) (space/flags)]
@@ -588,7 +589,7 @@ paragraph-ctx: context [
 		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
 		new-width: either canvas [canvas/x][infxinf/x]			;-- no canvas is treated as infinity
-		unless all [layout old-width = new-width] [				;-- redraw if: some facet / canvas width changed
+		unless old-width = new-width [							;-- redraw if: some facet / canvas width changed
 			lay-out space new-width
 		]
 		
@@ -2499,6 +2500,30 @@ field-ctx: context [
 		]]
 	]
 	
+	adjust-origin: function [
+		"Return field/origin adjusted so that caret is visible"
+		field [object!]
+	][
+		cmargin: field/caret/look-around
+		#assert [field/size]							;-- must be rendered first!
+		;; layout may be invalidated by a series of keys, second key will call `adjust` with no layout
+		;; field can just rebuild it since canvas is always known (infinite)
+		;@@ this hack won't work for area - will have to rethink the model!
+		layout: any [field/layout  paragraph-ctx/lay-out field infxinf/x]
+		#assert [object? layout]
+		view-width: field/size/x
+		text-width: layout/extra/x
+		if view-width - cmargin >= text-width [			;-- fully fits, no origin offset required
+			return 0
+		]
+		ci:   field/caret/index + 1
+		cxy1: caret-to-offset       layout ci
+		cxy2: caret-to-offset/lower layout ci
+		min-org: min 0 cmargin - cxy1/x
+		max-org: clip [min-org 0] view-width - cxy2/x - cmargin
+		clip [min-org max-org] field/origin
+	]
+		
 	draw: function [field [object!] canvas [none! pair!]] [
 		drawn: field/text-draw/on infxinf				;-- this sets the size
 		txt-size: field/layout/extra
@@ -2511,20 +2536,11 @@ field-ctx: context [
 		cxy1: caret-to-offset       field/layout ci
 		cxy2: caret-to-offset/lower field/layout ci
 		csize: field/caret/width by (cxy2/y - cxy1/y)
-		cmargin: field/caret/look-around
-		if canvas/x - (2 * cmargin) < txt-size/x [		;-- field width may be smaller/bigger than that of text
-			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
-			;; aim is: have caret always visible, ideally with a few chars of look-around
-			min-org: min 0 cmargin - cxy1/x
-			max-org: clip [min-org 0] canvas/x - cxy2/x - cmargin
-			maybe field/origin: clip [min-org max-org] field/origin
-			#assert [field/layout]						;-- must not invalidate the layout
-			; print [min-org max-org field/origin]
-		]
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
 			invalidate-cache/only field/caret
 		]
+		origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`
 		if sel: field/selected [
 			sxy1: caret-to-offset       field/layout sel/1 + 1
 			sxy2: caret-to-offset/lower field/layout sel/2
@@ -2535,7 +2551,7 @@ field-ctx: context [
 		#assert [field/layout]							;-- should be set after draw, others may rely
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
-				translate (field/origin by 0) [
+				translate (origin by 0) [
 					(when sdrawn [compose/only [translate (mrg) (sdrawn)]])
 					(drawn)
 					translate (cxy1 + mrg) (cdrawn)

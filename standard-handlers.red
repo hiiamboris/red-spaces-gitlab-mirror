@@ -258,8 +258,10 @@ define-handlers [
 			]
 			;@@ TODO: input validation / filtering
 			pos: insert skip space/text ci: space/caret/index char	;-- invalidated by index change
-			space/caret/index: offset? space/text pos
+			quietly space/caret/index: offset? space/text pos
+			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
+			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
 			update
 		]
 		
@@ -310,7 +312,9 @@ define-handlers [
 			] [exit]									;-- not supported yet key
 			
 			space/edit plan
+			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
+			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
 			update
 		]
 
