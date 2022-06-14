@@ -2387,12 +2387,14 @@ field-ctx: context [
 		
 	find-prev-word: function [field [object!] from [integer!]] [
 		rev: reverse append/part clear {} field/text from
-		parse rev [any ws some non-ws rev: (return from + skip? rev)]
+		parse rev [any ws some non-ws rev: (return from - skip? rev)]
+		0
 	]
 	
 	find-next-word: function [field [object!] from [integer!]] [
 		pos: skip field/text from
 		parse pos [any ws some non-ws pos: (return skip? pos)]
+		length? field/text
 	]
 	
 	mark-history: function [field [object!]] [
@@ -2432,6 +2434,8 @@ field-ctx: context [
 			|	'all  (sel: 0 by ci: len)
 			|	'head (n: negate ci)
 			|	'tail (n: len - ci)
+			|	'prev-word (n: (find-prev-word field ci) - ci)
+			|	'next-word (n: (find-next-word field ci) - ci)
 			|	set p pair! (sel: p  ci: p/1)
 			|	set n integer!
 			] (

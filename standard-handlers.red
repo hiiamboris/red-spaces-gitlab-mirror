@@ -257,8 +257,10 @@ define-handlers [
 				exit									;@@ what about enter key / on-enter event?
 			]
 			;@@ TODO: input validation / filtering
-			pos: insert skip space/text ci: space/caret/index char	;-- invalidated by index change
-			quietly space/caret/index: offset? space/text pos
+			space/edit compose [
+				remove selected
+				insert (form char)
+			]
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
 			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
@@ -292,14 +294,20 @@ define-handlers [
 					pick [select move]  event/shift?
 					'tail
 				]]
-				delete [compose [
-					remove selected
-					remove (pick [next-word  1] event/ctrl?)
-				]]
-				#"^H"  [compose [						;-- backspace 
-					remove selected
-					remove (pick [prev-word -1] event/ctrl?)
-				]]
+				delete [
+					either space/selected [
+						[remove selected]
+					][ 
+						compose [remove (pick [next-word 1] event/ctrl?)]
+					]
+				]
+				#"^H"  [								;-- backspace
+					either space/selected [
+						[remove selected]
+					][ 
+						compose [remove (pick [prev-word -1] event/ctrl?)]
+					]
+				]
 				#"A" [[select all]]
 				#"C" [[copy selected]]
 				#"X" [[copy selected remove selected]]
