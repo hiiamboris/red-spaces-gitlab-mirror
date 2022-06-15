@@ -182,9 +182,9 @@ image-ctx: context [
 			limits:    image/limits
 			isize:     image/data/size
 			;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
-			low-lim:   any [if limits [limits/min] 0x0]			;-- default to 0x0 as min size
+			low-lim:   1x1 * any [if limits [limits/min] 0x0]	;-- default to 0x0 as min size; * 1x1 in case it's integer
 			;; infinite canvas is fine here - it just won't affect the scale
-			high-lim:  min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be unscaled
+			high-lim:  1x1 * min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be unscaled
 			;; for uniform scaling, compute min/max scale applicable
 			lim:       max 1x1 low-lim - mrg - mrg
 			min-scale: max  lim/x / isize/x  lim/y / isize/y
@@ -198,10 +198,10 @@ image-ctx: context [
 				all [max-scale max-scale < 1] [max-scale]		;-- downscale if canvas or limits/max requires
 				'unconstrained [1]
 			]
-			maybe image/size: isize * scale
+			maybe image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
 		][
-			maybe image/size: 2x2 * image/margin
+			maybe image/size: 2x2 * image/margin				;@@ can't be constrained further; or call constrain again?
 			[]
 		]
 	]
@@ -445,7 +445,7 @@ scrollable-space: context [
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		default canvas: infxinf
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
-		maybe space/size: box: finite-canvas canvas
+		maybe space/size: box: constrain finite-canvas canvas space/limits
 		if zero? area? box [
 			#assert [false "Somehow scrollable has no size!"]
 			return quietly space/map: []
@@ -600,8 +600,9 @@ paragraph-ctx: context [
 		;; but if canvas is huge e.g. 2e9, then it's not so useful,
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
-		text-size: constrain space/layout/extra space/limits	;-- don't make it narrower than min limit
-		maybe space/size: space/margin * 2x2 + text-size		;-- full size, regardless if canvas height is smaller?
+		mrg2: space/margin * 2x2
+		text-size: max 0x0 (constrain space/layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
+		maybe space/size: mrg2 + text-size		;-- full size, regardless if canvas height is smaller?
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
 		;; so when layout/text is changed, we don't need to call `draw`
@@ -701,7 +702,7 @@ container-ctx: context [
 			]
 		]
 		quietly cont/map: map	;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		maybe cont/size: size
+		maybe cont/size: constrain size cont/limits		;@@ is this ok or layout needs to know the limits?
 		maybe cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
@@ -1362,7 +1363,7 @@ list-view-ctx: context [
 		#assert [canvas +< infxinf]						;-- window is never infinite
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			maybe list/size: list/margin * 2
+			maybe list/size: list/margin * 2x2
 			return quietly list/map: []
 		]
 		#assert [i1 <= i2]
@@ -1839,7 +1840,7 @@ grid-ctx: context [
 	;@@ this hack allows styles to know whether this cell is pinned or not
 	pinned?: does [get bind 'pinned? :draw]
 		
-	;@@ this could leverage canvas but I have no idea how
+	;@@ this could leverage canvas but I have no idea how; also limits?
 	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
 		;@@ keep this in sync with `list/draw`
@@ -2517,9 +2518,7 @@ field-ctx: context [
 		#assert [object? layout]
 		view-width: field/size/x
 		text-width: layout/extra/x
-		if view-width - cmargin >= text-width [			;-- fully fits, no origin offset required
-			return 0
-		]
+		if view-width - cmargin >= text-width [return 0]	;-- fully fits, no origin offset required
 		ci:   field/caret/index + 1
 		cxy1: caret-to-offset       layout ci
 		cxy2: caret-to-offset/lower layout ci
@@ -2534,7 +2533,7 @@ field-ctx: context [
 		default canvas: infxinf
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		if canvas/x < infxinf/x [						;-- fill the provided canvas, even if text is larger
-			maybe field/size: canvas/x by field/size/y
+			maybe field/size: constrain canvas/x by field/size/y field/limits
 		]
 		ci: field/caret/index + 1
 		cxy1: caret-to-offset       field/layout ci
@@ -2610,7 +2609,7 @@ area-ctx: context [
 		maybe area/paragraph/text:  area/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
 		pdrawn: render/on in area 'paragraph size
-		maybe area/size: max size area/paragraph/size
+		maybe area/size: constrain max size area/paragraph/size area/limits
 		xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
 		xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
 		maybe area/caret/size: as-pair area/caret-width xy2/y - xy1/y
