@@ -18,7 +18,7 @@ do/expand [
 	
 	#debug on
 	; #debug set draw										;-- turn on to see what space produces draw errors
-	#debug set profile									;-- turn on to see rendering times
+	; #debug set profile									;-- turn on to see rendering times
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
 	; #debug set sizing 									;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus
@@ -60,49 +60,34 @@ do/expand [
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
-		;-- below trickery is used to put all space things into a single context...
 		spaces: #()
-		context [
-			joined: clear []
-			script-dir: what-dir
-			change-dir #do keep [what-dir]
-			include: function [file [file!]] [
-				#debug [print ["loading" mold file]]
-				#debug [append joined compose/deep [print ["#including" (mold file)]]]
-				append joined load/all file
-				; print ["loaded" mold file]
-			]
-		
-			include %auxi.red
-			include %styles.red
-			include %rendering.red
-			include %layouts.red
-			include %vid.red
-			include %events.red
-			include %templates.red
-			include %timers.red							;-- must come after events and templates
-			include %popups.red
-			include %traversal.red
-			include %focus.red
-			include %tabbing.red
-			include %single-click.red
-			include %standard-handlers.red
-			include %hittest.red
-			include %actors.red
-			include %debug-helpers.red
-		
-			spaces/ctx: do/expand compose/only [context (joined)]
-		
-			;-- makes some things readily available:
-			spaces/events:    spaces/ctx/events
-			spaces/templates: spaces/ctx/templates
-			spaces/styles:    spaces/ctx/styles
-			spaces/layouts:   spaces/ctx/layouts
-			spaces/keyboard:  spaces/ctx/keyboard
-			spaces/VID:       spaces/ctx/VID
-			
-			change-dir script-dir
+		spaces/ctx: context [							;-- put all space things into a single context
+			#include %auxi.red
+			#include %styles.red
+			#include %rendering.red
+			#include %layouts.red
+			#include %vid.red
+			#include %events.red
+			#include %templates.red
+			#include %timers.red						;-- must come after events and templates
+			#include %popups.red
+			#include %traversal.red
+			#include %focus.red
+			#include %tabbing.red
+			#include %single-click.red
+			#include %standard-handlers.red
+			#include %hittest.red
+			#include %actors.red
+			#include %debug-helpers.red
 		]
+	
+		;; makes some things readily available:
+		spaces/events:    spaces/ctx/events
+		spaces/templates: spaces/ctx/templates
+		spaces/styles:    spaces/ctx/styles
+		spaces/layouts:   spaces/ctx/layouts
+		spaces/keyboard:  spaces/ctx/keyboard
+		spaces/VID:       spaces/ctx/VID
 	]
 ]
 #process on
