@@ -1186,6 +1186,14 @@ field origin is tricky!
 	oh ez fix: look in /layouts for an existing one?
 	nope, canvas can be 2e9, but size will be determined by the limits
 	ok, it's a bug that canvas is not the same as size? no it's not, since it is used to determine if redraw is needed
+	usage of 2e9 has another drawback: `constrain` in presence of upper limit, makes it finite
+	but finite canvas gets filled
+	maybe constrain should not affect infinite dimensions?
+	really this canvas system is quite messy due to it's implicit assumptions
+	maybe it would be better to rework it, pass an object with dimensions to fill and dimensions to minimize along
+	or simply do not call constrain in render, call it in each space when setting size?
+	on-change can't work here since this size should also apply to other things
+	;@@ `none` canvas should probably be normalized to infxinf by render itself though; removes `default` from everywhere
 	
 
 VID Styles: must be documented TODO

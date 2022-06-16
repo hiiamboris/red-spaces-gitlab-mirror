@@ -467,6 +467,7 @@ scrollable-space: context [
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
 		maybe space/origin: clip [origin 0x0] box - scrollers - csz
+		; print [space/content csz space/origin]
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
@@ -564,12 +565,22 @@ scrollable-space: context [
 paragraph-ctx: context [
 	~: self
 	
+	;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
+	;; just make face! is 120 times slower too, because of on-change handlers
+	;; rich text does not require any of that however, so I mimick it using a non-reactive object
+	;; achieved construction time is 16us vs 200us
+	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
+	rtd-template: compose [                                    
+		on-change*: does []								;-- for whatever reason, crashes without this
+		on-deep-change: none
+		(system/view/VID/styles/rich-text/template)
+	]
+	new-rich-text: does [make light-face! rtd-template]
+	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
-		;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
-		;@@ find  a way to create a rich-text face without rtd-layout
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
-		layout: any [space/layouts/:width  space/layouts/:width: rtd-layout [""]]
+		layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]
 		flags:  compose [(1 by length? space/text) (space/flags)]
 		remove find flags 'wrap							;-- otherwise rich-text throws an error
 		quietly layout/text: as string! space/text
@@ -1062,7 +1073,7 @@ window-ctx: context [
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
 		foreach x [x y] [size/:x: window/available? x 1 negate org/:x size/:x]
 		maybe window/size: size							;-- limit window size by content size (so we don't scroll over)
-		#debug list-view [#print "window resized to (size)"]
+		#debug sizing [#print "window resized to (size)"]
 		default xy1: 0x0
 		default xy2: size
 		cdraw: render/only/on window/content xy1 - org xy2 - org xy2 - xy1
@@ -1155,6 +1166,7 @@ inf-scrollable-ctx: context [
 				"on" canvas "->" space/size "window:" space/window/size
 			]
 		]
+		#assert [space/window/size]
 		drawn
 	]
 		
@@ -2403,8 +2415,9 @@ field-ctx: context [
 	]
 	
 	undo: function [field [object!]] [
-		unless head? field/history [
-			set [text: index:] field/history: back back field/history
+		if 4 < index? field/history [					;-- at least 2 states needed: initial and unrolled
+			field/history: skip field/history -2		;-- state *after* the previous change
+			set [text: index:] skip field/history -2
 			append clear field/text text
 			maybe field/caret/index: index
 		]
@@ -2474,9 +2487,9 @@ field-ctx: context [
 			
 		|	'insert [set s string!] (
 				unless empty? s [
-					mark-history field
 					field/caret/index: ci: skip? pos: insert pos s
 					len: length? text
+					mark-history field
 				]
 			)
 			
@@ -2495,10 +2508,10 @@ field-ctx: context [
 				]
 				n: min n len - ci						;-- don't let it go past the tail
 				if n <> 0 [
-					mark-history field
 					maybe field/caret/index: ci
 					remove/part pos: skip text ci n
 					len: length? text
+					mark-history field
 				]
 			)
 		|	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
@@ -2566,7 +2579,10 @@ field-ctx: context [
 	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
 			origin selected [invalidate-cache field]	;-- invalidating just cache in enough since text is the same
-			text [field/caret/index: length? new]		;-- auto position at the tail; invalidated by text
+			text [
+				field/caret/index: length? new			;-- auto position at the tail; invalidated by text
+				mark-history field
+			]
 		]
 		field/text-on-change word :old :new
 	]
