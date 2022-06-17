@@ -31,6 +31,7 @@ get-current-style: function [
 ]
 
 
+;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
 	;; render cache format: [space-object [parent-object name  ...] name [canvas space-size map drawn ...] ...]
 	;;   it holds rendered draw block of all spaces that have /cache? = true

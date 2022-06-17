@@ -309,6 +309,7 @@ layouts: context [
 					rows/1/y: rows/1/y + share'
 					rows: next rows
 				]
+				total-length: canvas/:y
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
