@@ -185,10 +185,15 @@ layouts: context [
 			default canvas: infxinf						;-- none to pair normalization
 			; stripe: (subtract-canvas canvas 2x2 * margin) * oy
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
-			;; along Y canvas stays as is, let items fill it
+			;; along Y canvas becomes infinite, later expanded to fill the row
+			;@@ should it always be 0xinf maybe?
 			; stripe: round/to subtract-canvas canvas 2x2 * margin infxinf * ox		;@@ #5151
-			stripe: subtract-canvas canvas 2x2 * margin
-			stripe/:x: round/to stripe/:x infxinf/x
+			stripe: infxinf
+			if canvas/:x < infxinf/x [stripe/:x: 0]
+			; stripe: subtract-canvas canvas 2x2 * margin
+			; stripe/:x: round/to stripe/:x infxinf/x
+			; stripe/:y: infxinf/x
+			; print ["tube c=" canvas "stripe=" stripe]
 			#debug sizing [print ["tube c=" canvas "stripe=" stripe]]
 			
 			repeat i count [
@@ -223,31 +228,36 @@ layouts: context [
 			][
 				infxinf/x
 			]
-			peak-row-width: 0							;-- will be used to determine full layout size when canvas is not limited
+			peak-row-width: 0							;-- used to determine full layout size when canvas is not limited
+			total-length:   0							;-- used to extend row heights to fill finite canvas
 			foreach [name space drawn available weight] info [
 				new-row-size: as-pair					;-- add item-size and check if it hangs over
 					row-size/x + space/size/:x + spacing/:x
 					max row-size/y space/size/:y		;-- height will only be needed in infinite width case (no 2nd render)
-				row-size: either any [					;-- row either fits allowed-row-width, or has no items yet?
+				either any [							;-- row either fits allowed-row-width, or has no items yet?
 					new-row-size/x <= allowed-row-width
 					tail? row
 				][										;-- accept new width
-					new-row-size
+					row-size: new-row-size
 				][										;-- else move this item to next row
 					append (new-row: obtain block! length? row) row
 					repend rows [row-size new-row]
 					clear row
-					reverse? space/size
+					row-size: reverse? space/size
+					total-length: total-length + row-size/y
 				]
 				peak-row-width: max peak-row-width row-size/x
 				repend row [name space drawn available weight]
 			]
 			repend rows [row-size row]
+			total-length: total-length + row-size/y
 			#leaving [foreach [_ row] rows [stash row]  stash rows]
 			
 			;; expand row items - facilitates a second render cycle of the row
+			;; this collects row heights (canvas/:y is still infinite)
 			if allowed-row-width < infxinf/x [			;-- only if width is constrained
 				peak-row-width: 0						;-- will have to recalculate it during expansion
+				total-length:   0
 				forall rows [							;@@ use for-each
 					set [row-size: row:] rows
 					free: allowed-row-width - row-size/x
@@ -281,6 +291,22 @@ layouts: context [
 						rows/1: row-size
 					]
 					peak-row-width: max peak-row-width row-size/x
+					total-length: total-length + row-size/y
+					rows: next rows
+				]
+			]
+			
+			;; when canvas has height lesser than all rows height - extend row heights evenly before filling rows
+			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
+			nrows: half length? rows
+			total-length: total-length + (2 * margin/:y) + (nrows - 1 * spacing/:y)
+			free: canvas/:y - total-length
+			if all [0 < free  canvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
+				share: free / nrows
+				extra: 0.0								;-- rounding error compensation
+				forall rows [							;@@ use for-each
+					extra: share - share': round/to share + extra 1
+					rows/1/y: rows/1/y + share'
 					rows: next rows
 				]
 			]
@@ -303,7 +329,6 @@ layouts: context [
 			row-shift:    align/1 + 1 / 2
 			in-row-shift: align/2 + 1 / 2
 			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
-			total-length: 0
 			foreach [row-size row] rows [
 				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
 				foreach [name space drawn _ _] row [
@@ -312,10 +337,8 @@ layouts: context [
 					repend map [name geom]
 					ofs/:x: ofs/:x + spacing/:x + space/size/:x
 				]
-				total-length: total-length + row-size/y + spacing/:y
 				row-y: margin/:y + total-length
 			]
-			total-length: total-length - spacing/:y
 			;; fill the desired canvas width if canvas is given:
 			size: 2x2 * margin + reverse? total-width by total-length
 			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive

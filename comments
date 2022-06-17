@@ -1194,6 +1194,13 @@ field origin is tricky!
 	or simply do not call constrain in render, call it in each space when setting size?
 	on-change can't work here since this size should also apply to other things
 	;@@ `none` canvas should probably be normalized to infxinf by render itself though; removes `default` from everywhere
+found a problem in tubes
+	I want them to fill the available limited canvas dimension (otherwise will have to set limits manually = boring)
+	on the other hand, I want them to split into rows when they can't fit into one
+	and these requirements conflict with one another, as split rows will then become bigger than should be
+	here's an idea: render them on infinity first
+	once rows are known, adjust the widths, then we know each row height
+	then distribute available row height to rows according to weights (just modifies the 3rd render)
 	
 
 VID Styles: must be documented TODO
