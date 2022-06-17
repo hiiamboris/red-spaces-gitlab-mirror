@@ -2552,6 +2552,16 @@ field-ctx: context [
 		cxy1: caret-to-offset       field/layout ci
 		cxy2: caret-to-offset/lower field/layout ci
 		csize: field/caret/width by (cxy2/y - cxy1/y)
+		cmargin: field/caret/look-around
+		if canvas/x - (2 * cmargin) < txt-size/x [		;-- field width may be smaller/bigger than that of text
+			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
+			;; aim is: have caret always visible, ideally with a few chars of look-around
+			min-org: min 0 cmargin - cxy1/x
+			max-org: clip [min-org 0] canvas/x - cxy2/x - cmargin
+			maybe field/origin: clip [min-org max-org] field/origin
+			#assert [field/layout]						;-- must not invalidate the layout
+			; print [min-org max-org field/origin]
+		]
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
 			invalidate-cache/only field/caret
