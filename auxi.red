@@ -319,6 +319,8 @@ max-safe: function [a [scalar! none!] b [scalar! none!]] [
 	any [all [a b max a b] a b]
 ]
 
+half: func [x] [x / 2]
+
 ;; constraining is used by `render` to impose soft limits on space sizes
 ;; constraining logic:
 ;; no canvas (unlimited) and no limits (unlimited) => return `none` (also unlimited)
