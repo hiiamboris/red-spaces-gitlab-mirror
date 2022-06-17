@@ -60,34 +60,35 @@ do/expand [
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
-		spaces: #()
-		spaces/ctx: context [							;-- put all space things into a single context
-			#include %auxi.red
-			#include %styles.red
-			#include %rendering.red
-			#include %layouts.red
-			#include %vid.red
-			#include %events.red
-			#include %templates.red
-			#include %timers.red						;-- must come after events and templates
-			#include %popups.red
-			#include %traversal.red
-			#include %focus.red
-			#include %tabbing.red
-			#include %single-click.red
-			#include %standard-handlers.red
-			#include %hittest.red
-			#include %actors.red
-			#include %debug-helpers.red
-		]
+		spaces: context [
+			ctx: context [							;-- put all space things into a single context
+				#include %auxi.red
+				#include %styles.red
+				#include %rendering.red
+				#include %layouts.red
+				#include %vid.red
+				#include %events.red
+				#include %templates.red
+				#include %timers.red						;-- must come after events and templates
+				#include %popups.red
+				#include %traversal.red
+				#include %focus.red
+				#include %tabbing.red
+				#include %single-click.red
+				#include %standard-handlers.red
+				#include %hittest.red
+				#include %actors.red
+				#include %debug-helpers.red
+			]
 	
-		;; makes some things readily available:
-		spaces/events:    spaces/ctx/events
-		spaces/templates: spaces/ctx/templates
-		spaces/styles:    spaces/ctx/styles
-		spaces/layouts:   spaces/ctx/layouts
-		spaces/keyboard:  spaces/ctx/keyboard
-		spaces/VID:       spaces/ctx/VID
+			;; makes some things readily available:
+			events:    ctx/events
+			templates: ctx/templates
+			styles:    ctx/styles
+			layouts:   ctx/layouts
+			keyboard:  ctx/keyboard
+			VID:       ctx/VID
+		]
 	]
 ]
 #process on
