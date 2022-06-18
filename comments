@@ -1194,6 +1194,9 @@ field origin is tricky!
 	or simply do not call constrain in render, call it in each space when setting size?
 	on-change can't work here since this size should also apply to other things
 	;@@ `none` canvas should probably be normalized to infxinf by render itself though; removes `default` from everywhere
+scrollable origin is tricky too!
+	when scrollable is inside tube - tube calls it on a 0 canvas and scrollable adjusts it's origin
+	since this happens all the time, it becomes impossible to scroll after a certain length
 found a problem in tubes
 	I want them to fill the available limited canvas dimension (otherwise will have to set limits manually = boring)
 	on the other hand, I want them to split into rows when they can't fit into one

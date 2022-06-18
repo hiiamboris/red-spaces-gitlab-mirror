@@ -466,6 +466,8 @@ scrollable-space: context [
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
+		;@@ origin clipping in tube makes it impossible to scroll to the bottom because of window resizes!
+		;@@ I need a better idea, how to apply it without breaking things, until then - not clipped
 		; maybe space/origin: clip [origin 0x0] box - scrollers - csz
 		maybe space/origin: origin
 		; print [space/content csz space/origin]

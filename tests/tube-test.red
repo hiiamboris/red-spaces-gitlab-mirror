@@ -58,6 +58,7 @@ boxes: lay-out-vids [
 width: 130
 ; aligns: map-each/only x [-1 0 1] [ map-each y [-1 0 1] [as-pair x y] ]
 aligns: map-each/only y [↑ #[none] ↓] [ map-each/only x [← #[none] →] [trim reduce [x y]] ]
+; aligns: [[[← ↑]]]
 tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
 	keep compose [
@@ -65,6 +66,7 @@ tubes: collect [
 		style tube:  tube  margin= 5x5 spacing= 5x5 content= boxes
 	]
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
+	; for-each [/i axes] [ [↓ →] ][
 		do with spaces/ctx [
 			lim2: extend-canvas
 				lim1: width by width
