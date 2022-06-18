@@ -120,9 +120,9 @@ layouts: context [
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axes align margin spacing canvas cache]"
+			settings [block!] "Any subset of [axes align margin spacing canvas limits]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axes align margin spacing canvas
+			/local axes align margin spacing canvas limits
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -147,6 +147,7 @@ layouts: context [
 				margin   [      pair! (0x0 +<= margin)]
 				spacing  [      pair! (0x0 +<= spacing)]
 				canvas   [none! pair! (0x0 +<= canvas)]
+				limits   [none! object! (all [in limits 'min in limits 'max])]
 			]]
 			default axes:  [e s]
 			default align: -1x-1
@@ -183,6 +184,7 @@ layouts: context [
 			#leaving [stash info]
 			
 			default canvas: infxinf						;-- none to pair normalization
+			ccanvas: constrain canvas limits			;-- clipped canvas - used for allowed width / height fitting
 			; stripe: (subtract-canvas canvas 2x2 * margin) * oy
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes infinite, later expanded to fill the row
@@ -193,7 +195,6 @@ layouts: context [
 			; stripe: subtract-canvas canvas 2x2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
-			; print ["tube c=" canvas "stripe=" stripe]
 			#debug sizing [print ["tube c=" canvas "stripe=" stripe]]
 			
 			repeat i count [
@@ -223,8 +224,8 @@ layouts: context [
 			rows: obtain block! 40
 			row:  obtain block! count * 5
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
-			allowed-row-width: either all [canvas canvas/:x < infxinf/x] [	;-- how wide rows to allow (splitting margin)
-				canvas/:x - (2 * margin/:x)
+			allowed-row-width: either all [ccanvas ccanvas/:x < infxinf/x] [	;-- how wide rows to allow (splitting margin)
+				ccanvas/:x - (2 * margin/:x)
 			][
 				infxinf/x
 			]
@@ -299,9 +300,9 @@ layouts: context [
 			;; when canvas has height lesser than all rows height - extend row heights evenly before filling rows
 			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
 			nrows: half length? rows
-			total-length: total-length + (2 * margin/:y) + (nrows - 1 * spacing/:y)
-			free: canvas/:y - total-length
-			if all [0 < free  canvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
+			total-length: total-length + (nrows - 1 * spacing/:y)
+			free: ccanvas/:y - (2 * margin/:y) - total-length
+			if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
 				share: free / nrows
 				extra: 0.0								;-- rounding error compensation
 				forall rows [							;@@ use for-each
@@ -309,7 +310,7 @@ layouts: context [
 					rows/1/y: rows/1/y + share'
 					rows: next rows
 				]
-				total-length: canvas/:y
+				total-length: ccanvas/:y
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
@@ -317,9 +318,9 @@ layouts: context [
 			foreach [row-size row] rows [
 				repeat i (length? row) / 5 [			;@@ use for-each
 					set [name: space:] item: skip row i - 1 * 5
-					if space/size/:y < row-size/y [		;-- only re-render items that are being extended
-						item/3: render/on name reverse? space/size/:x by row-size/y
-					]
+					;; always re-renders items, because they were painted on an infinite canvas
+					;; finite canvas will most likely bring about different outcome
+					item/3: render/on name reverse? space/size/:x by row-size/y
 				]
 			]
 			
@@ -338,7 +339,7 @@ layouts: context [
 					repend map [name geom]
 					ofs/:x: ofs/:x + spacing/:x + space/size/:x
 				]
-				row-y: margin/:y + total-length
+				row-y: row-y + spacing/:y + row-size/y
 			]
 			;; fill the desired canvas width if canvas is given:
 			size: 2x2 * margin + reverse? total-width by total-length
@@ -346,7 +347,7 @@ layouts: context [
 				shift: size * abs shift
 				foreach [name geom] map [geom/offset: geom/offset + shift]
 			]
-			#debug sizing [print ["tube c=" canvas "stripe=" stripe ">> size=" size]]
+			#debug sizing [print ["tube c=" canvas "fc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
 			reduce [size copy map]
 		]
