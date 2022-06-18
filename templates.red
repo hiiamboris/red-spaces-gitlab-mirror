@@ -466,7 +466,8 @@ scrollable-space: context [
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
-		maybe space/origin: clip [origin 0x0] box - scrollers - csz
+		; maybe space/origin: clip [origin 0x0] box - scrollers - csz
+		maybe space/origin: origin
 		; print [space/content csz space/origin]
 		
 		;; determine what scrollers to show
@@ -860,7 +861,7 @@ tube-ctx: context [
 		
 		container-draw: :draw
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
-			settings: [margin spacing align axes canvas]
+			settings: [margin spacing align axes canvas limits]
 			drawn: container-draw/layout/only 'tube settings xy1 xy2
 			#debug sizing [print ["tube with" content "on" canvas "->" size]]
 			drawn
@@ -2414,6 +2415,7 @@ field-ctx: context [
 		field/history: clear rechange field/history [copy field/text field/caret/index]
 	]
 	
+	;@@ TODO: group edits somehow instead of char by char saves
 	undo: function [field [object!]] [
 		if 4 < index? field/history [					;-- at least 2 states needed: initial and unrolled
 			field/history: skip field/history -2		;-- state *after* the previous change
