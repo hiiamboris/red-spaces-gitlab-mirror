@@ -21,6 +21,7 @@ layouts: context [
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas        [pair! none!]   > 0x0
+		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
 		;;   viewport         [pair!]   only matters if any cache-* is true, >= 0x0
 		;;   cache         [word! none!]
@@ -35,9 +36,9 @@ layouts: context [
 		create: function [
 			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axis margin spacing canvas origin viewport cache]"
+			settings [block!] "Any subset of [axis margin spacing canvas limits origin viewport cache]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas origin viewport cache
+			/local axis margin spacing canvas limits origin viewport cache
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -50,6 +51,7 @@ layouts: context [
 				margin   [pair!       (0x0 +<= margin)]
 				spacing  [pair!       (0x0 +<= spacing)]
 				canvas   [none! pair! (0x0 +<= canvas)]
+				limits   [none! object! (all [in limits 'min in limits 'max])]
 				origin   [none! pair!]
 				viewport [none! pair! (0x0 +<= viewport)]
 				cache    [none! word! (find [all invisible] cache)]
@@ -59,7 +61,6 @@ layouts: context [
 			x: ortho y: axis
 			guide: axis2pair y
 			pos: pos': origin + (1x1 * margin)
-			size:  0x0
 			draw?: case [
 				cache = 'all [[not space/size]]			;-- cache everything, only redraw if never drawn
 				cache = 'invisible [[					;-- cache invisible only, redraw if never drawn or visible
@@ -75,6 +76,7 @@ layouts: context [
 			; canvas1: canvas2: (subtract-canvas canvas 2x2 * margin) * reverse guide
 			
 			map: make [] 2 * count
+			size: 0x0
 			repeat i count [							;-- first render cycle
 				space: get name: either func? [spaces/pick i][spaces/:i]
 				if any draw? [drawn: render/on name canvas1]
@@ -83,6 +85,8 @@ layouts: context [
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
+			;; apply limits to size/:x to obtain proper list width
+			size: constrain size limits
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
 			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]
@@ -117,6 +121,7 @@ layouts: context [
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas         [none! pair!]   > 0x0 or none=inf (width determined by widest item)
+		;;   limits        [none! object!]
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"

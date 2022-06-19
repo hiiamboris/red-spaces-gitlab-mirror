@@ -777,7 +777,7 @@ list-ctx: context [
 
 		container-draw: :draw
 		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
-			settings: [axis margin spacing canvas]
+			settings: [axis margin spacing canvas limits]
 			container-draw/layout/only 'list settings xy1 xy2
 		]
 		
