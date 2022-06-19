@@ -617,6 +617,7 @@ paragraph-ctx: context [
 		mrg2: space/margin * 2x2
 		text-size: max 0x0 (constrain space/layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
 		maybe space/size: mrg2 + text-size		;-- full size, regardless if canvas height is smaller?
+		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
 		;; so when layout/text is changed, we don't need to call `draw`
