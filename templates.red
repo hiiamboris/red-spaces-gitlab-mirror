@@ -111,10 +111,10 @@ space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
 templates/timer: make-template 'space [rate: none]		;-- template space for timers
 
 ;; has to be an object so these words have binding and can be placed as words into content field
-generic: object [										;-- holds commonly used spaces ;@@ experimental
-	empty: make-space 'space []							;-- used when no content is given
-	<->: stretch: none									;-- set after box definition
-	; too-deep: none										;-- used by data-view to contain recursion
+;@@ map is used to work around #5137 when compiling with -e!
+generic: construct to [] make map! reduce [				;-- holds commonly used spaces ;@@ experimental
+	'empty make-space 'space []							;-- used when no content is given
+	'<-> none 'stretch none								;-- set after box definition
 ]
 
 rectangle-ctx: context [
