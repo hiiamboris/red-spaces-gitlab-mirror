@@ -116,7 +116,7 @@ context [
 					(map-each/eval/only/drop [key [word! lit-word! get-word! refinement!]] spec-of :value [
 						;; words might not be accessible:
 						val: <unavailable> type: {}
-						attempt [type? set/any 'val get/any bind to word! key :value]
+						attempt [type: type? set/any 'val get/any bind to word! key :value]
 						[form to word! key  type  :val]
 					])
 				] 
@@ -395,8 +395,8 @@ context [
 					]
 				]
 			]
-			on-over [status/text: form hittest face/space event/offset]
-			return status: text 800x40
+			; on-over [status/text: form hittest face/space event/offset]
+			; return status: text 800x40
 			; do [debug-draw]
 		] 'resize [
 			actors: object [
