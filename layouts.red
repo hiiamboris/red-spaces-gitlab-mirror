@@ -189,7 +189,8 @@ layouts: context [
 			#leaving [stash info]
 			
 			default canvas: infxinf						;-- none to pair normalization
-			ccanvas: constrain canvas limits			;-- clipped canvas - used for allowed width / height fitting
+			;; clipped canvas - used for allowed width / height fitting
+			ccanvas: subtract-canvas constrain canvas limits 2x2 * margin
 			; stripe: (subtract-canvas canvas 2x2 * margin) * oy
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes infinite, later expanded to fill the row
@@ -230,7 +231,7 @@ layouts: context [
 			row:  obtain block! count * 5
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
 			allowed-row-width: either all [ccanvas ccanvas/:x < infxinf/x] [	;-- how wide rows to allow (splitting margin)
-				ccanvas/:x - (2 * margin/:x)
+				ccanvas/:x
 			][
 				infxinf/x
 			]
@@ -289,6 +290,13 @@ layouts: context [
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
 								desired-size: reverse? space/size/:x + extensions/:i by infxinf/y
 								item/3: render/on name desired-size
+								;; special case: item renders bigger than canvas - try to fit it
+								;; happens e.g. when long text is inside a column
+								;@@ this is a temporary kludge FIXME with design!!
+								if space/size/:y > ccanvas/:y [
+									desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
+									item/3: render/on name desired-size
+								]
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -306,7 +314,7 @@ layouts: context [
 			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
 			nrows: half length? rows
 			total-length: total-length + (nrows - 1 * spacing/:y)
-			free: ccanvas/:y - (2 * margin/:y) - total-length
+			free: ccanvas/:y - total-length
 			if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
 				share: free / nrows
 				extra: 0.0								;-- rounding error compensation
@@ -352,7 +360,7 @@ layouts: context [
 				shift: size * abs shift
 				foreach [name geom] map [geom/offset: geom/offset + shift]
 			]
-			#debug sizing [print ["tube c=" canvas "fc=" ccanvas "stripe=" stripe ">> size=" size]]
+			#debug sizing [print ["tube c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
 			reduce [size copy map]
 		]

@@ -1204,6 +1204,18 @@ found a problem in tubes
 	here's an idea: render them on infinity first
 	once rows are known, adjust the widths, then we know each row height
 	then distribute available row height to rows according to weights (just modifies the 3rd render)
+even bigger one
+	column [paragraph] - if paragraph is long, goes out of the canvas, can be fixed but fix is a kludge
+	column [row [paragraph]] - fix doesn't work
+	test code for polygon: column [row [data-view wrap?= on data= "abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop abc def ghi klm nop "]]
+	but main issue is that this is so messy I can't even think of it
+	have to redesign the canvas notion!
+	idea is: have both canvas and explicit filling intent (which axes to fill or not)
+	in simple form, single pair should be enough:
+	WxH   - fill whole canvas
+	-WxH  - fill vertically
+	Wx-H  - fill horizontally
+	-Wx-H - don't fill, just don't hang over
 	
 
 VID Styles: must be documented TODO

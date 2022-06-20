@@ -9,6 +9,7 @@ Red [
 	}
 ]
 
+#do keep [reduce [to issue! 'do 'keep [reduce [to issue! 'include %../../cli/mockups/a+v/console-on-demand.red]]]] 
 #include %../../cli/cli.red
 #include %../../common/setters.red
 #include %../../common/forparse.red
@@ -16,6 +17,7 @@ Red [
 #include %../everything.red
 
 import/only spaces/ctx [top]
+append spaces/keyboard/focusable 'tube
 
 context [
 
@@ -248,6 +250,7 @@ context [
 		]
 	
 		spaces/templates/data-view: make-template 'data-view [
+			wrap?: on
 			old-draw: :draw
 			draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		]
@@ -342,6 +345,26 @@ context [
 			if any [path? path word? path] [navigate to path! path]
 		]
 	
+		register-finalizer [key] global-keys: function [space path event] [
+			if stop? [exit]
+			; dump-event event
+			case [
+				event/key = #"^L" [
+					;@@ TODO: more straightforward focusing function
+					focus-space compose [
+						(copy/part spaces/keyboard/focus 3)			;-- screen/window/base
+						(first spaces/ctx/paths-from-space entry)	;-- part after base
+					]
+					update
+				]
+				any [
+					event/key = #"^H"					;-- backspace
+					all [event/key = 'left  find event/flags 'alt]
+				] [history-back update]
+				all [event/key = 'right find event/flags 'alt] [history-forward update]
+			]
+		]
+	
 		view/flags/options [
 			title "Red Inspector"
 			host: host rate 33 800x450 [						;-- lower rate to save resources
@@ -365,7 +388,7 @@ context [
 					do [set-details]
 					;@@ 9999 is a hack that needs a better solution
 					;@@ currently scrollable doesn't know how to render itself on inf canvas, becomes zero and complains
-					browser: data-view focus 100x100 .. 9999x9999 data=(get/any target) on-dbl-click [
+					browser: data-view 100x100 .. 9999x9999 data=(get/any target) on-dbl-click [
 						if all [ 
 							pos: find path 'grid
 							grid: get pos/1
@@ -373,7 +396,7 @@ context [
 							set [cell: offset:] grid/locate-point pos/2
 							contspace: get grid/content/(3 by cell/y)
 							namespace: get grid/content/(1 by cell/y)
-							if all [0 <= offset/y  offset/y < contspace/size/y] [
+							if all [0 <= offset/y  offset/y < contspace/size/y  string? namespace/data] [
 								new-path: append copy history/1 transcode/one namespace/data
 								if all [
 									set/any 'value attempt [get-path new-path]
@@ -383,14 +406,6 @@ context [
 									update
 								]
 							]
-						]
-					] on-key [
-						; dump-event event
-						case [
-							event/key = #"^H" [history-back update]
-							event/key = #"^L" [focus-space entry update]
-							all [event/key = 'left  find event/flags 'alt] [history-back    update]
-							all [event/key = 'right find event/flags 'alt] [history-forward update]
 						]
 					]
 				]
@@ -409,6 +424,8 @@ context [
 				]
 			]
 		]
+		
+		delist-finalizer :global-keys
 	]
 ]
 
@@ -423,8 +440,7 @@ red-inspector: function [
 	script [file! block!]
 ][
 	if empty? script [
-		print "No file given^/"
-		print cli/help-for red-inspector
+		inspect system
 		quit/return 0
 	]
 	do script/1
@@ -435,4 +451,4 @@ red-inspector: function [
 ; prof/show
 ; debug-draw
 cli/process-into red-inspector
-
+quit/return 0

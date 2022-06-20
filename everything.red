@@ -16,7 +16,8 @@ Red [
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	#debug on
+	#debug off
+	; #debug on
 	; #debug set draw										;-- turn on to see what space produces draw errors
 	; #debug set profile									;-- turn on to see rendering times
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
@@ -28,7 +29,7 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	; #assert off
+	#assert off
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red

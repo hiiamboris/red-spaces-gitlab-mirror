@@ -14,6 +14,7 @@ example-func: function [message [string!]] [
 	
 	;; suppose this is where error appears
 	;; call inspect to observe the system state!
+	; inspect lorem
 	inspect example-func
 ]
 
