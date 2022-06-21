@@ -9,7 +9,7 @@ Red [
 	}
 ]
 
-#do keep [reduce [to issue! 'do 'keep [reduce [to issue! 'include %../../cli/mockups/a+v/console-on-demand.red]]]] 
+; #do keep [reduce [to issue! 'do 'keep [reduce [to issue! 'include %../../cli/mockups/a+v/console-on-demand.red]]]] 
 #include %../../cli/cli.red
 #include %../../common/setters.red
 #include %../../common/forparse.red
@@ -374,8 +374,8 @@ context [
 						label "Jump to:" 
 						entry: field focus weight= 1 on-key [
 							if event/key = #"^M" [jump stop update]
-						]
-						button "Go" [jump]
+						] hint= "Enter a valid path and click 'Go'"
+						button "Go" [jump] hint= "Browse into entered path"
 					] 
 					row 200 .. none [
 						box [
@@ -383,7 +383,8 @@ context [
 								event/key = #"^-" [pass update]
 							]
 						]
-						button "<<" [history-back] button ">>" [history-forward]
+						button "<<" [history-back]    hint= "Go back in history"
+						button ">>" [history-forward] hint= "Go forward in history"
 					]
 					do [set-details]
 					;@@ 9999 is a hack that needs a better solution
@@ -416,11 +417,9 @@ context [
 		] 'resize [
 			actors: object [
 				on-resize: on-resizing: function [window event] [
-					new-size: window/size - 20x70
-					; unless new-size = host/size [
+					new-size: window/size - 20x20
 					host/size: new-size
 					host/dirty?: yes
-					; ]
 				]
 			]
 		]
