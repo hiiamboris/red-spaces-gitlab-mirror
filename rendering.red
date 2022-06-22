@@ -141,29 +141,31 @@ context [
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
 				#debug cache [#print "Invalidating (any [select space-names space 'unknown])"]
 				if pos: find/same memoized-paths space [fast-remove pos 2]
-				if all [
-					node: find/same render-cache space
+				either node: find/same render-cache space [
 					;; currently rendered spaces should not be invalidated, or parents get lost:
-					not   find/same visited-spaces space
-				][
-					unless only [
-						;; no matter if cache?=yes or no, parents still have to be invalidated
-						#assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
-						#debug cache [
-							;; this may still happen normally, e.g. as a result of a reaction on rendered space
-							#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
+					unless find/same visited-spaces space [
+						unless only [
+							;; no matter if cache?=yes or no, parents still have to be invalidated
+							#assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
+							#debug cache [
+								;; this may still happen normally, e.g. as a result of a reaction on rendered space
+								#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
+							]
+							append invalidation-stack space
+							either forget					;@@ use apply
+								[foreach [parent _] node/:parents-index [invalidate-cache/forget parent]]
+								[foreach [parent _] node/:parents-index [invalidate-cache parent]]
+							remove top invalidation-stack	;@@ not using take/last for #5066
+							; if in space 'dirty? [space/dirty?: yes]		;-- mark for redraw
 						]
-						append invalidation-stack space
-						either forget					;@@ use apply
-							[foreach [parent _] node/:parents-index [invalidate-cache/forget parent]]
-							[foreach [parent _] node/:parents-index [invalidate-cache parent]]
-						remove top invalidation-stack	;@@ not using take/last for #5066
+						clear node/:slots-index				;-- clear cached slots
+						if forget [
+							clear node/:parents-index		;-- clear parents now
+							change node 'free				;-- mark free for claiming (so blocks can be reused)
+						]
 					]
-					clear node/:slots-index				;-- clear cached slots
-					if forget [
-						clear node/:parents-index		;-- clear parents now
-						change node 'free				;-- mark free for claiming (so blocks can be reused)
-					]
+				][
+					if in space 'dirty? [space/dirty?: yes]		;-- mark host for redraw
 				]
 			]
 		]
@@ -220,9 +222,9 @@ context [
 	
 	set-parent: function [
 		"Mark parent/child relationship in the parents cache"
-		child  [object!]
+		child  [object!] "Space"
 		name   [word!]
-		parent [object! none!]
+		parent [object! none!] "Space or host face"
 	][
 		;; `none` may happen during init phase, e.g. autofit calls render to estimate row sizes
 		;; in this case cache slot has still to be created

@@ -1216,6 +1216,8 @@ even bigger one
 	-WxH  - fill vertically
 	Wx-H  - fill horizontally
 	-Wx-H - don't fill, just don't hang over
+	0 will still be used for minimization
+	+infinity will still be used for e.g. unconstrained text rendering inside horizontal list etc 
 	
 
 VID Styles: must be documented TODO

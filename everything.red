@@ -63,6 +63,7 @@ do/expand [
 	#local [											;-- don't spill macros into user code
 		spaces: context [
 			ctx: context [							;-- put all space things into a single context
+				#include %debug-helpers.red
 				#include %auxi.red
 				#include %styles.red
 				#include %rendering.red
@@ -79,7 +80,6 @@ do/expand [
 				#include %standard-handlers.red
 				#include %hittest.red
 				#include %actors.red
-				#include %debug-helpers.red
 			]
 	
 			;; makes some things readily available:
