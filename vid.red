@@ -83,7 +83,7 @@ VID: context [
 			text   [template: text   facets: [string! text #font-styles]]
 			field  [template: field  facets: [string! text #font-styles]]
 			link   [template: link   facets: [string! text url! text block! command]]
-			button [template: button facets: [string! data block! command] spec: [limits: 40 .. 80]]
+			button [template: button facets: [string! data block! command] spec: [limits: 40 .. none]]
 			
 			box    [template: box    facets: [#align]]
 			cell   [template: cell   facets: [#align]]
