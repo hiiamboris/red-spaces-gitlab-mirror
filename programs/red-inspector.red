@@ -9,7 +9,6 @@ Red [
 	}
 ]
 
-; #do keep [reduce [to issue! 'do 'keep [reduce [to issue! 'include %../../cli/mockups/a+v/console-on-demand.red]]]] 
 #include %../../cli/cli.red
 #include %../../common/setters.red
 #include %../../common/forparse.red
