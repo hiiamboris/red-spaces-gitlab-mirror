@@ -1,4 +1,8 @@
-Red []
+Red [
+	title:   "VID/S experimentation polygon"
+	author:  @hiiamboris
+	license: 'BSD-3
+]
 
 ; #do [disable-space-cache?: yes]
 #include %../everything.red
