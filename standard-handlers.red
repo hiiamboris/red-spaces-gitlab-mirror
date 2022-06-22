@@ -183,10 +183,12 @@ define-handlers [
 	button: [											;-- focusable unlike `clickable` space
 		on-down [space path event] [
 			space/pushed?: yes
+			start-drag path								;-- otherwise `up` event might not be caught, leaving button "pressed"
 			update
 		]
 		on-up [space path event] [
 			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
+			stop-drag
 			update
 		]
 		on-key [space path event] [
