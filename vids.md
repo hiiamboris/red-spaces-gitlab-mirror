@@ -35,8 +35,6 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 
 ## Predefined styles
 
-All [supported space *templates*](reference.md) can be used in VID/S, but without auto-facet magic, flags, or user-friendly default settings.
-
 The following VID/S styles are currently supported for truly high level experience (more to come later):
 
 | Style | Description | Based on template | Datatypes accepted | Flags supported |
@@ -57,6 +55,8 @@ The following VID/S styles are currently supported for truly high level experien
 | `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data | block! as command | |
 | `timer` | invisible zero-sized time events receiver | [timer](reference.md#timer) | integer!, float! or time! as rate,<br>block! as on-time actor body | |
 | `<->` aka `stretch` | invisible elastic filler space | [stretch](reference.md#stretch) | | |
+
+All [supported space *templates*](reference.md) can be used in VID/S, but without auto-facet magic, flags, or user-friendly default settings.
 
 
 [comment]: # (maybe button should support sigil as label does!)
@@ -79,11 +79,6 @@ VID/S can contain the following kinds of expressions:
 2. [Style definition](#style-definition)
 3. [Do-expression](#do-expression)
 
-**TIP:** Examples in this document can be run:
-- in a separate script (after including `everything.red`)
-- directly in Spaces console (started by `run.bat` or equivalent `red console.red` shell command)
-- using [VID/S Polygon](programs/vids-polygon.red) - an evolving tool for testing various layouts, minimalistic for now but still quite handy (in this case, omit the `view [host []]` part!) and is a great way to get a feel how sizing works
-
 #### Style instantiation
 
 This results in a new space created and returned.
@@ -104,6 +99,9 @@ view [host [
 ]]
 ```
 ![](images/example-style-instantiation.png)
+
+| **TIP** | Examples in this document can be run:<br>- in a separate script (after including `everything.red`)<br>- directly in Spaces console (started by `run.bat` or equivalent `red console.red` shell command)<br>- using [VID/S Polygon](programs/vids-polygon.red) - an evolving tool for testing various layouts, minimalistic for now but still quite handy (in this case, omit the `view [host []]` part!) and is a great way to get a feel how sizing works |
+|-|-|
 
 #### Style definition
 
