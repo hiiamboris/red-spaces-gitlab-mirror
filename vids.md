@@ -196,7 +196,7 @@ Example (combining both VID and VID/S reactivity):
 view/flags [
 	;) just `h: host` won't work since it's delayed by VID after reaction definition
 	host 100x100 with [set 'h self] [
-		cell [text react [self/text: form h/size]]	;) VID/S react keyword
+		cell [text react [text: form h/size]]		;) VID/S react keyword
 	] react [h/size: h/parent/size - 20]			;) VID react keyword
 ] 'resize
 ```
@@ -209,8 +209,9 @@ Defines an actor (i.e. a function that gets called when specific event happens i
 Syntax:
 - `<on-event> <body>`
 - `<on-event> function <spec> <body>`
-- `<on-event> :<reference>`\
-where:
+- `<on-event> :<reference>`
+
+Where:
 - `on-event` is any word that starts with `on-` (see [list of supported events](https://w.red-lang.org/en/view/#events))
 - `body` and `spec` are blocks. In the first case, actor is defined implicitly as `function [space path event] body`, so `body` should use these names
 - `reference` is either a get-word or get-path referring to the actor function
@@ -255,12 +256,12 @@ view [host [
 
 ### Auto-facets
 
-Some datatypes are automatically recognized by certain VID/S styles and are assigned to a corresponding facet.
+Some **datatypes** are automatically recognized by certain VID/S styles and are assigned to a corresponding facet.
 
 Syntax: `<value>`
 - `value` is a value of one of the recognized datatypes
 
-Each style has it's own set of supported flags. Currently these are:
+Each style has it's own set of supported datatypes. Currently these are:
 
 | Style | Datatypes | Target facets |
 | -|-|- |
@@ -291,7 +292,7 @@ view [host [
 
 ### Flags setting
 
-Flags are words that when present, modify the appearance of the space.
+Flags are **words** that when present, modify the appearance of the space.
 
 Syntax: `<flag>`\
 where `flag` is a word
@@ -318,7 +319,7 @@ view [host [
 
 ### Coloring
 
-Sets `color` facet of the new space. Not all spaces support it: `color` should be used by the stylesheet.
+Sets `color` facet of the new space. Not all spaces support it: `color` should be used by the stylesheet to have effect.
 
 Syntax: `<color>`\
 where `color` can be:
@@ -345,15 +346,16 @@ view [host 100x100 [
 Each space supports /limits facet which may define it's minimum and maximum size. It can take one of the following values:
 - `none` - no limit defined (0x0 to infinity), equivalent to `none .. none`
 - a `range!` object with /min and /max fields, each can be:
-  - `none` - no limit defined, equivalent to `0x0` for /min and `infxinf` for /max (`infxinf` is a special pair value defined by spaces)
+  - `none` - no limit defined, equivalent to `0x0` for /min and `infxinf` for /max (`infxinf` is a special `pair!` value defined by spaces)
   - a `pair!` value - defines 2D limit
   - an `integer!` value - defines width limit, height stays unconstrained
 
 Syntax:
 - `<limit-value>` or
-- `<range-expression>`\
-where:
-- `limit-value` - an integer or pair value, which sets both low and high limits, fixing the size
+- `<range-expression>`
+
+Where:
+- `limit-value` - an `integer!` or `pair!` value, which sets both low and high limits, fixing the size
 - `range-expression` - is a Red expression of the form `<limit1> .. <limit2>` that constructs a new `range!` object:
   - `limit1` can only be a single token (expressions should be wrapped in parentheses), otherwise VID/S cannot reliably detect the range expression
   - `limit2` can be any expression, parenthesized or not, but keep in mind that `..` is an operator, so it will take precedence over possible following operators
@@ -398,7 +400,7 @@ Normally, each new instantiated space in grid's pane just increments column inde
 The following additional syntax allows one to control the cell coordinate:
 - `return` moves subsequent space into the first column on the next row
 - `at <expression>` evaluates the expression that follows it and uses it's result:  
-  - if result is a pair, it moves subsequent space into given cell coordinate
+  - if result is a `pair!`, it moves subsequent space into given cell coordinate
   - if result is a `range!` object, it works as above, but also tells this cell to span the given range
 
 Example:
