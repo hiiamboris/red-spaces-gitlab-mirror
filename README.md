@@ -27,9 +27,10 @@ Self-containing grid shows that there are no limitations: every space can contai
 
 ## Docs
 
-- [Quickstart](quickstart.md) - if you just wanna use one in your program
-- [Widget Reference](reference.md) - if you're interested in what Spaces are available and how they work
-- [Creators Guide](creators.md) - will describe the architecture and help you write your own Spaces
+#### [Quickstart](quickstart.md) - if you just wanna use one in your program
+#### [VID/S manual](vids.md) - description of the layout dialect
+#### [Widget Reference](reference.md) - if you're interested in what Spaces are available and how they work
+#### [Creators Guide](creators.md) - description of the architecture that will help you write your own Spaces
 
 
 ## Status
