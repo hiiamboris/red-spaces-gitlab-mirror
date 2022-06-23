@@ -110,6 +110,7 @@ VID: context [
 						;@@ hacky way to get access to current stylesheet.. any better idea?
 						lay-out-grid/styles block get bind 'sheet :lay-out-vids
 					]) 
+					#tight
 				]
 			]
 		];; styles
