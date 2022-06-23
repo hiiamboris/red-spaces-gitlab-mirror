@@ -98,7 +98,7 @@ view [host [
 	label #"☺" "some text" underline teal
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-style-instantiation.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-instantiation.png)
 
 | **TIP** | Examples in this document can be run:<ul><li>in a separate script (after including `everything.red`)<li>directly in Spaces console (started by `run.bat` or equivalent `red console.red` shell command)<li>using [VID/S Polygon](programs/vids-polygon.red) - an evolving tool for testing various layouts, minimalistic for now but still quite handy (in this case, omit the `view [host []]` part!) and is a great way to get a feel how sizing works</ul> |
 |-|-|
@@ -122,7 +122,7 @@ view [host [
 	vlist [big-button "abc" big-button "def"]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-style-definition.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-definition.png)
 
 #### Do expression
 
@@ -162,7 +162,7 @@ view [host [
 	]
 ]]
 ```  
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-pane-definition)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-pane-definition)
 
 
 #### `with`
@@ -178,7 +178,7 @@ view [host [
 	button with [data: "some text" font: make font! [size: 20] limits: none]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-modifier-with.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-with.png)
 
 #### `react`
 
@@ -200,7 +200,7 @@ view/flags [
 	] react [h/size: h/parent/size - 20]			;) VID react keyword
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-modifier-react.gif)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-react.gif)
 
 #### Actor definition
 
@@ -244,14 +244,14 @@ view [host [
 		color= green - 20
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-facet-assignment.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment.png)
 
 ```
 view [host [
 	text text= "no conflict between style names and their facets!"
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-facet-assignment-2.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment-2.png)
 
 #### Auto-facets
 
@@ -286,7 +286,7 @@ view [host [
 	]
 ]]
 ```  
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-auto-facet.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-auto-facet.png)
 
 
 #### Flags setting
@@ -314,7 +314,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-flags-setting.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-flags-setting.png)
 
 #### Coloring
 
@@ -338,7 +338,7 @@ view [host 100x100 [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-coloring.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-coloring.png)
 
 #### Constaining the size
 
@@ -371,7 +371,7 @@ view/flags [
 	] react [face/size: face/parent/size - 20 face/dirty?: yes]
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-size-constraining.gif)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining.gif)
 
 ---
 ```
@@ -385,7 +385,7 @@ view/flags [
 	] react [face/size: face/parent/size - 20 face/dirty?: yes]
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-size-constraining-2.gif)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining-2.gif)
 
 
 ### Grid-specific extensions
@@ -413,5 +413,5 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/src/branch/master/spaces/example-grid-extensions.png)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-grid-extensions.png)
 
