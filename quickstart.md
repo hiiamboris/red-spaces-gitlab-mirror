@@ -26,10 +26,10 @@ Spaces provide infrastructure and model using which **you can**:
 
 Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only automated builds!!), [Git](https://git-scm.com/downloads)
 
-Spaces depend on the helpful functions & macros from [mezz warehouse](https://gitlab.com/hiiamboris/red-mezz-warehouse). So, in your favorite directory, run:
+Spaces depend on the helpful functions & macros from [mezz warehouse](https://codeberg.org/hiiamboris/red-common). So, in your favorite directory, run:
 ```
-git clone https://gitlab.com/hiiamboris/red-mezz-warehouse common
-git clone https://gitlab.com/hiiamboris/red-spaces
+git clone https://gitlab.com/hiiamboris/red-common common
+git clone https://gitlab.com/hiiamboris/red-spaces spaces
 ```
 
 <details>
@@ -38,40 +38,40 @@ git clone https://gitlab.com/hiiamboris/red-spaces
 	</summary>
 
 ```
-%red-spaces/
-%red-spaces/auxi.red 
-%red-spaces/comments 
-%red-spaces/creators.md 
-%red-spaces/debug-helpers.red 
-%red-spaces/events.red 
-%red-spaces/everything.red 
-%red-spaces/focus.red 
-%red-spaces/hittest.red 
-%red-spaces/pen-test.red 
-%red-spaces/quickstart.md 
-%red-spaces/README.md 
-%red-spaces/reference.md 
-%red-spaces/single-click.red 
-%red-spaces/spaces.red 
-%red-spaces/standard-handlers.red 
-%red-spaces/styles.red 
-%red-spaces/tabbing.red 
-%red-spaces/timers.red 
-%red-spaces/traversal.red 
+%spaces/
+%spaces/auxi.red 
+%spaces/comments 
+%spaces/creators.md 
+%spaces/debug-helpers.red 
+%spaces/events.red 
+%spaces/everything.red 
+%spaces/focus.red 
+%spaces/hittest.red 
+%spaces/pen-test.red 
+%spaces/quickstart.md 
+%spaces/README.md 
+%spaces/reference.md 
+%spaces/single-click.red 
+%spaces/spaces.red 
+%spaces/standard-handlers.red 
+%spaces/styles.red 
+%spaces/tabbing.red 
+%spaces/timers.red 
+%spaces/traversal.red 
 
-%red-spaces/tests/ 
-%red-spaces/tests/grid-test1.red 
-%red-spaces/tests/grid-test2.red 
-%red-spaces/tests/grid-test3.red 
-%red-spaces/tests/grid-test4.red 
-%red-spaces/tests/grid-test5.red 
-%red-spaces/tests/grid-test6.red 
-%red-spaces/tests/grid-test7.red 
-%red-spaces/tests/list-test.red 
-%red-spaces/tests/README.md 
-%red-spaces/tests/scrollbars-test.red 
-%red-spaces/tests/spiral-test.red 
-%red-spaces/tests/web-test.red
+%spaces/tests/ 
+%spaces/tests/grid-test1.red 
+%spaces/tests/grid-test2.red 
+%spaces/tests/grid-test3.red 
+%spaces/tests/grid-test4.red 
+%spaces/tests/grid-test5.red 
+%spaces/tests/grid-test6.red 
+%spaces/tests/grid-test7.red 
+%spaces/tests/list-test.red 
+%spaces/tests/README.md 
+%spaces/tests/scrollbars-test.red 
+%spaces/tests/spiral-test.red 
+%spaces/tests/web-test.red
 
 %common/
 %common/apply.red 
@@ -136,7 +136,7 @@ git clone https://gitlab.com/hiiamboris/red-spaces
 
 </details>
 
-Put it another way, if you download a zip from the Gitlab site, don't forget to rename directories after unzipping, to `red-spaces` and `common`.
+Put it another way, if you download a zip from the Gitlab site, don't forget to rename directories after unzipping, to `spaces` and `common`.
 
 
 
@@ -148,54 +148,52 @@ Create the following `hello-space.red` script:
 ```
 Red [needs: view]						;) we need the View module to be able to show graphics
 
-recycle/off								;) without this - often crashes on heisenbugs :(
-
-#include %red-spaces/everything.red		;) add Spaces to the current program
+#include %spaces/everything.red			;) add Spaces to the current program
 
 view [
 	host [								;) create a Host face that can contain spaces
-		list with [axis: 'y] [			;) draw a vertical list on the Host
-			paragraph with [text: "Hello, space!"]
-			button with [data: "OK" width: 80 command: [quit]]
+		vlist [									;) draw a vertical list on the Host
+			text "Hello, space!"
+			button "OK" 80 focus [unview]		;) unview generates an error - #5124 :)
 		]
 	]
 ]
 ```
 
-Now all you need to do is ensure you've written `#include` path to where you've put the actual `red-spaces` directory, and run the script: `red hello-space.red`
+Code assumes /spaces and /common reside in this script's directory, if they're not, fix the path. Then run the script: `red hello-space.red`
 
 ![](https://i.gyazo.com/9218e54a2703bae245b87798e9d42c51.png)
 
 A few notes:
 
-- Later this example will become much simpler once layout work is completed. For now it just shows how spaces can be embedded into [VID](https://doc.red-lang.org/en/vid.html). Right after `host [` VID ends and [spaces layout DSL](#layout-dsl) begins.
-- In the example above you might have noticed that I never specified `list/size`. Most spaces will automatically adjust their `/size` facet when drawn. `list` adjusts it's size to fit it's whole content.
-- `host` uses it's `rate` and `draw` facets internally, requires `all-over` flag to be set, but the other facets can be repurposed as you see fit.
+- `host` is a face on which all spaces are drawn. Like [`panel`](https://w.red-lang.org/en/vid/#panel) but for Spaces.
+- `host` uses it's `rate` and `draw` facets internally, requires `all-over` flag to be set, but other facets can be repurposed as you see fit.
+- The example is written in a mix of DSLs: standard [VID](https://doc.red-lang.org/en/vid.html) starts after `view [` and is used to describe faces layout. After `host [` VID ends and specialized [VID/S](#layout-dsl) begins.
+- In the example above you might have noticed that I never specified `vlist`'s size. Most spaces will automatically adjust their `/size` facet when drawn. `vlist` adjusts it's size to fit it's whole content. See [Sizing](#sizing) chapter.
 
 <details>
 	<summary>
-		The same example can also be written on a lower level, without VID, although requires better knowledge of spaces internals
+		The same example can also be written on a lower level, without VID or VID/S, but using manual layout construction which is faster but very boring
 	</summary>
 
 ```
 Red [needs: view]						;) we need the View module to be able to show graphics
 
-recycle/off								;) without this - often crashes on heisenbugs :(
-
-#include %red-spaces/everything.red		;) add Spaces to the current program
+#include %spaces/everything.red			;) add Spaces to the current program
 
 list: make-space 'list [				;) make-space is used to instantiate spaces
 	axis: 'y							;) lists can be horizontal(x) or vertical(y)
+	margin: spacing: 10x10				;) list is tight by default, this makes it spacious
 
-	item-list: reduce [					;) item-list is a block of NAMES of spaces
+	content: reduce [					;) content is a block of NAMES of spaces
 
-		make-space/name 'paragraph [	;) each make-space/name returns a name referring to an object
+		make-space/name 'text [			;) each make-space/name returns a name referring to an object
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
 		make-space/name 'button [
 			data: "OK"					;) data can be any Red type
-			width: 80					;) width makes the button bigger than it's data
-			command: [quit]				;) code that is evaluated when button is released
+			limits: 80 .. 80			;) limit with min=max fixes the button's size
+			command: [unview]			;) code that is evaluated when button is released
 		]
 	]
 ]
@@ -209,6 +207,7 @@ host/offset: 10x10						;) apply default VID margin
 window: make-face 'window				;) create window to put host into
 window/pane: reduce [host]				;) add host to it
 window/size: host/size + 20x20			;) add default VID margins to host/size to infer window/size
+window/offset: system/view/screens/1/size - window/size / 2		;) center the window
 
 show window								;) finally, we display the layout
 set-focus host							;) focus host for it to receive keyboard events
@@ -218,20 +217,20 @@ do-events								;) enter View event loop
 </details>
 
 
+### Anything more complex?
+
+I'm planning to create a set of explained templates for common layouts when the time permits.\
+For now, the only thing to reverse-engineer is [tests](tests/).
 
 
 ## Layout DSL
 
-Will be documented once it's finished.\
-Right now, just the bare minimum: 
-- style name
-- (optionally) followed by `with [code to evaluate]`
-- (optionally) followed by `[list of inner spaces]` - for containers like `list` (TODO: `grid` too)
+See [VID/S manual](vids.md) for detailed description and examples!
 
-See [the example above](#hello-world).
+## Sizing
 
-
-
+Sizing of most spaces is fully automated, but it's possible to manually set the range in which sizing is allowed. 
+See [Constaining the size](Constaining the size) chapter of VID/S manual for details and common usage examples.
 
 ## Styling
 
