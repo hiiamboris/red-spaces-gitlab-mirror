@@ -436,7 +436,8 @@ VID: context [
 		;; and adding it into every VID/S style would be tedious, plus raw templates won't support it otherwise
 		;@@ should there be two colors (fg/bg)? (this may complicate styles a lot)
 		=color=:      [
-			[	set w word! if (tuple? get/any w) (x: get w)
+			[	set x tuple!
+			|	set w word! if (tuple? get/any w) (x: get w)
 			|	set w issue! if (x: hex-to-rgb w)
 			]
 			(repend def/facets ['color x])
