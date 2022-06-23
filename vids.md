@@ -135,9 +135,9 @@ Examples:
 - `do [print "hello in the middle of layout creation!"]`
 - `do [some initialization of previously created spaces...]`
 
-### Supported modifiers
+## Supported modifiers
 
-#### Pane definition
+### Pane definition
 
 Styles that don't use block as a facet will get it processed by `lay-out-vids` and assigned to their `content` facet (which contains inner spaces). 
 
@@ -165,7 +165,7 @@ view [host [
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-pane-definition.png)
 
 
-#### `with`
+### `with`
 
 Serves as a spec for the newly created space object. Similarly to `make object! spec` semantics, it may define new facets. This is the most basic and powerful way of defining facets (and the most verbose for sure ;)
 
@@ -180,7 +180,7 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-with.png)
 
-#### `react`
+### `react`
 
 Defines a reactive relation on a space and makes the space [reactive](https://w.red-lang.org/en/reactivity/). Reaction may refer to this space by `self` or by [bound name](#style-instantiation) (if one is given).
 
@@ -202,7 +202,7 @@ view/flags [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-react.gif)
 
-#### Actor definition
+### Actor definition
 
 Defines an actor (i.e. a function that gets called when specific event happens in a space).
 
@@ -217,7 +217,7 @@ where:
 
 In all cases, function body is bound to space object, so `space/` prefix is not required to access it's facets (unless actor is shared across multiple spaces).  
 
-#### `focus`
+### `focus`
 
 Sets keyboard focus to the chosen space (and to host face).
 
@@ -227,7 +227,7 @@ Syntax: `focus`
 
 Example: `button "text" focus`
 
-#### Facet assignment
+### Facet assignment
 
 Sets space's facet to the value of expression. Non-existing facets are silently added, so check your speling. Facets supported by each space are listed in the [Widget Reference](reference.md).
 
@@ -253,7 +253,7 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment-2.png)
 
-#### Auto-facets
+### Auto-facets
 
 Some datatypes are automatically recognized by certain VID/S styles and are assigned to a corresponding facet.
 
@@ -289,7 +289,7 @@ view [host [
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-auto-facet.png)
 
 
-#### Flags setting
+### Flags setting
 
 Flags are words that when present, modify the appearance of the space.
 
@@ -316,7 +316,7 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-flags-setting.png)
 
-#### Coloring
+### Coloring
 
 Sets `color` facet of the new space. Not all spaces support it: `color` should be used by the stylesheet.
 
@@ -340,7 +340,7 @@ view [host 100x100 [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-coloring.png)
 
-#### Constaining the size
+### Constaining the size
 
 Each space supports /limits facet which may define it's minimum and maximum size. It can take one of the following values:
 - `none` - no limit defined (0x0 to infinity), equivalent to `none .. none`
