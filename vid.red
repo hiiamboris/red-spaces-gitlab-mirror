@@ -248,6 +248,8 @@ VID: context [
 		code
 	]
 	
+	datatype-names: to block! any-type!					;-- used to screen datatypes from flags
+			
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
 		spec [block!]	;@@ document DSL, leave a link here
@@ -279,7 +281,7 @@ VID: context [
 				either facet [ reduce [to set-word! facet 'system/words/quote :value] ][ value ]
 			]
 			unless empty? def/actors [
-				append facets compose/only [
+				append facets compose/deep/only [
 					actors: either object? :actors		;-- allows block! facet to define an actor too
 						[construct/with (to [] def/actors) actors]
 						[construct      (to [] def/actors)]
@@ -301,7 +303,7 @@ VID: context [
 				put sheet def/link new-style
 			][
 				space: get name: make-space/name def/style/template space-spec
-				if def/link [set def/link space]
+				if def/link [set def/link space]		;-- set the word before calling reactions
 				
 				append focusing name					;@@ BUG: not cleared on error
 				if def/pane [
@@ -325,8 +327,11 @@ VID: context [
 				if def/focused? [focus-space focusing]
 				remove top focusing
 				
-				foreach [_ actor] def/actors [
-					with [events/commands :actor] body-of :actor	;-- bind to commands but don't unbind locals
+				if object? actors: select space 'actors [
+					foreach actor values-of actors [
+						;; bind to space and commands but don't unbind locals:
+						with [space events/commands :actor] body-of :actor
+					]
 				]
 				if actor: :def/actors/on-created [actor space none none]	;@@ need this? or need `on-create`?
 				
@@ -340,7 +345,7 @@ VID: context [
 						]
 				]
 				foreach [late? reaction] def/reactions [
-					reaction: bind copy/deep reaction space
+					reaction: bind copy/deep reaction space		;@@ should bind to commands too?
 					either late? [react/later reaction][react reaction] 
 				]
 				
@@ -415,7 +420,9 @@ VID: context [
 		=facet-expr=: [s: e: (append/only def/facets do/next s 'e) :e]
 		
 		=flag=: [
-			set w word! if (attempt [facet: def/style/facets/:w])	;-- flag defined for this style? ;@@ REP #113
+			set w word!
+			if (attempt [facet: def/style/facets/:w])	;-- flag defined for this style? ;@@ REP #113
+			if (not find datatype-names w)				;-- datatype names do not count
 			(repend def/facets [none facet])
 		]
 			
