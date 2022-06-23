@@ -107,9 +107,6 @@ view [host [
 
 This creates new *VID/S styles*, that are valid until return of `lay-out-vids`. VID/S style is a collection of facets that will be automatically applied upon it's instantiation, thus helping avoid repetition.
 
-| **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in Quick Start manual](quickstart.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
-|-|-|
-
 Syntax: `style <new-style-name>: <style-name> <modifiers...>`
 - `style-instantiation` is described [above](#style-instantiation)
 - `new-style-name` is a set-word that will be used as `style-name` in the subsequent style instantiations
@@ -123,6 +120,9 @@ view [host [
 ]]
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-definition.png)
+
+| **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in Quick Start manual](quickstart.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
+|-|-|
 
 #### Do expression
 
@@ -162,7 +162,7 @@ view [host [
 	]
 ]]
 ```  
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-pane-definition)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-pane-definition.png)
 
 
 #### `with`
