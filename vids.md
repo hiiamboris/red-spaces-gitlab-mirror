@@ -9,7 +9,7 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 
 ## Quick VID to VID/S and faces to spaces comparison
 
-| Feature | VID | VID/S |
+| Feature | VID, View, Faces | VID/S, Spaces |
 | - | - | - |
 | Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly linked `space!` objects (parents have /map facet). Same space can appear in multiple places¹. |
 | Geometry | All faces are boxes sized in (virtual) pixels. | Each space can rotate/scale/bend it's children if it can express that in Draw. For interactivity support, it should provide coordinate transformation. |
