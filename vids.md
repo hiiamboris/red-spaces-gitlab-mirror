@@ -11,9 +11,9 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 
 | Feature | VID, View, Faces | VID/S, Spaces |
 | - | - | - |
-| Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly linked `space!` objects (parents have /map facet). Same space can appear in multiple places¹. |
+| Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly¹ linked `space!` objects (parents have /map facet). Same space can appear in multiple places². |
 | Geometry | All faces are boxes sized in (virtual) pixels. | Each space can rotate/scale/bend it's children if it can express that in Draw. For interactivity support, it should provide coordinate transformation. |
-| Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://w.red-lang.org/en/draw), redrawn continuously over time². |
+| Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://w.red-lang.org/en/draw), redrawn continuously over time³. |
 | Naming | `name:` can prefix a face definition. | `name:` can prefix a space definition. |
 | VID styles | `style` keyword allows to define a new style with new defaults. | `style` keyword allows to define a new style with new defaults. |
 | Stylesheets | No support. Faces look is mostly cast in stone. | Whole classes of spaces can be styled using a single style block or function. Styling is affected by the hierarchy. Spaces look can be fully customized, animated, effects applied (no limits). |
@@ -23,14 +23,15 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 | Event handlers | Events are handled by the OS. Some little customization can be done using a stack of [event functions](https://w.red-lang.org/en/view/#insert-event-func). | Events are handled by [standard event handlers](standard-handlers.red). Each space can have a stack of event handlers defining different levels of behavior from basic to custom. |
 | Facets | Each face has exactly the same set of facets that cannot be extended from VID. Mapping of VID datatypes to facets is hardcoded. | Each space defines it's own set of facets (only a few are shared), which can be extended by user with the `facet=` notation. Mapping of datatypes to facets is defined by [`spaces/styles` map](vid.red) which can be altered at any time. |
 | Sizing | Each face has a fixed size that has to be changed manually when required. | Most spaces automatically adjust their sizes, virtually eliminating the need for manual intervention. `limits` facet controls the range in which the size can vary. |
-| Positioning | VID allows for quite tricky static layouts with rows, columns, alignment. Every pane is pre-arranged using the same powerful algorithm. | VID/S uses [layout functions](layouts.red) to position spaces (some support alignment). They are more limited³ and predictable but able to adapt to size changes. Some spaces can only contain a single child. |
-| Reactivity | Faces are deeply reactive. | Spaces are not reactive⁴, but VID/S adds (shallow) reactivity to spaces with a name or reaction defined. |
+| Positioning | VID allows for quite tricky static layouts with rows, columns, alignment. Every pane is pre-arranged using the same powerful algorithm. | VID/S uses [layout functions](layouts.red) to position spaces (some support alignment). They are more limited⁴ and predictable but able to adapt to size changes. Some spaces can only contain a single child. |
+| Reactivity | Faces are deeply reactive. | Spaces are not reactive⁵, but VID/S adds (shallow) reactivity to spaces with a name or reaction defined. |
 
 **Footnotes**:\
-¹ For a space to appear in multiple places it's size and map must not depend on canvas size, because these are parts of the `space!` object and every new render (in a new place) will invalidate the old data.\
-² Draw block and map are cached internally, so space's `draw` function is only called when it's invalid. Invalidation is triggered by a change of it's facet (not a deep change!). A redraw cycle is only triggered when `/dirty?` facet of the `host` is true. Actors must use `update` function to mark it as dirty (when they change the look).\
-³ It's possible to write a VID-like layout function, but most likely it won't be able to react to resizes in a meaningful way.\
-⁴ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time.
+¹ Internally there's still a link from child to parent which is used for cache invalidation and fast provision of paths to timer events. It lives from one rendered frame until another.\
+² For a space to appear in multiple places it's size and map must not depend on canvas size, because these are parts of the `space!` object and every new render (in a new place) will invalidate the old data.\
+³ Draw block and map are cached internally, so space's `draw` function is only called when it's invalid. Invalidation is triggered by a change of it's facet (not a deep change!). A redraw cycle is only triggered when `/dirty?` facet of the `host` is true. Actors must use `update` function to mark it as dirty (when they change the look).\
+⁴ It's possible to write a VID-like layout function, but most likely it won't be able to react to resizes in a meaningful way.\
+⁵ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time.
 
 
 ## Predefined styles
