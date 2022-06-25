@@ -390,6 +390,24 @@ view/flags [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining-2.gif)
 
+### Weight effect
+
+Spaces can define their `weight` facet to determine relative sizing in containers. Some templates set it to `1` (the default). `row` & `column` in particular make great use of it. `0` or `none` values disable extension.
+
+Example:
+```
+view/flags [
+	host 100x100 [
+		row [
+			cell blue							;) uses default weight = 1
+			cell green 40 .. 100 weight= 0.5	;) also has size constraints, receives 1/2 extension 
+			cell red             weight= 3		;) receives triple extension
+		]
+	] react [face/size: face/parent/size - 20 face/dirty?: yes]
+] 'resize
+```
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-weight-effect.gif)
+
 
 ### Grid-specific extensions
 
