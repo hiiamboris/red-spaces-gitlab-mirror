@@ -1161,6 +1161,7 @@ inf-scrollable-ctx: context [
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: 0 < add area? space/hscroll/size area? space/vscroll/size
 		maybe space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		;; the only benefit of this is to count spaces more accurately:
 		append space/map compose [
 			(in space 'roll-timer) [offset 0x0 size 0x0]	;-- scrollable/draw removes it
 		]
@@ -2491,6 +2492,7 @@ field-ctx: context [
 			)
 			
 		|	'insert [set s string!] (
+				s: trim/with append clear "" s "^/^M"	;-- remove line breaks esp. when pasting smth from clipboard
 				unless empty? s [
 					field/caret/index: ci: skip? pos: insert pos s
 					len: length? text
