@@ -2492,7 +2492,7 @@ field-ctx: context [
 			)
 			
 		|	'insert [set s string!] (
-				s: trim/with append clear "" s "^/^M"	;-- remove line breaks esp. when pasting smth from clipboard
+				s: trim/lines append clear "" s			;-- remove line breaks esp. when pasting smth from clipboard
 				unless empty? s [
 					field/caret/index: ci: skip? pos: insert pos s
 					len: length? text
