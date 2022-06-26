@@ -77,9 +77,9 @@ context [
 	time: none											;-- cached to all `now` less often
 
 	process-timers: function [face [object!] event [event!] /extern time] [
-		;-- timer has no target (as is the case with focused space or pointed at)
-		;-- so we'll have to scan the whole tree for `rate` facets; all the time
-		;-- so this code has to be blazing fast
+		;; timer has no target (as is the case with focused space or pointed at)
+		;; and scanning of the whole tree for `rate` facets, all the time, is out of question - or this code will take 99% CPU time
+		;; paths-from-space helps win performance at the cost of having to explicitly render each timer
 		handlers: events/handlers
 		hpath: as path! []
 		foreach [space rate] rated-spaces [

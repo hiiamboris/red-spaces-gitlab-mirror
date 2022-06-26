@@ -332,7 +332,7 @@ define-handlers [
 
 		on-click [space path event] [
 			#assert [space/layout]
-			maybe space/caret/index: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
+			maybe space/caret/offset: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
 			update										;-- let styles update
 		]
 

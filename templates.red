@@ -2355,7 +2355,7 @@ caret-ctx: context [
 			switch to word! word [
 				width [maybe caret/size: new by caret/size/y]	;-- rectangle invalidates itself
 				visible? [invalidate-cache caret]
-				index [if caret/visible? [invalidate-cache caret]]
+				offset [if caret/visible? [invalidate-cache caret]]
 			]
 		]
 		caret/rectangle-on-change word :old :new
@@ -2364,7 +2364,7 @@ caret-ctx: context [
 	templates/caret: make-template 'rectangle [		;-- caret has to be a separate space so it can be styled
 		width:       1
 		look-around: 10				;-- how close caret is allowed to come to field borders
-		index:       0				;-- should be kept even when not focused, so tabbing in leaves us where we were
+		offset:      0				;-- should be kept even when not focused, so tabbing in leaves us where we were
 		visible?:    no
 		
 		rectangle-draw: :draw
@@ -2395,60 +2395,60 @@ field-ctx: context [
 	]
 	
 	mark-history: function [field [object!]] [
-		field/history: clear rechange field/history [copy field/text field/caret/index]
+		field/history: clear rechange field/history [copy field/text field/caret/offset]
 	]
 	
 	;@@ TODO: group edits somehow instead of char by char saves
 	undo: function [field [object!]] [
 		if 4 < index? field/history [					;-- at least 2 states needed: initial and unrolled
 			field/history: skip field/history -2		;-- state *after* the previous change
-			set [text: index:] skip field/history -2
+			set [text: offset:] skip field/history -2
 			append clear field/text text
-			maybe field/caret/index: index
+			maybe field/caret/offset: offset
 		]
 	]
 	
 	redo: function [field [object!]] [
 		unless tail? field/history [
-			set [text: index:] field/history
+			set [text: offset:] field/history
 			field/history: next next field/history
 			append clear field/text text
-			maybe field/caret/index: index
+			maybe field/caret/offset: offset
 		]
 	]
 	
 	edit: function [field [object!] plan [block!] /local n p] [
 		len: length? text: field/text
-		pos: skip text ci: field/caret/index
+		pos: skip text co: field/caret/offset
 		sel: field/selected
 		
 		parse/case plan [any [plan:
 			['undo (undo field) | 'redo (redo field)] (
-				pos: skip text ci: field/caret/index
+				pos: skip text co: field/caret/offset
 				len: length? text: field/text
 			)
 			
 		|	'select [(n: none)
 				'none (sel: none)
-			|	'all  (sel: 0 by ci: len)
-			|	'head (n: negate ci)
-			|	'tail (n: len - ci)
-			|	'prev-word (n: (find-prev-word field ci) - ci)
-			|	'next-word (n: (find-next-word field ci) - ci)
-			|	set p pair! (sel: p  ci: p/1)
+			|	'all  (sel: 0 by co: len)
+			|	'head (n: negate co)
+			|	'tail (n: len - co)
+			|	'prev-word (n: (find-prev-word field co) - co)
+			|	'next-word (n: (find-next-word field co) - co)
+			|	set p pair! (sel: p  co: p/1)
 			|	set n integer!
 			] (
 				if n [									;-- this only works if caret is at selection edge
 					other: case [
-						not sel    [ci]
-						ci = sel/1 [sel/2]
-						ci = sel/2 [sel/1]
-						'else      [ci]					;-- shouldn't happen, but just in case
+						not sel    [co]
+						co = sel/1 [sel/2]
+						co = sel/2 [sel/1]
+						'else      [co]					;-- shouldn't happen, but just in case
 					]
-					ci: clip [0 len] ci + n
-					sel: (min ci other) by (max ci other)
+					co: clip [0 len] co + n
+					sel: (min co other) by (max co other)
 				]
-				maybe field/caret/index: ci
+				maybe field/caret/offset: co
 				maybe field/selected: sel
 			)
 			
@@ -2458,44 +2458,44 @@ field-ctx: context [
 			] (if p [write-clipboard copy/part text p + 1])
 			
 		|	'move [
-				'head (ci: 0)
-			|	'tail (ci: len)
-			|	'prev-word (ci: find-prev-word field ci)
-			|	'next-word (ci: find-next-word field ci)
-			|	'sel-bgn   (if sel [ci: sel/1])
-			|	'sel-end   (if sel [ci: sel/2])
-			|	set n integer! (ci: clip [0 len] ci + n)
+				'head (co: 0)
+			|	'tail (co: len)
+			|	'prev-word (co: find-prev-word field co)
+			|	'next-word (co: find-next-word field co)
+			|	'sel-bgn   (if sel [co: sel/1])
+			|	'sel-end   (if sel [co: sel/2])
+			|	set n integer! (co: clip [0 len] co + n)
 			] (
-				pos: skip text maybe field/caret/index: ci
+				pos: skip text maybe field/caret/offset: co
 				maybe field/selected: sel: none			;-- `select` should be used to keep selection
 			)
 			
 		|	'insert [set s string!] (
 				s: trim/lines append clear "" s			;-- remove line breaks esp. when pasting smth from clipboard
 				unless empty? s [
-					field/caret/index: ci: skip? pos: insert pos s
+					field/caret/offset: co: skip? pos: insert pos s
 					len: length? text
 					mark-history field
 				]
 			)
 			
 		|	'remove [
-				'prev-word (n: (find-prev-word field ci) - ci)
-			|	'next-word (n: (find-next-word field ci) - ci)
+				'prev-word (n: (find-prev-word field co) - co)
+			|	'next-word (n: (find-next-word field co) - co)
 			|	'selected  (n: 0  if sel [
-					n: sel/2 - ci: sel/1
+					n: sel/2 - co: sel/1
 					sel: field/selected: none
 				])
 			|	set n integer!
 			] (
 				if n < 0 [								;-- reverse negative removal
-					ci: ci - n: abs n
-					if ci < 0 [n: n + ci  ci: 0]		;-- don't let it go past the head
+					co: co - n: abs n
+					if co < 0 [n: n + co  co: 0]		;-- don't let it go past the head
 				]
-				n: min n len - ci						;-- don't let it go past the tail
+				n: min n len - co						;-- don't let it go past the tail
 				if n <> 0 [
-					maybe field/caret/index: ci
-					remove/part pos: skip text ci n
+					maybe field/caret/offset: co
+					remove/part pos: skip text co n
 					len: length? text
 					mark-history field
 				]
@@ -2518,9 +2518,9 @@ field-ctx: context [
 		view-width: field/size/x
 		text-width: layout/extra/x
 		if view-width - cmargin >= text-width [return 0]	;-- fully fits, no origin offset required
-		ci:   field/caret/index + 1
-		cxy1: caret-to-offset       layout ci
-		cxy2: caret-to-offset/lower layout ci
+		co:   field/caret/offset + 1
+		cxy1: caret-to-offset       layout co
+		cxy2: caret-to-offset/lower layout co
 		min-org: min 0 cmargin - cxy1/x
 		max-org: clip [min-org 0] view-width - cxy2/x - cmargin
 		clip [min-org max-org] field/origin
@@ -2534,9 +2534,9 @@ field-ctx: context [
 		if canvas/x < infxinf/x [						;-- fill the provided canvas, even if text is larger
 			maybe field/size: constrain canvas/x by field/size/y field/limits
 		]
-		ci: field/caret/index + 1
-		cxy1: caret-to-offset       field/layout ci
-		cxy2: caret-to-offset/lower field/layout ci
+		co: field/caret/offset + 1
+		cxy1: caret-to-offset       field/layout co
+		cxy2: caret-to-offset/lower field/layout co
 		csize: field/caret/width by (cxy2/y - cxy1/y)
 		cmargin: field/caret/look-around
 		if canvas/x - (2 * cmargin) < txt-size/x [		;-- field width may be smaller/bigger than that of text
@@ -2576,7 +2576,7 @@ field-ctx: context [
 		switch to word! word [
 			origin selected [invalidate-cache field]	;-- invalidating just cache in enough since text is the same
 			text [
-				field/caret/index: length? new			;-- auto position at the tail; invalidated by text
+				field/caret/offset: length? new			;-- auto position at the tail; invalidated by text
 				mark-history field
 			]
 		]
