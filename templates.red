@@ -987,30 +987,6 @@ label-ctx: context [
 data-view-ctx: context [
 	~: self
 
-	; generic/too-deep: make-space 'paragraph [text: "(depth limit reached)"]
-	
-	; ;; to avoid infinite draw blocks during render of cyclic data:
-	; ;@@ maybe this should be in the style? but styls is a place for visual things, not depth control..
-	; limit: 3
-	; depth: 0
-	
-	; deep-types: make typeset! [object! map! function! all-word! any-block!]	;@@ what else? should it even be here??
-	
-	; draw: function [space [object!] canvas [none! pair!] /extern depth] [
-		; depth: depth + 1
-		; if all [
-			; limit < depth
-			; find deep-types type? :space/data
-		; ][
-			; saved: space/content
-			; quietly space/content: in generic 'too-deep
-		; ]
-		; trap/catch [drawn: space/box-draw/on canvas] [error: thrown]
-		; depth: depth - 1
-		; if saved [quietly space/content: saved]
-		; either error [do error][drawn]
-	; ]
-
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		; print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
 		push-font: [
@@ -1039,9 +1015,6 @@ data-view-ctx: context [
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
 		font:    none
 		wrap?:   off									;-- controls choice between text (off) and paragraph (on)
-		
-		; box-draw: :draw
-		; draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		
 		box-on-change: :on-change*
 		#on-change-redirect
