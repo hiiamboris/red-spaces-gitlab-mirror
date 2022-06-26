@@ -117,6 +117,15 @@ generic: construct to [] make map! reduce [				;-- holds commonly used spaces ;@
 	'<-> none 'stretch none								;-- set after box definition
 ]
 
+;; empty stretching space used for alignment (static version and template)
+templates/stretch: put templates '<-> make-template 'space [	;@@ affected by #5137
+	weight: 1
+	draw: func [/on canvas [pair! none!]] [
+		size: finite-canvas canvas 0x0 []
+	]
+]
+generic/stretch: set in generic '<-> make-space 'stretch []
+
 rectangle-ctx: context [
 	~: self
 	
@@ -291,10 +300,6 @@ cell-ctx: context [
 	]
 	
 	templates/cell: make-template 'box [margin: 1x1]	;-- same thing just with a border and background ;@@ margin - in style?
-	
-	;; empty stretching space used for alignment (static version and template)
-	generic/stretch: set in generic '<-> make-space 'box [weight: 1]	;@@ affected by #5137
-	templates/stretch: put templates '<-> make-template 'box [weight: 1]
 ]
 
 ;@@ TODO: externalize all functions, make them shared rather than per-object
@@ -590,8 +595,9 @@ paragraph-ctx: context [
 		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
 		quietly layout/data: flags						;-- support of font styles - affects width
 		
+		mrg2: 1x1 * space/margin
 		quietly layout/size: if width [					;-- wrap canvas, or none (no-wrap)
-			(max 1 width - (2 * space/margin/x)) by infxinf/y	;-- width has to be set to determine height
+			(max 1 width - mrg2/x) by infxinf/y			;-- width has to be set to determine height
 		]
 		;; NOTE: #4783 to keep in mind
 		quietly layout/extra: size-text layout			;-- 'size-text' is slow, has to be cached (by using on-change)
