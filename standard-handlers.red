@@ -280,13 +280,13 @@ define-handlers [
 			] [pass exit]
 
 			plan: switch/default key: event/key [
-				left   [reduce [
-					pick [select move]  event/shift?
-					pick [prev-word -1] event/ctrl?
+				left   [compose [
+					(pick [select move]      event/shift?)
+					(pick [prev-word [by -1]] event/ctrl?)
 				]]
-				right  [reduce [
-					pick [select move]  event/shift?
-					pick [next-word 1]  event/ctrl?
+				right  [compose [
+					(pick [select move]      event/shift?)
+					(pick [next-word [by 1]] event/ctrl?)
 				]]
 				home   [reduce [
 					pick [select move]  event/shift?
@@ -330,11 +330,23 @@ define-handlers [
 
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
 
-		on-click [space path event] [
-			#assert [space/layout]
-			maybe space/caret/offset: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
-			update										;-- let styles update
+		on-down [space path event] [
+			new-ofs: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
+			space/edit compose [select none move to (new-ofs)]
+			start-drag path
 		]
+		
+		on-over [space path event] [
+			#assert [space/layout]
+			dpath: drag-path
+			if all [dpath dpath/1 =? path/1] [			;-- if started dragging also on this field
+				new-ofs: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
+				space/edit compose [select to (new-ofs)]
+				update									;-- let styles update
+			]
+		]
+		
+		on-up [space path event] [stop-drag]
 
 		on-focus [space path event] [
 			maybe space/caret/visible?: yes

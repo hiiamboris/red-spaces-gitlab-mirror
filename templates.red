@@ -2435,8 +2435,9 @@ field-ctx: context [
 			|	'tail (n: len - co)
 			|	'prev-word (n: (find-prev-word field co) - co)
 			|	'next-word (n: (find-next-word field co) - co)
+			|	'to set n integer! (n: n - co)
+			|	'by set n integer!
 			|	set p pair! (sel: p  co: p/1)
-			|	set n integer!
 			] (
 				if n [									;-- this only works if caret is at selection edge
 					other: case [
@@ -2445,7 +2446,7 @@ field-ctx: context [
 						co = sel/2 [sel/1]
 						'else      [co]					;-- shouldn't happen, but just in case
 					]
-					co: clip [0 len] co + n
+					probe co: clip [0 len] co + n
 					sel: (min co other) by (max co other)
 				]
 				maybe field/caret/offset: co
@@ -2464,9 +2465,10 @@ field-ctx: context [
 			|	'next-word (co: find-next-word field co)
 			|	'sel-bgn   (if sel [co: sel/1])
 			|	'sel-end   (if sel [co: sel/2])
-			|	set n integer! (co: clip [0 len] co + n)
+			|	'to set co integer!
+			|	'by set n  integer! (co: co + n)
 			] (
-				pos: skip text maybe field/caret/offset: co
+				pos: skip text maybe field/caret/offset: co: clip [0 len] co
 				maybe field/selected: sel: none			;-- `select` should be used to keep selection
 			)
 			
