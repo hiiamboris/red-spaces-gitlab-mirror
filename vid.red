@@ -81,9 +81,21 @@ VID: context [
 			]
 			paragraph [template: paragraph facets: [string! text #font-styles]]
 			text   [template: text   facets: [string! text #font-styles]]
-			field  [template: field  facets: [string! text #font-styles]]
 			link   [template: link   facets: [string! text url! text block! command]]
 			button [template: button facets: [string! data image! data block! command] spec: [limits: 40 .. none]]
+			field  [
+				template: field
+				facets: [string! text #font-styles]
+				;@@ unfortunately without deep reactivity there's no way changes in caret can be recognized in owning field
+				;@@ so any reactions placed upon field/caret/stuff will not fire unless I explicitly make caret reactive
+				;@@ #4529 could solve this for all spaces
+				spec: [
+					insert body-of :caret/on-change*
+						with [caret :caret/on-change*] [		;-- newlines are imporant here for mold readability
+							system/reactivity/check/only self word
+						]
+				]
+			]
 			
 			box    [template: box    facets: [#align]]
 			cell   [template: cell   facets: [#align]]
