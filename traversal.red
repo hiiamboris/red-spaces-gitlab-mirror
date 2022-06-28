@@ -123,6 +123,8 @@ context [
 	][
 		if any-word? spec [spec: to [] to word! spec]
 		path: either word? path [to path! path][as path! path]
+		#assert [not empty? path "Tree iteration expects a face in the path"]
+		if empty? path [exit]								;-- no paths to iterate over
 
 		buf: cache/get										;-- so we can call foreach-*ace from itself
 		list: lister/into path/1 buf
