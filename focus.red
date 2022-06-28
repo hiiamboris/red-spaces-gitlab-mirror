@@ -73,7 +73,7 @@ focused?: function [
 
 ;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
 find-next-focal-space: function [dir "forth or back"] [
-	focus: keyboard/last-valid-focus
+	focus: any [keyboard/last-valid-focus reduce [anonymize 'screen system/view/screens/1]]
 	#debug focus [#print "last valid focus: (as path! focus)"]
 	; #assert [focus]										;@@ TODO: cover the case when it's none
 	foreach: pick [										;@@ use apply
