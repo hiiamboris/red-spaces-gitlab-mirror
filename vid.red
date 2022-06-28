@@ -11,9 +11,6 @@ Red [
 ;@@ another idea: tag for hint (makes sense if hint is widely used)
 
 VID: context [
-	;@@ I'm not sure about adding containers (tubes, lists) to native VID!
-	;@@ because it won't support spaces syntax and this will cause a lot of confusion!
-	;@@ but without any facets set it kind of works and eliminates the need for `host` with only a single child
 	; create VID styles for basic containers
 	; #localize [
 		; foreach name [hlist vlist row column] [
@@ -21,8 +18,6 @@ VID: context [
 			; spec/template/space: to lit-word! name
 		; ]
 	; ]
-	
-	;@@ add grids somehow
 	
 	#local [
 		;; these help avoid repetition:
@@ -116,14 +111,8 @@ VID: context [
 			]
 			grid [
 				template: grid
-				facets:   [
-					pair!  bounds
-					block! !(func [block] [
-						;@@ hacky way to get access to current stylesheet.. any better idea?
-						lay-out-grid/styles block get bind 'sheet :lay-out-vids
-					]) 
-					#tight
-				]
+				layout:   lay-out-grid					;-- uses custom layout function
+				facets:   [pair! bounds  #tight]
 			]
 		];; styles
 		
@@ -131,7 +120,6 @@ VID: context [
 		
 	];; #local
 	
-	;@@ grid
 	;@@ grid-view
 	
 	
@@ -162,14 +150,10 @@ VID: context [
 		spec: body-of :spec
 		if empty? spec [exit]
 		
-		append clear focusing path-from-face face		;-- reset in case it wasn't & collect path prefix of faces
-		;@@ this has no screen yet! because window is not shown!
-		insert focusing anonymize 'screen system/view/screens/1
-		
+		set 'focused none								;-- reset focus flag
 		pane: lay-out-vids spec
 		if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 		face/space: pane/1
-		
 		;; this is rather tricky:
 		;;  1. we want `render` to render the content on currently set face/size
 		;;  2. yet, in `layout` we set face/size from the rendered content size
@@ -182,8 +166,23 @@ VID: context [
 		drawn: render face
 		#assert [face/size]								;-- should be set by `render-face`, `size: none` blows up `layout`
 		#debug draw [prin "host/draw: " probe~ drawn] 
-		
 		face/draw: drawn
+		
+		if object? focused [							;-- has to be focused after render creates the tree
+			;; this is the only viable way to set focus,
+			;; as multiple `wrap-space` funcs create spaces that cannot be accounted for in VID code
+			foreach path list-*aces anonymize face/type face [
+				if focused =? get last path [
+					#assert [face? face/parent]
+					focus-space path: compose [
+						(anonymize 'screen system/view/screens/1)	;-- not linked to the screen yet, has no /parent
+						(anonymize 'window face/parent)
+						(as [] path)
+					] 
+					break
+				]
+			]
+		]
 	]
 	
 	
@@ -220,11 +219,8 @@ VID: context [
 	]
 	
 	
-	;@@ not exactly solid design - rethink this! in case errors happen during VID evaluation it may be corrupted
-	focusing: make block! 20							;-- used internally to have a focusable path
-	
 	lay-out-grid: function [
-		"Turn Grid specification block into a facet block"
+		"Turn Grid specification block into a code block"
 		spec [block!] "Same as VID/S, with `as pair!` / `as range!` support"
 		/styles sheet [map! none!] "Add custom stylesheet to the global one"
 		/local x
@@ -262,6 +258,7 @@ VID: context [
 	]
 	
 	datatype-names: to block! any-type!					;-- used to screen datatypes from flags
+	focused: none										;-- used to make `focus` flag work
 			
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
@@ -318,27 +315,32 @@ VID: context [
 				space: get name: make-space/name def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
 				
-				append focusing name					;@@ BUG: not cleared on error
 				if def/pane [
 					unless in space 'content [
 						ERROR "Style (def/template) cannot contain other spaces"
 					]
-					content: lay-out-vids/styles def/pane sheet
-					space/content: case [				;-- always trigger on-change just in case
-						any-list? :space/content [content]
-						immediate? :space/content [
-							if 1 < n: length? content [
-								ERROR "Style (def/template) can only contain a single space, given (n)"
+					;; allow usage of custom layout function
+					either def/style/layout [
+						layout: get def/style/layout
+						#assert [function? :layout]
+						do with space layout/styles def/pane sheet
+					][
+						content: lay-out-vids/styles def/pane sheet
+						space/content: case [			;-- always trigger on-change just in case
+							any-list? :space/content [content]
+							immediate? :space/content [
+								if 1 < n: length? content [
+									ERROR "Style (def/template) can only contain a single space, given (n)"
+								]
+								content/1				;-- can be none if no items
 							]
-							content/1					;-- can be none if no items
-						]
-						'else [							;-- e.g. content is a map in grid
-							ERROR "Style (def/template) requires custom content filling function"
+							'else [						;-- e.g. content is a map in grid
+								ERROR "Style (def/template) requires custom content filling function"
+							]
 						]
 					]
 				]
-				if def/focused? [focus-space focusing]
-				remove top focusing
+				if def/focused? [set 'focused space]
 				
 				if object? actors: select space 'actors [
 					foreach actor values-of actors [
