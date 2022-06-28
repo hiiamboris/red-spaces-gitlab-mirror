@@ -58,6 +58,7 @@ layouts: context [
 			]]
 			default origin: 0x0
 			default canvas: infxinf						;-- none to pair normalization
+			; canvas: constrain canvas limits
 			x: ortho y: axis
 			guide: axis2pair y
 			pos: pos': origin + (1x1 * margin)
@@ -90,6 +91,7 @@ layouts: context [
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
 			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]
+			canvas2/:x: canvas2/:x - (2 * margin/:x)
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
