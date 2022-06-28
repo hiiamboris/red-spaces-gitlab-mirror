@@ -2012,6 +2012,7 @@ grid-ctx: context [
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
 		;@@       and how? per-row or per-col? or per-cell? or custom func? or alignment should be provided by item wrapper?
+		;@@       maybe just in lay-out-grid? or as some hacky map that can map rows/columns/cells to alignment?
 		map: []
 
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
@@ -2446,7 +2447,7 @@ field-ctx: context [
 						co = sel/2 [sel/1]
 						'else      [co]					;-- shouldn't happen, but just in case
 					]
-					probe co: clip [0 len] co + n
+					co: clip [0 len] co + n
 					sel: (min co other) by (max co other)
 				]
 				maybe field/caret/offset: co
@@ -2585,6 +2586,7 @@ field-ctx: context [
 		field/text-on-change word :old :new
 	]
 	
+	;@@ field will need on-change handler & actor support for better user friendliness!
 	;; based directly on text to expose /text facet which would be hard to sync both ways otherwise
 	templates/field: make-template 'text [
 		weight:    1
