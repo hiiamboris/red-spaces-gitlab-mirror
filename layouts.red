@@ -97,8 +97,7 @@ layouts: context [
 			size: constrain size limits
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
-			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]
-			canvas2/:x: canvas2/:x - (2 * margin/:x)
+			canvas2/:x: max-safe size/:x - (2 * margin/:x) if canvas2/:x < infxinf/x [canvas2/:x]
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
@@ -305,7 +304,7 @@ layouts: context [
 								;; happens e.g. when long text is inside a column
 								;@@ this is a temporary kludge FIXME with design!!
 								if space/size/:y > ccanvas/:y [
-									desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
+									desired-size/:y: ccanvas/:y
 									item/3: render/on name desired-size
 								]
 							]
@@ -321,7 +320,7 @@ layouts: context [
 				]
 			]
 			
-			;; when canvas has height lesser than all rows height - extend row heights evenly before filling rows
+			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
 			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
 			nrows: half length? rows
 			total-length: total-length + (nrows - 1 * spacing/:y)
