@@ -6,10 +6,16 @@ Red [
 
 ;-- requires export, typecheck
 
-exports: [layouts]
+exports: [layouts make-layout]
 
 ;@@ can this be layouts/make ?
-make-layout: function [type [word!] spaces [block! function!] settings [block!]] [
+make-layout: function [
+	"Create a layout (arrangement of spaces on a plane)"
+	type     [word!]            "Layout name (list, tube, ring)"
+	spaces   [block! function!] "List of space names or a picker function"
+	settings [block!]           "Block of words referring to setting values"
+	; return: [block!] "[size [pair!] map [block!]]
+][
 	layouts/:type/create :spaces settings
 ]
 
@@ -18,13 +24,13 @@ layouts: context [
 	list: context [
 		;; settings for list layout:
 		;;   axis             [word!]   x or y
-		;;   margin           [pair!]   >= 0x0
+		;;   margin           [pair!]   >= 0x0			;@@ these should support integers!
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas        [pair! none!]   > 0x0
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
 		;;   viewport         [pair!]   only matters if any cache-* is true, >= 0x0
-		;;   cache         [word! none!]
+		;;   cache         [word! none!]				;@@ remove viewport and cache! now that general caching is done
 		;;     none       = disabled
 		;;     'invisible = items outside 0x0-viewport are not rendered if they have a size
 		;;     'all       = all items are not rendered if they have a size
