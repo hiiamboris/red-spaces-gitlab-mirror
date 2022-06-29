@@ -24,8 +24,8 @@ layouts: context [
 	list: context [
 		;; settings for list layout:
 		;;   axis             [word!]   x or y
-		;;   margin           [pair!]   >= 0x0			;@@ these should support integers!
-		;;   spacing          [pair!]   >= 0x0
+		;;   margin       [integer! pair!]   >= 0x0			;@@ these should support integers!
+		;;   spacing      [integer! pair!]   >= 0x0
 		;;   canvas        [pair! none!]   > 0x0
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
@@ -54,8 +54,8 @@ layouts: context [
 			]
 			#debug [typecheck [
 				axis     [word!       (find [x y] axis)]
-				margin   [pair!       (0x0 +<= margin)]
-				spacing  [pair!       (0x0 +<= spacing)]
+				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair! (0x0 +<= canvas)]
 				limits   [none! object! (all [in limits 'min in limits 'max])]
 				origin   [none! pair!]
@@ -64,10 +64,11 @@ layouts: context [
 			]]
 			default origin: 0x0
 			default canvas: infxinf						;-- none to pair normalization
+			margin: margin * 1x1						;-- integer to pair normalization
 			; canvas: constrain canvas limits
 			x: ortho y: axis
 			guide: axis2pair y
-			pos: pos': origin + (1x1 * margin)
+			pos: pos': origin + margin
 			draw?: case [
 				cache = 'all [[not space/size]]			;-- cache everything, only redraw if never drawn
 				cache = 'invisible [[					;-- cache invisible only, redraw if never drawn or visible
@@ -79,8 +80,8 @@ layouts: context [
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: extend-canvas subtract-canvas canvas 2x2 * margin axis
-			; canvas1: canvas2: (subtract-canvas canvas 2x2 * margin) * reverse guide
+			canvas1: canvas2: extend-canvas subtract-canvas canvas 2 * margin axis
+			; canvas1: canvas2: (subtract-canvas canvas 2 * margin) * reverse guide
 			
 			map: make [] 2 * count
 			size: 0x0
@@ -112,7 +113,7 @@ layouts: context [
 				]
 			]
 			size: pos - (spacing * guide)				;-- cut trailing space
-				- origin + (1x1 * margin)				;-- 2 margins + size along axis
+				- origin + margin						;-- 2 margins + size along axis
 				+ (size * reverse guide)				;-- size normal to axis
 			#assert [size +< (1e7 by 1e7)]
 			reduce [size map]
@@ -126,8 +127,8 @@ layouts: context [
 		;;                                  default = [e s] - left-to-right items, top-down rows
 		;;   align         [block! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
 		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
-		;;   margin           [pair!]   >= 0x0
-		;;   spacing          [pair!]   >= 0x0
+		;;   margin        [integer! pair!]   >= 0x0
+		;;   spacing       [integer! pair!]   >= 0x0
 		;;   canvas         [none! pair!]   > 0x0 or none=inf (width determined by widest item)
 		;;   limits        [none! object!]
 		create: function [
@@ -157,13 +158,15 @@ layouts: context [
 						find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/2
 					]
 				)]]
-				margin   [      pair! (0x0 +<= margin)]
-				spacing  [      pair! (0x0 +<= spacing)]
+				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair! (0x0 +<= canvas)]
 				limits   [none! object! (all [in limits 'min in limits 'max])]
 			]]
 			default axes:  [e s]
 			default align: -1x-1
+			margin:  margin  * 1x1						;-- integer to pair normalization
+			spacing: spacing * 1x1
 			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
 			ox: anchor2pair axes/1
 			oy: anchor2pair axes/2
@@ -198,15 +201,15 @@ layouts: context [
 			
 			default canvas: infxinf						;-- none to pair normalization
 			;; clipped canvas - used for allowed width / height fitting
-			ccanvas: subtract-canvas constrain canvas limits 2x2 * margin
-			; stripe: (subtract-canvas canvas 2x2 * margin) * oy
+			ccanvas: subtract-canvas constrain canvas limits 2 * margin
+			; stripe: (subtract-canvas canvas 2 * margin) * oy
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes infinite, later expanded to fill the row
 			;@@ should it always be 0xinf maybe?
-			; stripe: round/to subtract-canvas canvas 2x2 * margin infxinf * ox		;@@ #5151
+			; stripe: round/to subtract-canvas canvas 2 * margin infxinf * ox		;@@ #5151
 			stripe: infxinf
 			if canvas/:x < infxinf/x [stripe/:x: 0]
-			; stripe: subtract-canvas canvas 2x2 * margin
+			; stripe: subtract-canvas canvas 2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
 			#debug sizing [print ["tube c=" canvas "stripe=" stripe]]
@@ -363,7 +366,7 @@ layouts: context [
 				row-y: row-y + spacing/:y + row-size/y
 			]
 			;; fill the desired canvas width if canvas is given:
-			size: 2x2 * margin + reverse? total-width by total-length
+			size: 2 * margin + reverse? total-width by total-length
 			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive
 				shift: size * abs shift
 				foreach [name geom] map [geom/offset: geom/offset + shift]
