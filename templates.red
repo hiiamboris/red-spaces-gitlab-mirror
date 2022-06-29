@@ -257,8 +257,8 @@ cell-ctx: context [
 		free:   space/size - cspace/size - mrg2
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
 		unless tail? drawn [
-			drawn: compose/only [translate (offset) (drawn)]
-			; drawn: compose/only [clip 0x0 (space/size) translate (offset) (drawn)]
+			; drawn: compose/only [translate (offset) (drawn)]
+			drawn: compose/deep/only [clip 0x0 (space/size) [translate (offset) (drawn)]]
 		]
 		space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
 		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
