@@ -1839,7 +1839,6 @@ grid-ctx: context [
 	;@@ this could leverage canvas but I have no idea how; also limits?
 	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
-		;@@ keep this in sync with `list/draw`
 		#assert [any [not grid/infinite?  all [xy1 xy2]]]	;-- bounds must be defined for an infinite grid
 
 		cache: grid/size-cache
@@ -1919,6 +1918,7 @@ grid-ctx: context [
 	
 	;; stochastic content-agnostic column width fitter
 	;@@ should also account for minimum cell width - don't make columns less than that (at least optionally)
+	;@@ make it available from grid/ or grid-view/
 	autofit: function [
 		"Automatically adjust GRID column widths for best look"
 		grid  [object!]
@@ -2048,11 +2048,11 @@ grid-ctx: context [
 
 		set-span: function [
 			"Set the SPAN of a FIRST cell, breaking it if needed"
-			first [pair!] "Starting cell of a multicell or normal cell that should become a multicell"
+			cell1 [pair!] "Starting cell of a multicell or normal cell that should become a multicell"
 			span  [pair!] "1x1 for normal cell, more to span multiple rows/columns"
 			/force "Also break all multicells that intersect with the given area"
 		][
-			~/set-span self first span force
+			~/set-span self cell1 span force
 		]
 		
 		get-offset-from: function [
@@ -2206,10 +2206,9 @@ grid-view-ctx: context [
 			]
 		]
 
-		wrap-data: function [xy [pair!] item-data [any-type!]] [
+		wrap-data: function [item-data [any-type!]] [
 			spc: make-space 'data-view [wrap?: on margin: 3x3 align: -1x0]
 			set/any 'spc/data :item-data
-			spc/width: (grid/col-width? xy/x) - (spc/margin/x * 2)	;@@ deal with width!
 			anonymize 'cell spc
 		]
 
@@ -2230,7 +2229,7 @@ grid-view-ctx: context [
 			either pick [
 				any [
 					grid/content/:xy					;@@ need to think when to free this up, maybe when cells get hidden
-					grid/content/:xy: wrap-data xy data/pick xy
+					grid/content/:xy: wrap-data data/pick xy
 				]
 			][data/size]
 		]
