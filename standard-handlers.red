@@ -315,6 +315,7 @@ define-handlers [
 				#"X" [[copy selected remove selected]]
 				#"V" [
 					if string? new: read-clipboard [
+						new: trim/with new "^/^M"		;-- remove line breaks but not spaces
 						compose [remove selected insert (new)]
 					]
 				]
