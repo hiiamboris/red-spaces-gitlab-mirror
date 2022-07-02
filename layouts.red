@@ -97,7 +97,7 @@ layouts: context [
 			size: constrain size limits
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
-			canvas2/:x: max-safe size/:x - (2 * margin/:x) if canvas2/:x < infxinf/x [canvas2/:x]
+			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]		;-- `size` already has margin subtracted
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
@@ -211,7 +211,7 @@ layouts: context [
 			; stripe: subtract-canvas canvas 2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
-			#debug sizing [print ["tube c=" canvas "stripe=" stripe]]
+			#debug sizing [print ["tube canvas=" canvas "ccanvas=" ccanvas "stripe=" stripe]]
 			
 			repeat i count [
 				space: get name: either func? [spaces/pick i][spaces/:i]
