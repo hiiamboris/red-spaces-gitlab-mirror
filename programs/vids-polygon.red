@@ -15,11 +15,11 @@ text: any [
 ; view/no-wait/flags/options compose [
 view/flags/options compose [
 	title "VID/S experimentation polygon"
-	text "VID/S code:" space: field 400 focus (text) return
+	text "VID/S code:" space: area 400x80 focus (text) return
 	host: host 400x300 white react [
 		try [
 			data: load/all space/text
-			face/space: first probe lay-out-vids data
+			face/space: first lay-out-vids data
 			face/dirty?: yes
 			write %vids-polygon.cfg space/text
 		]
@@ -30,7 +30,7 @@ view/flags/options compose [
 		on-resize: on-resizing: function [window event] [
 			status/size: window/size/x - 20 by 40 
 			status/offset/y: window/size/y - 50
-			host/size: window/size - 20x95
+			host/size: window/size - 20x155
 			host/dirty?: yes
 		]
 	]
