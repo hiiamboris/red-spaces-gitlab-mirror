@@ -17,6 +17,18 @@ dump-tree: function [] [
 	()
 ]
 
+dump-host-tree: function [
+	"List hierarchical tree of currently rendered spaces"
+	host-face [object!] "Root face to list from"
+][
+	unless in host-face 'space [ERROR "Host space expected"]
+	foreach-*ace path: anonymize 'host host-face [
+		spc: get last path
+		print [pad spc/size 10 path]
+	]
+	()
+]
+
 fix-paths: function [
 	"Replaces convenient but invalid space-referring paths with valid ones"
 	code [block!] "Block where to replace paths"
