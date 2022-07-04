@@ -219,6 +219,8 @@ Where:
 
 In all cases, function body is bound to space object, so `space/` prefix is not required to access it's facets (unless actor is shared across multiple spaces).  
 
+For `on-time` event to fire, space's /rate facet should be a positive integer, float or time value.
+
 ### `focus`
 
 Sets keyboard focus to the chosen space (and to host face).
@@ -342,7 +344,7 @@ view [host 100x100 [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-coloring.png)
 
-### Constaining the size
+### Constraining the size
 
 Each space supports /limits facet which may define it's minimum and maximum size. It can take one of the following values:
 - `none` - no limit defined (0x0 to infinity), equivalent to `none .. none`

@@ -5,15 +5,15 @@ include_toc: true
 
 # RED SPACES - DRAW-BASED WIDGET LIBRARY FOR [RED](http://red-lang.org/)
 
-Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https://codeberg.org/hiiamboris/red-spaces)
+Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https://codeberg.org/hiiamboris/red-spaces) (you may be viewing an automatic mirror otherwise)
 
 ## Examples (clickable)
 
-| Spiral editable field | Table |
+| Spiral editable field | Grid-view |
 |---|---|
-| ![](https://i.gyazo.com/74d4e22f7480bda9f5c2df8e11c6bfb5.gif) | ![](https://i.gyazo.com/5f16371407967a41e16bb6f601201a70.gif) |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-view.gif) |
 |  **Infinite list of items *of varying size*** | **Self-containing grid** |
-| ![](https://i.gyazo.com/856724cebae6a5967a9eb96142dd35de.gif) | ![](https://i.gyazo.com/4a2557024a80ac54e890fbf665e1cf7a.gif) |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-infinite-list.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-self-containing-grid.gif) |
 
 \>\> [MORE DEMOS IN /TESTS](tests/) <<
 
@@ -28,35 +28,37 @@ Self-containing grid shows that there are no limitations: every space can contai
 ## Docs
 
 #### [Quickstart](quickstart.md) - if you just wanna use one in your program
-#### [VID/S manual](vids.md) - description of the layout dialect
-#### [Widget Reference](reference.md) - if you're interested in what Spaces are available and how they work
+#### [VID/S manual](vids.md) - description of the layout dialect (must read after Quickstart)
+#### [Tinkerer's manual](manual.md) - for deeper understanding and how to alter things
+#### [Widget Reference](reference.md) - reference of all available space templates and their properties
 #### [Creators Guide](creators.md) - description of the architecture that will help you write your own Spaces
 
 
 ## Status
 
-**Alpha stage. Some design changes possible, risk of breaking changes. Not very high-level yet.**
+**Alpha stage. Some design changes possible, risk of breaking changes.**
 
-Good enough to experiment with, and to propose design enhancements and feature requests.
+Good enough to write basic apps with. Design enhancements proposals and feature requests are welcome =)
 
 | By component | State |
 | --- | --- |
-| Widget architecture | Mostly stable | 
-| Events | Mostly stable |
-| Timers | Stable | 
-| Styling | Mostly stable |
-| Focus model | Mostly stable |
-| [Tabbing](https://en.wikipedia.org/wiki/Tabbing_navigation) | Mostly stable |
+| Widget architecture | Stable |
+| Events | Stable |
+| Timers | Stable |
+| Styling | Syntax may change |
+| Focus model | Stable |
+| [Tabbing](https://en.wikipedia.org/wiki/Tabbing_navigation) | Stable |
 | [Spatial navigation](https://en.wikipedia.org/wiki/Spatial_navigation) | Not implemented |
-| Resize model | Need a powerful simple design idea, ideally that would apply to faces too |
-| Layout | Embedded into View layout seamlessly, but very basic: only accepts space names and `with` |
+| Resize model | Mostly stable. Needs some internal work. |
+| Layout | Designed and [documented](vids.md), will be extended when required |
 | Grid/Table | Requires interactivity: columns dragging, sorting, filtering |
-| Reactivity | Waiting for [PR #4529](https://github.com/red/red/pull/4529) (reactivity has to be scalable for Spaces scope) |
-| User's guide | Written |
-| Widget reference | Written |
-| Creator's guide | Written |
+| Reactivity | Waiting for [PR #4529](https://github.com/red/red/pull/4529) (reactivity has to be scalable for Spaces scope). Temporary kludges are inserted by VID/S |
+| Quickstart | [Written](quickstart.md) |
+| User guide | [Written](manual.md) |
+| Widget reference | [Written](reference.md) |
+| Creator's guide | [Written](creators.md) |
 | Templates | None made so far |
-
+| Alternate stylesheets | None made so far |
 
 
 ## Goals
@@ -72,5 +74,5 @@ Good enough to experiment with, and to propose design enhancements and feature r
 ## Help & feedback
 
 If you find it too complex to achieve some task, you can [ask my advice on Gittard](https://gitter.im/hiiamboris).\
-When you spot bugs or other issues you can report them also on Gittard or by creating an [issue report or wish request](https://gitlab.com/hiiamboris/red-spaces/-/issues/new) in this repository. Improvement ideas are also welcome :)
+When you spot bugs or other issues you can report them also on Gittard or by creating an [issue report or wish request](https://codeberg.org/hiiamboris/red-spaces/issues/new). Improvement ideas are also welcome :)
 
