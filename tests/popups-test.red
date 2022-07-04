@@ -49,9 +49,8 @@ view/no-wait [
 					https://codeberg.org/hiiamboris/red-spaces
 			]
 			row tight center [ 
-				rocket hint="Retro-styled racing space ship" with [
-					rocket: self
-					menu: reshape [
+				rocket: rocket hint="Retro-styled racing space ship"
+					menu= reshape [
 						"Approve the course" #[true] (print "On our way") 
 						"Alter the course" #[false] (rocket/angle: random 360 invalidate rocket print "Adjusting...")
 						"Beam me up" "🔭" (print "Zweeee..^/- Welcome onboard!")
@@ -60,7 +59,6 @@ view/no-wait [
 							print pick ["Thrusters at maximum" "Keeping quiet"] rocket/burn?
 						)
 					]
-				]
 				wheel hint="Just a travelling cog"
 					menu=[[radial]
 						"A" (print "A chosen")
