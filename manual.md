@@ -337,7 +337,7 @@ Timer handlers should be prepared to handle huge delays, possible when device la
 Delay bias is accumulated internally and event system automatically makes delayed timers fire more often until bias is zeroed (possible up to 50-55 fps, after which Windows' native timers can't keep up anymore). This is done to best achieve a desired framerate, regardless of whether handler handles the `delay` in any way.
 
 
-### Previewes and finalizers
+### Previewers and finalizers
 
 Event handlers are divided into 3 stacks (called in this order obviously):
 - previewers (e.g. to focus a space on clicks, and still process the click)

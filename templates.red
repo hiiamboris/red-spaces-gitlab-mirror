@@ -543,7 +543,8 @@ scrollable-space: context [
 		]
 		space/space-on-change word :old :new
 	]
-		
+	
+	;@@ TODO: maybe make triangles *shared* for more juice? they always have the same size.. but this may limit styling
 	templates/scrollable: make-template 'space [
 		; cache?: off
 		;@@ make limits a block to save some RAM?

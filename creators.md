@@ -21,24 +21,26 @@ Everything else is an implementation detail, with the aim of making programmer's
 
 ## Space
 
-Draw-based widget are called *spaces* because they are (separate) coordinate spaces that know how to draw itself.
+Draw-based widgets are called *spaces* because they are (separate) coordinate spaces that know how to draw themselves.
 
 Minimal space:
 ```
-size: none! or pair!
-draw: func [] -> block!
+object [
+	size: none! or pair!
+	draw: func [] -> block!
+]
 ```
 Nothing else! `draw` tells how to render this space. `size` tells outside observers how big the render was.
 
 To make spaces more lightweight, optimal **definition model** looks like this:
 ```
-my-space-context [									;) context for functions shared by all spaces of this type
+my-space-context: context [							;) context for functions shared by all spaces of this type
 	~: self											;) shortcut for the wrapping context
 	my-fun: function [space [object!] ...] [		;) functions should accept space instance
 		...lots of code...
 	]
 
-	spaces/templates/my-space: make-space/block 'space [
+	spaces/templates/my-space: make-template 'space [
 		my-fun: function [...] [
 			~/my-fun self ...						;) in-space function should delegate it's task to the shared function
 		]
@@ -49,14 +51,14 @@ This way, every instance of `my-space` carries only short dispatching code rathe
 
 Building a space on top of another is done like this:
 ```
-new-space-context [
+new-space-context: context [
 	~: self											;) another shortcut - only affects new functions
 	my-fun: function [space [object!] ...] [		;) another big task solver
 		...lots of code...
 	]
 
 	spaces/templates/new-space:
-		make-space/block 'my-space [				;) extends previously defined 'my-space' type
+		make-template 'my-space [					;) extends previously defined 'my-space' type
 			my-space-my-fun: :my-fun				;) old `my-fun` can be saved by prefixing it with a prototype name `my-space-`
 			my-fun: function [...] [
 				~/myfun self ...
@@ -66,32 +68,52 @@ new-space-context [
 ]
 ```
 
-`my-space-context` and `new-space-context` names are not necessary: contexts can be anonymous. But functions from named contexts can be used by respective event handlers.
+`my-space-context` and `new-space-context` names are not necessary: contexts can be anonymous. But functions from named contexts can be used by respective event handlers or when debugging.
 
 Instantiation of space type is done using [`make-space` function](reference.md#make-space).
 
 Spaces can be created and rendered freely, but to properly use them and apply styles one needs a `host` face. It is based on the [`base` View widget](https://w.red-lang.org/en/view/#base), and provides event dispatching, styling and visual updates.
 
-How to use `host` face is explained in [`quickstart`](quickstart.md). It should be rendered as `host/draw: render host` if out of order update is required, otherwise it takes care of updating itself on *next timer event* after one of the space event handlers called `update` command.
+How to use `host` face is explained in [`quickstart`](quickstart.md). 
+
+### Rendering
+
+Is done by calling `render` function: `draw-commands: render 'some-space`.
+
+`render` accepts either:
+- a space name (word!)
+- a face object!
+
+`render` internally calls:
+- space's style function if style is a function, not a block (style function should call `draw` then)
+- space's `draw` function otherwise 
+
+Space's `draw` function must:
+- return a block of draw commands to visualize that space
+- set space's /size facet to a `pair!` value, unless space is infinite
+- set space's /map facet if space contains other spaces ([map syntax described below](#map)); for that it must `render` those spaces, resulting in a tree of `render` calls
+
+Host face is rendered as `host/draw: render host` if out of order update is required, otherwise it takes care of redrawing itself on *next timer event*.
+
+Space's redraw is the most expensive operation, so it is only done when necessary. Necessity is signalled by setting face's `/dirty?` facet to true. Usually it is done either by `update` command available to event handlers, or by `invalidate` function that gets called when an imporant facet of a space is changed.
+
+Internally a cache of rendered blocks is kept for each canvas size. When such (still valid) block is available, `render` grabs and returns it and sets `/size` and `/map` facets to cached values corresponding to that canvas. Consequently, both map and draw block should be created anew by the `draw` call, and cannot be modified in place.
+
+`draw` may support the following refinements (if it does, it's style function must also support these and pass through):
+- `/only xy1 [pair! none!] xy2 [pair! none!]` if it makes sense to draw only an area (xy1..xy2) of it. E.g. spaces that are likely to occur inside a `scrollable` (list, grid) support it. Infinite spaces *must* support it, because one cannot draw an infinite space wholly.
+- `/on canvas [pair! none!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Canvas model is scheduled for a change though.
 
 ### Size
 
-2 strategies are used (sometimes by the same space, e.g. [`image`](reference.md#image)):
-- `size` is defined (fixed), `draw` adapts space's appearance to `size` (e.g. [`scrollable`](reference.md#scrollable)).
-- `size` is determined by content, and `draw` sets it *after each frame*  (e.g. [`list`](reference.md#list)). Before the 1st call to `draw`, `size` can be `none`.
+[comment]: # (describe canvas once it's ready)  
 
-Automatic sizing strategy is not implemented yet, but will only affect the fixed sizes.
+Some spaces have a fixed size (e.g. `rectangle`'s size is controlled by the owner).\
+Most other spaces however set their own size, adapting it to the given `canvas` size within range allowed by `limits` facet.\
+`canvas` is best understood as the amount of free space inside the parent.
 
-<details>
-	<summary>
-How does hittest work if `size` is volatile and may even depend on time itself?
-</summary>
+`size` can be `none` before the first call to `draw` or for infinite spaces.
 
-<br>
-`size` for the last rendered frame determines the geometry for all pointer events land. New frame - new geometry. Layout can be moving, rotating, distorting, but what one sees is what one interacts with.
-
-</details>
-
+Since `size` is set by `draw`, it is quite volatile and represents *space's size on the last rendered frame in a given canvas*. New frame - new size. Moreover, often to render a single frame, a series of canvas sizes is given to the `draw` before the optimal final size is found. Layout can be moving, resizing, rotating, distorting, but between two frames size is a constant.
 
 ## Umbrella namespace
 
@@ -106,7 +128,10 @@ SPACES is a map! with the following words and values:
      layouts    object!       [list tube list-layout-ctx tube-layout-ctx]
      keyboard   object!       [focusable focus history valid-path? last-v.
 ```
-`spaces/ctx` contains every function and context defined, and it is the context under which all spaces code operates internally. By binding your code to it you get access to all the features.
+`spaces/ctx` contains every function and context defined, and it is the context under which all spaces code operates internally. By binding your code to it you get access to all the features:
+```
+do with spaces/ctx [...code...] 
+```
 
 For convenience, a few names are duplicated from `spaces/ctx` into `spaces` map: `events`, `templates`, etc.
 
@@ -138,13 +163,18 @@ There is no `parent` facet. <i>Same</i> space object can be shared between vario
 A tree nonetheless exists:
 - root for spaces is the `host` face
 - each space's children are listed in the `map`
+- internal cache holds the parent references, for `invalidate` to affect them, and as an optimization for timers
 
 Event handlers receive a path on this tree, so child spaces handlers can access their parents.
+
+A space can only be shared if:
+- it's `size` and `map` are fixed and do not depend on the canvas (otherwise a render somewhere else on another canvas invalidates these set by render in a previous place); an example of that would be some avatar icon
+- it's non-interactive, has no map, and no one cares if it's size becomes invalid after it's rendered; example: `stretch` space that paints nothing
 
 </details>
 
 
-### into
+### `into`
 
 Function that is used in hittesting only.
 
@@ -155,7 +185,7 @@ Function that is used in hittesting only.
 
 This allows for rotation, compression, reflection, anything. Can we make a "mirror" space that reflects another space along some axis? Easily.
 
-`into` is not required for hittesting, it just makes it possible to use all these transformations on events. If all inner spaces are just boxes, `map` should be defined instead.
+`into` is not required for hittesting, it just makes it possible to use all these transformations on events. If all inner spaces are just boxes, `map` should be defined instead. Where `into` is also useful is in infinite spaces like `grid-view`.
 
 <details>
 	<summary>
@@ -170,7 +200,7 @@ Geometries in such `map` are ignored and can be absent or contain invalid/dummy/
 
 </details>
 
-### map
+### `map`
 
 Is a block that tells which inner face occupies which region (offset & size) of this space.\
 Order: first items get precedence in case of overlap. So `map` can be thought of a reverse Z-order: topmost child appears first in the map.
@@ -189,7 +219,7 @@ Examples of that are `list` and `grid` styles that can contain hundreds of `item
 
 </details>
 
-`map/child/size <> child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates.
+`map/child/size <> child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates. E.g. parent may scale it's child.
 
 ### Names
 
@@ -211,13 +241,13 @@ Why <code>(get name) = object</code> rather than <code>object [name: ..]</code>?
 </summary>
 
 - dumping particular spaces tree: if you've ever tried `?? my-face` you know it is a bad idea that will force you to kill the console; spaces however are always fully inspectable
-- it makes inspectable style and event paths, which is helpful when debugging
+- it makes style and event paths also inspectable, which is very helpful when debugging
 - simpler listing of the tree of spaces (otherwise all those words would have to be created anew every time a tree is listed)
 - to test and evaluate an approach different to the one taken in View
 
 Drawbacks:
 - have to call `get` an extra round sometimes. But other way would have to `select .. 'name`, so no big deal.
-- to fetch a deep subspace for inspection (e.g. `probe host/space/list/item`), such path has to be preprocessed.
+- to fetch a deep subspace for inspection (e.g. `probe host/space/list/item`), such path has to be preprocessed (done automatically by Spaces Console - `red console.red`).
 
 I'm not totally against the alternative though, if more benefits will be discovered.
 
@@ -226,59 +256,63 @@ I'm not totally against the alternative though, if more benefits will be discove
 
 ## Styles
 
-Styles may influence or replace the Draw code used to render any space. See [`quickstart`](quickstart.md#styling) about how to write styles.
+Spaces should include facets that affect their appearance, e.g. `margin` or `font`, and provide reasonable defaults. Those defaults may then be overridden in styles. It's not a necessity, but practicality: it's easy to modify space's facets, but if margin and font were hardcoded in the styling function, modifying it would require it's replacement.
 
-Spaces should include facets that affect their appearance, e.g. `margin` or `font`, and provide reasonable defaults. Those defaults may then be overridden in styles.
+Visual features that are not meant to be changed between different instances of a space template, should be hardcoded into the template style. See [the manual](manual.md#styling) on style definition.
 
-Each space must have a `draw` function (or inherit it), that defines it's look as generally as possible.\
-A higher level `render` function applies styles and calls `draw`, so `draw` should not concern itself with styles.
+Template styles should not include any logic unrelated to visual appearance, as they should be easy to replace.
+
+For simpler usage in VID/S, a VID/S style should be defined as well. It's done by extending the `spaces/VID/styles` map:
 ```
-USAGE:
-     RENDER space
-
-DESCRIPTION: 
-     Return Draw code to draw a space or host face, after applying styles. 
-     RENDER is a function! value.
-
-ARGUMENTS:
-     space        [word! object!] "Space name, or host face as object."
-
-REFINEMENTS:
-     /only        => Limit rendering area to [XY1,XY2] if space supports it.
-        xy1          [pair! none!] 
-        xy2          [pair! none!] 
+extend spaces/VID/styles [
+	my-style-name [										;) VID/S style name
+		template: template-name							;) name of the template used to create space with
+		spec:     [.. default init code ..]				;) spec is used as in: `make-space 'template-name spec`
+		facets: [
+			some-datatype!  some-facet-name				;) data of this type will be auto-assigned to this facet
+			other-datatype! some-function-value			;) data of this type will be passed as argument to given function
+			flag-name       [.. code to evaluate ..]	;) code will be evaluated if flag is met in VID/S
+		]
+		layout:   name-of-the-custom-layout-function	;) use this only if you want to extend layout syntax beyond the default
+	]
+]
 ```
-
-Style functions (defined using [free syntax](quickstart.md#free-syntax)) should call `draw` and not `render`, because at that moment style is already applied.
-
-Everywhere else `draw` should not be called directly (if only for debugging), and `render` should be used instead. Even `draw` function of composite spaces should call `render` for it's children, as otherwise child styles won't be applied.
-
-If `draw` supports `/only xy1 xy2` refinement to draw only a selected region, it should not take `only` value into account. Instead it should check if `xy1` and `xy2` are `none` or not. `none` means "unspecified" and implies rendering of the whole space area.
+Comments above basically summarize the whole syntax of it. A few remarks:
+- `facets` block is what makes it more user friendly, so use it
+- to put function values into this block, use `compose/deep` or [`reshape`](https://codeberg.org/hiiamboris/red-common/src/branch/master/reshape.md)
+- `spec` is good to alter hardcoded defaults
+- `layout` should usually be omitted
+  - if provided, it's spec should be `func [block [block!] /styles sheet [map! none!]]`
+  - it should process the block and return a block of *code* to be used to build it's `content` pane
+  - code will be bound to the space and evaluated after it's construction
+  - `sheet` carries currently accumulated VID/S styles and should be passed to `lay-out-vids` to create panes of inner spaces
 
 
 ## Events
 
-Events handling makes space interactive. See [`quickstart`](quickstart.md#defining-behavior) about how to write event handlers. Space should include all necessary levers inside, and event handlers used only to operate these levers and be kept short and clean.
+Events handlers provide interactivity to a space template. See [the manual](manual.md#defining-behavior) about how to write event handlers. Space should include all necessary levers inside, and event handlers used only to operate these levers and be kept short and clean.
 
-Key concepts:
+Key takeaways:
 - same event and handler names [as in View](https://w.red-lang.org/en/view/#events)
 - `function` constructor is used to prevent set-words leakage
 - handlers are function lists, not single functions
-- receive path on the tree (see [`quickstart`](quickstart.md#path-in-the-tree))
+- receive path on the tree
 - path is relative to the space for which the handler is defined
 - previewers and finalizers for fine event flow control
-- two-dimensional event handler lookup order (see [`quickstart`](quickstart.md#event-lookup-order))
+- two-dimensional event handler lookup order (see [the manual](manual.md#handler-lookup-and-event-propagation))
+- event handlers (for the whole template) are not actors (that belong to an individual space), handlers are written by widget designer, actors - by widget user
 
 
 
 ### Function lists
 
-*Faces:* single actor works on top of magic done in R/S or by the OS. It cannot override this magic and render the widget useless.\
-*Spaces:* all magic is done by default event handlers, so they should not be overridden.
+Unlike faces, where all the magic of how widget works is done in R/S or by the OS, handlers have to implement the magic manually.\
+If this magic was overridden, widget would become rather useless.\
+So in Spaces, *handlers are function lists*: each handler entry given to `define-handler` function adds a new function to the list.
 
-Every space/event combo is associated with a function list: default handler -> extension handler -> user handler... Handlers of extending spaces do not override handlers of spaces they are based on.
+List *is associated with a path*, e.g. `menu/list/clickable` or just `button`.
 
-This list is evaluated sequentially from the first defined handler to the last one.
+List handlers are evaluated from the *oldest to the newest* (or default handler -> extension handler -> user handler).
 
 Individual handlers in this list cannot be blocked by `stop` command, only the whole list at once. So if original event handler receives an event, then all of it's extensions do too.
 
@@ -286,60 +320,65 @@ Individual handlers in this list cannot be blocked by `stop` command, only the w
 
 ### Previewers and finalizers
 
-[`Quickstart`](quickstart.md#previewes-and-finalizers) explains the basics and how to write one.
+[Manual](manual.md#previewers-and-finalizers) explains the basics and how to write one.
 
 Key concepts:
 - use masks to select events to respond to
 - cannot be blocked via `stop` command
 - can generate new events (see [event generation](#event-generation))
 - evaluated in order from the first defined to the last defined
+- same as normal handlers, these are called hierarchically, e.g. for path `menu/list/clickable` there will be 3 global handler calls: `menu/list/clickable`, `list/clickable` and `clickable` (if they are defined)
+  - handler may use `head? path` test if it doesn't need to be evaluated for child spaces (e.g. right-click on a menu-enabled space only wants to find the innermost `menu` facet, and should not show multiple menus if there's more than one) 
+
 
 
 ### Event generation
 
-`events/dispatch` is the function that receives View events and decides how to handle them.
+`spaces/events/dispatch` is the function that receives View events and decides how to handle them.
 
-<details>
-	<summary>
-`events/process-event` is the function that can be called to pass emulated events into event handlers.
-</summary>
+`spaces/events/process-event` is the function that can be called to pass emulated events into event handlers.
 
 ```
->> ? events/process-event
+>> ? spaces/events/process-event
 USAGE:
-     EVENTS/PROCESS-EVENT path event focused?
+     PROCESS-EVENT path event args focused?
 
 DESCRIPTION: 
      Process the EVENT calling all respective event handlers. 
-     EVENTS/PROCESS-EVENT is a function! value.
+     PROCESS-EVENT is a function! value.
 
 ARGUMENTS:
      path         [block!] "Path on the space tree to lookup handlers in."
-     event        [event!] "View event."
+     event        [event! object!] "View event or simulated."
+     args         [block!] "Extra arguments to the event handler."
      focused?     [logic!] {Skip parents and go right into the innermost space.}
 ```
-However this design is still in question (the `focused?` part). On one hand it helps omit the extra check in key event handlers: `unless single? path [pass exit]` would mostly be needed for parent handlers to pass down events meant for it's *focused* child. On another hand, now parents can't stop or inspect the event.
+- `path` you usually get in the previewer/finalizer; just pass it further
+- `event` you get from View, in the same previewer/finalizer
+- `args` are only used right now to pass `delay` to timers, and should be an empty block everywhere else
+- `focused?` is true for keyboard and focus/unfocus events: only focused spaces should receive these, not their parents
 
-</details>
 
 ## Focus & Tabbing
 
-Focus allows to direct keyboard events (`key key-down key-up enter`) into a particular "focused" space.
+Focus allows to direct keyboard events (`key key-down key-up enter`) into a particular "focused" space. Tabbing cycles focus between spaces when Tab key is pressed.
 
-`spaces/keyboard/focus` holds the currently focused space. Focused space can be changed via:
+`spaces/keyboard/focus` holds the currently focused space's path. Focused space can be changed via:
 - calling `focus-space` function directly (it accepts a tree path)
 - clicking (`down mid-down alt-down aux-down dbl-click`) on a point that intersects with a *focusable* space
 - [tabbing (module)](tabbing.red)
 
-Focused space is a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus).
+[comment]: # (TODO: a more user-friendly focusing way is needed since path isn't always available, sometimes only the space object)  
 
-Focusable space types are listed in `spaces/keyboard/focusable` block (new types can be added there at will).
+Focused space is a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus) and attempt to focus next or previous space will start from last valid focused path.
 
-Only *visible* spaces can be focused by tabbing or clicking, i.e. they must be present in the `map`s of their parents. `focus-space` doesn't have this limitation. If tabbing into a space outside of viewport is desired, spaces near the edge of the viewport should be put into the `map`.
+Focusable space types are listed in `spaces/keyboard/focusable` block (new types can be added there at will, simply as words).
+
+Only *rendered* spaces can be focused by tabbing or `focus-space`, and clicking can only focus *visible* ones. Spaces must be present in the `map`s of their parents. Map may or may not include spaces outside the scrollable's viewport, it's implementation-dependent. If tabbing into a space outside of the viewport is desired, spaces near the edge of it should be put into the `map`.
 
 <details>
 	<summary>
-<i>Tabbing order</i> is the order of the tree, i.e. defined by `map` order (in turn may be defined by `items` order in case of `list` space, etc.). `list-spaces` function can be used to visualize it.
+<i>Tabbing order</i> is the order of the tree, i.e. defined by `map` order (in turn may be defined by `content` order in case of `list` space, etc.). `list-spaces` and `dump-tree` functions can be used to visualize it.
 	</summary>
 
 <br>
@@ -361,11 +400,11 @@ list
 
 </details>
 
-Example code with a new focusable space:
+Example code with a new *focusable* space:
 ```
-#include %red-spaces/everything.red
+#include %spaces/everything.red
 
-spaces/templates/my-space: make-space/block 'space [
+spaces/templates/my-space: make-template 'space [
 	size: 50x50
 	draw: [box 1x1 49x49]
 ]

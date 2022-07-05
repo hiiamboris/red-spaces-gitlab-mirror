@@ -119,6 +119,7 @@ generative planet atlas to demo full-featured table widget; galaxy name hash use
 lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
 debug-draw should become a fully-featured layout explorer to help users understand the anatomy of their layouts
 	and it should move the main window to the left
+make tree-view widget a case study (document the whole process) ?
 
 
 key aspects: draggable columns, rearrange by styles (and styling DSL?)

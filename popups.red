@@ -284,7 +284,7 @@ context [
 		]
 	]
 
-	;; searches the path for a defined field (lowest one wins)
+	;; searches the path for a defined field (lowest/innermost one wins)
 	find-field: function [path [block!] name [word!] types [datatype! typeset!]] [
 		path: tail path
 		type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types

@@ -180,7 +180,6 @@ events: context [
 	;--         ...                               
 	;--     ]                                     
 	;-- ]                                         
-	;@@ TODO: doc this DSL
 	define-handlers: function [
 		"Define event handlers for any number of spaces"
 		def [block!] "[name: [on-event [space path event] [...]] ...]"
