@@ -157,8 +157,10 @@ map: [
 
 <details>
 	<summary>
-There is no `parent` facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
+There is no <code>parent</code> facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
 	</summary>
+
+<br>
 
 A tree nonetheless exists:
 - root for spaces is the `host` face
@@ -189,10 +191,11 @@ This allows for rotation, compression, reflection, anything. Can we make a "mirr
 
 <details>
 	<summary>
-`into` does not provide tree iteration capability (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then `map` should also be provided.
+<code>into</code> does not provide tree iteration capability (e.g. for tabbing). If iteration is needed (e.g. inner spaces are focusable), then <code>map</code> should also be provided.
 </summary>
 
 <br>
+
 Geometries in such `map` are ignored and can be absent or contain invalid/dummy/empty values, e.g.:
 - `[inner-space [] ...]` (no offset or size)
 - `[inner-space [offset 0x0 size 0x0] ...]` (dummy geometry)
