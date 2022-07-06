@@ -393,7 +393,7 @@ events: context [
 		"Process the EVENT calling all respective event handlers"
 		path  [block!] "Path on the space tree to lookup handlers in"
 		event [event! object!] "View event or simulated"
-		args  [block!]
+		args  [block!] "Extra arguments to the event handler"
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][
 		#debug profile [prof/manual/start 'process-event]
