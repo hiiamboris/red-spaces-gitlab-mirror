@@ -244,6 +244,8 @@ Why a name is needed?
 Why <code>(get name) = object</code> rather than <code>object [name: ..]</code>?
 </summary>
 
+<br>
+
 - dumping particular spaces tree: if you've ever tried `?? my-face` you know it is a bad idea that will force you to kill the console; spaces however are always fully inspectable
 - it makes style and event paths also inspectable, which is very helpful when debugging
 - simpler listing of the tree of spaces (otherwise all those words would have to be created anew every time a tree is listed)
@@ -382,10 +384,11 @@ Only *rendered* spaces can be focused by tabbing or `focus-space`, and clicking 
 
 <details>
 	<summary>
-<i>Tabbing order</i> is the order of the tree, i.e. defined by `map` order (in turn may be defined by `content` order in case of `list` space, etc.). `list-spaces` and `dump-tree` functions can be used to visualize it.
+<i>Tabbing order</i> is the order of the tree, i.e. defined by <code>map</code> order (in turn may be defined by <code>content</code> order in case of <code>list</code> space, etc.). <code>list-spaces</code> and <code>dump-tree</code> functions can be used to visualize it.
 	</summary>
 
 <br>
+
 Space tree has 2 dimensions: outer/inner (depth-wise) and previous/next (sibling nodes).\
 Forward order (Tab key) is defined as *outer->inner and previous->next*, e.g.:
 ```
