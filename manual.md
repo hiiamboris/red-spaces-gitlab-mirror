@@ -147,6 +147,7 @@ Unfortunately compose expressions become ugly, and I will most likely revise thi
 	</summary>
 	
 <br>
+
 There are 3 **steps**:
 
 1. Block is bound to the space object and *composed*.
@@ -163,7 +164,7 @@ There are 3 **steps**:
 
 <details>
 	<summary>
-		Animated style example: drunken scrollbars used in some of [the tests](tests/README.md)
+		Animated style example: drunken scrollbars used in some of <a href=tests/README.md>the tests</a>
 	</summary>
 
 ```
@@ -294,6 +295,7 @@ Path received by the handler is relative to the space that defined it. E.g. for 
 	</summary>
 
 <br>
+
 Snippet from `scrollable` that uses `item` and `subitem` to refer to it's children targeted by the pointer:
 ```
 scrollable: [
@@ -423,6 +425,7 @@ A set of commands is available to each event handler, implementing the idea of [
 	</summary>
 
 <br>
+
 - `stop?: false` is set before calling previewers. Previewers can use `stop` command to stop the event from reaching normal event handlers
 - `stop?: true` is set before entering *every* normal event handler, which may call `pass` to pass it further. If it does not, event won't be passed to other normal handlers
 - finalizers may inspect `stop?` state to only react to events (e.g. keys - tabbing module only reacts to Tab presses not processed in other handlers)
@@ -438,6 +441,7 @@ A set of commands is available to each event handler, implementing the idea of [
 	</summary>
 
 <br>
+
 E.g. if hittest returns `[list-view 210x392 hscroll 210x8 thumb 196x8]`, and we reduce that to `list-view/hscroll/thumb` then the order would be:
 ```
 list-view
@@ -464,6 +468,7 @@ Path along the spaces tree comes:
 	</summary>
 
 <br>
+
 E.g. if event is defined for `list-view/hscroll/thumb`, `thumb` space that receives it will be able to access `hscroll` as `path/-1` and `list-view` as `path/-2` and never worry that it might have been used inside another space. Another way to do that is define events for `list-view` and inspect if `path/2 = 'hscroll` and `path/3 = 'thumb`. The choice is a matter of convenience.
 
 </details>

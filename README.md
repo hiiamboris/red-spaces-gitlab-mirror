@@ -19,7 +19,7 @@ Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https
 
 Spiral Field demo reuses the normal rectangular `field` space (that contains all the keyboard logic and everything) by transforming hittest coordinates in a spiral way. Rendering logic of course had to be rewritten because such complex transformations are far beyond Draw capabilities. That's why it's a bit laggy: it renders each character individually.
 
-Table demo demonstrates how events are handled naturally even on a rotated layout.
+Grid-view demo demonstrates how events are handled naturally even on a rotated and distorted layout.
 
 Infinite List's trick is that when items vary in height, it's hard to provide uniform scrolling (naive desings would scroll at item granularity) and at the same time make it respond in real time to user actions.
 

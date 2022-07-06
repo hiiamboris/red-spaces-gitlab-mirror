@@ -898,9 +898,6 @@ why drawn block should be copied:
 	which is probably a good idea, because in the lack of apply, render wastes a lot of time
 	this will also enable render to have more than one cache, but.. how to invalidate?
 	/cache? = yes / /cache? = 'invalid ?
-	TODO: such caching should also be invalidated when style changes
-	TODO: doc this, maybe make `invalidate` func?
-	TODO: styles are no longer able to invalidate cache, but they should!
 global caching is trickier than I thought 
 	since a lot of spaces are composite - from `cell` & `scrollable` to `tube` to `grid-view` etc
 	they cannot be directly cached as they never know if their `content` is changed

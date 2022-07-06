@@ -68,8 +68,25 @@ All [supported space *templates*](reference.md) can be used in VID/S, but withou
 
 VID/S is handled by `lay-out-vids` function which takes a VID/S block and returns a block of space names (each name refers to space object). Example:
 ```
->> lay-out-vids [text "foo" vlist [] button "bar"]
+>> names: lay-out-vids [text "foo" vlist [] button "bar"]
 == [text list button]
+
+>> ? :names/1
+TEXT is an object! with the following words and values:
+     on-change*       function!     [word [any-word!] old [any-type!] new [...
+     draw             function!     [/on canvas [pair! none!]]
+     size             none!         none
+     limits           none!         none
+     cache?           logic!        true
+     text             string!       "foo"
+     margin           pair!         0x0
+     font             none!         none
+     flags            block!        length: 0  []
+     weight           integer!      0
+     layouts          map!          []
+     layout           none!         none
+     invalidate       function!     []
+     space-on-change  function!     [word [any-word!] old [any-type!] new [...
 ```
 Upon `host` initialization, this list is rendered into Draw code.
 
@@ -91,7 +108,7 @@ Syntax: `<bound-name>: <style-name> <modifiers...>`
   - styles predefined by VID/S (see `? spaces/VID/styles` output)
   - raw template names (see `? spaces/templates` output), but these do not support [auto-facets](#auto-facets)
 - `bound-name` is a set-word that will refer to the created space object, and it makes the space reactive
-- `modifiers` is an optional set of any number of parameters described [below](#supported-modifiers)
+- `modifiers` is an optional *unordered* set of any number of parameters described [below](#supported-modifiers)
 
 Example:
 ```
@@ -122,7 +139,7 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-definition.png)
 
-| **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in Quick Start manual](quickstart.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
+| **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in the manual](manual.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
 |-|-|
 
 #### Do expression
@@ -140,7 +157,7 @@ Examples:
 
 ### Pane definition
 
-Styles that don't use block as a facet will get it processed by `lay-out-vids` and assigned to their `content` facet (which contains inner spaces). 
+Styles that don't use block value for an auto-facet will get it processed by `lay-out-vids` and assigned to their `content` facet (which contains inner spaces). 
 
 Only some spaces support it:
 - `cell` and `box` may only contain a single space
