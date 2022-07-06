@@ -438,3 +438,45 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-grid-extensions.png)
 
+## Menu DSL
+
+*Read this only if you want popup menus.*
+
+Only single-level popup menus are supported currently.
+
+Menus are specified in the `menu` facet (`menu= [...]` in VID/S). Any space can have it. Triggered by right-click (so they require a pointing device to work).
+
+Menu specification is a block: `[opt any flag  any menu-item]`
+
+It starts with optional flags. Currently supported are:
+- `radial` - uses [`ring` layout](reference.md#ring) to arrange menu items, instead of the default [`vlist`](reference.md#list)
+- `round` - considers menu items round, not rectangular; only has effect together with `radial` flag
+
+**Each menu item** is one or more values to display, followed by a `paren!` with code to evaluate when this item is chosen:\
+`data data ... (code)`
+
+Item data can contain: `char!`, `string!`, `logic!` and `image!` values, as well as `word!`s referring to spaces. It is laid out using [`row` layout](reference.md#row). When aligning separator (`stretch` aka `<->`) is missing in the row, one is automatically added after first textual space, so rows like `"Find..." "Ctrl+F"` become `"Find..." <-> "Ctrl+F"` and get aligned properly (name to the left, key to the right).
+
+Example from [`popups-test.red`](tests/popups-test.red):
+```
+menu: reshape [
+	;) note usage of logic values for sigils:
+	"Approve the course" #[true] (print "On our way")
+	"Alter the course" #[false] (
+		rocket/angle: random 360
+		invalidate rocket
+		print "Adjusting..."
+	)
+	
+	;) note that sigil will be right-aligned because `<->` will be inserted after first string:
+	"Beam me up" "🔭" (print "Zweeee..^/- Welcome onboard!")
+	
+	;) note how `switch` space is created by `reshape` and inserted as word into the item block:
+	"Thrusters overload" !(anonymize 'switch r-switch: make-space 'switch [state: on]) (
+		r-switch/state: rocket/burn?: not rocket/burn?
+		print pick ["Thrusters at maximum" "Keeping quiet"] rocket/burn?
+	)
+]
+```
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-menu.png)
+
