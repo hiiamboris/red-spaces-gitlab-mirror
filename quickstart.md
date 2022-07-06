@@ -28,8 +28,8 @@ Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only automated bu
 
 Spaces depend on the helpful functions & macros from [mezz warehouse](https://codeberg.org/hiiamboris/red-common). So, in your favorite directory, run:
 ```
-git clone https://gitlab.com/hiiamboris/red-common common
-git clone https://gitlab.com/hiiamboris/red-spaces spaces
+git clone https://codeberg.org/hiiamboris/red-common common
+git clone https://codeberg.org/hiiamboris/red-spaces spaces
 ```
 
 <details>
