@@ -455,7 +455,30 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-grid-extensions.png)
 
-## Menu DSL
+## Popups
+
+### Hints
+
+[comment]: # (this is completely irrelevant to VID/S but I don't have a better place to put it)
+
+Every space can have a hint (tooltip) shown when it's hovered over.
+
+To have a hint it should define it's `/hint` facet to a string.
+
+Example:
+```
+view [host [
+	row [
+		button "OK"     hint= "Destroy all files on my HDD"
+		button "Cancel" hint= "I prefer to have my files kept"
+	]
+]]
+```
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-hints.gif)
+
+**Warning:** tablet users won't see it! Mind your audience.
+
+### Menu DSL
 
 *Read this only if you want popup menus.*
 

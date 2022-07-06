@@ -1039,5 +1039,3 @@ Default `data` just acts as a wrapper around `source`, picking from it and retur
 
 [comment]: # (not sure icon template is worth documenting / making available by default, we'll see)
 
-MENUS!!!
-HINTS!!!
