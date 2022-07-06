@@ -291,9 +291,7 @@ Path received by the handler is relative to the space that defined it. E.g. for 
 
 <details>
 	<summary>
-	
-	Parent handler can also know that interaction is made with one of it's children. E.g. `scrollable` space's handlers know if interaction is made with a scroller's thumb or one of the arrows...
-	
+	Parent handler can also know that interaction is made with one of it's children. E.g. <code>scrollable</code> space's handlers know if interaction is made with a scroller's thumb or one of the arrows...
 	</summary>
 
 <br>
@@ -351,7 +349,7 @@ Event handlers are divided into 3 stacks (called in this order obviously):
 Previewers and finalizers help modularize the event system. E.g. [tabbing](tabbing.red), [hovering](hovering.red), [single click event emulation](single-click.red) are separate files that are added on top of the core event system and are not required for it's operation.
 
 <details>
-	<summary>`register-previewer` and `register-finalizer` functions add global handlers...</summary>
+	<summary><code>register-previewer</code> and <code>register-finalizer</code> functions add global handlers...</summary>
 
 ```
 >> ? register-previewer
@@ -423,7 +421,7 @@ A set of commands is available to each event handler, implementing the idea of [
 
 <details>
 	<summary>
-		`stop?` pipeline deserves special mention
+		<code>stop?</code> pipeline deserves special mention
 	</summary>
 
 <br>
@@ -466,7 +464,7 @@ Path along the spaces tree comes:
 
 <details>
 	<summary>
-		Define events *for paths* to ensure hierarchy.
+		Define events <em>for paths</em> to ensure hierarchy.
 	</summary>
 
 <br>
@@ -482,7 +480,7 @@ Previewers however can use the `stop` command to stop the event from reaching al
 
 <details>
 	<summary>
-Current API (not yet mature enough) - `start-drag`, `stop-drag`, `dragging?`, `drag-offset`, `drag-parameter`, `drag-path`
+Current API (not yet mature enough) - <code>start-drag</code>, <code>stop-drag</code>, <code>dragging?</code>, <code>drag-offset</code>, <code>drag-parameter</code>, <code>drag-path</code>
 </summary>
 
 ```
