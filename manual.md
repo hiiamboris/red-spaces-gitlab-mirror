@@ -235,9 +235,7 @@ When it makes sense to draw only a portion of a space (e.g. it's big or infinite
 
 ## Defining behavior
 
-[VID/S actors](vids.md#actor-definition) can be used to tune each single space separately.
-
-This chapter describes general event handlers that are applied to whole templates.
+This chapter describes general event handlers that are applied to whole templates. [VID/S actors](vids.md#actor-definition) can be used to tune each single space separately.
 
 Why write an event handler:
 - non-standard or extended behavior for standard templates
@@ -293,7 +291,9 @@ Path received by the handler is relative to the space that defined it. E.g. for 
 
 <details>
 	<summary>
+	
 	Parent handler can also know that interaction is made with one of it's children. E.g. `scrollable` space's handlers know if interaction is made with a scroller's thumb or one of the arrows...
+	
 	</summary>
 
 <br>
