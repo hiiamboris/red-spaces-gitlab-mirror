@@ -214,10 +214,11 @@ Map is only good for rectangular geometry (which is the majority of use cases an
 
 <details>
 	<summary>
-Names in the `map` may repeat (by spelling), but each should refer to a unique object.
+Names in the <code>map</code> may repeat (by spelling), but each should refer to a unique object.
 	</summary>
 
 <br>
+
 Examples of that are `list` and `grid` styles that can contain hundreds of `item` or `cell` occurrences in their `map`. Each `item`/`cell` is styled using the same style, and shares same event handlers, but objects (`get item`/`get cell`) are not the same.
 
 </details>
