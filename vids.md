@@ -463,7 +463,7 @@ view [host [
 
 Every space can have a hint (tooltip) shown when it's hovered over.
 
-To have a hint it should define it's `/hint` facet to a string.
+To have a hint it should set it's `/hint` facet to a string.
 
 Example:
 ```
