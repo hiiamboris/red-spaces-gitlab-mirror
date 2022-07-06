@@ -14,7 +14,7 @@ A few terms for less confusion:
 
 ## Space creation
 
-### Anonymize
+### `anonymize`
 
 A core concept in spaces is that each space object must be named. Name is what makes it possible to look up styles and choose proper event handlers, because there is no other connection between styles/events and the space object.
 
@@ -151,7 +151,7 @@ All examples of code in this reference (except those above, which are more expli
 
 ## Common facets
 
-In contrast to REBOL & Red's `face!` object that always includes every possible facet, `space` is minimalistic and includes only those facets that each widget requires. And those usually vary, but some have **reserved** meaning:
+In contrast to REBOL & Red's `face!` object that always includes every possible facet, `space` is minimalistic and includes only those facets that each widget requires. And those usually vary, but some have **reserved** meaning (cannot be used for anything else):
 
 | Facet | Type | Description |
 |-|-|-|
@@ -908,6 +908,7 @@ Expand to see all supported axes/align combinations.
   </summary>
 
 <br>
+
 Generated using [`tube-test.red`](tests/tube-test.red):
 
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/tube-axes-alignments-showcase.png)
@@ -996,8 +997,10 @@ An [`inf-scrollable`](#inf-scrollable) wrapper around [`grid`](#grid), used to d
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [any [xy []]]<br>]</pre><br>Tip: `data` returns `[]` as size, so both `size/x` and `size/y` yield `none` (infinite in both directions) |
 |-|-|
 
-Inherited all of [`inf-scrollable`](#inf-scrollable) facets:
+Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 
+| facet  | type | description |
+|-|-|-|
 | `origin` | pair! | offset of unpinned cells (mirrors `grid/origin`), together with `window/origin` can be used to translate coordinates into `grid`'s coordinate system |
 | `hscroll` | scroller space object! | horizontal scrollbar; can be styled as `grid-view/hscroll` |
 | `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
