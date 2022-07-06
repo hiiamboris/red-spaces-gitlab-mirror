@@ -108,6 +108,8 @@ After the scope, a block with style descriptor should follow, which can be:
 		How style lookup works...
 	</summary>
 
+<br>
+
 Lookup order is "specific-to-generic". E.g. for path = `host/list-view/list/item/paragraph` the order will be:
 ```
 host/list-view/list/item/paragraph
