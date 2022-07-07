@@ -425,3 +425,55 @@ view [host focus [my-space]]
 ```
 Press Tab or click on the box space to focus it. Then it will print every key pressed.
 
+## Debugging
+
+### Assertions 
+
+Usually the first thing to do when something unexplicable happens is to ensure assertions are turned on. In [`everything.red`](everything.red) after inclusion of `assert.red` the `off` line should be commented out:
+```
+#include %../common/assert.red
+; #assert off
+```
+Assertions may slow down Spaces operation by up to 30%, but are useful to contain the error.
+
+Then:
+- divert the output of your program to a file, e.g. `red myscript.red |tee log` or `red myscript.red >log`
+- run the script until the error occurs
+- inspect the `log` file: usually the *first* failed assertion is the cause of misbehavior
+
+Assertions are assumptions about how my code works. They can often fail if something is misused though. E.g. you assign a string to `/draw` facet, or an object to `/content` facet, or trying to measure the size of an infinite grid. In time, when design solidifies, most of that should become error messages, but we're not there yet.
+
+### Debug output
+
+Is very helpful in nailing down the issue. E.g. Red tells you that `none` is unexpected in a Draw block. How do you know which one it is? You turn `draw` debugging and it will tell you in the log. 
+
+In [`everything.red`](everything.red) there's a whole bunch of commented out debug directives:
+```
+; #debug on											;-- general (unspecialized) debug logs
+; #debug set draw									;-- turn on to see what space produces draw errors
+; #debug set profile								;-- turn on to see rendering and other times
+; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
+; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
+; #debug set focus									;-- turn on to see focus changes and errors
+; #debug set events									;-- turn on to see what events get dispatched by hosts
+; #debug set styles									;-- turn on to see which styles get applied
+```
+Uncomment relevant item, run your script and see if there's a clue in the log.
+
+For `profile` output, add `prof/show` before exit or at the point where you want the output. `prof/reset` can be used to reset stats. E.g. load during initialization can be different from load during usage, so it makes sense to call `prof/show prof/reset` after the `view/no-wait` call to see initialization phase, then `prof/show` after `do-events` loop quits to see the usage phase. It also makes sense sometimes to do `prof/show prof/reset` every one or few seconds in `on-time` actor, to have smaller profiling slices.
+
+`debug-draw` command can be used to bring up GUI where you can inspect the spaces tree and look of each space in the tree.
+
+### Inspecting your data
+
+Biggest issue with this comes from spaces using words for links to other spaces, not objects. So usual `space-a/space-b/space-c` approach doesn't work.
+
+Spaces console (that is run by `run.bat` or `red console.red`) automatically converts such paths to those understood by Red, so give it a try. But it may create other issues, as it's not a bug-free hack. In normal Red console, after including `everything.red`, same effect can be achieved with `do fix-paths [..code..]`. Also Red [`get` bugs](https://github.com/red/red/issues/4988) may make the experience much worse that it should be.
+
+Inspect data at the point in the code where it's relevant. In event handlers, styles, etc. `??~` is a variant of `??` that does not expand objects, to keep the output small. `probe~` is a variants of `probe` with the same behavior. Data will be auto formatted by `probe~` using `prettify` function, which helps with unformatted/generated block data, but sometimes messes formatted data a bit.
+
+`dorc` (short for `do read-clipboard`) command can be used to evaluate code from the clipboard without messing up console's history. I use it a lot.
+
+### Test your widgets in [VID/S Polygon](programs/vids-polygon.red)
+
+Put them into containers, e.g. into a `row` inside a `column`, and see how they work with automatic sizing. Try resizing the window.
