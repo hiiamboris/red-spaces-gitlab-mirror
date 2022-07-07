@@ -118,6 +118,9 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-instantiation.png)
 
+Important quote from [Quickstart](quickstart.md):
+> **Standard [VID](https://doc.red-lang.org/en/vid.html) starts after `view [` and is used to describe faces layout. After `host [` VID ends and specialized [VID/S](#layout-dsl) begins.**
+
 | **TIP** | Examples in this document can be run:<ul><li>in a separate script (after including `everything.red`)<li>directly in Spaces console (started by `run.bat` or equivalent `red console.red` shell command)<li>using [VID/S Polygon](programs/vids-polygon.red) - an evolving tool for testing various layouts, minimalistic for now but still quite handy (in this case, omit the `view [host []]` part!) and is a great way to get a feel how sizing works</ul> |
 |-|-|
 
