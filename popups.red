@@ -7,28 +7,11 @@ Red [
 
 ;; requires events, templates, vid, reshape
 
-;@@ for tooltips:
-;@@ ideally I want a stick pointing to the original pointer offset: it will make hints clearer on what they refer to
-;@@ but long as face itself cannot be transparent, nothing can visually stick out of it, so no luck - see REP #40
-
 ;@@ menu command should be able to access the space that opened the menu! - bind it!
-
-{	;@@ document this
-	Menu DSL - unlike View's default:
-	
-	menu: a block! [any menu-item]
-	menu-item: [layout opt hotkey action]
-	layout:    [string! | block!]
-		string is interpreted simply as text,
-		while block may include other data as accepted by data-view
-	hotkey:    [issue!] e.g. #Ctrl+O
-	action:    [code | menu] (block is a submenu in this case)
-	code:      [paren!]
-}
 
 templates/hint: make-template 'box [margin: 20x10 origin: 0x0]
 
-;@@ use a single stack maybe? not sure if View will handle cross-window face transfer though
+;@@ use a single stack for all windows maybe? not sure if View will handle cross-window face transfer though
 popup-registry: make hash! 2
 
 has-flag?: function [
