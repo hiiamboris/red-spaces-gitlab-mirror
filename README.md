@@ -15,9 +15,6 @@ Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https
 |  **Infinite list of items *of varying size*** | **Self-containing grid** |
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-infinite-list.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-self-containing-grid.gif) |
 
-| [MORE DEMOS IN /TESTS](tests/) |
-| :-: |
-
 Spiral Field demo reuses the normal rectangular `field` space (that contains all the keyboard logic and everything) by transforming hittest coordinates in a spiral way. Rendering logic of course had to be rewritten because such complex transformations are far beyond Draw capabilities. That's why it's a bit laggy: it renders each character individually.
 
 Grid-view demo demonstrates how events are handled naturally even on a rotated and distorted layout.
@@ -25,6 +22,9 @@ Grid-view demo demonstrates how events are handled naturally even on a rotated a
 Infinite List's trick is that when items vary in height, it's hard to provide uniform scrolling (naive desings would scroll at item granularity) and at the same time make it respond in real time to user actions.
 
 Self-containing grid shows that there are no limitations: every space can contain any other space, or even itself (but then one has to manually limit the rendering depth or stack will overflow ☻).
+
+| [MORE DEMOS IN /TESTS](tests/) |
+| :-: |
 
 ## Docs
 
