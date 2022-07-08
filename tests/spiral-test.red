@@ -72,7 +72,7 @@ spaces/templates/spiral: make-template 'space [
 			cycles: bgn/x / 2 / pi / rmid
 			scale: decay ** cycles
 			box: []
-			if all [i - 1 = field/caret/index] [
+			if all [i - 1 = field/caret/offset] [
 				box: compose [box (p) (p + as-pair field/caret/width full/y)]
 			]
 			compose/deep/into [
