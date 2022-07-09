@@ -117,24 +117,24 @@ Since `size` is set by `draw`, it is quite volatile and represents *space's size
 
 Is an argument to `draw` function of spaces and to their style function, which is passed if these functions support `/on canvas [pair! none!]` refinement. To properly handle resizing one must understand how to interpret it.
 
-`canvas` is best understood as the amount of free space inside the parent. Colored `box` space can be used to visualize it, as it tries to fill all of it.
+`canvas` is best understood as the *amount of free space inside the parent*. Colored `box` space can be used to visualize it, as it tries to fill all of it.
 
 It's a bit more complicated though, as required for proper handling of flow layouts (`paragraph`, `tube`). Each axis of the canvas can have the following values:
 
 | Value | Meaning | Example |
 |-|-|-|
 | < 0 | Size of available area that should be filled if possible | `-300x-200` means area size of `300x200` should be filled |
-| = 0 | Intent is to minimize space along given axis | text rendered on `0x200` canvas would put 1 char per line |
-| 0 < canvas < infxinf/x | Size of available area should be used to limit the space but should not be filled | text rendered on `200x0` canvas would wrap itself at 200 pixels and start a new line |
-| = infxinf/x | Size is infinite: space should not wrap itself along this axis, but should otherwise minimize itself, because infinity cannot be filled | text rendered on `infxinf` canvas will always render as a single line |
+| = 0 | Intent is to minimize space along given axis | text rendered on `0x200` canvas should put 1 char per line |
+| 0 < canvas < infxinf/x | Size of available area should be used to limit the space but should not be filled | text or tube rendered on `200x0` canvas should wrap itself at 200 pixels and start a new line, but should not extend to fill the width `200` |
+| = infxinf/x | Size is infinite: space should not wrap itself along this axis, but should otherwise minimize itself, because infinity cannot be filled | text rendered on `infxinf` canvas should always render as a single line |
 
 Notes:
 - `infxinf` is a special `pair!` value exported by Spaces and is used to represent virtual infinity. Equals `2e9 by 2e9`
 - `canvas` can be `none`, in which case it has the same meaning as `infxinf`
 
-To simplify working with canvas, following functions exist in `spaces/ctx` context:
+To simplify working with canvas, following *functions* exist in `spaces/ctx` context:
 - `decode-canvas canvas [pair!]` returns a block `[abs-canvas [pair!] fill-flags [pair!]]`:
-  - `abs-canvas` contains the positive value of area size
+  - `abs-canvas` contains the positive value of area size; it's useful for calculations - min, max, subtraction, etc
   - `fill-flags` is a pair -1x-1 to 1x1, where value of `1` means that axis should be filled, `0` or `-1` mean that it should not
 - `encode-canvas abs-canvas [pair!] fill-flags [pair!]` is the reverse: it turns positive area size value into an encoded possibly-infinite canvas size
 - `subtract-canvas abs-canvas [pair!] value [pair!]` is used to subtract margins mostly. It's like normal subtraction, but:
