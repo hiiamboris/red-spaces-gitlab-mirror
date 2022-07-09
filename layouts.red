@@ -26,7 +26,7 @@ layouts: context [
 		;;   axis             [word!]   x or y
 		;;   margin       [integer! pair!]   >= 0x0			;@@ these should support integers!
 		;;   spacing      [integer! pair!]   >= 0x0
-		;;   canvas        [pair! none!]   > 0x0
+		;;   canvas        [pair! none!]
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
 		;;   viewport         [pair!]   only matters if any cache-* is true, >= 0x0
@@ -56,17 +56,20 @@ layouts: context [
 				axis     [word!       (find [x y] axis)]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
-				canvas   [none! pair! (0x0 +<= canvas)]
+				canvas   [none! pair!]
 				limits   [none! object! (all [in limits 'min in limits 'max])]
 				origin   [none! pair!]
 				viewport [none! pair! (0x0 +<= viewport)]
 				cache    [none! word! (find [all invisible] cache)]
 			]]
 			default origin: 0x0
-			default canvas: infxinf						;-- none to pair normalization
+			default canvas: infxinf
+			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
+			set [canvas: fill:] decode-canvas canvas
 			margin: margin * 1x1						;-- integer to pair normalization
 			; canvas: constrain canvas limits
 			x: ortho y: axis
+			fill/:x: 1									;-- always fills along it's secondary axis
 			guide: axis2pair y
 			pos: pos': origin + margin
 			draw?: case [
@@ -80,14 +83,13 @@ layouts: context [
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: extend-canvas subtract-canvas canvas 2 * margin axis
-			; canvas1: canvas2: (subtract-canvas canvas 2 * margin) * reverse guide
+			canvas1: canvas2: subtract-canvas canvas 2 * margin
 			
 			map: make [] 2 * count
 			size: 0x0
 			repeat i count [							;-- first render cycle
 				space: get name: either func? [spaces/pick i][spaces/:i]
-				if any draw? [drawn: render/on name canvas1]
+				if any draw? [drawn: render/on name encode-canvas canvas1 fill]
 				#assert [space/size +< (1e7 by 1e7)]
 				compose/only/deep/into [(name) [offset (pos) size (space/size) drawn (drawn)]] tail map
 				pos:   pos + (space/size + spacing * guide)
@@ -99,11 +101,11 @@ layouts: context [
 			;; do contract if X is infinite
 			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]		;-- `size` already has margin subtracted
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
-			if canvas2 <> canvas1 [						;-- second render cycle - only if canvas changed
+			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
 					space: get name: either func? [spaces/pick i][spaces/:i]
-					if any draw? [drawn: render/on name canvas2]
+					if any draw? [drawn: render/on name encode-canvas canvas2 fill]
 					#assert [space/size +< (1e7 by 1e7)]
 					geom:  pick map 2 * i
 					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
@@ -128,7 +130,7 @@ layouts: context [
 		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing       [integer! pair!]   >= 0x0
-		;;   canvas         [none! pair!]   > 0x0 or none=inf (width determined by widest item)
+		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
 		;;   limits        [none! object!]
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
@@ -159,11 +161,13 @@ layouts: context [
 				)]]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
-				canvas   [none! pair! (0x0 +<= canvas)]
+				canvas   [none! pair!]
 				limits   [none! object! (all [in limits 'min in limits 'max])]
 			]]
-			default axes:  [e s]
-			default align: -1x-1
+			default axes:   [e s]
+			default align:  -1x-1
+			default canvas: infxinf						;-- none to pair normalization
+			set [canvas: fill:] decode-canvas canvas
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
 			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
@@ -198,7 +202,6 @@ layouts: context [
 			info: obtain block! count * 5
 			#leaving [stash info]
 			
-			default canvas: infxinf						;-- none to pair normalization
 			;; clipped canvas - used for allowed width / height fitting
 			ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			; stripe: (subtract-canvas canvas 2 * margin) * oy
@@ -206,8 +209,7 @@ layouts: context [
 			;; along Y canvas becomes infinite, later expanded to fill the row
 			;@@ should it always be 0xinf maybe?
 			; stripe: round/to subtract-canvas canvas 2 * margin infxinf * ox		;@@ #5151
-			stripe: infxinf
-			if canvas/:x < infxinf/x [stripe/:x: 0]
+			stripe: reverse? encode-canvas  0 by ccanvas/:y  0x-1	;-- fill is not used for 1st render
 			; stripe: subtract-canvas canvas 2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
@@ -215,7 +217,8 @@ layouts: context [
 			
 			repeat i count [
 				space: get name: either func? [spaces/pick i][spaces/:i]
-				drawn: render/on name stripe			;-- 1st render needed to obtain min *real* space/size, which may be > limits/max
+				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
+				drawn: render/on name stripe
 				weight: any [select space 'weight 0]
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
@@ -237,16 +240,13 @@ layouts: context [
 			
 			;; split info into rows according to found min widths
 			;; rows coordinate system is always [x=e y=s] for simplicity; results are later normalized
-			rows: obtain block! 40
+			rows: obtain block! 30
 			row:  obtain block! count * 5
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
-			allowed-row-width: either all [ccanvas ccanvas/:x < infxinf/x] [	;-- how wide rows to allow (splitting margin)
-				ccanvas/:x
-			][
-				infxinf/x
-			]
+			allowed-row-width: ccanvas/:x				;-- how wide rows to allow (splitting margin)
 			peak-row-width: 0							;-- used to determine full layout size when canvas is not limited
 			total-length:   0							;-- used to extend row heights to fill finite canvas
+			row-weight:     0							;-- later used to expand rows with >0 peak weight
 			foreach [name space drawn available weight] info [
 				new-row-size: as-pair					;-- add item-size and check if it hangs over
 					row-size/x + space/size/:x + spacing/:x
@@ -255,20 +255,22 @@ layouts: context [
 					new-row-size/x <= allowed-row-width
 					tail? row
 				][										;-- accept new width
-					row-size: new-row-size
+					row-size:   new-row-size
+					row-weight: max row-weight weight
 				][										;-- else move this item to next row
 					append (new-row: obtain block! length? row) row
-					repend rows [row-size new-row]
+					repend rows [row-size row-weight new-row]
 					clear row
 					row-size: reverse? space/size
+					row-weight: weight
 					total-length: total-length + row-size/y
 				]
 				peak-row-width: max peak-row-width row-size/x
 				repend row [name space drawn available weight]
 			]
-			repend rows [row-size row]
+			repend rows [row-size row-weight row]
 			total-length: total-length + row-size/y
-			#leaving [foreach [_ row] rows [stash row]  stash rows]
+			#leaving [foreach [_ _ row] rows [stash row]  stash rows]
 			
 			;; expand row items - facilitates a second render cycle of the row
 			;; this collects row heights (canvas/:y is still infinite)
@@ -276,9 +278,9 @@ layouts: context [
 				peak-row-width: 0						;-- will have to recalculate it during expansion
 				total-length:   0
 				forall rows [							;@@ use for-each
-					set [row-size: row:] rows
+					set [row-size: row-weight: row:] rows
 					free: allowed-row-width - row-size/x
-					if free > 0 [						;-- any space left to distribute?
+					if all [row-weight > 0 free > 0] [	;-- any space left to distribute?
 						;; free space distribution mechanism relies on continuous resizing!
 						;; render itself doesn't have to occupy max-size or the size we allocate to it
 						;; and since we don't know what render is up to,
@@ -298,15 +300,9 @@ layouts: context [
 						repeat i length? extensions [	;@@ use for-each
 							set [name: space:] item: skip row i - 1 * 5
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
-								desired-size: reverse? space/size/:x + extensions/:i by infxinf/y
-								item/3: render/on name desired-size
-								;; special case: item renders bigger than canvas - try to fit it
-								;; happens e.g. when long text is inside a column
-								;@@ this is a temporary kludge FIXME with design!!
-								if space/size/:y > ccanvas/:y [
-									desired-size/:y: ccanvas/:y
-									item/3: render/on name desired-size
-								]
+								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
+								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
+								item/3: render/on name encode-canvas desired-size reverse? 1x-1
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -316,34 +312,35 @@ layouts: context [
 					]
 					peak-row-width: max peak-row-width row-size/x
 					total-length: total-length + row-size/y
-					rows: next rows
+					rows: skip rows 2
 				]
 			]
 			
 			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
 			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
-			nrows: half length? rows
+			nrows: (length? rows) / 3
 			total-length: total-length + (nrows - 1 * spacing/:y)
 			free: ccanvas/:y - total-length
 			if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
-				share: free / nrows
-				extra: 0.0								;-- rounding error compensation
-				forall rows [							;@@ use for-each
-					extra: share - share': round/to share + extra 1
-					rows/1/y: rows/1/y + share'
-					rows: next rows
+				weights: extract/into next rows 3 clear []	;@@ use map-each
+				extras:  append/dup clear [] free nrows
+				shares:  distribute free weights extras
+				repeat i nrows [						;@@ use for-each
+					i3: i - 1 * 3 + 1
+					rows/:i3/y: rows/:i3/y + shares/:i
 				]
 				total-length: ccanvas/:y
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
 			;@@ maybe it should affect (contract) row widths?
-			foreach [row-size row] rows [
+			foreach [row-size row-weight row] rows [
 				repeat i (length? row) / 5 [			;@@ use for-each
 					set [name: space:] item: skip row i - 1 * 5
 					;; always re-renders items, because they were painted on an infinite canvas
 					;; finite canvas will most likely bring about different outcome
-					item/3: render/on name reverse? space/size/:x by row-size/y
+					desired-size: reverse? space/size/:x by row-size/y
+					item/3: render/on name encode-canvas desired-size 1x1
 				]
 			]
 			
@@ -354,7 +351,7 @@ layouts: context [
 			row-shift:    align/1 + 1 / 2
 			in-row-shift: align/2 + 1 / 2
 			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
-			foreach [row-size row] rows [
+			foreach [row-size _ row] rows [
 				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
 				foreach [name space drawn _ _] row [
 					ofs/:y: to integer! row-size/y - space/size/:y * in-row-shift + row-y

@@ -120,8 +120,10 @@ generic: construct to [] make map! reduce [				;-- holds commonly used spaces ;@
 ;; empty stretching space used for alignment (static version and template)
 templates/stretch: put templates '<-> make-template 'space [	;@@ affected by #5137
 	weight: 1
-	draw: func [/on canvas [pair! none!]] [
-		size: finite-canvas canvas 0x0 []
+	draw: function [/on canvas [pair! none!]] [
+		set [canvas: fill:] decode-canvas canvas
+		self/size: constrain (finite-canvas canvas) * max 0x0 fill limits
+		[]
 	]
 ]
 generic/stretch: set in generic '<-> make-space 'stretch []
@@ -187,6 +189,7 @@ image-ctx: context [
 	draw: function [image [object!] canvas [pair! none!]] [
 		either image? image/data [
 			default canvas: infxinf
+			set [canvas: _:] decode-canvas canvas		;-- image does not respect fill flag; scale is more important
 			mrg:       image/margin * 1x1 
 			limits:    image/limits
 			isize:     image/data/size
@@ -246,13 +249,16 @@ cell-ctx: context [
 	draw: function [space [object!] canvas [pair! none!]] [
 		#assert [space/content]
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
+		default canvas: infxinf
+		set [canvas: fill:] decode-canvas canvas
 		mrg2:   2x2 * space/margin
-		drawn:  render/on space/content subtract-canvas canvas mrg2
+		drawn:  render/on space/content encode-canvas (subtract-canvas canvas mrg2) fill
 		cspace: get space/content
 		size:   mrg2 + cspace/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
-		size:   max size finite-canvas canvas
+		size:   max size (finite-canvas canvas) * fill	;-- only extends along fill-enabled axes
 		maybe space/size: constrain size space/limits
+		; #print "size: (size) space/size: (space/size) fill: (fill)"
 		
 		free:   space/size - cspace/size - mrg2
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
@@ -449,6 +455,7 @@ scrollable-space: context [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		default canvas: infxinf
+		set [canvas: fill:] decode-canvas canvas
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
 		maybe space/size: box: constrain finite-canvas canvas space/limits
 		if zero? area? box [
@@ -467,7 +474,7 @@ scrollable-space: context [
 		cdraw: render/only/on space/content		
 			max 0x0 0x0 - origin
 			box - origin
-			ccanvas
+			encode-canvas ccanvas -1x-1					;-- scrollable never uses fill flag for content
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
@@ -479,7 +486,6 @@ scrollable-space: context [
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
-		full: max 1x1 max box - origin csz + (max 0x0 origin)
 		clip-p1: max 0x0 p1
 		loop 2 [										;-- each scrollbar affects another's visibility
 			clip-p2: min box p2
@@ -487,6 +493,9 @@ scrollable-space: context [
 			if hdraw?: shown/x < 100 [box/y: space/size/y - space/hscroll/size/y]
 			if vdraw?: shown/y < 100 [box/x: space/size/x - space/vscroll/size/x]
 		]
+		space/hscroll/size/x: hx: either hdraw? [box/x][0]
+		space/vscroll/size/y: vy: either vdraw? [box/y][0]
+		full: max 1x1 max box - origin - (hx by vy) csz + (max 0x0 origin)
 		
 		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
 		;; (else may stack up to 99% of all rendering time)
@@ -496,8 +505,6 @@ scrollable-space: context [
 		quietly space/vscroll/amount: min 100% - ofs 100% * box/y / full/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
-		space/hscroll/size/x: either hdraw? [box/x][0]
-		space/vscroll/size/y: either vdraw? [box/y][0]
 		quietly space/map: compose/deep [				;@@ should be reshape (to remove scrollers) but it's too slow
 			(space/content) [offset: 0x0 size: (box)]
 			(in space 'hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
@@ -609,7 +616,7 @@ paragraph-ctx: context [
 		unless find space/flags 'wrap [canvas: infxinf]
 		layout:    space/layout
 		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
-		new-width: either canvas [canvas/x][infxinf/x]			;-- no canvas is treated as infinity
+		new-width: either canvas [abs canvas/x][infxinf/x]		;-- no canvas is treated as infinity
 		unless old-width = new-width [							;-- redraw if: some facet / canvas width changed
 			lay-out space new-width
 		]
@@ -904,7 +911,7 @@ switch-ctx: context [
 		; command: []
 		data: make-space 'data-view []					;-- general viewer to be able to use text/images
 		draw: func [/on canvas [none! pair!]] [
-			also data/draw/on canvas
+			also data/draw/on canvas					;-- draw avoids extra 'data-view' style in the tree
 			size: data/size
 		]
 		space-on-change: :on-change*
@@ -1226,9 +1233,10 @@ list-view-ctx: context [
 	locate-line: function [
 		"Turn a coordinate along main axis into item index and area type (item/space/margin)"
 		list   [object!]  "List object with items"
-		canvas [pair!]    "Canvas on which it is rendered"
+		canvas [pair!]    "Canvas on which it is rendered; positive!"
 		level  [integer!] "Offset in pixels from the 0 of main axis"
 	][
+		#assert [0x0 +<= canvas]						;-- shouldn't happen - other funcs must pass positive canvas here
 		x: list/axis
 		if level < list/margin/:x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
@@ -1256,7 +1264,7 @@ list-view-ctx: context [
 			;; - every time window gets scrolled closer to it's borders
 			;; so there's no easy way around requiring render here, and around having a canvas here
 			;; for the purpose of this function, last rendered canvas works, as well as window size
-			render/on name canvas
+			render/on name encode-canvas canvas 1x1		;-- uses fill on secondary axis
 			item: obj/size
 		]
 		;@@ should this func use layout or it will only complicate things?
@@ -1339,7 +1347,8 @@ list-view-ctx: context [
 		r
 	]
 	
-	available?: function [list [object!] canvas [pair!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+	available?: function [list [object!] canvas [pair!] "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+		#assert [0x0 +<= canvas]						;-- shouldn't happen
 		if axis <> list/axis [
 			return either dir < 0 [from][min requested canvas/:axis - from]
 		]
@@ -1356,6 +1365,7 @@ list-view-ctx: context [
 	;; it's also too general, while this `draw` can be optimized better
 	list-draw: function [list [object!] canvas [pair!] xy1 [pair!] xy2 [pair!]] [
 		axis: list/axis
+		#assert [0x0 +<= canvas]						;-- shouldn't happen; other funcs must pass positive canvas here
 		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		#assert [canvas +< infxinf]						;-- window is never infinite
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
@@ -1724,7 +1734,7 @@ grid-ctx: context [
 		#leaving [stash hmin]
 		append hmin any [grid/heights/min 0]
 		for x: 1 xlim [
-			canvas: as-pair grid/col-width? x infxinf/y
+			canvas: encode-canvas (as-pair grid/col-width? x infxinf/y) 1x1		;-- fill the cell
 			span: grid/get-span xy: as-pair x y
 			if span/x < 0 [continue]					;-- skip cells of negative x span (counted at span = 0 or more)
 			cell1: grid/get-first-cell xy
@@ -1820,10 +1830,10 @@ grid-ctx: context [
 			
 			mcspace: get mcname: grid/wrap-space mcell content-name
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
-			render/on mcname canvas						;-- render content to get it's size - in case it was invalidated
+			render/on mcname encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			invalidate-cache/only mcspace
-			mcdraw: render/on mcname mcsize				;-- re-render to draw the full background
+			mcdraw: render/on mcname encode-canvas mcsize 1x1	;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
 			repend map [mcname geom]					;-- map may contain the same space if it's both pinned & normal
@@ -1903,7 +1913,7 @@ grid-ctx: context [
 	;; this should not use hcache, or it will have to be cleared all the time
 	col-height?: function [grid [object!] col [integer!] width [integer!] rows [integer!]] [	;-- used by autofit only
 		r: 0
-		canvas: width by infxinf/y
+		canvas: encode-canvas width by infxinf/y 1x-1
 		repeat i rows [
 			xy: col by i
 			h: any [grid/heights/:i grid/heights/default]		;-- row may be fixed
@@ -2266,7 +2276,8 @@ button-ctx: context [
 	]
 	
 	templates/button: make-template 'clickable [		;-- styled with decor
-		margin: 10x5
+		weight:   0
+		margin:   10x5
 		rounding: 5										;-- box rounding radius in px
 	]
 ]
@@ -2532,20 +2543,20 @@ field-ctx: context [
 		drawn: field/text-draw/on infxinf				;-- this sets the size
 		txt-size: field/layout/extra
 		default canvas: infxinf
+		set [canvas: fill:] decode-canvas canvas
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
-		if canvas/x < infxinf/x [						;-- fill the provided canvas, even if text is larger
-			maybe field/size: constrain canvas/x by field/size/y field/limits
-		]
+		width: either fill/x = 1 [canvas/x][min txt-size/x canvas/x]	;-- fill the provided canvas, but clip if text is larger
+		maybe field/size: constrain width by field/size/y field/limits
 		co: field/caret/offset + 1
 		cxy1: caret-to-offset       field/layout co
 		cxy2: caret-to-offset/lower field/layout co
 		csize: field/caret/width by (cxy2/y - cxy1/y)
 		cmargin: field/caret/look-around
-		if canvas/x - (2 * cmargin) < txt-size/x [		;-- field width may be smaller/bigger than that of text
+		if field/size/x - (2 * cmargin) < txt-size/x [	;-- field width may be smaller/bigger than that of text
 			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
 			;; aim is: have caret always visible, ideally with a few chars of look-around
 			min-org: min 0 cmargin - cxy1/x
-			max-org: clip [min-org 0] canvas/x - cxy2/x - cmargin
+			max-org: clip [min-org 0] field/size/x - cxy2/x - cmargin
 			maybe field/origin: clip [min-org max-org] field/origin
 			#assert [field/layout]						;-- must not invalidate the layout
 			; print [min-org max-org field/origin]
@@ -2612,61 +2623,61 @@ field-ctx: context [
 	
 ]
 
-area-ctx: context [
-	~: self
+; area-ctx: context [
+	; ~: self
 	
-	draw: function [area [object!] canvas [pair! none!]] [
+	; draw: function [area [object!] canvas [pair! none!]] [
 		; #assert [pair? canvas]
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
 		; quietly area/size: canvas
-		size: finite-canvas canvas
-		maybe area/paragraph/width: if area/wrap? [size/x]
-		maybe area/paragraph/text:  area/text
+		; size: finite-canvas canvas
+		; maybe area/paragraph/width: if area/wrap? [size/x]
+		; maybe area/paragraph/text:  area/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
-		pdrawn: render/on in area 'paragraph size
-		maybe area/size: constrain max size area/paragraph/size area/limits
-		xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
-		xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
-		maybe area/caret/size: as-pair area/caret-width xy2/y - xy1/y
-		cdrawn: []
-		if area/active? [
-			cdrawn: compose/only [translate (xy1) (render in area 'caret)]
-		]
-		compose [(cdrawn) clip 0x0 (area/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
-	]
+		; pdrawn: render/on in area 'paragraph size
+		; maybe area/size: constrain max size area/paragraph/size area/limits
+		; xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
+		; xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
+		; maybe area/caret/size: as-pair area/caret-width xy2/y - xy1/y
+		; cdrawn: []
+		; if area/active? [
+			; cdrawn: compose/only [translate (xy1) (render in area 'caret)]
+		; ]
+		; compose [(cdrawn) clip 0x0 (area/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
+	; ]
 		
-	watched: make hash! [text selected caret-index caret-width wrap? active?]
-	on-change: function [area [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find watched word [area/invalidate]
-		area/scrollable-on-change word :old :new
-	]
+	; watched: make hash! [text selected caret-index caret-width wrap? active?]
+	; on-change: function [area [object!] word [any-word!] old [any-type!] new [any-type!]] [
+		; if find watched word [area/invalidate]
+		; area/scrollable-on-change word :old :new
+	; ]
 	
-	;@@ TODO: only area should be scrollable
-	templates/area: make-template 'scrollable [
-		text: ""
-		selected: none		;@@ TODO
-		caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
-		caret-width: 1		;-- in px
-		limits: 60x20 .. none
-		paragraph: make-space 'paragraph []
-		caret: make-space 'rectangle []		;-- caret has to be a separate space so it can be styled
-		content: 'paragraph
-		wrap?: no           ;@@ must be a flag
-		active?: no			;-- whether it should react to keyboard input or pass thru (set on click, Enter)
-		;@@ TODO: render caret only when focused
-		;@@ TODO: auto scrolling when caret is outside the viewport
-		invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
-			paragraph/layout: none
-			invalidate-cache paragraph
-		]
+	; ;@@ TODO: only area should be scrollable
+	; templates/area: make-template 'scrollable [
+		; text: ""
+		; selected: none		;@@ TODO
+		; caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
+		; caret-width: 1		;-- in px
+		; limits: 60x20 .. none
+		; paragraph: make-space 'paragraph []
+		; caret: make-space 'rectangle []		;-- caret has to be a separate space so it can be styled
+		; content: 'paragraph
+		; wrap?: no           ;@@ must be a flag
+		; active?: no			;-- whether it should react to keyboard input or pass thru (set on click, Enter)
+		; ;@@ TODO: render caret only when focused
+		; ;@@ TODO: auto scrolling when caret is outside the viewport
+		; invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
+			; paragraph/layout: none
+			; invalidate-cache paragraph
+		; ]
 	
-		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		; draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		
-		scrollable-on-change: :on-change*
-		#on-change-redirect
-	]
+		; scrollable-on-change: :on-change*
+		; #on-change-redirect
+	; ]
 	
-]
+; ]
 
 templates/fps-meter: make-template 'text [
 	cache?:    off

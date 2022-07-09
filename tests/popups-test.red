@@ -41,7 +41,7 @@ define-handlers [
 
 view/no-wait [
 	h: host [
-		v: vlist 100 .. 300 spacing= 10x5 [; hint="This is the host face"
+		v: vlist 300 spacing= 10x5 [; hint="This is the host face"
 			fps-meter
 			hl: row black [
 				text yello "Clickable URL:"

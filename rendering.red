@@ -335,15 +335,18 @@ context [
 		#assert [not is-face? :space]					;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 		#assert [
 			any [
-				none = canvas canvas +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
+				none = canvas (abs canvas) +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
 				also no #print "(name): canvas=(canvas)" 
 			] "Oversized canvas detected!"
 		]
 		#assert [
 			any [
-				none = canvas  0x0 +<= canvas
-				also no #print "(name): canvas=(canvas)" 
-			] "Negative canvas detected!"
+				none = canvas
+				all [
+					canvas/x <> negate infxinf/x
+					canvas/y <> negate infxinf/y
+				]
+			] "Negative infinity canvas detected!"
 		]
 
 		with-style name [

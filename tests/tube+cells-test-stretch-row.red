@@ -13,7 +13,7 @@ bigfont: make font! [size: 20]
 set-style 'heading function [self /on canvas [pair! none!]] [
 	self/font: bigfont
 	drawn: self/draw/on canvas
-	width: either canvas [canvas/x][self/size/x]
+	width: either canvas [abs canvas/x][self/size/x]
 	compose [
 		fill-pen (svmc/text + 0.0.0.200)
 		pen off box 0x0 (width by self/size/y)

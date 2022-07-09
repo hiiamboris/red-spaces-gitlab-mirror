@@ -140,6 +140,28 @@ clone: function [
 ]
 
 
+;-- chainable pair comparison - instead of `within?` monstrosity
+; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
+; == 4x4
+
+;; very hard to find a sigil for these ops
+;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
++<=: make op! func [
+	"Chainable pair comparison (non-strict)"
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b  b]
+]
++<:  make op! func [
+	"Chainable pair comparison (strict)"    
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b - 1  b]
+]
+;+>:  make op! func [a b] [a = max a b + 1]
+;+>=: make op! func [a b] [a = max a b]
+
+
 flush: function [
 	"Grab a copy of SERIES, clearing the original"
 	series [series!]
@@ -456,6 +478,92 @@ normalize-alignment: function [
 ]
 
 
+decode-canvas: function [
+	"Turn pair canvas into positive value and fill flags"
+	canvas [none! pair!] "can be none, negative or infinite (no fill), positive (fill)"
+][
+	reduce/into [
+		|canvas|: either canvas [abs canvas][canvas: infxinf]
+		fill: negate canvas / max 1x1 |canvas|			;-- 1 if fill=true, -1 if false, can be 0 (also false, but doesn't matter)
+	] clear []
+]
+
+#assert [
+	(reduce [infxinf -1x-1]) = decode-canvas none
+	[10x20 -1x-1] = decode-canvas  10x20
+	[10x20  1x1]  = decode-canvas -10x-20
+	[10x0  -1x0]  = decode-canvas  10x0
+]
+
+encode-canvas: function [
+	|canvas| [pair!] "Absolute canvas size"
+	fill     [pair!] "Fill mask (1 = true, 0 and -1 = false)"
+][
+	;; must ensure infinity always stays +infinity:
+	add |canvas| / infxinf * infxinf					;-- part for infinite coordinates
+		|canvas| % infxinf * negate fill				;-- part for finite coordinates
+]
+
+#localize [#assert [
+	reencode: func [b] [encode-canvas b/1 b/2]
+	infxinf = reencode decode-canvas  none
+	 10x20  = reencode decode-canvas  10x20
+	-10x-20 = reencode decode-canvas -10x-20
+	 10x0   = reencode decode-canvas  10x0
+	infxinf = encode-canvas infxinf 1x1					;-- must not become negative infinity
+	infxinf = encode-canvas infxinf 1x0					;-- must not become zero
+]]
+
+; normalize-canvas: function [
+	; "Make negative or none canvas into positive"
+	; canvas [none! pair!]
+; ][
+	; either canvas [abs canvas][infxinf]
+; ]
+
+; fill?: function [
+	; "Get fill flag from non-normalized canvas axis"
+	; canvas [pair!] axis [word!] "X or Y"
+; ][
+	; all [0 < canvas/:axis  canvas/:axis < infxinf/x]
+; ]
+
+; canvas-sign?: function [canvas [pair!]] [
+	; canvas / max 1x1 abs canvas
+; ]
+
+
+; decode-canvas: function [
+	; "Turn pair canvas into positive value and fill flags"
+	; canvas [none! pair!] "can be none, negative or infinite (no fill), positive (fill)"
+	; fill   [block!]      "output buffer for: [x logic y logic]; cleared"
+; ][
+	; also either canvas [abs canvas][canvas: infxinf]
+	; compose/into [
+		; ;; 2D fill flag: x>=0 and x<>inf -> 1; x<0 or x=inf -> 0
+		; x (0 < canvas/x and (canvas/x < infxinf/x))
+		; y (0 < canvas/y and (canvas/y < infxinf/y))
+	; ] clear fill
+; ]
+
+; decode-canvas1: function [canvas [none! pair!]] [
+	; reduce/into [
+		; either canvas [abs canvas][canvas: infxinf]
+		; ;; 2D fill flag: x>=0 and x<>inf -> 1; x<0 or x=inf -> 0
+		; as-pair
+			; any [all [0 < canvas/x canvas/x < infxinf/x 1] 0]
+			; any [all [0 < canvas/y canvas/y < infxinf/y 1] 0]
+		; ;; tricky but faster way (150% overall)
+		; (xy: max 0x0 canvas % infxinf) / max 1x1 xy
+	; ] clear []
+; ]
+
+; #assert [
+	; (reduce [infxinf 0x0]) = decode-canvas none
+	; [10x20 1x1] = decode-canvas 10x20
+	; [10x20 1x0] = decode-canvas 10x-20
+; ]
+
 finite-canvas: function [
 	"Turn infinite dimensions of CANVAS into zero"
 	canvas [pair! none!]
@@ -465,19 +573,20 @@ finite-canvas: function [
 
 #assert [0x20 = finite-canvas infxinf/x by 20]
 
-extend-canvas: function [canvas [pair! none!] axis [word!]] [
-	if canvas [canvas/:axis: infxinf/x  canvas]
+extend-canvas: function [canvas [pair!] axis [word!]] [
+	canvas/:axis: infxinf/x
+	canvas
 ]
 
 ;; useful to subtract margins, but only from finite dimensions
-subtract-canvas: function [canvas [pair! none!] pair [pair!]] [
-	if canvas [											;-- none = infxinf - nothing to subtract
-		mask: 1x1 - (canvas / infxinf)					;-- 0x0 (infinite) to 1x1 (finite)
-		max 0x0 canvas - (pair * mask)
-	]
+subtract-canvas: function [canvas [pair!] pair [pair!]] [
+	#assert [0x0 +<= canvas]
+	mask: 1x1 - (canvas / infxinf)						;-- 0x0 (infinite) to 1x1 (finite)
+	max 0x0 canvas - (pair * mask)
 ]
 
-#assert [(60 by infxinf/y) = subtract-canvas 100 by infxinf/y 40x30]
+#assert [( 60 by infxinf/y) = subtract-canvas  100 by infxinf/y 40x30]
+#assert [( 0  by infxinf/y) = subtract-canvas   20 by infxinf/y 40x30]
 
 
 ;-- debug func
@@ -545,27 +654,6 @@ rechange: function [
 	            -1x-1 = max -1x-1 b - a <=> B is in Q3 to A, axis-exclusive <=> A is in Q1 to B, axis-exclusive
 	a = min a b <=> b = max a b   
 }
-
-;-- chainable pair comparison - instead of `within?` monstrosity
-; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
-; == 4x4
-
-;; very hard to find a sigil for these ops
-;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
-+<=: make op! func [
-	"Chainable pair comparison (non-strict)"
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b  b]
-]
-+<:  make op! func [
-	"Chainable pair comparison (strict)"    
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b - 1  b]
-]
-;+>:  make op! func [a b] [a = max a b + 1]
-;+>=: make op! func [a b] [a = max a b]
 
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs

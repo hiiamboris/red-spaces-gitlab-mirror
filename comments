@@ -119,7 +119,9 @@ generative planet atlas to demo full-featured table widget; galaxy name hash use
 lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
 debug-draw should become a fully-featured layout explorer to help users understand the anatomy of their layouts
 	and it should move the main window to the left
-make tree-view widget a case study (document the whole process) ?
+make tree-view widget a widget creation case study (document the whole process) ?
+pekr's idea is to rename `host` to `spaces` in VID/S, and it's reasonable but.. has drawbacks too - need more consideration and input
+	dsunanda's vote: "A SPAN is a collection of SPACES held in one VID face"
 
 
 key aspects: draggable columns, rearrange by styles (and styling DSL?)
@@ -1118,6 +1120,7 @@ fast hittesting over grid - how?
 	nor scache worked for pinned-or-not cell identification, because grid/cell style has no access to grid!
 	as a result, pinned cells cannot have different size (only colors),
 	because grid-ctx/pinned? does not affect rendering from calc-height (and locate-line)
+	for the time being: using locate-point (until proven slow) 
 infinite canvas bores me to death already
 	main reason - I'm treating infinite dimensions somewhere as 0, somewhere as alias to limits/max, it's a mess
 	can I get rid of it? use only finite and 0?
@@ -1215,44 +1218,30 @@ even bigger one
 	Wx-H  - fill horizontally
 	-Wx-H - don't fill, just don't hang over
 	0 will still be used for minimization
-	+infinity will still be used for e.g. unconstrained text rendering inside horizontal list etc 
-	
+	+infinity will still be used for e.g. unconstrained text rendering inside horizontal list etc
+	that means, finite dimensions may not mean "fill" but they will always mean "clip" at that point, which for flow layouts makes sense
+	`none` will not be used explicitly, only when passing over from a function called without canvas
+	lack of /on or canvas=none will be normalized to infxinf to simplify every other canvas handling code
+	hmm encoding and decoding canvas all the time seems like quite an overhead
+	maybe pass it as two arguments?
+	or to hell with encoding, not need it, no need to pass fill flag?
+	dammit, canvas should be passed as it was, with fill flags
+	so best option then is to use test functions
+	shit math is too complicated, subtraction, taking maximum etc
+	better to have two arguments then: abs canvas and fill flags
+	if fill flags are a block, it has to be copied, so pair should be a better fit
+	encoding+decoding 2 pairs should be simple though
+	let negative values mean 'fill=true' then for simplicity (since infxinf is positive and doesn't fill)
+	most important point of introduction of canvas/fill split is to carry over info about outer canvases
+	e.g. spaces within a column within a row should not be bigger than the row,
+	and explicit rounding to zero/inf loses this info, so should be avoided when possible
+	list of course is infinite by design
+	so far encoding/decoding is fine.. nice properties of using negatives for fill and enabling fill = 0 and 1 for "no fill":
+	- can pass fill=1x1 and if canvas is zero, fill will be set to 0 too
+	- extend-canvas just works: no change needed
+	- render cache needs no change while canvas is a single value, negative and positive canvas leads to different cache hits
+	- encode-canvas is super easy operation
 
-VID Styles: must be documented TODO
-	specification:
-	
-	rule:              [any [style-definition | style-declaration]]
-	style-definition:  ['style new-name style-declaration]
-	new-name:          [set-word!]
-	style-declaration: [opt space-name style-name any modifier]
-	space-name:        [set-word!] - will be set to the instantiated space object
-	style-name:        [word!] - should not end in `=` (I will simply not define such style names)
-	
-	modifier:          [spec | reaction | action | facet | auto-facet | pane | size]
-	
-	spec:              ['with block!] - block is used to build space, before all other modifiers applied
-	
-	reaction:          ['react block!] - block is bound to space
-	
-	action:            [actor-name [block! | get-word! | get-path! | 'function block! block!]]
-	actor-name:        [word!] - should start in `on-`
-	                   unlike event handlers, this affects individual space only
-	                   
-	facet:             [facet-name expression]
-	facet-name:        [word!] - should end in `=`, e.g. text="abc"
-	expression:        anything do/next can swallow
-	
-	auto-facet:        [any-type!] - defined by /facets block in style spec, facet is assigned from it, no expressions
-	
-	pane:              [block!] - unless snatched by auto-facet, assigns /content and /item-list
-	                   cannot be handled by auto-facet because requires a layout effort
-	                   
-	size:              [size-component '.. size-component | size-component]
-	size-component:    [integer! | pair! | 'none | none! | word! | get-word! | paren!]
-	                   paren is evaluated; all can be snatched by auto-facet
-	                   also limits= any expression can be used ofc
-	(also rules I recently added to vid.red)
-	(also the quirks of current react kludge)	                   
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)

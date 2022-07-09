@@ -146,8 +146,8 @@ do with [
 			function [cell /on canvas] [
 				#assert [canvas]						;-- grid should provide finite canvas
 				drawn: cell/draw/on canvas
-				;; when cell content is not compressible, cell/size may be bigger than canvas
-				canvas: min canvas cell/size
+				;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
+				canvas: min abs canvas cell/size
 				color: any [
 					select cell 'color
 					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
