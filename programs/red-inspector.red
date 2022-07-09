@@ -209,6 +209,7 @@ context [
 			draw: function [/on canvas [pair! none!]] [
 				if layout [quietly layout/text: text]
 				drawn: text-draw/on canvas
+				set [canvas: fill:] spaces/ctx/decode-canvas canvas
 				if size/x > canvas/x [
 					len: split-text/chars layout canvas/x - ellipsis/size/x
 					append clear skip layout/text len "..." 
@@ -262,6 +263,7 @@ context [
 			default canvas: 0x0
 			widths: gview/grid/widths
 			image?: gview/type = 'image
+			set [canvas: fill:] spaces/ctx/decode-canvas canvas
 			if all [
 				canvas/x < infxinf/x
 				canvas/x <> attempt [gview/size/x]
@@ -281,7 +283,7 @@ context [
 					if canvas/y >= infxinf/y [canvas/y: shift-right 400 depth - 1]
 				]
 			]
-			drawn: gview/draw/on canvas
+			drawn: gview/draw/on spaces/ctx/encode-canvas canvas fill
 			if depth > 1 [
 				vsc: gview/vscroll/size
 				hsc: gview/hscroll/size
