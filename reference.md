@@ -915,6 +915,16 @@ Generated using [`tube-test.red`](tests/tube-test.red):
 
 </details>
 
+Tube is not some generalized equation solver. It's just a fast simple algorithm that does broadly the following:
+- render each item to obtain it's minimal size
+- split this long row into multiple rows so each row's width is no bigger than the given canvas width 
+- expand items in each row to fill row's width fully (if any item has weight > 0)
+- expand rows to fill the canvas height (if any row has item with weight > 0)
+- expand items in each row to fill row's height fully (so they can be aligned)
+
+This works fine with spaces like `box`, which just expand to the given size, and to an extent with other flow-like things. But some more complex spaces may not work well with it or it may be hard to predict the outcome.  
+
+
 ## Ring
 
 A `container` that arranges spaces using `ring` layout. Used by ring menu popup.
