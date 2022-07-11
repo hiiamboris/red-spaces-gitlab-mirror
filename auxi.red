@@ -327,7 +327,12 @@ enhance: function [
 
 
 ;-- `compose` readability helper variant 2
-when: func [test value] [only if :test [do :value]]
+; when: func [test value] [only if :test [do :value]]
+
+;-- `compose` readability helper variant 3
+when: func [test :value [paren! block!]] [
+	only if :test [either paren? :value [do :value][:value]]
+]
 
 range: func [a [integer!] b [integer!]] [
 	collect [while [a <= b] [keep a  a: a + 1]]

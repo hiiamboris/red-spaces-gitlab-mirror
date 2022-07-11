@@ -70,8 +70,8 @@ do with [
 		/margin mrg [pair!]
 	][
 		mrg:    any [mrg (system/words/round/ceiling/to 1x1 * line 2) / 2]
-		pen?:   when pen      [compose [pen      (pen)     ]]
-		fill?:  when fill-pen [compose [fill-pen (fill-pen)]]
+		pen?:   when pen      (compose [pen      (pen)     ])
+		fill?:  when fill-pen (compose [fill-pen (fill-pen)])
 		compose [
 			(pen?) (fill?)
 			line-width (line)
@@ -108,7 +108,7 @@ do with [
 		text paragraph link fps-meter [
 			default font: fonts/text
 			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
-			when select self 'color [[pen (color)]]
+			when select self 'color [pen (color)]
 		]
 
 		field [
@@ -180,7 +180,7 @@ do with [
 		switch [										;-- clickable
 			function [space] [
 				space/size: 16x16
-				cross?: when space/state [[line 3x3 13x13 line 13x3 3x13]]
+				cross?: when space/state [line 3x3 13x13 line 13x3 3x13]
 				frame: make-box space/size 1 none none
 				reduce [frame cross?]
 			]
@@ -201,7 +201,7 @@ do with [
 					fonts/sigil
 				] 
 			]
-			when select self 'color [[pen (color)]]
+			when select self 'color [pen (color)]
 		]
 		label/text-box/body/text    [font: fonts/label   []]
 		label/text-box/body/comment [font: fonts/comment []]
@@ -211,10 +211,10 @@ do with [
 				drawn:   btn/draw/on canvas
 				fill:    either btn/pushed? [svmc/text + 0.0.0.120]['off]
 				overlay: make-box/round btn/size 1 none fill btn/rounding
-				focus?:  when focused? [
+				focus?:  when focused? (
 					inner-radius: max 0 btn/rounding - 2
 					make-box/round/margin btn/size 1 checkered-pen 'off inner-radius 4x4
-				]
+				)
 				reduce [
 					; shadow 2x4 5 0 (green)			;@@ not working - see #4895; not portable (Windows only)
 					'push drawn
@@ -227,9 +227,9 @@ do with [
 		hscroll/thumb vscroll/thumb [
 			function [thumb] [
 				drawn: thumb/draw
-				focus?: when focused?/above 2 [
+				focus?: when focused?/above 2 (
 					make-box/margin thumb/size 1 checkered-pen none 4x3
-				]
+				)
 				reduce [drawn focus?]
 			]
 		]
@@ -244,10 +244,10 @@ do with [
 		]
 
 		menu/list/clickable [
-			when self =? :highlight [[
+			when self =? :highlight [
 				push [(make-box size 0 'off !(svmc/text + 0.0.0.220))]	;@@ render to get size?
 				pen !(enhance svmc/panel svmc/text 125%)
-			]]
+			]
 		]
 		
 		menu/ring/clickable [

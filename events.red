@@ -198,7 +198,7 @@ events: context [
 		]
 		add-style: function [name body /from base] [
 			append prefix name
-			#debug events [print ["Defining" mold as path! prefix when base ["from"] when base [base]]]
+			#debug events [print ["Defining" mold as path! prefix when base ("from") when base (base)]]
 			path: as path! prefix
 			map: either base [
 				copy-deep-map get as path! compose [handlers (to [] base)]
