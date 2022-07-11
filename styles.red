@@ -41,7 +41,7 @@ do with [
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
 	checkered-pen: reshape [							;-- used for focus indication
-		pen pattern 4x4 [
+		pattern 4x4 [
 			scale 0.5 0.5 pen off
 			fill-pen !(svmc/text)  box 0x0  8x8
 			fill-pen !(svmc/panel) box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
@@ -60,6 +60,24 @@ do with [
 	;-- very experimental `either` shortener: value |y true-result |n false-result
 	; |y: make op! func [a b] [either :a [:b][:a]]
 	; |n: make op! func [a b] [either :a [:a][:b]]
+	
+	make-box: function [
+		size [pair!]
+		line [integer!]
+		pen [word! tuple! block! none!]
+		fill-pen [word! tuple! none!]
+		/round radius [integer!]
+		/margin mrg [pair!]
+	][
+		mrg:    any [mrg (system/words/round/ceiling/to 1x1 * line 2) / 2]
+		pen?:   when pen      [compose [pen      (pen)     ]]
+		fill?:  when fill-pen [compose [fill-pen (fill-pen)]]
+		compose [
+			(pen?) (fill?)
+			line-width (line)
+			box (mrg) (size - mrg) (only radius)
+		]
+	]
 ][
 	;@@ fill this with some more ;@@ should it be part of system/view/metrics/fonts?
 	fonts: make map! reduce [
@@ -98,13 +116,8 @@ do with [
 				default field/font: fonts/text
 				maybe   field/margin: 3x3					;-- better default when having a frame
 				drawn:  field/draw/on canvas
-				color?: when select field 'color [compose [pen (field/color)]]	;@@ REP #113
-				compose/only [
-					(color?)
-					line-width 1
-					box 0x0 (field/size)
-					(drawn)
-				]
+				frame:  make-box field/size 1 select field 'color none
+				reduce ['push frame drawn]
 			]
 		]
 		field/caret [
@@ -123,7 +136,7 @@ do with [
 				]
 				unless color: select space 'color [return drawn]
 				#assert [space/size]
-				compose/deep/only [push [pen off fill-pen (color) box 0x0 (space/size)] (drawn)]
+				compose/only [push (make-box space/size 0 'off color) (drawn)]
 			]
 		]
 		
@@ -131,15 +144,8 @@ do with [
 		menu/list cell [
 			function [cell /on canvas] [
 				drawn: do copy/deep [cell/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
-				color?: when color: select cell 'color [compose [fill-pen (color)]]
-				bgnd: compose/deep [
-					push [
-						(color?)
-						line-width 1
-						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
-					]
-				]
-				reduce [bgnd drawn]
+				bgnd: make-box cell/size 1 none select cell 'color	;@@ add frame (pair) field and use here?
+				reduce ['push bgnd drawn]
 			]
 		]
 		
@@ -153,15 +159,8 @@ do with [
 					select cell 'color
 					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
 				]
-				color?: when color [compose [fill-pen (color)]]
-				bgnd: compose/deep [
-					push [
-						pen off
-						(color?)
-						box 0x0 (canvas)
-					]
-				]
-				reduce [bgnd drawn]
+				bgnd: make-box canvas 0 'off color		;-- always fill canvas, even if cell is constrained
+				reduce ['push bgnd drawn]
 			]
 		]
 		
@@ -182,11 +181,8 @@ do with [
 			function [space] [
 				space/size: 16x16
 				cross?: when space/state [[line 3x3 13x13 line 13x3 3x13]]
-				compose [
-					line-width 1
-					box 1x1 (space/size - 1)
-					(cross?)
-				]
+				frame: make-box space/size 1 none none
+				reduce [frame cross?]
 			]
 		]
 		logic  [										;-- readonly
@@ -212,22 +208,18 @@ do with [
 
 		button [
 			function [btn /on canvas] [
-				drawn: btn/draw/on canvas
-				bgnd: either btn/pushed? [svmc/text + 0.0.0.120]['off]
-				focus?: when focused? [
-					compose [
-						line-width 1
-						fill-pen off
-				        (checkered-pen)
-						box 4x4 (btn/size - 4) (max 0 btn/rounding - 2)
-					]
+				drawn:   btn/draw/on canvas
+				fill:    either btn/pushed? [svmc/text + 0.0.0.120]['off]
+				overlay: make-box/round btn/size 1 none fill btn/rounding
+				focus?:  when focused? [
+					inner-radius: max 0 btn/rounding - 2
+					make-box/round/margin btn/size 1 checkered-pen 'off inner-radius 4x4
 				]
-				compose/only [
+				reduce [
 					; shadow 2x4 5 0 (green)			;@@ not working - see #4895; not portable (Windows only)
-					push (drawn)
-					fill-pen (bgnd)
-					box 1x1 (btn/size - 1) (btn/rounding)
-					(focus?)
+					'push drawn
+					overlay
+					focus?
 				]
 			]
 		]
@@ -236,11 +228,7 @@ do with [
 			function [thumb] [
 				drawn: thumb/draw
 				focus?: when focused?/above 2 [
-					compose [
-						line-width 1
-						(checkered-pen)
-						box 4x3 (thumb/size - 4x3)
-					]
+					make-box/margin thumb/size 1 checkered-pen none 4x3
 				]
 				reduce [drawn focus?]
 			]
@@ -250,24 +238,14 @@ do with [
 			function [window /only xy1 xy2] [
 				drawn: window/draw/only xy1 xy2
 				#assert [window/size]
-				bgnd: compose/deep [
-					push [
-						fill-pen !(svmc/text + 0.0.0.120)
-						pen off
-						box 0x0 (window/size)
-					]
-				]
-				reduce [bgnd drawn]
+				bgnd: make-box window/size 0 'off !(svmc/text + 0.0.0.120)
+				reduce ['push bgnd drawn]
 			]
 		]
 
 		menu/list/clickable [
 			when self =? :highlight [[
-				push [
-					pen off
-					fill-pen !(svmc/text + 0.0.0.220)
-					box 0x0 (size)						;@@ render to get size?
-				]
+				push [(make-box size 0 'off !(svmc/text + 0.0.0.220))]	;@@ render to get size?
 				pen !(enhance svmc/panel svmc/text 125%)
 			]]
 		]
@@ -275,14 +253,16 @@ do with [
 		menu/ring/clickable [
 			function [space] [
 				drawn: space/draw
-				compose/only [box 0x0 (space/size) (drawn)]
+				bgnd:  make-box space/size 0 none none
+				reduce [bgnd drawn]
 			]
 		]
 		
 		menu/ring/round-clickable [
 			function [space] [
 				drawn: space/draw
-				compose/only [box 0x0 (space/size) 50 (drawn)]
+				bgnd:  make-box/round space/size 0 none none 50
+				reduce [bgnd drawn]
 			]
 		]
 		
@@ -298,8 +278,7 @@ do with [
 				]
 				compose/only/deep [
 					push [
-						line-width 1
-						box (1x1 + m) (box/size - 1 - m) 3
+						(make-box/round/margin box/size 1 none none 3 1x1 + m)
 						(matrix) (arrow)
 					]
 					(drawn)
