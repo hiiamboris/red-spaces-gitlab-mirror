@@ -206,15 +206,19 @@ clip: func [range [block!] value [scalar!]] [
 	min range/2 max range/1 value
 ]
 
+resolve-color: function [color [tuple! word!]] [
+	either tuple? color [color][system/view/metrics/colors/:color]
+]
+
 mix: function [
 	"Impose COLOR onto BGND and return the resulting color"
-	bgnd  [tuple!] "Alpha channel ignored"
-	color [tuple!] "Alpha channel determines blending amount"
+	bgnd  [tuple! word!] "Alpha channel ignored"
+	color [tuple! word!] "Alpha channel determines blending amount"
 ][
-	c3: c4: color + 0.0.0.0
+	c3: c4: (resolve-color color) + 0.0.0.0
 	c3/4: none
 	bg-amnt: c4/4 / 255
-	bgnd * bg-amnt + (1 - bg-amnt * c3)
+	(resolve-color bgnd) * bg-amnt + (1 - bg-amnt * c3)
 ]
 
 #assert [
@@ -313,17 +317,23 @@ HSL2RGB: function [hsl [block!]] [
 
 enhance: function [
 	"Push COLOR further from BGND (alpha channels ignored)"
-	bgnd  [tuple!]
-	color [tuple!]
+	bgnd  [tuple! word!]
+	color [tuple! word!]
 	amnt  [number!] "Should be over 100%"
 ][
-	bg-hsl: RGB2HSL bgnd
-	fg-hsl: RGB2HSL color
+	bg-hsl: RGB2HSL resolve-color bgnd
+	fg-hsl: RGB2HSL resolve-color color
 	sign: pick [1 -1] fg-hsl/3 >= bg-hsl/3
 	fg-hsl/3: clip [0% 100%] fg-hsl/3 + (amnt - 1 / 2 * sign)
 	HSL2RGB fg-hsl
 ]
 
+
+opaque: function [color [tuple! word!] alpha [percent! float!]] [
+	color: 0.0.0.0 + resolve-color color
+	color/4: none										;-- remove alpha channel
+	100% - alpha * 0.0.0.255 + color
+]
 
 
 ;-- `compose` readability helper variant 2

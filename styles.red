@@ -37,7 +37,7 @@ do with [
 	svm: system/view/metrics
 	unless svm/colors [svm/colors: copy #()]			;@@ MacOS fix for #4740
 	svmc: system/view/metrics/colors
-	unless svmc/text [svmc/text: black]					;@@ GTK fix for #4740
+	unless svmc/text  [svmc/text: black]				;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	svf:  system/view/fonts
 	checkered-pen: reshape [							;-- used for focus indication
@@ -125,7 +125,7 @@ do with [
 			[pen off fill-pen !(svmc/text)]
 		]
 		field/selection [
-			[pen off fill-pen !(svmc/text + 0.0.0.200)]
+			[pen off fill-pen !(opaque 'text 30%)]
 		]
 		
 		tube list box [									;-- allow color override for containers
@@ -157,7 +157,7 @@ do with [
 				canvas: min abs canvas cell/size
 				color: any [
 					select cell 'color
-					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
+					if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
 				]
 				bgnd: make-box canvas 0 'off color		;-- always fill canvas, even if cell is constrained
 				reduce ['push bgnd drawn]
@@ -209,7 +209,7 @@ do with [
 		button [
 			function [btn /on canvas] [
 				drawn:   btn/draw/on canvas
-				fill:    either btn/pushed? [svmc/text + 0.0.0.120]['off]
+				fill:    either btn/pushed? [opaque 'text 50%]['off]
 				overlay: make-box/round btn/size 1 none fill btn/rounding
 				focus?:  when focused? (
 					inner-radius: max 0 btn/rounding - 2
@@ -238,15 +238,15 @@ do with [
 			function [window /only xy1 xy2] [
 				drawn: window/draw/only xy1 xy2
 				#assert [window/size]
-				bgnd: make-box window/size 0 'off !(svmc/text + 0.0.0.120)
+				bgnd: make-box window/size 0 'off !(opaque 'text 50%)
 				reduce ['push bgnd drawn]
 			]
 		]
 
 		menu/list/clickable [
 			when self =? :highlight [
-				push [(make-box size 0 'off !(svmc/text + 0.0.0.220))]	;@@ render to get size?
-				pen !(enhance svmc/panel svmc/text 125%)
+				push [(make-box size 0 'off !(opaque 'text 15%))]	;@@ render to get size?
+				pen !(enhance 'panel 'text 125%)
 			]
 		]
 		
