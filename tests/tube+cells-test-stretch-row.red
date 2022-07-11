@@ -20,7 +20,7 @@ set-style 'heading function [self /on canvas [pair! none!]] [
 		(drawn) 
 	]
 ]
-set-style 'field [fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]
+set-style 'field [[fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]]
 set-style 'field/caret [fill-pen (svmc/text)]
 set-style 'tube function [tube /on canvas [pair! none!]] [
 	drawn: tube/draw/on canvas

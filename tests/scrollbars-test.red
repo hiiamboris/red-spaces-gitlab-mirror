@@ -10,9 +10,9 @@ Red [
 
 ;-- drunken scrollbars animation
 angle: 0
-set-style 'back-arrow  [rotate (angle) (size / 2)]
-set-style 'forth-arrow [rotate (angle) (size / 2)]
-set-style 'thumb [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
+set-style 'back-arrow  [[rotate (angle) (size / 2)]]
+set-style 'forth-arrow [[rotate (angle) (size / 2)]]
+set-style 'thumb [[translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]]
 ; render/as 'test 'root
 
 ; system/view/capturing?: yes
@@ -39,6 +39,7 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
+		invalidate <everything>
 		b/draw: render b
 	]
 ] [offset: 10x10]

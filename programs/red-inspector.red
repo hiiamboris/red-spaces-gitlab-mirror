@@ -255,10 +255,10 @@ context [
 			draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 		]
 		
-		set-style 'image [(
-			limits/max: either depth > 1 [10x1 * shift-right 400 depth - 1][none]
-			()
-		)]
+		set-style 'image [
+			limits/max: if depth > 1 [10x1 * shift-right 400 depth - 1]
+			[]
+		]
 		set-style 'grid-view function [gview /on canvas] [
 			default canvas: 0x0
 			widths: gview/grid/widths

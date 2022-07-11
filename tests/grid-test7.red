@@ -83,7 +83,7 @@ view/no-wait/options [
 							(r)
 						]
 						; 100
-						44
+						47
 						; 33
 						; 23
 				]

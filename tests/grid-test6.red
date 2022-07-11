@@ -95,8 +95,8 @@ view/no-wait/options [
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 						append clear r old-draw/on canvas
 						prof/manual/start 'truncation
-						; r: copy-deep-limit r 30				;-- 3 levels - 15625 grids
-						r: copy-deep-limit r 20				;-- 2 levels - 625 grids
+						; r: copy-deep-limit r 33				;-- 3 levels - 15625 grids
+						r: copy-deep-limit r 22				;-- 2 levels - 625 grids
 						prof/manual/end 'truncation
 					]
 					depth: depth - 1

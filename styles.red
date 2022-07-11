@@ -79,27 +79,28 @@ do with [
 	;-- using paths we get another benefit: we can apply the same style to multiple spaces (e.g. hscroll vscroll [style..])
 	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
 	set 'styles reshape [		;-- styles come before the main drawing code
-		host [
+		host [[
 			pen off
 			fill-pen !(svmc/panel)
-			font !(fonts/text)
+			font     !(fonts/text)
 			line-width 2
-			pen !(svmc/text)
-		]
+			pen      !(svmc/text)
+		]]
 
 		text paragraph link fps-meter [
-			(when select self 'color [compose [pen (color)]])
-			(when not font [font: fonts/text ()])				;@@ hate this syntax! find a better one
+			default font: fonts/text
 			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
+			when select self 'color [[pen (color)]]
 		]
 
 		field [
 			function [field /on canvas] [
-				unless field/font [field/font: fonts/text]
-				maybe  field/margin: 3x3					;-- better default when having a frame
-				drawn: field/draw/on canvas
+				default field/font: fonts/text
+				maybe   field/margin: 3x3					;-- better default when having a frame
+				drawn:  field/draw/on canvas
+				color?: when select field 'color [compose [pen (field/color)]]	;@@ REP #113
 				compose/only [
-					(when select field 'color [compose [pen (field/color)]])	;@@ REP #113
+					(color?)
 					line-width 1
 					box 0x0 (field/size)
 					(drawn)
@@ -107,11 +108,11 @@ do with [
 			]
 		]
 		field/caret [
-			; pen off fill-pen !(contrast-with svmc/panel)
-			pen off fill-pen !(svmc/text)
+			; [pen off fill-pen !(contrast-with svmc/panel)]
+			[pen off fill-pen !(svmc/text)]
 		]
 		field/selection [
-			pen off fill-pen !(svmc/text + 0.0.0.200)
+			[pen off fill-pen !(svmc/text + 0.0.0.200)]
 		]
 		
 		tube list box [									;-- allow color override for containers
@@ -130,10 +131,10 @@ do with [
 		menu/list cell [
 			function [cell /on canvas] [
 				drawn: do copy/deep [cell/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
-				color: select cell 'color
+				color?: when color: select cell 'color [compose [fill-pen (color)]]
 				bgnd: compose/deep [
 					push [
-						(when color [compose [fill-pen (color)]])
+						(color?)
 						line-width 1
 						box 1x1 (cell/size - 1x1)		;@@ add frame (pair) field and use here?
 					]
@@ -152,10 +153,11 @@ do with [
 					select cell 'color
 					if grid-ctx/pinned? [mix svmc/panel svmc/text + 0.0.0.220]
 				]
+				color?: when color [compose [fill-pen (color)]]
 				bgnd: compose/deep [
 					push [
 						pen off
-						(when color [compose [fill-pen (color)]])
+						(color?)
 						box 0x0 (canvas)
 					]
 				]
@@ -179,20 +181,21 @@ do with [
 		switch [										;-- clickable
 			function [space] [
 				space/size: 16x16
+				cross?: when space/state [[line 3x3 13x13 line 13x3 3x13]]
 				compose [
 					line-width 1
 					box 1x1 (space/size - 1)
-					(when space/state [[line 3x3 13x13 line 13x3 3x13]])
+					(cross?)
 				]
 			]
 		]
-		logic  [(										;-- readonly
+		logic  [										;-- readonly
 			maybe/same data/font: fonts/text
 			maybe data/data: either state ["✓"]["✗"]
-			()
-		)]
+			[]
+		]
 		
-		label [(
+		label [
 			if spaces/image-box/content = 'sigil [
 				spaces/sigil/font: either (spaces/body/content/2) = 'comment [
 					spaces/sigil/limits/min: 32
@@ -202,17 +205,17 @@ do with [
 					fonts/sigil
 				] 
 			]
-			when select self 'color [compose [pen (color)]]
-		)]
-		label/text-box/body/text    [(font: fonts/label ())]
-		label/text-box/body/comment [(font: fonts/comment ())]
+			when select self 'color [[pen (color)]]
+		]
+		label/text-box/body/text    [font: fonts/label   []]
+		label/text-box/body/comment [font: fonts/comment []]
 
 		button [
 			function [btn /on canvas] [
 				drawn: btn/draw/on canvas
 				bgnd: either btn/pushed? [svmc/text + 0.0.0.120]['off]
-				if focused? [
-					focus: compose/deep [
+				focus?: when focused? [
+					compose [
 						line-width 1
 						fill-pen off
 				        (checkered-pen)
@@ -224,7 +227,7 @@ do with [
 					push (drawn)
 					fill-pen (bgnd)
 					box 1x1 (btn/size - 1) (btn/rounding)
-					(only focus)
+					(focus?)
 				]
 			]
 		]
@@ -232,16 +235,14 @@ do with [
 		hscroll/thumb vscroll/thumb [
 			function [thumb] [
 				drawn: thumb/draw
-				if focused?/above 2 [
-					focus: compose/deep [
-						push [
-							line-width 1
-							(checkered-pen)
-							box 4x3 (thumb/size - 4x3)
-						]
+				focus?: when focused?/above 2 [
+					compose [
+						line-width 1
+						(checkered-pen)
+						box 4x3 (thumb/size - 4x3)
 					]
 				]
-				compose/only [(drawn) (only focus)]
+				reduce [drawn focus?]
 			]
 		]
 
@@ -256,31 +257,32 @@ do with [
 						box 0x0 (window/size)
 					]
 				]
-				compose [(bgnd) (drawn)]
+				reduce [bgnd drawn]
 			]
 		]
 
-		menu/list/clickable [(
-			when self =? :highlight [
-				compose/deep [push [
+		menu/list/clickable [
+			when self =? :highlight [[
+				push [
 					pen off
 					fill-pen !(svmc/text + 0.0.0.220)
 					box 0x0 (size)						;@@ render to get size?
-				] pen !(enhance svmc/panel svmc/text 125%)]
-			]
-		)]
+				]
+				pen !(enhance svmc/panel svmc/text 125%)
+			]]
+		]
 		
 		menu/ring/clickable [
 			function [space] [
 				drawn: space/draw
-				compose/deep/only [box 0x0 (space/size) (drawn)]
+				compose/only [box 0x0 (space/size) (drawn)]
 			]
 		]
 		
 		menu/ring/round-clickable [
 			function [space] [
 				drawn: space/draw
-				compose/deep/only [box 0x0 (space/size) 50 (drawn)]
+				compose/only [box 0x0 (space/size) 50 (drawn)]
 			]
 		]
 		
@@ -310,7 +312,7 @@ do with [
 	]
 	
 
-	map-each/only/self [w [word! ]] styles [to path! w]	;-- replace words with paths
+	map-each/only/self [w [word!]] styles [to path! w]	;-- replace words with paths
 	do with [paths: block: none] [						;-- separate grouped styles
 		mapparse [copy paths some path! set block block!] styles [
 			map-each/eval path paths [[path copy/deep block]]	;@@ copy/deep works around #4854
@@ -319,7 +321,6 @@ do with [
 	map-each/only/self [b [block!]] styles [			;-- extract blocks, construct functions
 		either 'function = first b [do b][b]
 	]
-
 ]
 
 

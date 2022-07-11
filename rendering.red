@@ -25,7 +25,7 @@ get-current-style: function [
 		style: any [select/only/skip styles p 2  :style]
 		head? path: p
 	]
-	default style: []
+	default style: [[]]									;-- for `do` to return empty block
 	#debug styles [#print "Style for (p) is (mold/flat :style)"]
 	:style
 ]
@@ -303,14 +303,14 @@ context [
 		host: face										;-- required for `same-paths?` to have a value (used by cache)
 		append visited-spaces host
 		with-style 'host [
-			style: compose/deep bind get-current-style face	;-- host style can only be a block
+			style: compose/deep do with face get-current-style	;-- host style can only be a block
 			drawn: render-space/only/on face/space xy1 xy2 face/size
 			#assert [block? :drawn]
-			unless face/size [								;-- initial render: define face/size
+			unless face/size [									;-- initial render: define face/size
 				space: get face/space
 				#assert [space/size]
 				face/size: space/size
-				style: compose/deep bind get-current-style face	;-- reapply the host style using new size
+				style: compose/deep do with face get-current-style	;-- reapply the host style using new size
 			]
 			render: reduce [style drawn]
 		]
@@ -373,7 +373,7 @@ context [
 				enter-space space name					;-- mark parent/child relations
 				
 				either block? :style [
-					style: compose/deep bind style space	;@@ how slow this bind will be? any way not to bind? maybe construct a func?
+					style: compose/deep do with space style
 					draw: select space 'draw
 					
 					;@@ this basically cries for FAST `apply` func!!

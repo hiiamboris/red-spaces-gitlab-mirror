@@ -32,7 +32,7 @@ set-style 'field function [field /on canvas] [
 		box 0x0 (field/size)
 	] (drawn)]
 ]
-; set-style 'field/caret [fill-pen (svmc/text)]
+; set-style 'field/caret [[fill-pen (svmc/text)]]
 set-style 'tube function [tube /on canvas [pair! none!]] [
 	drawn: tube/draw/on canvas
 	#assert [drawn]
