@@ -4,21 +4,32 @@ Red [
 	license: BSD-3
 ]
 
-;; needs: map-each, anonymize, reshape, export, contrast-with
+;; needs: map-each, anonymize, reshape, export, contrast-with, apply
 
 
-styles: none											;-- reserve names in the spaces/ctx context
-exports: [set-style remove-style]
+exports: [set-style remove-style define-styles]
 
+styles: make hash! 50
+
+;; used to keep above/below words from leaking out
+style-ctx!: context [above: below: none]
+	
 set-style: function [
 	"Define a named style"
 	name [word! path!]
 	style [block! function!]
+	/unique "Warn about duplicates"
 ][
 	name: to path! name
-	pos: any [											;-- `put` does not support paths/blocks so have to reinvent it
-		find/only/tail styles name
-		insert/only tail styles name
+	either pos: find/only/tail styles name [		;-- `put` does not support paths/blocks so have to reinvent it
+		if unique [ERROR "Duplicate style found named `(mold name)`"]
+	][
+		pos: insert/only tail styles name
+	]
+	style: either block? :style [
+		bind copy/deep style copy style-ctx!
+	][
+		func spec-of :style copy/deep body-of :style	;@@ copy/deep to work around #4854
 	]
 	change/only pos :style
 	:style
@@ -30,6 +41,25 @@ remove-style: function [
 ][
 	name: to path! name
 	remove/part find/only styles name 2
+]
+
+define-styles: function [
+	"Define one or multiple styles using Styling dialect"
+	styles [block!] "Stylesheet"
+	/unique "Warn about duplicates"
+	/local style
+][
+	=style-name=: [set-word! | set-path!]
+	=names=:  [not tail ahead #expect =style-name= copy names some =style-name=]
+	=expr=:   [p: (set/any 'style do/next p 'p) :p]
+	=commit=: [(
+		foreach name names [
+			if set-word? name [name: to word! name]		;-- to path! set-word keeps the colon
+			name: to path! name
+			apply set-style 'local
+		]
+	)]
+	parse styles [any [=names= =expr= =commit=]]
 ]
 
 do with [
@@ -90,183 +120,133 @@ do with [
 		'comment   make font! [name: svf/system size: svf/size]
 	]
 
-	;-- styles should balance between readability, ease of extension and lookup speed
-	;-- benchmarks prove that if we define styles as words sequences, lookups are 5x slower (find, parse)
-	;-- (because find [a b c [style]] [b] finds the wrong style and requires another inner loop)
-	;-- so we should either use paths ('item/subitem) or blocks [item subitem]
-	;-- using paths we get another benefit: we can apply the same style to multiple spaces (e.g. hscroll vscroll [style..])
-	;-- drawback is that we have to convert words into paths at startup to keep it both readable and efficient
-	set 'styles reshape [		;-- styles come before the main drawing code
-		host [[
-			pen off
-			fill-pen !(svmc/panel)
-			font     !(fonts/text)
-			line-width 2
-			pen      !(svmc/text)
-		]]
-
-		text paragraph link fps-meter [
-			default font: fonts/text
-			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
-			when select self 'color [pen (color)]
-		]
-
-		field [
-			function [field /on canvas] [
-				default field/font: fonts/text
-				maybe   field/margin: 3x3					;-- better default when having a frame
-				drawn:  field/draw/on canvas
-				frame:  make-box field/size 1 select field 'color none
-				reduce ['push frame drawn]
+	;@@ TODO: organize this internally as a map of nested words-blocks
+	define-styles/unique reshape [
+		host: [
+			below: [
+				pen off
+				fill-pen !(svmc/panel)
+				font     !(fonts/text)
+				line-width 2
+				pen      !(svmc/text)
 			]
 		]
-		field/caret [
-			; [pen off fill-pen !(contrast-with svmc/panel)]
-			[pen off fill-pen !(svmc/text)]
+
+		text: paragraph: link: fps-meter: [
+			default font: fonts/text
+			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
+			below: when select self 'color [pen (color)]
 		]
-		field/selection [
-			[pen off fill-pen !(opaque 'text 30%)]
+
+		field: [
+			default font: fonts/text
+			maybe   margin: 3x3							;-- better default when having a frame
+			below: [push (make-box size 1 select self 'color none)]
+		]
+		field/caret: [
+			; [pen off fill-pen !(contrast-with svmc/panel)]
+			below: [pen off fill-pen !(svmc/text)]
+		]
+		field/selection: [
+			below: [pen off fill-pen !(opaque 'text 30%)]
 		]
 		
-		tube list box [									;-- allow color override for containers
-			function [space /only xy1 xy2 /on canvas] [
-				drawn: either find spec-of :space/draw /only [	;-- draw to get the size
-					space/draw/on/only canvas xy1 xy2			;@@ this needs apply
-				][	space/draw/on      canvas
-				]
-				unless color: select space 'color [return drawn]
-				#assert [space/size]
-				compose/only [push (make-box space/size 0 'off color) (drawn)]
+		tube: list: box: [									;-- allow color override for containers
+			below: when select self 'color [
+				; (#assert [size])
+				push (make-box size 0 'off color)
 			]
 		]
 		
 		;; cell is a box with a border around it; while general box is widely used in borderless state
-		menu/list cell [
-			function [cell /on canvas] [
-				drawn: do copy/deep [cell/draw/on canvas]		;-- draw to get the size ;@@ #4854 workaround - remove me
-				bgnd: make-box cell/size 1 none select cell 'color	;@@ add frame (pair) field and use here?
-				reduce ['push bgnd drawn]
-			]
+		menu/list: cell: [
+			below: [push (make-box size 1 none select self 'color)]	;@@ add frame (pair) field and use here?
 		]
 		
-		grid/cell [										;-- has no frame since frame is drawn by grid itself
-			function [cell /on canvas] [
-				#assert [canvas]						;-- grid should provide finite canvas
-				drawn: cell/draw/on canvas
-				;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
-				canvas: min abs canvas cell/size
-				color: any [
-					select cell 'color
-					if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
-				]
-				bgnd: make-box canvas 0 'off color		;-- always fill canvas, even if cell is constrained
-				reduce ['push bgnd drawn]
+		grid/cell: function [cell /on canvas] [			;-- has no frame since frame is drawn by grid itself
+			#assert [canvas]							;-- grid should provide finite canvas
+			drawn: cell/draw/on canvas
+			;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
+			canvas: min abs canvas cell/size
+			color: any [
+				select cell 'color
+				if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
 			]
+			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
+			reduce ['push bgnd drawn]
 		]
 		
-		grid/cell/paragraph grid/cell/text [			;-- make pinned text bold
-			function [text /on canvas] [
-				maybe text/flags: either grid-ctx/pinned?
-					[union   text/flags [bold]]
-					[exclude text/flags [bold]]
-				text/draw/on canvas
-			]
+		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
+			maybe flags: either grid-ctx/pinned?
+				[union   flags [bold]]
+				[exclude flags [bold]]
 		]
 		
 		
 		; list/item [[pen cyan]]
 		
-		;; ☒☐ make lines too big! needs custom draw code, not symbols
-		switch [										;-- clickable
-			function [space] [
-				space/size: 16x16
-				cross?: when space/state [line 3x3 13x13 line 13x3 3x13]
-				frame: make-box space/size 1 none none
-				reduce [frame cross?]
-			]
+		;; "☒☐" make lines too big! needs custom draw code, not symbols
+		;; this doesn't use /draw at all (what's there to use?)
+		;; it also cannot be written in block style, since draw will nullify the size (given text is empty)
+		switch: function [self] [						;-- clickable
+			cross?: when self/state [line 3x3 13x13 line 13x3 3x13]
+			frame:  make-box self/size: 16x16 1 none none
+			reduce [frame cross?]
 		]
-		logic  [										;-- readonly
+		logic: [										;-- readonly
 			maybe/same data/font: fonts/text
 			maybe data/data: either state ["✓"]["✗"]
-			[]
 		]
 		
-		label [
+		label: using [big?] [
 			if spaces/image-box/content = 'sigil [
-				spaces/sigil/font: either (spaces/body/content/2) = 'comment [
-					spaces/sigil/limits/min: 32
-					fonts/sigil-big
-				][
-					spaces/sigil/limits/min: 20
-					fonts/sigil
-				] 
+				big?: spaces/body/content/2 = 'comment
+				spaces/sigil/limits/min: pick [32 20] big? 
+				spaces/sigil/font: select fonts pick [sigil-big sigil] big?
 			]
-			when select self 'color [pen (color)]
+			below: when select self 'color [pen (color)]
 		]
-		label/text-box/body/text    [font: fonts/label   []]
-		label/text-box/body/comment [font: fonts/comment []]
+		label/text-box/body/text:    [maybe/same font: fonts/label  ]
+		label/text-box/body/comment: [maybe/same font: fonts/comment]
 
-		button [
-			function [btn /on canvas] [
-				drawn:   btn/draw/on canvas
-				fill:    either btn/pushed? [opaque 'text 50%]['off]
-				overlay: make-box/round btn/size 1 none fill btn/rounding
-				focus?:  when focused? (
-					inner-radius: max 0 btn/rounding - 2
-					make-box/round/margin btn/size 1 checkered-pen 'off inner-radius 4x4
-				)
-				reduce [
-					; shadow 2x4 5 0 (green)			;@@ not working - see #4895; not portable (Windows only)
-					'push drawn
-					overlay
-					focus?
-				]
-			]
+		button: using [fill overlay focus? inner-radius] [
+			fill:    either pushed? [opaque 'text 50%]['off]
+			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
+			overlay: [make-box/round size 1 none fill rounding]	;-- delay evaluation until 'size' is ready (after render)
+			focus?:  when focused? (
+				inner-radius: max 0 rounding - 2
+				[make-box/round/margin size 1 checkered-pen 'off inner-radius 4x4]
+			)
+			above: [(do overlay) (do focus?)]
 		]
 		
-		hscroll/thumb vscroll/thumb [
-			function [thumb] [
-				drawn: thumb/draw
-				focus?: when focused?/above 2 (
-					make-box/margin thumb/size 1 checkered-pen none 4x3
-				)
-				reduce [drawn focus?]
-			]
+		hscroll/thumb: vscroll/thumb: [
+			above: when focused?/above 2 (
+				make-box/margin size 1 checkered-pen none 4x3
+			)
 		]
 
-		grid-view/window [
-			function [window /only xy1 xy2] [
-				drawn: window/draw/only xy1 xy2
-				#assert [window/size]
-				bgnd: make-box window/size 0 'off !(opaque 'text 50%)
-				reduce ['push bgnd drawn]
-			]
+		grid-view/window: [
+			; #assert [size]
+			below: [push (make-box size 0 'off !(opaque 'text 50%))]
 		]
 
-		menu/list/clickable [
-			when self =? :highlight [
-				push [(make-box size 0 'off !(opaque 'text 15%))]	;@@ render to get size?
+		menu/list/clickable: [
+			below: when self =? :highlight [
+				push (make-box size 0 'off !(opaque 'text 15%))	;@@ render to get size?
 				pen !(enhance 'panel 'text 125%)
 			]
 		]
 		
-		menu/ring/clickable [
-			function [space] [
-				drawn: space/draw
-				bgnd:  make-box space/size 0 none none
-				reduce [bgnd drawn]
-			]
+		menu/ring/clickable: [
+			below: [(make-box size 0 none none)]
 		]
 		
-		menu/ring/round-clickable [
-			function [space] [
-				drawn: space/draw
-				bgnd:  make-box/round space/size 0 none none 50
-				reduce [bgnd drawn]
-			]
+		menu/ring/round-clickable: [
+			below: [(make-box/round size 0 none none 50)]
 		]
 		
-		hint [
+		hint: [
 			function [box] [
 				drawn: box/draw							;-- draw to obtain the size
 				m: box/margin / 2
@@ -287,18 +267,6 @@ do with [
 		]
 		
 		;@@ scrollbars should prefer host color
-		;@@ as stylesheet grows, need to automatically check for dupes and report!
-	]
-	
-
-	map-each/only/self [w [word!]] styles [to path! w]	;-- replace words with paths
-	do with [paths: block: none] [						;-- separate grouped styles
-		mapparse [copy paths some path! set block block!] styles [
-			map-each/eval path paths [[path copy/deep block]]	;@@ copy/deep works around #4854
-		] 
-	]
-	map-each/only/self [b [block!]] styles [			;-- extract blocks, construct functions
-		either 'function = first b [do b][b]
 	]
 ]
 

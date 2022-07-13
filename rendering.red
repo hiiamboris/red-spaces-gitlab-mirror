@@ -14,12 +14,12 @@ style-typeset!: make typeset! [block! function!]		;@@ hide this
 
 ;@@ TODO: profile & optimize this a lot
 ;@@ devise some kind of style cache tree if it speeds it up
-get-current-style: function [
-	"Fetch styling code object for the current space being drawn"
-	/named path [path! block!] "Path to look for (defaults to current-style)"
+get-style: function [
+	"Fetch style for some tree path"
+	path [path! block!]
 ][
-	path: tail as path! either named [path][current-path]
-	#assert [not head? path]
+	#assert [not empty? head path]
+	path: tail path
 	until [												;-- look for the most specific fitting style
 		p: back path
 		style: any [select/only/skip styles p 2  :style]
@@ -29,7 +29,45 @@ get-current-style: function [
 	#debug styles [#print "Style for (p) is (mold/flat :style)"]
 	:style
 ]
+	
+get-current-style: function [
+	"Fetch styling code object for the current space being drawn"
+][
+	get-style as path! current-path
+]
 
+
+empty-context: context []
+
+apply-current-style: function [
+	"Apply relevant style to current space being drawn"
+	space [object!] "Face or space object"
+][
+	case [
+		function? style: get-current-style [:style]		;-- function is not applied here, only in render
+		style-ctx: all [
+			pos: any [find style 'above  find style 'below]
+			context? first pos
+		] [
+			set style-ctx none							;-- clean the context from old values
+			do with space style							;-- eval the style to preset facets
+			style-ctx									;-- return the context for later above/below lookup & composition
+		]
+		'else [empty-context]							;-- returns empty context if no /above or /below defined
+	]
+]
+
+combine-style: function [
+	"Combine style & draw code into final block"
+	drawn [block!] "Draw code produced by space/draw"
+	style [object!] "Styling context from apply-current-style"
+][
+	reduce [
+		compose/deep/only only select style 'below 
+		drawn
+		compose/deep/only only select style 'above
+	]
+]
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
@@ -303,16 +341,16 @@ context [
 		host: face										;-- required for `same-paths?` to have a value (used by cache)
 		append visited-spaces host
 		with-style 'host [
-			style: compose/deep do with face get-current-style	;-- host style can only be a block
+			style: apply-current-style face				;-- host style can only be a block
 			drawn: render-space/only/on face/space xy1 xy2 face/size
 			#assert [block? :drawn]
 			unless face/size [									;-- initial render: define face/size
 				space: get face/space
 				#assert [space/size]
 				face/size: space/size
-				style: compose/deep do with face get-current-style	;-- reapply the host style using new size
+				style: apply-current-style face			;-- reapply the host style using new size
 			]
-			render: reduce [style drawn]
+			render: combine-style drawn style
 		]
 		clear visited-spaces
 		; #debug cache [#print "cache size=(cache-size?)"]
@@ -350,7 +388,6 @@ context [
 		]
 
 		with-style name [
-			style: get-current-style
 			;@@ this does not allow the style code to invalidate the cache
 			;@@ which is good for resource usage, but limits style power
 			;@@ so maybe compose styles first, then check the cache?
@@ -371,9 +408,9 @@ context [
 				; if name = 'list [print ["canvas:" canvas mold space/content]]
 				#debug profile [prof/manual/start name]
 				enter-space space name					;-- mark parent/child relations
+				style: apply-current-style space
 				
-				either block? :style [
-					style: compose/deep do with space style
+				either object? :style [
 					draw: select space 'draw
 					
 					;@@ this basically cries for FAST `apply` func!!
@@ -389,9 +426,7 @@ context [
 					]
 					draw: either code [do copy/deep code][draw]	;-- call the draw function if not called yet
 					#assert [block? :draw]
-					
-					if empty? style [unset 'style]
-					render: compose/only [(:style) (:draw)]		;-- compose removes style if it's unset
+					render: combine-style draw style
 				][
 					#assert [function? :style]
 					;@@ this basically cries for FAST `apply` func!!

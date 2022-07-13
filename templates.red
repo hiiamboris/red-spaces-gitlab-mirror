@@ -2380,7 +2380,7 @@ caret-ctx: context [
 		visible?:    no
 		
 		rectangle-draw: :draw
-		draw: does [when visible? [rectangle-draw]]
+		draw: does [when visible? (rectangle-draw)]
 		
 		rectangle-on-change: :on-change*
 		#on-change-redirect 
@@ -2577,7 +2577,7 @@ field-ctx: context [
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
 				translate (origin by 0) [
-					(when sdrawn [compose/only [translate (mrg) (sdrawn)]])
+					(when sdrawn (compose/only [translate (mrg) (sdrawn)]))
 					(drawn)
 					translate (cxy1 + mrg) (cdrawn)
 				]

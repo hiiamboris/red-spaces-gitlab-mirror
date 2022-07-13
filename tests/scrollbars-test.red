@@ -10,10 +10,11 @@ Red [
 
 ;-- drunken scrollbars animation
 angle: 0
-set-style 'back-arrow  [[rotate (angle) (size / 2)]]
-set-style 'forth-arrow [[rotate (angle) (size / 2)]]
-set-style 'thumb [[translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]]
-; render/as 'test 'root
+define-styles [
+	back-arrow:  [below: [rotate (angle) (size / 2)]]
+	forth-arrow: [below: [rotate (angle) (size / 2)]]
+	thumb: [below: [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]]
+]
 
 ; system/view/capturing?: yes
 counter: 0

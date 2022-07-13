@@ -1241,6 +1241,7 @@ even bigger one
 	- extend-canvas just works: no change needed
 	- render cache needs no change while canvas is a single value, negative and positive canvas leads to different cache hits
 	- encode-canvas is super easy operation
+	
 
 
 Timer design:

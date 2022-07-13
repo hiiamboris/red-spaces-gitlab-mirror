@@ -28,6 +28,11 @@ exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-over
 by: make op! :as-pair
 abs: :absolute
 
+using: function [words [block!] code [block!]] [
+	words: construct map-each w words [to set-word! w]
+	with words code
+]
+
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
 ;; since it's for layout usage only, I don't care about a few allocated objects, no need to optimize it
 ;; ranges are used by spaces to constrain their size, but those are read-only

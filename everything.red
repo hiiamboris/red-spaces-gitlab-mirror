@@ -42,7 +42,7 @@ do/expand [
 	#include %../common/profiling.red
 	#include %../common/extremi.red
 	; #include %../common/map-each.red
-	; #include %../common/new-apply.red
+	#include %../common/new-apply.red
 	#include %../common/new-each.red
 	#include %../common/xyloop.red
 	#include %../common/modulo.red

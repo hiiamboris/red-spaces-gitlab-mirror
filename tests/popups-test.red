@@ -79,7 +79,7 @@ view/no-wait [
 					]
 					with [
 						text: "👽"
-						set-style 'menu/ring/round-clickable/tube/text [font: big-font []]
+						set-style 'menu/ring/round-clickable/tube/text [font: big-font]
 					]
 			]
 			; list [switch switch with [state: on]]

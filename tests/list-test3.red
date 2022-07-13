@@ -12,10 +12,13 @@ lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod 
 
 ;-- drunken scrollbars animation
 angle: 0
-set-style 'back-arrow  [[rotate (angle) (size / 2)]]
-set-style 'forth-arrow [[rotate (angle) (size / 2)]]
-set-style 'hscroll/thumb set-style 'vscroll/thumb [[translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]]
-; render/as 'test 'root
+define-styles [
+	back-arrow:  [below: [rotate (angle) (size / 2)]]
+	forth-arrow: [below: [rotate (angle) (size / 2)]]
+	hscroll/thumb: vscroll/thumb: [
+		below: [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
+	]
+]
 
 counter: 0
 ; system/view/capturing?: yes
