@@ -25,17 +25,16 @@ context [
 	;@@ workaround for #4854 crashes:
 	copy-func: func [f [function!]] [func spec-of :f copy/deep body-of :f]
 	
-	set-style 'cell/ellipsized-text copy-func
-	set-style 'cell/text copy-func 
-	set-style 'cell/paragraph function [text /on canvas] [
-	; set-style 'cell/text set-style 'cell/paragraph text-style: function [text /on canvas] [
-		maybe text/flags: either attempt [spaces/ctx/grid-ctx/pinned?]
-			[union   text/flags [bold]]
-			[exclude text/flags [bold]]
-		maybe/same text/font: code-font
-		compose [
-			(when color: select text 'color [compose [pen (color)]])
-			(text/draw/on canvas)
+	define-styles [
+		cell/ellipsized-text: cell/text: cell/paragraph: function [text /on canvas] [
+			maybe text/flags: either attempt [spaces/ctx/grid-ctx/pinned?]
+				[union   text/flags [bold]]
+				[exclude text/flags [bold]]
+			maybe/same text/font: code-font
+			compose [
+				(when color: select text 'color (compose [pen (color)]))
+				(text/draw/on canvas)
+			]
 		]
 	]
 	
@@ -257,7 +256,6 @@ context [
 		
 		set-style 'image [
 			limits/max: if depth > 1 [10x1 * shift-right 400 depth - 1]
-			[]
 		]
 		set-style 'grid-view function [gview /on canvas] [
 			default canvas: 0x0
@@ -314,7 +312,7 @@ context [
 		get-path: function [path] [
 			trap/catch [get/any path] [
 				;; there's a function in the path, so path access can't work
-				value: get path/1
+				set/any 'value get/any path/1
 				foreach name next path [
 					set/any 'value case [
 						function? :value [get/any bind name :value]
