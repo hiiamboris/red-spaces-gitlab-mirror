@@ -67,11 +67,9 @@ Spaces are designed in such a way that their core **logic is separated from UI/U
 
 ### Style definition
 
-**Warning:** I'm not happy with this design, so it's likely to change in the future. 
-
 Default styles are loaded from the [`styles.red`](styles.red) file.
 
-New styles are currently created by `set-style` function:
+New styles are currently created by `set-style` function which accepts single style value:
 ```
 >> ? set-style
 USAGE:
@@ -85,8 +83,24 @@ ARGUMENTS:
      name         [word! path!] 
      style        [block! function!] 
 ```
+Or with `define-styles` which is a simple dialect for stylesheet definition:
+```
+>> ? define-styles
+USAGE:
+     DEFINE-STYLES styles
 
-For style to have effect, `name` argument should be either:
+DESCRIPTION: 
+     Define one or multiple styles using Styling dialect. 
+     DEFINE-STYLES is a function! value.
+
+ARGUMENTS:
+     styles       [block!] "Stylesheet."
+
+REFINEMENTS:
+     /unique      => Warn about duplicates.
+```
+
+For style to have effect, style *name* should be either:
 - a `word!` which should coincide with the space's name (which usually equals it's template name)
 - a `path!` of such valid space names that will be matched against the tree path
 
@@ -94,13 +108,14 @@ Examples:
 ```
 set-style 'paragraph ..style-descriptor..
 set-style 'list/item ..style-descriptor..
+define-styles [
+	paragraph: ..style-descriptor..
+	list/item: menu/item: ..style-descriptor..
+]
 ```
 
 When looking up a style for each particular space, full hierarchical path in the space tree is scanned for this word or path. When found, style applies. E.g. `list/item` only styles `item`s that have `list` as their parent space, and has bigger priority than just `item` style.
 
-After the scope, a block with style descriptor should follow, which can be:
-- a `compose`-able `block!` with Draw commands
-- a function value that receives the space object as argument and returns the Draw block
 
 
 <details>
@@ -127,21 +142,67 @@ Thus styles apply widely by default (like `paragraph`), but can be specialized (
 
 </details>
 
-
-Styles are defined using **two syntaxes**: block and function.
+Style descriptor carries the style body. It can be either a block or a function.
 
 #### Simple (block) syntax
 
-In this form, style description is a block of [Draw commands](https://w.red-lang.org/en/draw/#draw-commands)
+Is just a block bound to space and evaluated. It minimizes the amount of boilerplate code and makes styles more readable.
+
+Block style may contain special `below:` and `above:` blocks with [Draw commands](https://w.red-lang.org/en/draw/#draw-commands) which will be inserted before and after the Draw block returned by the space's `/draw` function:
+- `below` is great for drawing frame and background after `/size` gets set
+- `above` is great for drawing focus overlay or tinting the space (like button in it's "pushed" state)
+
+Examples:
 ```
-set-style 'list/item [pen cyan]
+set-style 'list/item [
+	below: [pen cyan]					;) changes pen used by /draw
+]
 
 set-style 'paragraph [
-	(font: serif-12 ())			;) modifies /font facet of the space
-	pen blue
+	font: serif-12						;) modifies /font facet before /draw call
+	below: [pen blue]
+]
+
+define-styles [
+	tube: list: box: [					;) allows color override for containers
+	
+		;) `select self 'color` ensures that `color: none` value works same as absence of `color:` facet
+		below: when select self 'color [
+		
+			;) note usage of unqualified `size` here (compose gets called after /draw so it's valid)
+			push (make-box size 0 'off color)
+		]
+	]
+	
+	hscroll/thumb: vscroll/thumb: [		;) box that indicates focus presence in a scrollable
+		above: when focused?/above 2 (		;) test if focus is 2 levels above thumb (scrollable, grid-view, list-view)
+			make-box/margin size 1 checkered-pen none 4x3
+		)
+	]
 ]
 ```
-Unfortunately compose expressions become ugly, and I will most likely revise this syntax.
+Tip: `when` function tests a condition and if true, returns the block after it or evaluates a paren. If false, returns an empty block. It's a very useful helper for `compose`.
+
+<details>
+	<summary>
+		Animated style example: drunken scrollbars used in some of <a href=tests/README.md>the tests</a>
+	</summary>
+
+```
+define-styles [
+	back-arrow:  [below: [rotate (angle) (size / 2)]]
+	forth-arrow: [below: [rotate (angle) (size / 2)]]
+	thumb:       [below: [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]]
+]
+```
+Where `angle` is updated 3 times per sec as:
+```
+angle: pick [0 -13 -20 -13 0 13 20 13] (counter: counter + 1) % 8 + 1
+```
+Such power can be held in just a few lines! :D
+
+</details>
+
 
 <details>
 	<summary>
@@ -152,75 +213,68 @@ Unfortunately compose expressions become ugly, and I will most likely revise thi
 
 There are 3 **steps**:
 
-1. Block is bound to the space object and *composed*.
+1. Block is bound to the space object and evaluated before the `/draw` call.
 
    This allows one to set various space facets before drawing it. Like the above `/font` facet is set before space is drawn.\
-   Draw is quite limited: e.g. you can't "ask" what current pen color is, to modify it, and you can't set font for rich-text using "font" command, and so on. Composition is aimed to empower styles while still keeping them short.\
-   Don't forget to add `()` at the end of composition paren if you don't want it's output to be inserted into the draw block.
+   Draw is quite limited: e.g. you can't "ask" what current pen color is, to modify it, and you can't set font for rich-text using "font" command, and so on. Evaluation is aimed to empower styles while still keeping them short.\
+   Evaluation result is unused except for `below:` and `above:` fields.\
+   Other set-words that are not bound to space will leak out, so be careful.
 
-2. Space's `/draw` function is called to get a list of commands to render it. That is, `/draw` is called after style sets the facets.
+2. Space's `/draw` function is called to get a list of commands to render it.
 
-3. Composed block (1) is inserted *before* the `/draw` result (2).
+   `/draw` sets the `/size` and `/map` facets, so they will be valid when accessed from `below`/`above` blocks during their composition.
 
-</details>
+3. Values of `below:` and `above:` are composed (using `compose/only/deep`) and inserted around `/draw` result: `[(below) (drawn) (above)]`.
 
-<details>
-	<summary>
-		Animated style example: drunken scrollbars used in some of <a href=tests/README.md>the tests</a>
-	</summary>
-
-```
-set-style 'back-arrow  [rotate (angle) (size / 2)]
-set-style 'forth-arrow [rotate (angle) (size / 2)]
-set-style 'thumb [translate (size * 0x1 / 2) skew (angle / -2) translate (size * 0x-1 / 2)]
-```
-Where `angle` is updated 3 times per sec as:
-```
-angle: pick [0 -13 -20 -13 0 13 20 13] (counter: counter + 1) % 8 + 1
-```
-Such power can be held in just 2-3 lines! :D
+   If any of these values are absent or `none`, they're ignored.
 
 </details>
 
 
 #### Free (function) syntax
 
-Some goals cannot be achieved using simple insertion of styles into the draw block.\ 
-Consider a simple example - a button (or any surface that's autosized and has text content):
-1. Style sets font, font affects the final size
-2. Final size is used to draw background frame for the text
-3. Background should be drawn before the text or text will become invisible
+Function syntax gives more control over styling, e.g.:
+- it can ignore `/draw` function completely
+- it gets access to the `canvas` and `xy1`/`xy2` arguments
+- it's faster because it's not being bound to the space at runtime
 
-These constraints cannot be satisfied by insertion, unless space is rendered twice - first time to obtain the size, second time to insert background. But rendering is the most expensive operation performed, and I didn't want to slow things down.
+Sometimes it's more readable. Plus there's little risk of accidentally leaking words.
 
-Function syntax gives full control. Example with the aforementioned button:
+Style function:
+- receives space as it's mandatory argument and should use path syntax to access it's facets
+- should call `/draw` manually, passing `/on canvas` and `/only xy1 xy2` arguments to `/draw` if it supports those
+- should return a block of Draw commands, which will be used to draw the space without any further modifications
+ 
+Example for `grid/cell` that draws full cell background regardless of how small/big the cell content happens to be:
 ```
-set-style 'button function [btn] [
-	btn/font: fonts/button									;) set the font - affects the size
-	drawn: btn/draw											;) draw is called to render the button
-	bgnd: either btn/pushed? [svmc/text + 0.0.0.120]['off]	;) background color depends on button state
-	if focused? [
-		focus: compose/deep [								;) optionally add focus indicator, which depends on button size
-			line-width 1
-			fill-pen off
-			pen pattern 4x4 [scale 0.5 0.5 pen off fill-pen (svmc/text) box 0x0  8x8  fill-pen (svmc/panel) box 1x0 5x1 box 1x5 5x8  box 0x1 1x5 box 5x1  8x5]
-			box 4x4 (btn/size - 4) (max 0 btn/rounding - 2)
-		]
+set-style 'grid/cell function [cell /on canvas] [
+	#assert [canvas]							;-- grid should provide finite canvas
+	drawn: cell/draw/on canvas					;-- passes /canvas argument
+	
+	;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
+	canvas: min abs canvas cell/size
+	
+	color: any [								;-- allow cell color override and highlight pinned cells by default
+		select cell 'color
+		if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
 	]
-	compose/only [											;) finally, assemble things in right order
-		fill-pen (bgnd)
-		push (drawn)
-		(any [focus ()])
-	]														;) returns the draw block!
+	
+	bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
+	
+	reduce ['push bgnd drawn]					;-- compose result of /draw and background
 ]
 ```
-Such function is called with a space object as it's mandatory argument and it should return the block of draw commands.
 
-Function style should use the `/draw` facet of space to render it properly (like `btn/draw` above). It *should not* call the `render` function on it's own space, because the main difference between `/draw` and `render` is that `render` looks up and applies styles (and will deadlock if style calls it back).  
+Example for `switch` that doesn't use `/draw` at all, and sets the `/size` itself:
+```
+set-style 'switch function [self] [
+	cross?: when self/state [line 3x3 13x13 line 13x3 3x13]
+	frame:  make-box self/size: 16x16 1 none none
+	reduce [frame cross?]
+]
+```
 
-This function's output is used unmodified to draw the space.
-
-Note that `draw` function of each space usually sets it's `/size` and `/map` facets by convention.
+Note: style function *should not* call the `render` function on it's own space, because the main difference between `/draw` and `render` is that `render` looks up and applies styles (and will deadlock if style calls it back).  
 
 For spaces that adapt their size automatically, their styling function should accept `/on canvas [none! pair!]` refinement and pass it on to it's `draw` function. Value of `on` should not be accounted for, only `canvas` value matters.
 
