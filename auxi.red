@@ -53,6 +53,81 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ]
 
 
+{
+	useful pair invariants to test in which quadrant a point is located
+	points: a, b
+	a = min a b <=> 0x0 = min 0x0 b - a <=> B is in Q1 to A, axis-inclusive <=> A is in Q3 to B, axis-inclusive
+	a = max a b <=> 0x0 = max 0x0 b - a <=> B is in Q3 to A, axis-inclusive <=> A is in Q1 to B, axis-inclusive
+	                1x1 = min 1x1 b - a <=> B is in Q1 to A, axis-exclusive <=> A is in Q3 to B, axis-exclusive
+	            -1x-1 = max -1x-1 b - a <=> B is in Q3 to A, axis-exclusive <=> A is in Q1 to B, axis-exclusive
+	a = min a b <=> b = max a b   
+}
+
+;-- chainable pair comparison - instead of `within?` monstrosity
+; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
+; == 4x4
+
+;; very hard to find a sigil for these ops
+;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
++<=: make op! func [
+	"Chainable pair comparison (non-strict)"
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b  b]
+]
++<:  make op! func [
+	"Chainable pair comparison (strict)"    
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b - 1  b]
+]
+;+>:  make op! func [a b] [a = max a b + 1]
+;+>=: make op! func [a b] [a = max a b]
+
+;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
+;@@ to be rewritten once we have floating point pairs
+boxes-overlap?: function [
+	"Get intersection size of boxes A1-A2 and B1-B2, or none if they do not intersect"
+	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
+	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
+][
+	0x0 +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
+]
+
+vec-length?: function [v [pair!]] [						;-- this is still 2x faster than compiled `distance? 0x0 v`
+	v/x ** 2 + (v/y ** 2) ** 0.5
+]
+
+closest-box-point?: function [
+	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
+	B1 [pair!] "inclusive" B2 [pair!] "inclusive"
+	/to origin [pair!] "defaults to 0x0"
+][
+	default origin: 0x0
+	as-pair
+		case [origin/x < B1/x [B1/x] B2/x < origin/x [B2/x] 'else [origin/x]]
+		case [origin/y < B1/y [B1/y] B2/y < origin/y [B2/y] 'else [origin/y]]
+]
+
+box-distance?: function [
+	"Get distance between closest points of box A1-A2 and box B1-B2 (negative if overlap)"
+	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
+	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
+][
+	either isec: boxes-overlap? A1 A2 B1 B2 [			;-- case needed by box arrangement algo
+		negate min isec/x isec/y
+	][
+		AC: A1 + A2 / 2
+		BC: B1 + B2 / 2
+		AP: closest-box-point?/to A1 A2 BC
+		BP: closest-box-point?/to B1 B2 AP
+		vec-length? BP - AP
+	]
+]
+; test for it:
+; view [a: base 100x20 loose b: base 20x100 loose return t: text 100 react [t/text: form box-distance? a/offset a/offset + a/size b/offset b/offset + b/size]]
+
+
 ;; need this to be able to call event functions recursively with minimum allocations
 ;; can't use a static block but can use one block per recursion level
 ;; also used in the layout functions (which can be recursive easily)
@@ -619,80 +694,6 @@ rechange: function [
     if integer? data [return shift-left data offset]
     skip tail data negate offset
 ]
-
-{
-	useful pair invariants to test in which quadrant a point is located
-	points: a, b
-	a = min a b <=> 0x0 = min 0x0 b - a <=> B is in Q1 to A, axis-inclusive <=> A is in Q3 to B, axis-inclusive
-	a = max a b <=> 0x0 = max 0x0 b - a <=> B is in Q3 to A, axis-inclusive <=> A is in Q1 to B, axis-inclusive
-	                1x1 = min 1x1 b - a <=> B is in Q1 to A, axis-exclusive <=> A is in Q3 to B, axis-exclusive
-	            -1x-1 = max -1x-1 b - a <=> B is in Q3 to A, axis-exclusive <=> A is in Q1 to B, axis-exclusive
-	a = min a b <=> b = max a b   
-}
-
-;-- chainable pair comparison - instead of `within?` monstrosity
-; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
-; == 4x4
-
-;; very hard to find a sigil for these ops
-;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
-+<=: make op! func [
-	"Chainable pair comparison (non-strict)"
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b  b]
-]
-+<:  make op! func [
-	"Chainable pair comparison (strict)"    
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b - 1  b]
-]
-;+>:  make op! func [a b] [a = max a b + 1]
-;+>=: make op! func [a b] [a = max a b]
-
-;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
-;@@ to be rewritten once we have floating point pairs
-boxes-overlap?: function [
-	"Get intersection size of boxes A1-A2 and B1-B2, or none if they do not intersect"
-	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
-	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
-][
-	0x0 +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
-]
-
-vec-length?: function [v [pair!]] [						;-- this is still 2x faster than compiled `distance? 0x0 v`
-	v/x ** 2 + (v/y ** 2) ** 0.5
-]
-
-closest-box-point?: function [
-	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
-	B1 [pair!] "inclusive" B2 [pair!] "inclusive"
-	/to origin [pair!] "defaults to 0x0"
-][
-	default origin: 0x0
-	as-pair
-		case [origin/x < B1/x [B1/x] B2/x < origin/x [B2/x] 'else [origin/x]]
-		case [origin/y < B1/y [B1/y] B2/y < origin/y [B2/y] 'else [origin/y]]
-]
-
-box-distance?: function [
-	"Get distance between closest points of box A1-A2 and box B1-B2 (negative if overlap)"
-	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
-	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
-][
-	either isec: boxes-overlap? A1 A2 B1 B2 [			;-- case needed by box arrangement algo
-		negate min isec/x isec/y
-	][
-		AC: A1 + A2 / 2
-		BC: B1 + B2 / 2
-		AP: closest-box-point?/to A1 A2 BC
-		BP: closest-box-point?/to B1 B2 AP
-		vec-length? BP - AP
-	]
-]
-; test for it:
-; view [a: base 100x20 loose b: base 20x100 loose return t: text 100 react [t/text: form box-distance? a/offset a/offset + a/size b/offset b/offset + b/size]]
 
 
 ;-- faster than for-each/reverse, but only correct if series length is a multiple of skip
