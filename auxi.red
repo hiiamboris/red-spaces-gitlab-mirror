@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-overlap? infxinf]
+exports: [by abs range! range? .. using when only mix clip ortho dump-event boxes-overlap? infxinf]
 
 ;; readability helper instead of reduce/into [] clear [] ugliness
 #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -28,7 +28,11 @@ exports: [by abs range! range? .. when only mix clip ortho dump-event boxes-over
 by: make op! :as-pair
 abs: :absolute
 
-using: function [words [block!] code [block!]] [
+using: function [
+	"Return CODE bound to a context with WORDS local to it"
+	words [block!] "List of words"
+	code  [block!]
+][
 	words: construct map-each w words [to set-word! w]
 	with words code
 ]
@@ -40,7 +44,11 @@ using: function [words [block!] code [block!]] [
 ;; space with draw=[] = 512 B, rectangle = 1196 B, timer does not need this at all
 range!: object [min: max: none]
 range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
-..: make op! function [a [scalar! none!] b [scalar! none!]] [	;-- name `to` cannot be used as it's a native
+..: make op! function [									;-- name `to` cannot be used as it's a native
+	"Make a range from A to B"
+	a [scalar! none!]
+	b [scalar! none!]
+][
 	make range! [min: a max: b]
 ]
 
@@ -145,27 +153,6 @@ clone: function [
 ]
 
 
-;-- chainable pair comparison - instead of `within?` monstrosity
-; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
-; == 4x4
-
-;; very hard to find a sigil for these ops
-;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
-+<=: make op! func [
-	"Chainable pair comparison (non-strict)"
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b  b]
-]
-+<:  make op! func [
-	"Chainable pair comparison (strict)"    
-	a [pair! none!] b [pair! none!]
-][
-	all [a b a = min a b - 1  b]
-]
-;+>:  make op! func [a b] [a = max a b + 1]
-;+>=: make op! func [a b] [a = max a b]
-
 
 flush: function [
 	"Grab a copy of SERIES, clearing the original"
@@ -194,10 +181,22 @@ swap: func [a [word! series!] b [word! series!]] [
 ]
 
 only: function [
-	"Turn falsy values into unset, eliminating from compose expressions"
+	"Turn falsy values into empty block (useful for composing Draw code)"
 	value [any-type!] "Any truthy value is passed through"
 ][
 	any [:value []]		;-- block is better than unset here because can be used in set-word assignments
+]
+
+;-- `compose` readability helper variant 2
+; when: func [test value] [only if :test [do :value]]
+
+;-- `compose` readability helper variant 3
+when: func [
+	"If TEST is truthy, return VALUE, otherwise an empty block"
+	test   [any-type!]
+	:value [paren! block!] "Paren is evaluated, block is returned as is"
+][
+	only if :test [either paren? :value [do :value][:value]]
 ]
 
 area?: func [xy [pair!]] [xy/x * xy/y]
@@ -205,7 +204,11 @@ area?: func [xy [pair!]] [xy/x * xy/y]
 skip?: func [series [series!]] [-1 + index? series]
 
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
-clip: func [range [block!] value [scalar!]] [
+clip: func [
+	"Get VALUE or margin closest to it if it's outside of [range/1 range/2] segment"
+	range [block!]  "Reduced"
+	value [scalar!]
+][
 	range: reduce/into range clear []
 	#assert [any [not number? range/1  range/1 <= range/2]]
 	min range/2 max range/1 value
@@ -333,21 +336,17 @@ enhance: function [
 	HSL2RGB fg-hsl
 ]
 
-
-opaque: function [color [tuple! word!] alpha [percent! float!]] [
+;@@ any better name?
+opaque: function [
+	"Add alpha channel to the COLOR"
+	color [tuple! word!] "If a word, looked up in system/view/metrics/colors"
+	alpha [percent! float!]
+][
 	color: 0.0.0.0 + resolve-color color
 	color/4: none										;-- remove alpha channel
 	100% - alpha * 0.0.0.255 + color
 ]
 
-
-;-- `compose` readability helper variant 2
-; when: func [test value] [only if :test [do :value]]
-
-;-- `compose` readability helper variant 3
-when: func [test :value [paren! block!]] [
-	only if :test [either paren? :value [do :value][:value]]
-]
 
 range: func [a [integer!] b [integer!]] [
 	collect [while [a <= b] [keep a  a: a + 1]]
@@ -534,55 +533,6 @@ encode-canvas: function [
 	infxinf = encode-canvas infxinf 1x0					;-- must not become zero
 ]]
 
-; normalize-canvas: function [
-	; "Make negative or none canvas into positive"
-	; canvas [none! pair!]
-; ][
-	; either canvas [abs canvas][infxinf]
-; ]
-
-; fill?: function [
-	; "Get fill flag from non-normalized canvas axis"
-	; canvas [pair!] axis [word!] "X or Y"
-; ][
-	; all [0 < canvas/:axis  canvas/:axis < infxinf/x]
-; ]
-
-; canvas-sign?: function [canvas [pair!]] [
-	; canvas / max 1x1 abs canvas
-; ]
-
-
-; decode-canvas: function [
-	; "Turn pair canvas into positive value and fill flags"
-	; canvas [none! pair!] "can be none, negative or infinite (no fill), positive (fill)"
-	; fill   [block!]      "output buffer for: [x logic y logic]; cleared"
-; ][
-	; also either canvas [abs canvas][canvas: infxinf]
-	; compose/into [
-		; ;; 2D fill flag: x>=0 and x<>inf -> 1; x<0 or x=inf -> 0
-		; x (0 < canvas/x and (canvas/x < infxinf/x))
-		; y (0 < canvas/y and (canvas/y < infxinf/y))
-	; ] clear fill
-; ]
-
-; decode-canvas1: function [canvas [none! pair!]] [
-	; reduce/into [
-		; either canvas [abs canvas][canvas: infxinf]
-		; ;; 2D fill flag: x>=0 and x<>inf -> 1; x<0 or x=inf -> 0
-		; as-pair
-			; any [all [0 < canvas/x canvas/x < infxinf/x 1] 0]
-			; any [all [0 < canvas/y canvas/y < infxinf/y 1] 0]
-		; ;; tricky but faster way (150% overall)
-		; (xy: max 0x0 canvas % infxinf) / max 1x1 xy
-	; ] clear []
-; ]
-
-; #assert [
-	; (reduce [infxinf 0x0]) = decode-canvas none
-	; [10x20 1x1] = decode-canvas 10x20
-	; [10x20 1x0] = decode-canvas 10x-20
-; ]
 
 finite-canvas: function [
 	"Turn infinite dimensions of CANVAS into zero"
@@ -593,13 +543,21 @@ finite-canvas: function [
 
 #assert [0x20 = finite-canvas infxinf/x by 20]
 
-extend-canvas: function [canvas [pair!] axis [word!]] [
+extend-canvas: function [
+	"Make one of CANVAS dimensions infinite"
+	canvas [pair!]
+	axis   [word!] "X or Y"
+][
 	canvas/:axis: infxinf/x
 	canvas
 ]
 
 ;; useful to subtract margins, but only from finite dimensions
-subtract-canvas: function [canvas [pair!] pair [pair!]] [
+subtract-canvas: function [
+	"Subtract PAIR from CANVAS if it's finite, rounding negative results to 0x0"
+	canvas [pair!]
+	pair   [pair!]
+][
 	#assert [0x0 +<= canvas]
 	mask: 1x1 - (canvas / infxinf)						;-- 0x0 (infinite) to 1x1 (finite)
 	max 0x0 canvas - (pair * mask)
@@ -609,16 +567,12 @@ subtract-canvas: function [canvas [pair!] pair [pair!]] [
 #assert [( 0  by infxinf/y) = subtract-canvas   20 by infxinf/y 40x30]
 
 
-;-- debug func
-dump-event: function [event] [
-	event: object map-each/eval w system/catalog/accessors/event! [
-		[to set-word! w 'quote event/:w]
-	]
-	help event
+top: func [
+	"Return SERIES at it's position before the last item"
+	series [series!]
+][
+	back tail series
 ]
-
-
-top: func [series [series!]] [back tail series]
 
 ;; good addition to do-atomic which holds reactivity
 do-async: function [									;@@ used solely to work around #5132
@@ -647,6 +601,7 @@ rechange: function [
 	e =? tail s
 ]]
 
+;; main problem with these is they can't be used in performance critical areas, which is quite often the case
 >>: make op! function [
     "Return series at an offset from head or shift bits to the right"
     data   [series! integer!]
@@ -675,6 +630,27 @@ rechange: function [
 	a = min a b <=> b = max a b   
 }
 
+;-- chainable pair comparison - instead of `within?` monstrosity
+; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
+; == 4x4
+
+;; very hard to find a sigil for these ops
+;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
++<=: make op! func [
+	"Chainable pair comparison (non-strict)"
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b  b]
+]
++<:  make op! func [
+	"Chainable pair comparison (strict)"    
+	a [pair! none!] b [pair! none!]
+][
+	all [a b a = min a b - 1  b]
+]
+;+>:  make op! func [a b] [a = max a b + 1]
+;+>=: make op! func [a b] [a = max a b]
+
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
@@ -682,10 +658,10 @@ boxes-overlap?: function [
 	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
 	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
 ][
-	0x0 +< ((min A2 B2) - max A1 B1)							;-- 0x0 +< intersection size
+	0x0 +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
 ]
 
-vec-length?: function [v [pair!]] [
+vec-length?: function [v [pair!]] [						;-- this is still 2x faster than compiled `distance? 0x0 v`
 	v/x ** 2 + (v/y ** 2) ** 0.5
 ]
 
@@ -732,6 +708,7 @@ foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 	]
 ]
 
+;; O(1) remove that doesn't preserve the order (useful for hashes)
 fast-remove: function [block [any-block!] length [integer!]] [
 	any [
 		block =? other: skip tail block negate length
@@ -753,7 +730,6 @@ enlarge: function [
 same-paths?: function [p1 [block! path!] p2 [block! path!]] [
 	to logic! all [
 		p1 == as p1 p2									;-- spelling & length match
-		; (length? p1) = length? p2						;-- doesn't seem to be faster this way
 		find/match/same									;-- values match
 			reduce/into as [] p1 clear []
 			reduce/into as [] p2 clear []

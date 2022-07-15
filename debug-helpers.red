@@ -9,6 +9,14 @@ Red [
 exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~ debug-draw]
 
 
+;-- debug func
+dump-event: function [event] [
+	event: object map-each/eval w system/catalog/accessors/event! [
+		[to set-word! w 'quote event/:w]
+	]
+	help event
+]
+
 dump-tree: function [] [
 	foreach-*ace path: anonymize 'screen system/view/screens/1 [
 		spc: get last path
