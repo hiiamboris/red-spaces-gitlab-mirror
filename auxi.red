@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs range! range? .. using when only mix clip ortho dump-event boxes-overlap? infxinf]
+exports: [by abs range! range? .. using when only mix clip ortho dump-event boxes-overlap? infxinf opaque]
 
 ;; readability helper instead of reduce/into [] clear [] ugliness
 #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -289,8 +289,12 @@ clip: func [
 	min range/2 max range/1 value
 ]
 
-resolve-color: function [color [tuple! word!]] [
-	either tuple? color [color][system/view/metrics/colors/:color]
+resolve-color: function [color [tuple! word! issue!]] [
+	case [
+		word?  color [system/view/metrics/colors/:color]
+		issue? color [hex-to-rgb color]
+		'else [color]
+	]
 ]
 
 mix: function [
@@ -414,7 +418,7 @@ enhance: function [
 ;@@ any better name?
 opaque: function [
 	"Add alpha channel to the COLOR"
-	color [tuple! word!] "If a word, looked up in system/view/metrics/colors"
+	color [tuple! word! issue!] "If a word, looked up in system/view/metrics/colors"
 	alpha [percent! float!]
 ][
 	color: 0.0.0.0 + resolve-color color
