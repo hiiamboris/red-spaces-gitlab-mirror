@@ -75,10 +75,19 @@ spaces/templates/spiral: make-template 'space [
 			if all [i - 1 = field/caret/offset] [
 				box: compose [box (p) (p + as-pair field/caret/width full/y)]
 			]
+			sel?: all [sel: field/selected sel/1 < i i <= sel/2]
+			sel: []
+			if sel? [
+				sel: compose/deep [push [
+					pen off fill-pen (opaque system/view/metrics/colors/text 20%)
+					box (p) (p - bgn + caret-to-offset/lower r i)
+				]]
+			]
 			compose/deep/into [
 				push [
 					rotate (cycles * 360)
 					scale (scale) (scale)
+					(sel)
 					(box)
 					text (p) (form c)
 				]
