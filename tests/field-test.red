@@ -1,6 +1,5 @@
 Red [needs: view]
 
-recycle/off
 #include %../everything.red
 view [
 	host [

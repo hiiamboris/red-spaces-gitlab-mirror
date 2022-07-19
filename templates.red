@@ -581,18 +581,6 @@ scrollable-space: context [
 paragraph-ctx: context [
 	~: self
 	
-	;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
-	;; just make face! is 120 times slower too, because of on-change handlers
-	;; rich text does not require any of that however, so I mimick it using a non-reactive object
-	;; achieved construction time is 16us vs 200us
-	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
-	rtd-template: compose [                                    
-		on-change*: does []								;-- for whatever reason, crashes without this
-		on-deep-change: none
-		(system/view/VID/styles/rich-text/template)
-	]
-	new-rich-text: does [make light-face! rtd-template]
-	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
@@ -2566,20 +2554,23 @@ field-ctx: context [
 			invalidate-cache/only field/caret
 		]
 		origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`
+		mrg: field/margin * 1x1
 		if sel: field/selected [
 			sxy1: caret-to-offset       field/layout sel/1 + 1
 			sxy2: caret-to-offset/lower field/layout sel/2
 			maybe field/selection/size: sxy2 - sxy1
-			sdrawn: compose/only [translate (sxy1) (render in field 'selection)]
+			sdrawn: compose/only [translate (mrg + sxy1) (render in field 'selection)]
 		]
 		cdrawn: render in field 'caret
 		#assert [field/layout]							;-- should be set after draw, others may rely
 		compose/only/deep [
 			clip (mrg: field/margin * 1x1) (field/size - mrg) [
 				translate (origin by 0) [
-					(when sdrawn (compose/only [translate (mrg) (sdrawn)]))
+					(only sdrawn)
 					(drawn)
 					translate (cxy1 + mrg) (cdrawn)
+					;@@ workaround for #4901 which draws white background under text over the selection:
+					#if system/platform = 'Linux [(only sdrawn)]
 				]
 			]
 		]

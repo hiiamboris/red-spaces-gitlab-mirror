@@ -835,5 +835,41 @@ distribute: function [
 	[50%  25%  0%  25% ] == distribute 100%  [2 1 0 1] [2e9 2e9 2e9 2e9]
 ]
 
+new-rich-text: none
+context [
+	;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
+	;; just make face! is 120 times slower too, because of on-change handlers
+	;; rich text does not require any of that however, so I mimick it using a non-reactive object
+	;; achieved construction time is 16us vs 200us
+	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
+	rtd-template: compose [                                    
+		on-change*: does []								;-- for whatever reason, crashes without this
+		on-deep-change: none
+		(system/view/VID/styles/rich-text/template)
+	]
+	set 'new-rich-text does [make light-face! rtd-template]
+]
+	
+;@@ workaround for #5165! - remove me once it's fixed
+#if system/platform = 'Linux [
+	native-caret-to-offset: :caret-to-offset
+	set 'caret-to-offset function [
+	    {Given a text position, returns the corresponding coordinate relative to the top-left of the layout box} 
+	    face [object!] 
+	    pos [integer!] 
+	    /lower "lower end offset of the caret" 
+	][
+		either lower [
+			;@@ this also suffers from #3812: /with is ignored by size-text, have to work around!
+			rt: new-rich-text
+			quietly rt/text: copy/part face/text 0x1 + pos
+			add native-caret-to-offset face pos
+				size-text rt
+		][
+			native-caret-to-offset face pos
+		]
+	]
+]
+
 
 export exports

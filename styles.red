@@ -149,6 +149,10 @@ do with [
 		]
 		field/selection: [
 			below: [pen off fill-pen !(opaque 'text 30%)]
+			;@@ workaround for #5133 needed by workaround for #4901: clipping makes fill-pen black
+			#if system/platform = 'Linux [
+				below: [pen !(svmc/text) fill-pen off line-width 1 box 1x1 (size - 2)]
+			]
 		]
 		
 		tube: list: box: [									;-- allow color override for containers
