@@ -134,7 +134,7 @@ do with [
 
 		text: paragraph: link: fps-meter: [
 			default font: fonts/text
-			; #if system/platform = 'Linux [(font: serif-12 ())]	;@@ GTK fix for #4901
+			; #if linux? [(font: serif-12 ())]	;@@ GTK fix for #4901
 			below: when select self 'color [pen (color)]
 		]
 
@@ -150,7 +150,7 @@ do with [
 		field/selection: [
 			below: [pen off fill-pen !(opaque 'text 30%)]
 			;@@ workaround for #5133 needed by workaround for #4901: clipping makes fill-pen black
-			#if system/platform = 'Linux [
+			#if linux? [
 				below: [pen !(svmc/text) fill-pen off line-width 1 box 1x1 (size - 2)]
 			]
 		]

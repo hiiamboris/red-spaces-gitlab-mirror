@@ -851,7 +851,7 @@ context [
 ]
 	
 ;@@ workaround for #5165! - remove me once it's fixed
-#if system/platform = 'Linux [
+#if linux? [
 	native-caret-to-offset: :caret-to-offset
 	set 'caret-to-offset function [
 	    {Given a text position, returns the corresponding coordinate relative to the top-left of the layout box} 

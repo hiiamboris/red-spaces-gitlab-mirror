@@ -11,6 +11,13 @@ Red [
 ;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
 
 #include %../common/include-once.red					;-- the rest can use the improved include
+#do [
+	;; when compiling, this needs `inline` to get the `-t os` argument!
+	linux?: any [										;-- to unify compiled & interpreted workaround logic
+		system/platform = 'Linux
+		all [Rebol system/version/4 = 4]
+	]
+]
 
 #process off											;-- do not expand the rest using the default #include
 do/expand [

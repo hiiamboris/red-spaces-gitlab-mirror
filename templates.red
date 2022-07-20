@@ -2570,7 +2570,7 @@ field-ctx: context [
 					(drawn)
 					translate (cxy1 + mrg) (cdrawn)
 					;@@ workaround for #4901 which draws white background under text over the selection:
-					#if system/platform = 'Linux [(only sdrawn)]
+					#if linux? [(only sdrawn)]
 				]
 			]
 		]
