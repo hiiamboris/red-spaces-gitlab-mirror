@@ -95,11 +95,12 @@ layouts: context [
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
-			;; apply limits to size/:x to obtain proper list width
-			size: constrain size limits
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
 			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]		;-- `size` already has margin subtracted
+			;; apply limits to canvas2/:x to obtain proper list width
+			; size: constrain size limits
+			canvas2: constrain canvas2 limits
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
