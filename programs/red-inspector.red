@@ -336,8 +336,11 @@ context [
 		reload: does [
 			set/any 'browser/data get-path history/1
 			set-details
-			invalidate browser
-			invalidate details
+			;; partial invalidations don't get rid of the now invalid spaces, which burden the cache and make it slow
+			;@@ why hash! becomes so slow?? need a way to reproduce it
+			; invalidate browser
+			; invalidate details
+			invalidate <everything>
 		]
 		jump: function [] [
 			attempt [path: transcode/one entry/text]
