@@ -422,8 +422,8 @@ opaque: function [
 	alpha [percent! float!]
 ][
 	color: 0.0.0.0 + resolve-color color
-	color/4: none										;-- remove alpha channel
-	100% - alpha * 0.0.0.255 + color
+	color/4: to integer! 255 - (255 - color/4 * alpha)
+	color
 ]
 
 
