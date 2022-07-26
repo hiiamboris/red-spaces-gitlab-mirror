@@ -334,7 +334,7 @@ scrollbar: context [
 	draw: function [space [object!]] [
 		size2: either space/axis = 'x [space/size][reverse space/size]
 		h: size2/y  w-full: size2/x
-		w-arrow: to integer! size2/y * 0.9
+		w-arrow: to integer! size2/y * space/arrow-size
 		w-inner: w-full - (2 * w-arrow)
 		;-- in case size is too tight to fit the scrollbar - compress inner first, arrows next
 		if w-inner < 0 [w-arrow: to integer! w-full / 2  w-inner: 0]
@@ -362,17 +362,18 @@ scrollbar: context [
 	]
 	
 	on-change: function [bar [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [offset amount size axis [invalidate-cache bar]]
+		switch to word! word [offset amount size axis arrow-size [invalidate-cache bar]]
 		bar/space-on-change word :old :new
 	]
 				
 	templates/scrollbar: make-template 'space [
 		;@@ maybe leverage canvas size?
-		size:   100x16									;-- opposite axis defines thickness
-		axis:   'x
-		offset: 0%
-		amount: 100%
-		map:    []
+		size:       100x16								;-- opposite axis defines thickness
+		axis:       'x
+		offset:     0%
+		amount:     100%
+		arrow-size: 90%									;-- arrow length in percents of scroller's thickness 
+		map:        []
 		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] ;-- go back a step
 		back-page:   make-space 'rectangle [draw: []]           ;-- go back a page
 		thumb:       make-space 'rectangle [margin: 2x1]        ;-- draggable
@@ -1037,6 +1038,7 @@ window-ctx: context [
 			cavail? axis dir from requested
 		][														;-- otherwise deduce from content/size
 			csize: any [cspace/size 0x0]						;@@ or assume infinity if no /size in content?
+			; either dir < 0 [from][csize/:axis - from]
 			clip [0 requested] either dir < 0 [from][csize/:axis - from]
 		]
 	]
@@ -1051,7 +1053,7 @@ window-ctx: context [
 		;; safer to call available? every time because window never knows if content size will change
 		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
 		foreach x [x y] [size/:x: window/available? x 1 negate org/:x size/:x]
-		maybe window/size: size							;-- limit window size by content size (so we don't scroll over)
+		maybe window/size: size							;-- limit window size by content size (so we don't scroll over it)
 		#debug sizing [#print "window resized to (size)"]
 		default xy1: 0x0
 		default xy2: size
@@ -1178,7 +1180,7 @@ inf-scrollable-ctx: context [
 		autosize-window: function [] [
 			size: any [self/size if self/limits [self/limits/min]]
 			if 0x0 +< size [maybe window/max-size: pages * size]	;-- don't ever make window empty
-			#debug list-view [#print "autosized window to (window/max-size)"]
+			#debug sizing [#print "autosized window to (window/max-size)"]
 		]
 
 		scrollable-draw: :draw
@@ -1338,7 +1340,11 @@ list-view-ctx: context [
 	available?: function [list [object!] canvas [pair!] "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 		#assert [0x0 +<= canvas]						;-- shouldn't happen
 		if axis <> list/axis [
-			return either dir < 0 [from][min requested canvas/:axis - from]
+			list/draw/on/only canvas 
+			return either dir < 0 [from][
+				min requested canvas/:axis - from
+				; (max canvas/:axis list/size/:axis) - from
+			]
 		]
 		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
 		r: max 0 requested - switch item [
@@ -1404,7 +1410,7 @@ list-view-ctx: context [
 		#assert [0x0 <> size]
 		maybe lview/window/max-size: lview/pages - 1 * unit + 1 * size - scrollers
 		#assert [0x0 <> lview/window/max-size]
-		#debug list-view [#print "autosized window to (lview/window/max-size)"]
+		#debug sizing [#print "autosized window to (lview/window/max-size)"]
 	]
 
 	on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
