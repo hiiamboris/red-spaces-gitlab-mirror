@@ -455,7 +455,6 @@ scrollable-space: context [
 	draw: function [space [object!] canvas [none! pair!]] [
 		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
 		;; canvas takes priority (for auto sizing), but only along constrained axes
-		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
 		maybe space/size: box: constrain finite-canvas canvas space/limits
@@ -475,7 +474,8 @@ scrollable-space: context [
 		cdraw: render/only/on space/content		
 			max 0x0 0x0 - origin
 			box - origin
-			encode-canvas ccanvas -1x-1					;-- scrollable never uses fill flag for content
+			;; fill flag passed through as is, useful for 1D scrollables like list-view
+			encode-canvas ccanvas fill
 		csz: cspace/size
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
@@ -1027,55 +1027,60 @@ window-ctx: context [
 	;; if it returns more than requested, window is expanded by returned value
 	;; (e.g. user scrolls a chat up, whole message height is added to it, not just 20 pixels of the message)
 	available?: function [
-		content   [word!]
+		space     [object!]
 		axis      [word!]   
 		dir       [integer!]
 		from      [integer!]
 		requested [integer!]
 	][
-		cspace: get content
+		cspace: get space/content
 		either function? cavail?: select cspace 'available? [	;-- use content/available? when defined
 			cavail? axis dir from requested
 		][														;-- otherwise deduce from content/size
 			csize: any [cspace/size 0x0]						;@@ or assume infinity if no /size in content?
-			; either dir < 0 [from][csize/:axis - from]
 			clip [0 requested] either dir < 0 [from][csize/:axis - from]
 		]
 	]
 
-	draw: function [window [object!] xy1 [pair! none!] xy2 [pair! none!]] [
-		#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2)"]
+	;; window always has to render content on it's whole size,
+	;; otherwise how does it know how big it really is
+	;; (considering content can be smaller and window has to follow it)
+	;; but only xy1-xy2 has to appear in the render result block and map!
+	;@@ OTOH, it will be extra work now to remove it... doesn't work as an optimization
+	draw: function [window [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
+		#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2) on canvas=(canvas)"]
 		#assert [word? window/content]
-		cspace: get window/content
-		org:  window/origin
-		;; there's no size for infinite spaces so we use `available?` to get the drawing size
-		size: window/max-size
-		;; safer to call available? every time because window never knows if content size will change
-		;@@ maybe there's a way to avoid this, but just caching offset is clearly not enough
-		foreach x [x y] [size/:x: window/available? x 1 negate org/:x size/:x]
-		maybe window/size: size							;-- limit window size by content size (so we don't scroll over it)
-		#debug sizing [#print "window resized to (size)"]
-		default xy1: 0x0
-		default xy2: size
-		cdraw: render/only/on window/content xy1 - org xy2 - org xy2 - xy1
-		quietly window/map: compose/deep [(window/content) [offset: (org) size: (xy2 - org)]]
+		-org: negate org: window/origin
+		;; there's no size for infinite spaces so pages*canvas is used as drawing area
+		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
+		set [canvas': fill:] decode-canvas canvas
+		size: window/pages * finite-canvas canvas'
+		; default xy1: 0x0
+		; default xy2: size
+		cspace: get content: window/content
+		cdraw: render/only/on content -org -org + size canvas
+		;; once content is rendered, it's size is known and may be less than requested,
+		;; in which case window should be contracted too, else we'll be scrolling over an empty window area
+		maybe window/size: min size -org + cspace/size
+		#debug sizing [#print "window resized to (window/size)"]
+		;; let right bottom corner on the map also align with window size
+		; xy2: min xy2 window/size - xy1
+		; quietly window/map: compose/deep [(content) [offset: (xy1 - org) size: (xy2 - xy1)]]
+		quietly window/map: compose/deep [(content) [offset: (org) size: (cspace/size)]]
 		compose/only [translate (org) (cdraw)]
 	]
 	
 	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
-			origin limits content [invalidate-cache space]
+			origin limits pages content [invalidate-cache space]
 		]
 		space/space-on-change word :old :new
 	]
 		
 	templates/window: make-template 'space [
-		;; when drawn auto adjusts it's `size` up to `max-size` (otherwise scrollbars will always be visible)
-		;; but `max-size` itself is set by `inf-scrollable`, to a multiple of it's own size!
-		max-size: 1000x1000
-		; cache?: off
-
-		origin:   0x0									;-- content's offset (negative)
+		;; when drawn auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
+		pages:  10x10							;-- window size multiplier in canvas sizes (= size of inf-scrollable)
+		origin: 0x0								;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
 		content: generic/empty
@@ -1088,11 +1093,11 @@ window-ctx: context [
 			from      [integer!] "axis coordinate to look ahead from"
 			requested [integer!] "max look-ahead required"
 		][
-			~/available? content axis dir from requested
+			~/available? self axis dir from requested
 		]
 	
-		draw: func [/only xy1 [pair!] xy2 [pair!]] [
-			~/draw self xy1 xy2
+		draw: func [/only xy1 [pair!] xy2 [pair!] /on canvas [none! pair!]] [
+			~/draw self canvas xy1 xy2
 		]
 		
 		space-on-change: :on-change*
@@ -1106,67 +1111,56 @@ inf-scrollable-ctx: context [
 	roll: function [space [object!]] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
-		;; /2 is hardcoded because `content` may change while map still will reflect the previous frame
-		wofs: wofs0: negate window/origin				;-- (positive) offset of window within it's content
-		#assert [window/size]
+		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
+		#assert [window/size "window must be rendered before it's rolled"]
 		wsize:  window/size
-		before: negate space/origin
-		#assert [space/map/window]
-		after:  wsize - (before + space/map/window/size)
+		before: negate space/origin						;-- area before the current viewport offset
+		#assert [space/map/window]						;-- roll attempt on an empty viewport, or map is invalid?
+		viewport: space/map/window/size
+		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
+		if zero? area? viewport [return no]
+		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
 		foreach x [x y] [
-			any [		;-- prioritizes left/up jump over right/down
+			any [										;-- prioritizes left/up jump over right/down
 				all [
 					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wofs/:x space/jump-length
-					wofs/:x: wofs/:x - avail
+					0 < avail: window/available? x -1 wofs'/:x space/jump-length
+					wofs'/:x: wofs'/:x - avail
 				]
 				all [
 					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wofs/:x + wsize/:x space/jump-length
-					wofs/:x: wofs/:x + avail
+					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
+					wofs'/:x: wofs'/:x + avail
 				]
 			]
 		]
-		maybe space/origin: space/origin + (wofs - wofs0)	;-- transfer offset from scrollable into window, in a way detectable by on-change
-		;; since this is not a change of canvas, direct map manipulation is allowed:
-		maybe window/origin: negate wofs
-		wofs <> wofs0									;-- should return true when updates origin - used by event handlers
+		;; transfer offset from scrollable into window, in a way detectable by on-change
+		if wofs' <> wofs [
+			;; effectively viewport stays in place, while underlying window location shifts
+			#debug sizing [#print "rolling (space/size) with (space/content) by (wofs' - wofs)"]
+			maybe space/origin: space/origin + (wofs' - wofs)
+			maybe window/origin: negate wofs'
+		]
+		wofs' <> wofs									;-- should return true when updates origin - used by event handlers ;@@ or not?
 	]
 	
 	draw: function [space [object!] canvas [none! pair!]] [
+		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
 		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
-		any-scrollers?: 0 < add area? space/hscroll/size area? space/vscroll/size
+		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
 		maybe space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		;; scrollable/draw removes roll-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
-		append space/map compose [
-			(in space 'roll-timer) [offset 0x0 size 0x0]	;-- scrollable/draw removes it
-		]
-		#debug sizing [
-			print [
-				"inf-scrollable with" space/content
-				"on" canvas "->" space/size "window:" space/window/size
-			]
-		]
+		repend space/map [in space 'roll-timer [offset 0x0 size 0x0]]
+		#debug sizing [#print "inf-scrollable with (space/content) on (canvas) -> (space/size) window: (space/window/size)"]
 		#assert [space/window/size]
 		drawn
-	]
-		
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			pages size [
-				all [space/size  0x0 +< space/size  space/autosize-window]
-				invalidate-cache space
-			]
-		]
-		space/scrollable-on-change word :old :new
 	]
 	
 	templates/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
-		pages: 10x10							;-- window size multiplier in sizes of inf-scrollable
-		; cache?: off
 
 		window: make-space 'window [size: none]			;-- size is set by window/draw
 		content: 'window
@@ -1177,17 +1171,8 @@ inf-scrollable-ctx: context [
 
 		roll: does [~/roll self]
 
-		autosize-window: function [] [
-			size: any [self/size if self/limits [self/limits/min]]
-			if 0x0 +< size [maybe window/max-size: pages * size]	;-- don't ever make window empty
-			#debug sizing [#print "autosized window to (window/max-size)"]
-		]
-
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
-		
-		scrollable-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -1230,8 +1215,7 @@ list-view-ctx: context [
 		x: list/axis
 		if level < list/margin/:x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
-		;; make canvas zero to outline compression intent, otherwise single item will occupy it's size
-		canvas/:x: 0
+		canvas: encode-canvas canvas make-pair [1x1 x -1]	;-- list items will be filled along secondary axis
 		
 		either empty? list/map [
 			i: 1
@@ -1251,10 +1235,9 @@ list-view-ctx: context [
 			;; existing previous size is always preferred here, esp. useful for non-cached items
 			;; but `locate-line` is used by `available?` which is in turn called:
 			;; - when determining initial window extent (from content size)
-			;; - every time window gets scrolled closer to it's borders
-			;; so there's no easy way around requiring render here, and around having a canvas here
-			;; for the purpose of this function, last rendered canvas works, as well as window size
-			render/on name encode-canvas canvas 1x1		;-- uses fill on secondary axis
+			;; - every time window gets scrolled closer to it's borders (where we have to render out-of-window items)
+			;; so there's no easy way around requiring render here, but for canvas previous window size can be used
+			render/on name canvas
 			item: obj/size
 		]
 		;@@ should this func use layout or it will only complicate things?
@@ -1340,11 +1323,10 @@ list-view-ctx: context [
 	available?: function [list [object!] canvas [pair!] "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 		#assert [0x0 +<= canvas]						;-- shouldn't happen
 		if axis <> list/axis [
-			list/draw/on/only canvas 
-			return either dir < 0 [from][
-				min requested canvas/:axis - from
-				; (max canvas/:axis list/size/:axis) - from
-			]
+			;; along secondary axis there is no absolute width: no way to know some distant unrendered item's width
+			;; so just previously rendered width is used (and will vary as list is rolled, if some items are bigger than canvas)
+			#assert [list/size]
+			return either dir < 0 [from][min requested list/size/:axis - from]
 		]
 		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
 		r: max 0 requested - switch item [
@@ -1357,9 +1339,12 @@ list-view-ctx: context [
 			
 	;; container/draw only supports finite number of `items`, infinite needs special handling
 	;; it's also too general, while this `draw` can be optimized better
-	list-draw: function [list [object!] canvas [pair!] xy1 [pair!] xy2 [pair!]] [
+	list-draw: function [lview [object!] canvas [pair! none!] xy1 [pair!] xy2 [pair!]] [
+		#debug sizing [#print "list-view/list draw is called on (canvas), only (xy1)..(xy2)"]
+		set [canvas: _:] decode-canvas canvas			;-- fill is not used: X is infinite, Y is always filled along if finite
+		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
+		list: lview/list
 		axis: list/axis
-		#assert [0x0 +<= canvas]						;-- shouldn't happen; other funcs must pass positive canvas here
 		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		#assert [canvas +< infxinf]						;-- window is never infinite
 		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
@@ -1373,19 +1358,21 @@ list-view-ctx: context [
 		guide:    axis2pair axis
 		viewport: xy2 - xy1
 		origin:   guide * (xy1 - o1 - list/margin)
-		cache:    'all
+		;; visible items need rendering code; invisible items don't, so let layout just count their size when possible
+		;@@ will it even work? if canvas changes, items need at least a formal redraw!
+		cache:    none ;'all
+		; cache:    'invisible
 		settings: with [list 'local] [axis margin spacing canvas viewport origin cache]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn: make [] 3 * (length? new-map) / 2
 		foreach [name geom] new-map [
-			either drw: geom/drawn [					;-- invisible items don't get re-rendered
+			#assert [geom/drawn]						;@@ should never happen?
+			if drw: geom/drawn [						;-- invisible items don't get re-rendered
 				remove/part find geom 'drawn 2			;-- no reason to hold `drawn` in the map anymore
-			][
-				drw: render/on name geom/size
+				compose/only/into [translate (geom/offset) (drw)] tail drawn
 			]
-			compose/only/into [translate (geom/offset) (drw)] tail drawn
 		]
 		maybe list/size: new-size
 		quietly list/map: new-map
@@ -1397,41 +1384,21 @@ list-view-ctx: context [
 		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
 	]
 	
-	;; this initializes window size to a multiple of list-view sizes (paragraphs adjust to window then)
-	;; overrides inf-scrollable's own autosize-window because `list-view` has a linear `pages` interpretation (not 2D)
-	autosize-window: function [lview [object!]] [
-		size: any [lview/size lview/limits/min]			;@@ rethink how to better handle integer or invalid limit
-		unit: axis2pair lview/list/axis
-		;; account for scrollers size, since list-view is meant to always display one along main axis
-		;; this will make window and it's content adapt to list-view width when possible
-		;@@ it's a bit dumb to _always_ subtract scrollers even if they're not visible
-		;@@ need more dynamic way of adapting window size
-		scrollers: lview/hscroll/size * 0x1 + (lview/vscroll/size * 1x0) * reverse unit
-		#assert [0x0 <> size]
-		maybe lview/window/max-size: lview/pages - 1 * unit + 1 * size - scrollers
-		#assert [0x0 <> lview/window/max-size]
-		#debug sizing [#print "autosized window to (lview/window/max-size)"]
-	]
-
 	on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			axis size pages [
-				if :old <> :new [
-					#assert [any [word <> 'axis  find [x y] :new]]
-					if lview/size [						;-- do not trigger during initialization
-						lview/autosize-window
-						invalidate-cache lview
-					]
-				]
-			]
+		if all [
+			word = 'axis
+			:old <> :new
+			lview/size									;-- do not trigger during initialization
+		][
+			#assert [find [x y] :new]
+			invalidate-cache lview
 		]
 		lview/inf-scrollable-on-change word :old :new
 	]
 		
 	templates/list-view: make-template 'inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
-		; cache?: off
-		size:   none									;-- avoids extra triggers in on-change
+		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
 		source: []
 		data: function [/pick i [integer!] /size] [		;-- can be overridden
@@ -1447,7 +1414,6 @@ list-view-ctx: context [
 		window/content: 'list
 		list: make-space 'list [
 			axis: 'y
-			; cache?: off
 			
 			;; cache of last rendered item spaces (as words)
 			;; this persistency is required by the focus model: items must retain sameness
@@ -1463,17 +1429,14 @@ list-view-ctx: context [
 				][data/size]
 			]
 
-			;; window/max-size serves as list's canvas everywhere, while /on canvas is not used
-			;@@ window should be reset if list-view is resized!
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
-				~/available? self window/max-size axis dir from requested
-			]
-			draw: function [/only xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
-				~/list-draw self window/max-size xy1 xy2
+				;; must pass positive canvas (uses last rendered list-view size)
+				~/available? self size axis dir from requested
 			]
 		]
-
-		autosize-window: does [~/autosize-window self]
+		list/draw: function [/only xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
+			~/list-draw self canvas xy1 xy2
+		]
 
 		inf-scrollable-on-change: :on-change*
 		#on-change-redirect

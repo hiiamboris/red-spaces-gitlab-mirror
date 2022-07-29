@@ -1,7 +1,7 @@
 TODOS
-event handling system - standard way to react to clicks, clicks-and-holds, keypresses, etc.
++ event handling system - standard way to react to clicks, clicks-and-holds, keypresses, etc.
 keys binding to each UI item?
-focused items should be highlighted using styles
++ focused items should be highlighted using styles
 + decouple styles from the objects
 + demo+test of rotated scrollable space (mb rotate it with time and demo proper origin)
 demo: chatlog with smooth scrolling and an interactive bot
@@ -12,14 +12,14 @@ demo: chatlog with smooth scrolling and an interactive bot
 need to try 2 types of KB navigation: tabbed and spatial, how they apply
 	this navigation, at least tabbed, should be able to work across different *faces*
 	so: mixed transparent tabbing across spaces and faces
-if `map` is defined `into` should not be needed, when none is defined it is a final space (non-composite)
++ if `map` is defined `into` should not be needed, when none is defined it is a final space (non-composite)
 	or leave `into` always there? afraid of inheritance errors
 draggability of spaces (e.g. table columns) - this will require temporary offsets in the map
 disabled items, and they should not be focusable!
 if an item gets hidden, it should not receive keyboard events even if it's still in focus
 	(there will be no 'hidden', there will be 'not drawn')
 + how to decouple KB navigation from the dispatcher?
-make content: 'a-word ! make `make` return a word with a style value!
++ make content: 'a-word ! make `make` return a word with a style value!
 how to compose styles from the old ones? need a clear mechanism
 handler spec validation and auto addition of typesets - to help learning, minimize mistakes
 list & doc ideas that improve over vid/view, key differences
@@ -27,7 +27,7 @@ debug func to list handlers for this or that space (with all path variants)
 should events receive full paths (from `screen`) or relative to host (from it's `space`)??
 in event handlers `self` =? `commands` right now, should be set to `space`? and get rid of `space` arg?
 	this will be problematic as will require a `bind` before every handler call
-can I externalize list-view's rolling logic to be able to utilize it in other spaces?
++ can I externalize list-view's rolling logic to be able to utilize it in other spaces?
 table demo with wavy animated layout: each row would slide left and right in a sine manner - will be a killer demo!
 	and it's columns should be draggable! :D
 high-level table that would extend minimal table with advanced features
@@ -36,17 +36,17 @@ maybe a plugin mechanism:
 	or it's not worth it, even for the table?
 demo templates for all useful styles, like small static table, huge table for csv, etc etc
 	so others can take those and build upon
-separate space for an icon+text combo -- very common thing nowadays
++ separate space for an icon+text combo -- very common thing nowadays
 	or `list` will be enough?
-VID extension for spaces:
++ VID extension for spaces:
 	on-created (possible?) global event handler
 	will scan each host face's worst actor and create a space tree from it's spec
 rename host/space to host/content for consistency with scrollable?
 	or make it host a scrollable always?
 	or make separate faces for all spaces? - best idea to keep layout clean.. e.g. host.list, host.scrollable ..
-decide on resize model (though ideally it should cover View wholly)
-what if I devise a standard way child sizes can be propagated into parent sizes? (headers-list dilemma)
-make multi-cell span
++ decide on resize model (though ideally it should cover View wholly)
++ what if I devise a standard way child sizes can be propagated into parent sizes? (headers-list dilemma)
++ make multi-cell span
 	how can cell span multiple rows vertically?
 	perhaps separate grid style will be required
 	or I just make a span: field and disable clipping everywhere (except scrollable)
@@ -90,7 +90,7 @@ truly rich text (hypertext) widget - where text is mixed with other (interactive
 rename grid-view to data-grid?
 demo: debugger, need to mark functions, store values of all words during last iteration or 2-3 last iterations,
 	and be able to explore those (where spaces come to help)
-demo: round lists (like in games or sketchbook) - showing the power of container/layout
++ demo: round lists (like in games or sketchbook) - showing the power of container/layout
 splitters for UI panels
 inspect https://nicepage.com/nicepage-review for anything useful
 allow size to be an integer in `field` - so it will infer height automatically from font and adjust it on the fly
@@ -116,15 +116,16 @@ document resource usage howto:
 	- spaces do not redraw unless `update` or `invalidate` is called
 	- cache? = yes usage
 generative planet atlas to demo full-featured table widget; galaxy name hash used as random seed
+	a bit of a problem with this: can't sort infinite data, so not so good for table widget..
 lists (table) polymorphism: https://www.microsoft.com/en/microsoft-365/microsoft-lists
 debug-draw should become a fully-featured layout explorer to help users understand the anatomy of their layouts
-	and it should move the main window to the left
+	+ and it should move the main window to the left
 make tree-view widget a widget creation case study (document the whole process) ?
 pekr's idea is to rename `host` to `spaces` in VID/S, and it's reasonable but.. has drawbacks too - need more consideration and input
 	dsunanda's vote: "A SPAN is a collection of SPACES held in one VID face"
 
 
-key aspects: draggable columns, rearrange by styles (and styling DSL?)
+key aspects: draggable columns, rearrange by styles
 
 QUIRKS
 
@@ -1241,6 +1242,65 @@ even bigger one
 	- extend-canvas just works: no change needed
 	- render cache needs no change while canvas is a single value, negative and positive canvas leads to different cache hits
 	- encode-canvas is super easy operation
+there's a problem with window autosizing (again)
+	list-view sets window to a 1D multiple of it's sizes, so there's never a horizontal scroller
+	even if content is bigger than the window!
+	generic resize sets window to 2D multiple, so it becomes huge, much bigger than content
+	need to think more on this aspect...
+	what if: not only window gets smaller if it's content is smaller
+	but it also gets larger if it's content is larger?
+	what limits it is `available` returns up to max-size
+	and max-size is the only way to tell it what size it should align to.. well, so far it was
+	now there's canvas and window may use it! while max-size may stay big in 2D sense
+	oh, list-view has it's own available which just uses canvas for width (as max size)
+	I cannot resolve this after all?.. it's ambiguous
+	list items either draw themselves to fit into canvas, or into infinity
+	(list could have a controllable wrap flag)
+	problem here is wrapping instead, why it's not wrapped (files are single words?)
+	hmm... rethinking
+	if there was no `available?`, only draw:
+	list-view:
+	1. has canvas and limits - adjusts canvas to limits, calls draw on adjusted canvas (fills width? yes)
+	2. has no/inf canvas but limits - uses /min limit only, calls draw on it (may be 0x0) (fills width? yes)
+	3. has no/inf canvas or limits - because content may be infinite, cannot infer the size, uses 0x0 as default /min limit
+	   or rather passes canvas as is? if it's infinite so be it
+	window: always receives canvas, maybe 0x0, or infxinf:
+		list-view gives it 1x10*size canvas, to fill horizontally
+		grid-view gives it 10x10*size canvas, not to fill (web too)
+		in this case important part of the canvas is not lost, and no need in max-size too, or it can be set on the fly
+		problem with max-size is that available may then return 0 if window is 0 sized: need to ensure available works with content, not window
+	auto sets its max-size? there was a problem with this on 0x0/inf, but maybe it doesn't need explicit max-size anymore
+	> remove max-size
+	let it just multiply the canvas and pass it to the child? but then the original canvas will be lost
+	hmm actually it's maxsize is the argument to draw/only, and /on can still carry original canvas and filling intent
+	but clipping intent is the issue?
+	grid: will be no clipping
+	list: it's okay if it can clip at it's width
+	what window passes on as canvas?
+	may want to fill the original canvas (only if window is <= canvas), but not window
+	worse case: I could expose a lever to control list-view's 1D/2D behavior which controls the filling
+	also list itself fills it's width, but should it expand it's width to the canvas? for clickability of items, yes
+	so, now I add `available`.. why? because rendering is so much slower
+	what does it need?
+	in list case:
+		available takes canvas - why? because locate-line needs to render items to wrap around canvas width when they can
+		vertically, it doesn't care about window and may render outside of it
+		> horizontally, it should just tell how big is the current window (with all items rendered inside it's 1x10 size)
+		so then it doesn't really need the canvas, but it needs window to render itself (and items)
+		oops, it needs canvas for vertical estimation, because wrapping affects window height with limited content
+		> but if it's already rendered to window size, then it's enough to use this size
+		but first window renders get zero canvas, so how big should it render itself? how does it know 10x multiple of what it will take?
+		need to take care not to call available before window gets it's final render?
+		> also window maybe should not render anything if it's zero-sized
+		previous available? design didn't use canvas - only window/max-size as canvas, so it was losing canvas and it didn't reach content
+		this must change.. but still, available should not cause renders and use already rendered geometry!?
+		except it can't: it's called on window edges, and requires to render items around the window, and canvas to wrap these items
+		> so, roll will have to provide canvas, but roll is an event.. maybe it should use list-view's current size as canvas?
+		possible danger: during tube rendering cycle, list-view gets rendered at various sizes and causes a roll incidentally
+		> need to ensure, that roll is only called from timer events and never from the rendering chain itself
+		> pages must be synced with list-view/grid-view pages or removed from them? I'm for removal
+	
+	
 	
 
 
@@ -4343,4 +4403,27 @@ original field handlers
 		; maybe space/caret/visible?: no
 		; update
 	; ]
+; ]
+
+window/max-size was a super messy concept, not needed after adding canvas to window (good riddance)
+it's persistence just didn't work together with the volatility of /sizes, at all 
+; autosize-window: function [] [
+	; size: any [self/size if self/limits [self/limits/min]]
+	; if 0x0 +< size [maybe window/max-size: pages * size]	;-- don't ever make window empty
+	; #debug sizing [#print "autosized window to (window/max-size)"]
+; ]
+; ;; this initializes window size to a multiple of list-view sizes (paragraphs adjust to window then)
+; ;; overrides inf-scrollable's own autosize-window because `list-view` has a linear `pages` interpretation (not 2D)
+; autosize-window: function [lview [object!]] [
+	; size: any [lview/size lview/limits/min]			;@@ rethink how to better handle integer or invalid limit
+	; unit: axis2pair lview/list/axis
+	; ;; account for scrollers size, since list-view is meant to always display one along main axis
+	; ;; this will make window and it's content adapt to list-view width when possible
+	; ;@@ it's a bit dumb to _always_ subtract scrollers even if they're not visible
+	; ;@@ need more dynamic way of adapting window size
+	; scrollers: lview/hscroll/size * 0x1 + (lview/vscroll/size * 1x0) * reverse unit
+	; #assert [0x0 <> size]
+	; maybe lview/window/max-size: lview/pages - 1 * unit + 1 * size - scrollers
+	; #assert [0x0 <> lview/window/max-size]
+	; #debug sizing [#print "autosized window to (lview/window/max-size)"]
 ; ]

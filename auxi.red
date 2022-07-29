@@ -528,6 +528,14 @@ ortho: func [
 	switch xy [x ['y] y ['x] 0x1 [1x0] 1x0 [0x1]]
 ]
 
+make-pair: function [
+	"Construct a pair out of default value and possible axis replacements"
+	spec [block!] "Reduced, /x /y and /1 are used"
+][
+	reduce/into spec spec: clear []
+	as-pair any [spec/x spec/1/1] any [spec/y spec/1/2]
+]
+
 axis2pair: func [xy [word!]] [
 	switch xy [x [1x0] y [0x1]]
 ]
