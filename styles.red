@@ -243,7 +243,7 @@ do with [
 		]
 		
 		menu/ring/clickable: [
-			below: [(make-box size 0 none none)]
+			below: [(make-box size 1 none none)]
 		]
 		
 		menu/ring/round-clickable: [
