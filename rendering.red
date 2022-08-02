@@ -177,7 +177,7 @@ context [
 			clear memoized-paths
 		][
 			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
-				#debug cache [#print "Invalidating (any [select space-names space 'unknown])"]
+				#debug cache [#print "Invalidating (any [select space-names space 'unknown]) of size=(space/size)"]
 				if pos: find/same memoized-paths space [fast-remove pos 2]
 				either node: find/same render-cache space [
 					;; currently rendered spaces should not be invalidated, or parents get lost:
@@ -328,7 +328,6 @@ context [
 	
 	render-face: function [
 		face [object!] "Host face"
-		/only xy1 [pair! none!] xy2 [pair! none!]
 	][
 		#debug styles [#print "render-face on (face/type) with current-path: (mold current-path)"]
 		#assert [
@@ -342,7 +341,8 @@ context [
 		append visited-spaces host
 		with-style 'host [
 			style: apply-current-style face				;-- host style can only be a block
-			drawn: render-space/only/on face/space xy1 xy2 face/size
+			canvas: if face/size [encode-canvas face/size -1x-1]	;-- fill by default
+			drawn: render-space/on face/space canvas
 			#assert [block? :drawn]
 			unless face/size [									;-- initial render: define face/size
 				space: get face/space
@@ -360,7 +360,7 @@ context [
 
 	render-space: function [
 		name [word!] "Space name pointing to it's object"
-		/only xy1 [pair! none!] xy2 [pair! none!]
+		/window xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas [pair! none!]
 	][
 		; if name = 'cell [?? canvas]
@@ -388,12 +388,15 @@ context [
 		]
 
 		with-style name [
-			;@@ this does not allow the style code to invalidate the cache
-			;@@ which is good for resource usage, but limits style power
-			;@@ so maybe compose styles first, then check the cache?
+			window?: all [
+				any [xy1 xy2]
+				function? draw: select space 'draw
+				find spec-of :draw /window
+				;@@ this should also check if style func supports /only but it's already too much hassle, maybe later
+			]
 			
 			either all [
-				not xy1 not xy2							;-- usage of region is not supported by current cache model
+				not window?								;-- usage of region is not supported by current cache model
 				cache: get-cache space canvas
 			][
 				set [size: map: render:] next cache
@@ -416,12 +419,12 @@ context [
 					;@@ this basically cries for FAST `apply` func!!
 					if function? :draw [
 						spec: spec-of :draw
-						either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+						either find spec /window [window: any [xy1 xy2]][set [xy1: xy2: window:] none]
 						canvas': if find spec /on [canvas]		;-- must not affect `canvas` used by cache, thus new name
 						code: case [						;@@ workaround for #4854 - remove me!!
-							all [canvas' only] [[draw/only/on xy1 xy2 canvas']]
-							only               [[draw/only    xy1 xy2        ]]
-							canvas'            [[draw/on              canvas']]
+							all [canvas' window] [[draw/window/on xy1 xy2 canvas']]
+							window               [[draw/window    xy1 xy2        ]]
+							canvas'              [[draw/on                canvas']]
 						]
 					]
 					draw: either code [do copy/deep code][draw]	;-- call the draw function if not called yet
@@ -431,12 +434,12 @@ context [
 					#assert [function? :style]
 					;@@ this basically cries for FAST `apply` func!!
 					spec: spec-of :style
-					either find spec /only [only: any [xy1 xy2]][set [xy1: xy2: only:] none]
+					either find spec /window [window: any [xy1 xy2]][set [xy1: xy2: window:] none]
 					canvas': if find spec /on [canvas]	;-- must not affect `canvas` used by cache, thus new name
 					code: case [					
-						all [canvas' only] [[style/only/on space xy1 xy2 canvas']]
-						only               [[style/only    space xy1 xy2        ]]
-						canvas'            [[style/on      space         canvas']]
+						all [canvas' window] [[style/window/on space xy1 xy2 canvas']]
+						window               [[style/window    space xy1 xy2        ]]
+						canvas'              [[style/on        space         canvas']]
 					]
 					render: either code [do copy/deep code][style space]	;@@ workaround for #4854 - remove me!!
 					#assert [block? :render]
@@ -461,18 +464,16 @@ context [
 	set 'render function [
 		"Return Draw code to draw a space or host face, after applying styles"
 		space [word! object!] "Space name, or host face as object"
-		/only "Limit rendering area to [XY1,XY2] if space supports it"
+		/window "Limit rendering area to [XY1,XY2] if space supports it"
 			xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas [pair! none!] "Specify canvas size as sizing hint"
 	][
-		; render: either word? space [:render-space][:render-face]
-		; render/only/on space xy1 xy2 canvas
-		drawn: either word? space [					;@@ workaround for #4854 - remove me!!
-			render-space/only/on space xy1 xy2 canvas
+		drawn: either word? space [
+			render-space/window/on space xy1 xy2 canvas
 		][
-			render-face/only space xy1 xy2
+			render-face space
 		]
-		#debug draw [									;-- test the output to figure out which style has a Draw error
+		#debug draw [									;-- test the output to figure out which style has a "Draw error"
 			if error? error: try/keep [draw 1x1 drawn] [
 				prin "*** Invalid draw block: "
 				attempt [copy/deep drawn]				;@@ workaround for #5111

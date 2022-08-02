@@ -60,16 +60,16 @@ compose-map: function [
 	"Build a Draw block from MAP"
 	map "List of [space-name [offset XxY size XxY] ...]"
 	/only list [block!] "Select which spaces to include"
-	/limits xy1 [pair!] xy2 [pair!] "Specify viewport"
+	/window xy1 [pair!] xy2 [pair!] "Specify viewport"	;@@ it's unused; remove it?
 ][
 	r: make [] round/ceiling/to (1.5 * length? map) 1	;-- 3 draw tokens per 2 map items
 	foreach [name box] map [
 		all [list  not find list name  continue]		;-- skip names not in the list if it's provided
 		; all [limits  not boxes-overlap? xy1 xy2 o: box/offset o + box/size  continue]	;-- skip invisibles ;@@ buggy - requires origin
 		if zero? area? box/size [continue]				;-- don't render empty elements (also works around #4859)
-		cmds: either limits [
-			render/only name xy1 xy2
-		][	render      name
+		cmds: either window [
+			render/window name xy1 xy2
+		][	render        name
 		]
 		unless empty? cmds [							;-- don't spawn empty translate/clip structures
 			compose/only/into [
@@ -471,7 +471,7 @@ scrollable-space: context [
 		scrollers: space/vscroll/size/x by space/hscroll/size/y
 		ccanvas: max 0x0 box - scrollers				;-- valid since box is finite
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
-		cdraw: render/only/on space/content		
+		cdraw: render/window/on space/content		
 			max 0x0 0x0 - origin
 			box - origin
 			;; fill flag passed through as is, useful for 1D scrollables like list-view
@@ -687,11 +687,11 @@ container-ctx: context [
 		cont [object!]
 		type [word!]
 		settings [block!]
-		xy1 [pair! none!]
-		xy2 [pair! none!]
+		; xy1 [pair! none!]								;@@ unlikely window can be supported by general container
+		; xy2 [pair! none!]
 		; canvas [pair! none!]
 	][
-		#assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
+		; #assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
 		len: cont/items/size
 		#assert [len "container/draw works only for containers of limited items count"]
 		r: make [] 4 * len
@@ -708,16 +708,16 @@ container-ctx: context [
 			drw: geom/drawn
 			#assert [drw]
 			remove/part find geom 'drawn 2				;-- no reason to hold `drawn` in the map anymore
-			skip?: all [xy2  not boxes-overlap?  pos pos + siz  xy1 xy2]
-			unless skip? [
-				org: any [geom/origin 0x0]
-				compose/only/deep/into [
-					;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
-					; clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
-						translate (pos + org) (drw)
-					; ]
-				] tail drawn
-			]
+			; skip?: all [xy2  not boxes-overlap?  pos pos + siz  0x0 xy2 - xy1]
+			; unless skip? [
+			org: any [geom/origin 0x0]
+			compose/only/deep/into [
+				;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
+				; clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
+				translate (pos + org) (drw)
+				; ]
+			] tail drawn
+			; ]
 		]
 		quietly cont/map: map	;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
 		maybe cont/size: constrain size cont/limits		;@@ is this ok or layout needs to know the limits?
@@ -743,12 +743,11 @@ container-ctx: context [
 		]
 
 		draw: function [
-			/only xy1 [pair! none!] xy2 [pair! none!]
 			; /on canvas [pair! none!]					;-- not used: layout gets it in settings instead
 			/layout type [word!] settings [block!]
 		][
 			#assert [layout "container/draw requires layout to be provided"]
-			~/draw self type settings xy1 xy2
+			~/draw self type settings; xy1 xy2
 		]
 
 		space-on-change: :on-change*
@@ -780,9 +779,9 @@ list-ctx: context [
 		; cache?:    off
 
 		container-draw: :draw
-		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
+		draw: function [/on canvas [pair! none!]] [
 			settings: [axis margin spacing canvas limits]
-			container-draw/layout/only 'list settings xy1 xy2
+			container-draw/layout 'list settings; xy1 xy2
 		]
 		
 		container-on-change: :on-change*
@@ -866,9 +865,9 @@ tube-ctx: context [
 		align:   -1x-1
 		
 		container-draw: :draw
-		draw: function [/only xy1 [pair! none!] xy2 [pair! none!] /on canvas [pair! none!]] [
+		draw: function [/on canvas [pair! none!]] [
 			settings: [margin spacing align axes canvas limits]
-			drawn: container-draw/layout/only 'tube settings xy1 xy2
+			drawn: container-draw/layout 'tube settings
 			#debug sizing [print ["tube with" content "on" canvas "->" size]]
 			drawn
 		]
@@ -1046,27 +1045,24 @@ window-ctx: context [
 	;; otherwise how does it know how big it really is
 	;; (considering content can be smaller and window has to follow it)
 	;; but only xy1-xy2 has to appear in the render result block and map!
-	;@@ OTOH, it will be extra work now to remove it... doesn't work as an optimization
-	draw: function [window [object!] canvas [pair! none!] xy1 [pair! none!] xy2 [pair! none!]] [
-		#debug grid-view [#print "window/draw is called with xy1=(xy1) xy2=(xy2) on canvas=(canvas)"]
+	;; area outside of canvas and within xy1-xy2 may stay not rendered as long as it's size is guaranteed
+	draw: function [window [object!] canvas [pair! none!]] [
+		#debug grid-view [#print "window/draw is called on canvas=(canvas)"]
 		#assert [word? window/content]
 		-org: negate org: window/origin
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
 		set [canvas': fill:] decode-canvas canvas
 		size: window/pages * finite-canvas canvas'
-		; default xy1: 0x0
-		; default xy2: size
 		cspace: get content: window/content
-		cdraw: render/only/on content -org -org + size canvas
+		cdraw: render/window/on content -org -org + size canvas
 		;; once content is rendered, it's size is known and may be less than requested,
 		;; in which case window should be contracted too, else we'll be scrolling over an empty window area
-		maybe window/size: min size -org + cspace/size
+		if cspace/size [size: min size cspace/size - org]	;-- size has to be finite
+		maybe window/size: size
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
-		; xy2: min xy2 window/size - xy1
-		; quietly window/map: compose/deep [(content) [offset: (xy1 - org) size: (xy2 - xy1)]]
-		quietly window/map: compose/deep [(content) [offset: (org) size: (cspace/size)]]
+		quietly window/map: compose/deep [(content) [offset: (org) size: (size)]]
 		compose/only [translate (org) (cdraw)]
 	]
 	
@@ -1096,9 +1092,7 @@ window-ctx: context [
 			~/available? self axis dir from requested
 		]
 	
-		draw: func [/only xy1 [pair!] xy2 [pair!] /on canvas [none! pair!]] [
-			~/draw self canvas xy1 xy2
-		]
+		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
 		
 		space-on-change: :on-change*
 		#on-change-redirect
@@ -1217,16 +1211,20 @@ list-view-ctx: context [
 		#debug list-view [level0: level]				;-- for later output
 		canvas: encode-canvas canvas make-pair [1x1 x -1]	;-- list items will be filled along secondary axis
 		
-		either empty? list/map [
+		; either empty? list/map [
 			i: 1
 			level: level - list/margin/:x
-		][
-			#assert [not empty? list/icache]
-			#assert ['item = list/map/1]
-			item-spaces: reduce values-of list/icache
-			i: pick keys-of list/icache j: index? find/same item-spaces get list/map/1
-			level: level - list/map/2/offset/:x
-		]
+		; ][
+			;@@ this needs reconsideration, because canvas is not guaranteed to have persisted! plus it has a bug now
+			;@@ ideally I'll have to have a map of item (object) -> list of it's offsets on variuos canvases
+			;@@ invalidation conditions then will become a big question
+			; ;; start off the previously rendered first item's offset
+			; #assert [not empty? list/icache]
+			; #assert ['item = list/map/1]
+			; item-spaces: reduce values-of list/icache
+			; i: pick keys-of list/icache j: index? find/same item-spaces get list/map/1
+			; level: level - list/map/2/offset/:x
+		; ]
 		imax: list/items/size
 		space: list/spacing								;-- return value is named "space"
 		fetch-ith-item: [								;-- sets `item` to size
@@ -1242,6 +1240,7 @@ list-view-ctx: context [
 		]
 		;@@ should this func use layout or it will only complicate things?
 		;@@ right now it independently of list-layout computes all offsets
+		;@@ which saves some CPU time, because there's no need in final render here
 		r: catch [
 			either level >= 0 [
 				imax: any [imax 1.#inf]					;-- if undefined
@@ -1340,14 +1339,16 @@ list-view-ctx: context [
 	;; container/draw only supports finite number of `items`, infinite needs special handling
 	;; it's also too general, while this `draw` can be optimized better
 	list-draw: function [lview [object!] canvas [pair! none!] xy1 [pair!] xy2 [pair!]] [
-		#debug sizing [#print "list-view/list draw is called on (canvas), only (xy1)..(xy2)"]
+		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
 		set [canvas: _:] decode-canvas canvas			;-- fill is not used: X is infinite, Y is always filled along if finite
 		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
 		list: lview/list
+		worg: negate lview/window/origin				;-- offset of window within content
 		axis: list/axis
-		#assert [canvas/:axis > 0]						;-- some bug in window sizing likely
+		; #assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		#assert [canvas +< infxinf]						;-- window is never infinite
-		set [i1: o1: i2: o2:] locate-range list canvas xy1/:axis xy2/:axis
+		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
+		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
 			maybe list/size: list/margin * 2x2
 			return quietly list/map: []
@@ -1356,13 +1357,8 @@ list-view-ctx: context [
 
 		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
 		guide:    axis2pair axis
-		viewport: xy2 - xy1
 		origin:   guide * (xy1 - o1 - list/margin)
-		;; visible items need rendering code; invisible items don't, so let layout just count their size when possible
-		;@@ will it even work? if canvas changes, items need at least a formal redraw!
-		cache:    none ;'all
-		; cache:    'invisible
-		settings: with [list 'local] [axis margin spacing canvas viewport origin cache]
+		settings: with [list 'local] [axis margin spacing canvas origin]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
@@ -1434,7 +1430,7 @@ list-view-ctx: context [
 				~/available? self size axis dir from requested
 			]
 		]
-		list/draw: function [/only xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
+		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
 			~/list-draw self canvas xy1 xy2
 		]
 
@@ -1444,7 +1440,8 @@ list-view-ctx: context [
 ]
 
 
-;@@ TODO: list-view of SPACES?  simple layout-ers?  like grid..?
+;@@ TODO: list-view of SPACES?
+;@@ TODO: grid layout?
 
 ;; grid's key differences from list of lists:
 ;; * it aligns columns due to fixed column size
@@ -1744,6 +1741,7 @@ grid-ctx: context [
 	]
 		
 	calc-size: function [grid [object!]] [
+		if r: grid/size-cache/size [return r]			;-- already calculated
 		#debug grid-view [#print "grid/calc-size is called!"]
 		#assert [not grid/infinite?]
 		bounds: grid/calc-bounds
@@ -1753,7 +1751,7 @@ grid-ctx: context [
 		repeat x bounds/x [r/x: r/x + grid/col-width?  x]
 		repeat y bounds/y [r/y: r/y + grid/row-height? y]
 		#debug grid-view [#print "grid/calc-size -> (r)"]
-		r
+		grid/size-cache/size: r
 	]
 		
 	;@@ TODO: at least for the chosen range, cell/drawn should be invalidated and cell/size recalculated
@@ -1789,7 +1787,6 @@ grid-ctx: context [
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
 			render/on mcname encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
-			invalidate-cache/only mcspace
 			mcdraw: render/on mcname encode-canvas mcsize 1x1	;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
@@ -1800,36 +1797,39 @@ grid-ctx: context [
 		]
 		reduce [map drawn]
 	]
-		
 	;@@ this hack allows styles to know whether this cell is pinned or not
 	pinned?: does [get bind 'pinned? :draw]
-		
-	;@@ this could leverage canvas but I have no idea how; also limits?
-	draw: function [grid [object!] xy1 [none! pair!] xy2 [none! pair!]] [
-		#debug grid-view [#print "grid/draw is called with xy1=(xy1) xy2=(xy2)"]
-		#assert [any [not grid/infinite?  all [xy1 xy2]]]	;-- bounds must be defined for an infinite grid
 
+	;; uses canvas only to figure out what cells are visible (and need to be rendered)
+	draw: function [grid [object!] canvas [none! pair!] wxy1 [none! pair!] wxy2 [none! pair!]] [
+		#debug grid-view [#print "grid/draw is called with window xy1=(wxy1) xy2=(wxy2)"]
+		#assert [any [not grid/infinite?  all [canvas wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
+	
+		set [canvas: fill:] decode-canvas canvas
 		cache: grid/size-cache
 		set cache none
 
 		cache/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
 		#assert [cache/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
-		default xy1: 0x0
-		unless xy2 [cache/size: xy2: grid/calc-size]
+		default wxy1: 0x0
+		unless wxy2 [wxy2: wxy1 + grid/calc-size]
+		xy1: wxy1 - grid/origin
+		xy2: min xy1 + canvas wxy2
 
 		;; affects xy1 so should come before locate-point
-		pinned?: yes
+		pinned?: yes									;@@ hack for styles - need a better design!
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
-			set [map: drawn-common-header:] draw-range grid 1x1 pinned (grid/margin + xy1)
-			xy1: (xy0: xy1 + grid/margin) + grid/get-offset-from 1x1 (pinned + 1x1)
+			xy0: grid/margin + xy1						;-- location of drawn pinned cells relative to grid's origin
+			set [map: drawn-common-header:] draw-range grid 1x1 pinned xy0
+			xy1: xy1 + grid/get-offset-from 1x1 (pinned + 1x1)	;-- location of unpinned cells relative to origin
 		]
 		#debug grid-view [#print "drawing grid from (xy1) to (xy2)"]
 
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
-		all [none? cache/size  not grid/infinite?  cache/size: grid/calc-size]
-		; unless grid/size [quietly grid/size: cache/size]
+		all [none? cache/size  not grid/infinite?  grid/calc-size]
+		#assert [any [grid/infinite? cache/size]]		;-- must be set by calc-size
 		maybe grid/size: cache/size
 
 		;@@ create a grid layout?
@@ -2102,8 +2102,8 @@ grid-ctx: context [
 
 
 		;; does not use canvas, dictates it's own size
-		draw: function [/only xy1 [none! pair!] xy2 [none! pair!]] [
-			~/draw self xy1 xy2
+		draw: function [/on canvas [pair! none!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+			~/draw self canvas xy1 xy2
 		]
 	
 		space-on-change: :on-change*
@@ -2140,16 +2140,13 @@ grid-view-ctx: context [
 	
 	on-change: function [gview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
 		switch to word! word [
-			size pages [
+			;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
+			;@@ situation when jump clears a part of a viewport should never happen at runtime
+			size [quietly gview/jump-length: min gview/size/x gview/size/y]
+			axis [
 				if :old <> :new [
-					#assert [any [word <> 'axis  find [x y] :new]]
-					if gview/size [						;-- do not trigger during initialization
-						gview/autosize-window
-						gview/jump-length: min gview/size/x gview/size/y
-						;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
-						;@@ situation when jump clears a part of a viewport should never happen at runtime
-						invalidate-cache gview
-					]
+					#assert [find [x y] :new]
+					invalidate-cache gview
 				]
 			]
 			origin [gview/grid/origin: new]
@@ -2158,7 +2155,6 @@ grid-view-ctx: context [
 	]
 	
 	templates/grid-view: make-template 'inf-scrollable [
-		size:   none									;-- avoids extra triggers in on-change
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
@@ -2174,12 +2170,19 @@ grid-view-ctx: context [
 			]
 		]
 
+		;@@ this is super slow because setting data -> font reset -> full invalidation (same probably for other values)
+		;@@ need to somehow avoid invalidation while still ensuring state correctness
 		wrap-data: function [item-data [any-type!]] [
 			spc: make-space 'data-view [wrap?: on margin: 3x3 align: -1x0]
 			set/any 'spc/data :item-data
 			anonymize 'cell spc
 		]
 
+		;; cacheability requires window to be fully rendered but
+		;; full window render is too slow (many seconds), can't afford it
+		;; so instead, grid redraws visible part every time
+		window/cache?: off
+		
 		window/content: 'grid
 		grid: make-space 'grid [
 			;; grid-view does not use ccache, but sets it for the grid

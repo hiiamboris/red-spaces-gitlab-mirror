@@ -24,43 +24,35 @@ layouts: context [
 	list: context [
 		;; settings for list layout:
 		;;   axis             [word!]   x or y
-		;;   margin       [integer! pair!]   >= 0x0			;@@ these should support integers!
+		;;   margin       [integer! pair!]   >= 0x0
 		;;   spacing      [integer! pair!]   >= 0x0
 		;;   canvas        [pair! none!]
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
-		;;   viewport         [pair!]   only matters if any cache-* is true, >= 0x0
-		;;   cache         [word! none!]				;@@ remove viewport and cache! now that general caching is done
-		;;     none       = disabled
-		;;     'invisible = items outside 0x0-viewport are not rendered if they have a size
-		;;     'all       = all items are not rendered if they have a size
 		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
 		;; settings are passed as a list of bound words, not as context
 		;; this is done to make the list explicit, to avoid unexpected settings being read from the space object
 		;; some of the words are also calculated directly in `draw`, so object is a bad fit to pass these
-		;@@ cache should only be not none for unchanged canvas!
 		create: function [
 			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axis margin spacing canvas limits origin viewport cache]"
+			settings [block!] "Any subset of [axis margin spacing canvas limits origin]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas limits origin viewport cache
+			/local axis margin spacing canvas limits origin
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [0x0 []]]	;-- empty list optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
-				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
+				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count` or global smth
 			]
 			#debug [typecheck [
-				axis     [word!       (find [x y] axis)]
+				axis     [word! (find [x y] axis)]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
 				limits   [none! object! (all [in limits 'min in limits 'max])]
 				origin   [none! pair!]
-				viewport [none! pair! (0x0 +<= viewport)]
-				cache    [none! word! (find [all invisible] cache)]
 			]]
 			default origin: 0x0
 			default canvas: infxinf
@@ -72,24 +64,17 @@ layouts: context [
 			fill/:x: 1									;-- always fills along it's secondary axis
 			guide: axis2pair y
 			pos: pos': origin + margin
-			draw?: case [
-				cache = 'all [[not space/size]]			;-- cache everything, only redraw if never drawn
-				cache = 'invisible [[					;-- cache invisible only, redraw if never drawn or visible
-					not space/size
-					boxes-overlap? 0x0 viewport pos pos + space/size
-				]]
-				'else [[true]]							;-- don't cache, always redraw
-			]
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
 			canvas1: canvas2: subtract-canvas canvas 2 * margin
+			canvas1: encode-canvas canvas1 fill
 			
 			map: make [] 2 * count
 			size: 0x0
 			repeat i count [							;-- first render cycle
 				space: get name: either func? [spaces/pick i][spaces/:i]
-				if any draw? [drawn: render/on name encode-canvas canvas1 fill]
+				drawn: render/on name canvas1
 				#assert [space/size +< (1e7 by 1e7)]
 				compose/only/deep/into [(name) [offset (pos) size (space/size) drawn (drawn)]] tail map
 				pos:   pos + (space/size + spacing * guide)
@@ -101,12 +86,13 @@ layouts: context [
 			;; apply limits to canvas2/:x to obtain proper list width
 			; size: constrain size limits
 			canvas2: constrain canvas2 limits
+			canvas2: encode-canvas canvas2 fill
 			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
 					space: get name: either func? [spaces/pick i][spaces/:i]
-					if any draw? [drawn: render/on name encode-canvas canvas2 fill]
+					drawn: render/on name canvas2
 					#assert [space/size +< (1e7 by 1e7)]
 					geom:  pick map 2 * i
 					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
