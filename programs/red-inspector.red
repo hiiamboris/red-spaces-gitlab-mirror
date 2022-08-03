@@ -26,15 +26,12 @@ context [
 	copy-func: func [f [function!]] [func spec-of :f copy/deep body-of :f]
 	
 	define-styles [
-		cell/ellipsized-text: cell/text: cell/paragraph: function [text /on canvas] [
-			maybe text/flags: either attempt [spaces/ctx/grid-ctx/pinned?]
-				[union   text/flags [bold]]
-				[exclude text/flags [bold]]
-			maybe/same text/font: code-font
-			compose [
-				(when color: select text 'color (compose [pen (color)]))
-				(text/draw/on canvas)
-			]
+		cell/ellipsized-text: cell/text: grid/cell/text: grid/cell/paragraph: [
+			maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
+				[union   flags [bold]]
+				[exclude flags [bold]]
+			maybe/same font: code-font
+			below: [(when color: select self 'color (compose [pen (color)]))]
 		]
 	]
 	
