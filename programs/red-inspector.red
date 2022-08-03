@@ -31,7 +31,7 @@ context [
 				[union   flags [bold]]
 				[exclude flags [bold]]
 			maybe/same font: code-font
-			below: [(when color: select self 'color (compose [pen (color)]))]
+			below: when color: select self 'color [pen (color)]
 		]
 	]
 	
