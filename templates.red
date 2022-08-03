@@ -467,16 +467,18 @@ scrollable-space: context [
 		#debug grid-view [
 			#print "scrollable/draw: renders content from (max 0x0 0x0 - origin) to (box - origin); box=(box)"
 		]
-		;; scroller's area is reserved, otherwise we'll see X scroller on vertical lists and vice versa:
-		scrollers: space/vscroll/size/x by space/hscroll/size/y
-		ccanvas: max 0x0 box - scrollers				;-- valid since box is finite
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
-		cdraw: render/window/on space/content		
-			max 0x0 0x0 - origin
-			box - origin
-			;; fill flag passed through as is, useful for 1D scrollables like list-view
-			encode-canvas ccanvas fill
-		csz: cspace/size
+		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
+		cdraw: render/on space/content encode-canvas box fill
+		if all [
+			axis: switch space/content-type [vertical ['y] horizontal ['x]]
+			cspace/size/:axis > box/:axis
+		][												;-- have to add the scroller and subtract it from canvas width
+			scrollers: space/vscroll/size/x by space/hscroll/size/y
+			ccanvas: max 0x0 box - (scrollers * axis2pair ortho axis)		;-- valid since box is finite
+			cdraw: render/on space/content encode-canvas ccanvas fill
+		]
+		csz: cspace/size		
 		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
 		;@@ origin clipping in tube makes it impossible to scroll to the bottom because of window resizes!
@@ -560,6 +562,7 @@ scrollable-space: context [
 		weight: 1
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: in generic 'empty						;-- should be defined (overwritten) by the user
+		content-type: 'planar							;-- one of: planar, vertical, horizontal ;@@ doc this!
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
 		;; timer that scrolls when user presses & holds one of the arrows
@@ -1054,11 +1057,13 @@ window-ctx: context [
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
 		set [canvas': fill:] decode-canvas canvas
 		size: window/pages * finite-canvas canvas'
-		cspace: get content: window/content
-		cdraw: render/window/on content -org -org + size canvas
-		;; once content is rendered, it's size is known and may be less than requested,
-		;; in which case window should be contracted too, else we'll be scrolling over an empty window area
-		if cspace/size [size: min size cspace/size - org]	;-- size has to be finite
+		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
+			cspace: get content: window/content
+			cdraw: render/window/on content -org -org + size canvas
+			;; once content is rendered, it's size is known and may be less than requested,
+			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
+			if cspace/size [size: min size cspace/size - org]	;-- size has to be finite
+		]
 		maybe window/size: size
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
@@ -1380,16 +1385,16 @@ list-view-ctx: context [
 		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
 	]
 	
-	on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
+	list-on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
 		if all [
 			word = 'axis
-			:old <> :new
 			lview/size									;-- do not trigger during initialization
 		][
 			#assert [find [x y] :new]
-			invalidate-cache lview
+			lview/content-type: switch new [x ['horizontal] y ['vertical]]
+			if :old <> :new [invalidate-cache lview/list]
 		]
-		lview/inf-scrollable-on-change word :old :new
+		lview/list/list-on-change word :old :new
 	]
 		
 	templates/list-view: make-template 'inf-scrollable [
@@ -1429,13 +1434,16 @@ list-view-ctx: context [
 				;; must pass positive canvas (uses last rendered list-view size)
 				~/available? self size axis dir from requested
 			]
+			
+			list-on-change: :on-change*
+		]
+
+		list/on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
+			~/list-on-change self word :old :new
 		]
 		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
 			~/list-draw self canvas xy1 xy2
 		]
-
-		inf-scrollable-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -2155,6 +2163,7 @@ grid-view-ctx: context [
 	]
 	
 	templates/grid-view: make-template 'inf-scrollable [
+		content-type: 'planar
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
@@ -2205,6 +2214,11 @@ grid-view-ctx: context [
 			][data/size]
 		]
 		grid/calc-bounds: grid/bounds: does [grid/cells/size]
+		
+		inf-scrollable-draw: :draw
+		draw: function [/on canvas [pair! none!]] [
+			inf-scrollable-draw/on canvas
+		]
 		
 		inf-scrollable-on-change: :on-change*
 		#on-change-redirect

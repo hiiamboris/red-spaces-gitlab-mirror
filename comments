@@ -1299,40 +1299,60 @@ there's a problem with window autosizing (again)
 		possible danger: during tube rendering cycle, list-view gets rendered at various sizes and causes a roll incidentally
 		> need to ensure, that roll is only called from timer events and never from the rendering chain itself
 		> pages must be synced with list-view/grid-view pages or removed from them? I'm for removal
-	funny discrepancy found in window rendering:
-		window over list needs to render all items within itself, so we know size of items and can adjust scrollers' look
-		window over grid *must* not render all items, or it becomes way too slow
-		however if it doesn't, and rows are autosized, then how will it estimate scrollers offset/portion?
-		it's only simple on an infinite grid - just take the window size (though window knows nothing about that)
-		moreover, draw itself is a serious performance hit, so it would be best to exclude clipped out items from it's block
-		dammit.. another unsolvable puzzle
-		so: window only has to be rendered on a canvas once, next time it's cached (rightfully)
-		then cache doesn't work? or window gets invalidated?
-		aw shit.. window receives /only xy1 xy2 so it's not cached, indeed, and same goes for grid
-		but even if window gets cached, initial render of 10x10*size window is super slow (well, 100x times no shit)
-		so in general /only idea just doesn't work, needs redesign
-		initially meant for a scrollable over a container
-		but then even for a list, cacheability of items is questionable unless canvas stays the same
-		and even bigger issue is the initial render time.. just 5k text strings by 120ms take 6 seconds
-		grid can only avoid that if has fixed line height and I limit the rendering region to the viewport
-		so idea here is passing small region from window to the grid and list, and those will decide if they need to render more
-		and for that they need to know max rendering area covered by window, so /only needs 4 args, not 2 (ok maybe 3 considering canvas)
-		/window xy1 xy2 origin ? or simpler, 2 args: xy1 is always negative, origin is at 0x0, size up to canvas? nice!
-		/window is a good name then
-		XY1 is now coordinate before or at 0x0, left corner of the window relative to current window(!) location
-		XY2 then is after window
-		shit no! this is not simpler - same but reversed, old xy1-x2 were better (at least nonnegative)
-		while grid/origin contains current viewport (canvas) offset within the window but if I limit drawing I can't cache window
-		but if I don't limit, it'll be too slow to render and window size will have to be made too small
-		omg! can't cache window for grid then, but have to - for list? at least I have a /cache? flag
-		also, when not cached window is slow, let's see:
-		1) each cell creation is 2 spaces creation, each ~100us, 2x120x100us=24ms
-		   but wrap-data is not the culprit here, it's slow when approaching right bottom part of the window!
-		   btw 2x2500x100us=500ms
-		2) draw-range is indeed suspiciously increasing it's time towards bottom right! up to 350ms!
-		   now that's dumb, it always draws content starting from the 1st unpinned cell! of course it's slow
-		   solved! smooth now! 70fps @ 50x50 grid
-		now just to restore window to it's positive xy1 xy2 coordinates...
+funny discrepancy found in window rendering:
+	window over list needs to render all items within itself, so we know size of items and can adjust scrollers' look
+	window over grid *must* not render all items, or it becomes way too slow
+	however if it doesn't, and rows are autosized, then how will it estimate scrollers offset/portion?
+	it's only simple on an infinite grid - just take the window size (though window knows nothing about that)
+	moreover, draw itself is a serious performance hit, so it would be best to exclude clipped out items from it's block
+	dammit.. another unsolvable puzzle
+	so: window only has to be rendered on a canvas once, next time it's cached (rightfully)
+	then cache doesn't work? or window gets invalidated?
+	aw shit.. window receives /only xy1 xy2 so it's not cached, indeed, and same goes for grid
+	but even if window gets cached, initial render of 10x10*size window is super slow (well, 100x times no shit)
+	so in general /only idea just doesn't work, needs redesign
+	initially meant for a scrollable over a container
+	but then even for a list, cacheability of items is questionable unless canvas stays the same
+	and even bigger issue is the initial render time.. just 5k text strings by 120ms take 6 seconds
+	grid can only avoid that if has fixed line height and I limit the rendering region to the viewport
+	so idea here is passing small region from window to the grid and list, and those will decide if they need to render more
+	and for that they need to know max rendering area covered by window, so /only needs 4 args, not 2 (ok maybe 3 considering canvas)
+	/window xy1 xy2 origin ? or simpler, 2 args: xy1 is always negative, origin is at 0x0, size up to canvas? nice!
+	/window is a good name then
+	XY1 is now coordinate before or at 0x0, left corner of the window relative to current window(!) location
+	XY2 then is after window
+	shit no! this is not simpler - same but reversed, old xy1-x2 were better (at least nonnegative)
+	while grid/origin contains current viewport (canvas) offset within the window but if I limit drawing I can't cache window
+	but if I don't limit, it'll be too slow to render and window size will have to be made too small
+	omg! can't cache window for grid then, but have to - for list? at least I have a /cache? flag
+	also, when not cached window is slow, let's see:
+	1) each cell creation is 2 spaces creation, each ~100us, 2x120x100us=24ms
+	   but wrap-data is not the culprit here, it's slow when approaching right bottom part of the window!
+	   btw 2x2500x100us=500ms
+	2) draw-range is indeed suspiciously increasing it's time towards bottom right! up to 350ms!
+	   now that's dumb, it always draws content starting from the 1st unpinned cell! of course it's slow
+	   solved! smooth now! 70fps @ 50x50 grid
+	now just to restore window to it's positive xy1 xy2 coordinates...
+problem with scrollers now...
+	scrollable removes them from canvas so in case scrollers will be visible, content stays fit
+	but then window (grid) only draws itself up to scrollers, and there's an empty band in case they're invisible
+	ideally I would make a few renders to fit scrollers properly, but with a grid-view it's not an option
+	~3x slowdown? or rather, exponential, since each scrollable will multiply it's subtree by two?
+	grid knows nothing of scrollers size either, pity
+	don't wanna use an adhoc kludge too, what to do?
+	add an /over-render [pair!] facet to grid so it could be fixed in case default scroller's size is changed?
+	or maybe grid's canvas should simply be increased, because why not? it doesn't align anything anyway
+	(increase also increases the final size, so that doesn't work)
+	can scrollable remember it's scrollers state to avoid extra re-renders? will in this case initial render still be too slow?
+	also this auto-adjustment would be useless for grid, only applicable to lists.. so must be a configurable flag
+	general scrollable doesn't know if it's applicable to it's content or not
+	ok idea:
+	/content-type (/extension ?) facet for all scrollables which can be:
+	- 'planar - default, single render on a full canvas
+	- 'vertical - for list-view, texts - 1st render on full canvas, 2nd (if doesn't fit) - without vertical scrollbar
+	- 'horizontal - for (unused now) horizontal lists - 1st on full canvas, 2nd (if doesn't fit) - without horizontal scrollbar
+	because I simply have no idea how to properly feed the canvas sizes to a content which extension strategy is unknown 
+	
 	
 	
 
