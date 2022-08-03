@@ -10,11 +10,12 @@ Red [
 ;@@ TODO: beautify it and draw a spider at random location, or leave it to the others as a challenge
 ;@@ TODO: explore fractals this way :D
 spaces/templates/web: make-template 'inf-scrollable [
+	web: self
 	canvas: make-space 'space [
 		available?: function [axis dir from requested] [requested]
 	
-		draw: function [/only xy1 xy2] [
-			#assert [only]
+		draw: function [/window xy1 xy2 /on canvas] [
+			#assert [window]
 			center: 100x100
 			sectors: 12
 			t: tangent (sec: 360 / sectors) / 2
@@ -48,6 +49,7 @@ spaces/templates/web: make-template 'inf-scrollable [
 					rotate (a + (sec / 2)) (levels)
 				]
 			]
+			self/size: none
 			compose/only [translate (center) (sec-draw)]
 		]
 	]
