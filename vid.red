@@ -39,6 +39,13 @@ VID: context [
 		
 		;; specifications for VID/S styles available in `lay-out-vids`
 		styles: make map! reshape [
+			scrollable [
+				template: scrollable
+				facets:   [
+					vertical   [content-type: 'vertical]
+					horizontal [content-type: 'horizontal]
+				]
+			]
 			hlist [
 				template: list
 				spec:     [#spacious axis: 'x]

@@ -94,7 +94,7 @@ view/no-wait compose/only/deep [
 		vlist [
 			fps-meter									;-- constantly forces redraws which can be CPU intensive (due to Draw mostly)
 			;; list-view doesn't work here because it accepts data, not spaces
-			scrollable 540x500 [
+			scrollable 540x500 vertical [
 				list: vlist (tubes)
 			]
 		]
