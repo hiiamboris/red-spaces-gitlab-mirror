@@ -224,7 +224,7 @@ There are 3 **steps**:
 
    `/draw` sets the `/size` and `/map` facets, so they will be valid when accessed from `below`/`above` blocks during their composition.
 
-3. Values of `below:` and `above:` are composed (using `compose/only/deep`) and inserted around `/draw` result: `[(below) (drawn) (above)]`.
+3. Values of `below:` and `above:` are composed (using `compose/deep`) and inserted around `/draw` result: `[(below) (drawn) (above)]`.
 
    If any of these values are absent or `none`, they're ignored.
 
@@ -242,7 +242,7 @@ Sometimes it's more readable. Plus there's little risk of accidentally leaking w
 
 Style function:
 - receives space as it's mandatory argument and should use path syntax to access it's facets
-- should call `/draw` manually, passing `/on canvas` and `/only xy1 xy2` arguments to `/draw` if it supports those
+- should call `/draw` manually, passing `/on canvas` and `/window xy1 xy2` arguments to `/draw` if it supports those
 - should return a block of Draw commands, which will be used to draw the space without any further modifications
  
 Example for `grid/cell` that draws full cell background regardless of how small/big the cell content happens to be:
@@ -278,7 +278,7 @@ Note: style function *should not* call the `render` function on it's own space, 
 
 For spaces that adapt their size automatically, their styling function should accept `/on canvas [none! pair!]` refinement and pass it on to it's `draw` function. Value of `on` should not be accounted for, only `canvas` value matters.
 
-When it makes sense to draw only a portion of a space (e.g. it's big or infinite), styling function should accept `/only xy1 [none! pair!] xy2 [none! pair!]` refinement and pass it on to it's `draw` function. Value of `only` should not be accounted for, only values of `xy1` and `xy2` matter. `none` means "unspecified" and implies rendering of the whole space area.
+When it makes sense to draw only a portion of a space (e.g. it's big or infinite), styling function should accept `/window xy1 [none! pair!] xy2 [none! pair!]` refinement and pass it on to it's `draw` function. Value of `window` should not be accounted for, only values of `xy1` and `xy2` matter. `none` means "unspecified" and implies rendering of the whole space area.
 
 #### Flags
 

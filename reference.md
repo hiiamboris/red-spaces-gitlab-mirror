@@ -1,4 +1,4 @@
----
+---                                                                                                                   ,
 gitea: none
 include_toc: true
 ---
@@ -156,7 +156,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 | Facet | Type | Description |
 |-|-|-|
 | `size` | `pair!` `none!` | Size of this space in it's own coordinate system.<br> Usually updated during every `draw` call (as such, it is the *size of the last rendered frame* in a sequential chain of redraws), but sometimes fixed.<br> Used by container spaces (e.g. list) to arrange their items. <br> Can be `none` if space is infinite, or if it was never drawn yet. |
-| `draw` | `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/only xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
+| `draw` | `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
 | `rate` | `time!` `integer!` `float!` `none!` | Specifies rate of the `on-time` event. `time!` sets period, numbers set rate (1 / period).<br> Not usually present in most spaces by default, but can be added using `make-space` or `with [rate: ..]` keyword in VID/S.<br> If `none` or absent, no `on-time` event is generated. |
 | `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[name [offset: pair! size: pair!] name ...]`.<br> `name` is the name (word) of inner space that should refer to it's object.<br> Used for hittesting and tree iteration. |
 | `into` | `func [xy [pair!]] -> [name xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns name (word) of an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force name [word! none!]` refinement that takes full path to an inner space into which translation should happen even if `xy` point does not land on it. |
@@ -600,6 +600,7 @@ Obvious. To be used in other spaces, as by itself it's not interactive. Used in 
 | `axis` | word! | `x` or `y` - scrollbar orientation |
 | `offset` | float! percent! | 0 to 1 (100%) - area before the thumb |
 | `amount` | float! percent! | 0 to 1 (100%) - thumb area  |
+| `arrow-size` | float! percent! | arrow length in percents of scrollbar's overall thickness (useful for styling, default: 90%) |
 
 Scrollbar will try it's best to adapt it's appearance to remain useable (visible, clickable) even with extreme values of it's facets.
 
@@ -615,22 +616,46 @@ Wrapper for bigger (but finite) spaces. Automatically shows/hides scrollbars and
 |-|-|-|
 | `origin` | pair! | point in scrollable's coordinate system at which to place `content`: <0 to left above, >0 to right below |
 | `content` | word! | name of the space it wraps, should refer to a space object |
-| `hscroll` | scroller space object! | horizontal scrollbar; can be styled as `scrollable/hscroll` |
+| `content-flow` | word! | lets scrollable know how content is supposed to use canvas; can be one of: `planar` (default), `horizontal` or `vertical` (see below) |
+| `hscroll` | scrollbar space object! | horizontal scrollbar; can be styled as `scrollable/hscroll` |
 | `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
-| `vscroll` | scroller space object! | vertical scrollbar; can be styled as `scrollable/vscroll` |
+| `vscroll` | scrollbar space object! | vertical scrollbar; can be styled as `scrollable/vscroll` |
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
-| `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
+| `scroll-timer` | timer space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
 
+<details><summary>How to understand <code>content-flow</code>...</summary>
+
+Each scrollable faces a challenge: it has to figure out how to best draw it's content, and do it fast.
+
+It could render it's content on 4 canvas sizes:
+1. Full canvas
+2. Canvas minus horizontal scrollbar
+3. Canvas minus vertical scrollbar
+4. Canvas minus both scrollbars
+
+For some spaces, like `list`, there will be a difference: `list` fits content across it's secondary axis, so if list is vertical, width of the canvas will control overall list's width.
+
+But `scrollable` knows nothing of it's content's size adjustment behavior. In what order should it try canvases to render it's content on? 1-2-3-4? 1-3-2-4? And how should it evaluate if content fits successfully? 
+
+Performance is a significant consideration here, as in a scenario when a scrollable contains a scrollable that also contains a scrollable, if each one tries 2 canvases instead of 1, the innermost scrollable will be rendered 2^3=8 times instead of 1. This grows out of hand quickly.
+
+`content-flow` is what helps scrollable reason about what canvases it should try while keeping the number of renders to a minimum:
+- `planar` only tries the full canvas (1), which works great for spaces that do not adjust to canvas (like `grid`) and so do not suffer the performance hit
+- `vertical` tries (1) and then (if height is exceeded) - (2), which works for spaces that adjust their width to canvas (vertical `list`, text `paragraph`)
+- `horizontal` tries (1) and then (if width is exceeded) - (3), which works for spaces that adjust their height to canvas (horizontal `list`)
+- spaces that adjust both dimensions (`tube`, `box`, etc) are a bad fit for a scrollable: they bring ambiguity into canvas selection and are not meant to be scrolled anyway, so no special mode is supported for these (best would be to use `planar` anyway)
+
+</details>
 
 ## Window
 
-Used internally by `inf-scrollable` to wrap infinite spaces. Window has a size, while it's content may not have it. Window guarantees that `content/draw` of the infinite space is called with an `/only` refinement that limits the rendering area.
+Used internally by `inf-scrollable` to wrap infinite spaces. Window has a size, while it's content may not have it. Window guarantees that `content/draw` of the infinite space is called with an `/window` refinement that limits the rendering area.
 
 | facet  | type  | description |
 |-|-|-|
-| `size` | pair! none! | set by `draw` automatically, read-only for other code; it extends up to the smallest of `origin + content/size` (if defined) and `max-size` |
-| `max-size` | pair! | fixed and should be defined - determines maximum size the window adapts |
+| `size` | pair! none! | set by `draw` automatically, read-only for other code; it extends up to the smallest of `origin + content/size` (if defined) and `canvas * pages` |
+| `pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on it's parent's resize or auto adjustment) |
 | `content` | word! | name of the space it wraps, should refer to a space object |
 | `origin` | pair! | point in window's coordinate system at which to place `content`: <0 to left above, >0 to right below |
 | `available?` | function! (see below) | used by the window to measure nearby content - to move window around and to determine it's `size` |
@@ -684,9 +709,9 @@ Introduces new facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `pages` | integer! pair! | used to automatically adjust `window/max-size` as `self/size * pages` (e.g. if inf-scrollable is resized) |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | word! | space to wrap, possibly infinite or half-infinite along any of X/Y axes, or just huge |
+| `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on inf-scrollable's resize or auto adjustment) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
@@ -823,7 +848,6 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
-| `pages` | integer! pair! | used to automatically adjust `window/max-size` as `self/size * pages` (e.g. if inf-scrollable is resized) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
@@ -832,6 +856,7 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `content` | word! = `'window` | points to `window`, should not be changed |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | word! = `'list` | points to inner `list`, should not be changed |
+| `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on list-view's resize or auto adjustment) |
 | `list` | list space object! | inner (finite) list used to display currently visible page |
 | `list/axis` | word! | list's primary axis of extension; defaults to `y` but can be changed when needed |
 | `list/margin` | integer! pair! | horizontal and vertical space between the items and the bounding box; should be set in styles |
@@ -915,7 +940,7 @@ Generated using [`tube-test.red`](tests/tube-test.red):
 
 </details>
 
-Tube is not some generalized equation solver. It's just a fast simple algorithm that does broadly the following:
+Tube is not some generalized equation solver. It's just a fast simple algorithm that does roughly the following:
 - render each item to obtain it's minimal size
 - split this long row into multiple rows so each row's width is no bigger than the given canvas width 
 - expand items in each row to fill row's width fully (if any item has weight > 0)
@@ -1021,9 +1046,9 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
 | `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `roll` | function! | can be called to manually check for a jump |
-| `pages` | integer! pair! | used to automatically adjust `window/max-size` as `self/size * pages` (e.g. if grid-view is resized) |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | word! = `'grid` | points to inner `grid` and should not be changed |
+| `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on grid-view's resize or auto adjustment) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 

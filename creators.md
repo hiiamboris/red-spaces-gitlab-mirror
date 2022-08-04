@@ -100,8 +100,8 @@ Space's redraw is the most expensive operation, so it is only done when necessar
 Internally a cache of rendered blocks is kept for each canvas size. When such (still valid) block is available, `render` grabs and returns it and sets `/size` and `/map` facets to cached values corresponding to that canvas. Consequently, both map and draw block should be created anew by the `draw` call, and cannot be modified in place.
 
 `draw` may support the following refinements (if it does, it's style function must also support these and pass through):
-- `/only xy1 [pair! none!] xy2 [pair! none!]` if it makes sense to draw only an area (xy1..xy2) of it. E.g. spaces that are likely to occur inside a `scrollable` (list, grid) support it. Infinite spaces *must* support it, because one cannot draw an infinite space wholly.
-- `/on canvas [pair! none!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Canvas model is scheduled for a change though.
+- `/window xy1 [pair! none!] xy2 [pair! none!]` if it makes sense to draw only an area (xy1..xy2) of it. E.g. spaces that are likely to occur inside a `scrollable` (list, grid) support it. Infinite spaces *must* support it, because one cannot draw an infinite space wholly.
+- `/on canvas [pair! none!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Explained [below](#canvas).
 
 ### Size
 
