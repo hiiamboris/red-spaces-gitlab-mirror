@@ -471,7 +471,7 @@ scrollable-space: context [
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
 		cdraw: render/on space/content encode-canvas box fill
 		if all [
-			axis: switch space/content-type [vertical ['y] horizontal ['x]]
+			axis: switch space/content-flow [vertical ['y] horizontal ['x]]
 			cspace/size/:axis > box/:axis
 		][												;-- have to add the scroller and subtract it from canvas width
 			scrollers: space/vscroll/size/x by space/hscroll/size/y
@@ -562,7 +562,7 @@ scrollable-space: context [
 		weight: 1
 		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
 		content: in generic 'empty						;-- should be defined (overwritten) by the user
-		content-type: 'planar							;-- one of: planar, vertical, horizontal ;@@ doc this!
+		content-flow: 'planar							;-- one of: planar, vertical, horizontal ;@@ doc this!
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
 		;; timer that scrolls when user presses & holds one of the arrows
@@ -1391,7 +1391,7 @@ list-view-ctx: context [
 			lview/size									;-- do not trigger during initialization
 		][
 			#assert [find [x y] :new]
-			lview/content-type: switch new [x ['horizontal] y ['vertical]]
+			lview/content-flow: switch new [x ['horizontal] y ['vertical]]
 			if :old <> :new [invalidate-cache lview/list]
 		]
 		lview/list/list-on-change word :old :new
@@ -2163,7 +2163,7 @@ grid-view-ctx: context [
 	]
 	
 	templates/grid-view: make-template 'inf-scrollable [
-		content-type: 'planar
+		content-flow: 'planar
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [

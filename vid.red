@@ -42,8 +42,8 @@ VID: context [
 			scrollable [
 				template: scrollable
 				facets:   [
-					vertical   [content-type: 'vertical]
-					horizontal [content-type: 'horizontal]
+					vertical   [content-flow: 'vertical]
+					horizontal [content-flow: 'horizontal]
 				]
 			]
 			hlist [
