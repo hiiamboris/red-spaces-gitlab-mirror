@@ -102,10 +102,12 @@ do with [
 		mrg:    any [mrg (system/words/round/ceiling/to 1x1 * line 2) / 2]
 		pen?:   when pen      (compose [pen      (pen)     ])
 		fill?:  when fill-pen (compose [fill-pen (fill-pen)])
-		compose [
-			(pen?) (fill?)
-			line-width (line)
-			box (mrg) (size - mrg) (only radius)
+		compose/deep [
+			push [
+				(pen?) (fill?)
+				line-width (line)
+				box (mrg) (size - mrg) (only radius)
+			]
 		]
 	]
 ][
@@ -141,7 +143,7 @@ do with [
 		field: [
 			default font: fonts/text
 			maybe   margin: 3x3							;-- better default when having a frame
-			below: [push (make-box size 1 select self 'color none)]
+			below: [(make-box size 1 select self 'color none)]
 		]
 		field/caret: [
 			; [pen off fill-pen !(contrast-with svmc/panel)]
@@ -158,13 +160,13 @@ do with [
 		tube: list: box: [									;-- allow color override for containers
 			below: when select self 'color [
 				; (#assert [size])
-				push (make-box size 0 'off color)
+				(make-box size 0 'off color)
 			]
 		]
 		
 		;; cell is a box with a border around it; while general box is widely used in borderless state
 		menu/list: cell: [
-			below: [push (make-box size 1 none select self 'color)]	;@@ add frame (pair) field and use here?
+			below: [(make-box size 1 none select self 'color)]	;@@ add frame (pair) field and use here?
 		]
 		
 		grid/cell: function [cell /on canvas] [			;-- has no frame since frame is drawn by grid itself
@@ -177,7 +179,7 @@ do with [
 				if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
 			]
 			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
-			reduce ['push bgnd drawn]
+			reduce [bgnd drawn]
 		]
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
@@ -232,12 +234,12 @@ do with [
 
 		grid-view/window: [
 			; #assert [size]
-			below: [push (make-box size 0 'off !(opaque 'text 50%))]
+			below: [(make-box size 0 'off !(opaque 'text 50%))]
 		]
 
 		menu/list/clickable: [
 			below: when self =? :highlight [
-				push (make-box size 0 'off !(opaque 'text 15%))	;@@ render to get size?
+				(make-box size 0 'off !(opaque 'text 15%))
 				pen !(enhance 'panel 'text 125%)
 			]
 		]
@@ -261,11 +263,9 @@ do with [
 					arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
 				]
 				compose/only/deep [
-					push [
-						(make-box/round/margin box/size 1 none none 3 1x1 + m)
-						(matrix) (arrow)
-					]
-					(drawn)
+					(make-box/round/margin box/size 1 none none 3 1x1 + m)
+					push [(matrix) (arrow)]
+					(wrap drawn)
 				]
 			]
 		]

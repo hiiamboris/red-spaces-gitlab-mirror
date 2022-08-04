@@ -274,6 +274,14 @@ when: func [
 	only if :test [either paren? :value [do :value][:value]]
 ]
 
+;-- simple shortcut for `compose` to produce blocks only where needed
+wrap: func [
+	"Put VALUE into a block"
+	value [any-type!]
+][
+	reduce [:value]
+]
+
 area?: func [xy [pair!]] [xy/x * xy/y]
 
 skip?: func [series [series!]] [-1 + index? series]

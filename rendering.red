@@ -63,9 +63,9 @@ combine-style: function [
 	style [object!] "Styling context from apply-current-style"
 ][
 	reduce [
-		compose/deep/only only select style 'below 
+		compose/deep only select style 'below 
 		drawn
-		compose/deep/only only select style 'above
+		compose/deep only select style 'above
 	]
 ]
 
