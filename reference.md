@@ -985,7 +985,7 @@ Features:
 - Grid can have infinite height.
 - Grid cells can span multiple rows and/or columns.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-grid-template.png) | <pre>grid [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-grid.png) | <pre>grid [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
 |-|-|
 
 | facet  | type | description |
