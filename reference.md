@@ -626,6 +626,7 @@ Wrapper for bigger (but finite) spaces. Automatically shows/hides scrollbars and
 
 <details><summary>How to understand <code>content-flow</code>...</summary>
 
+<br>
 Each scrollable faces a challenge: it has to figure out how to best draw it's content, and do it fast.
 
 It could render it's content on 4 canvas sizes:
@@ -638,13 +639,13 @@ For some spaces, like `list`, there will be a difference: `list` fits content ac
 
 But `scrollable` knows nothing of it's content's size adjustment behavior. In what order should it try canvases to render it's content on? 1-2-3-4? 1-3-2-4? And how should it evaluate if content fits successfully? 
 
-Performance is a significant consideration here, as in a scenario when a scrollable contains a scrollable that also contains a scrollable, if each one tries 2 canvases instead of 1, the innermost scrollable will be rendered 2^3=8 times instead of 1. This grows out of hand quickly.
+Performance is a significant consideration here, as in a scenario when a scrollable contains a scrollable that also contains a scrollable, if each one tries 2 canvases instead of 1, the innermost scrollable will be rendered 2^3=8 times instead of 1. This gets out of hand quickly.
 
 `content-flow` is what helps scrollable reason about what canvases it should try while keeping the number of renders to a minimum:
-- `planar` only tries the full canvas (1), which works great for spaces that do not adjust to canvas (like `grid`) and so do not suffer the performance hit
+- `planar` only tries the full canvas (1), which works great for spaces that do not adjust to canvas (like `grid`), and so do not suffer the performance hit from multiple renders
 - `vertical` tries (1) and then (if height is exceeded) - (2), which works for spaces that adjust their width to canvas (vertical `list`, text `paragraph`)
 - `horizontal` tries (1) and then (if width is exceeded) - (3), which works for spaces that adjust their height to canvas (horizontal `list`)
-- spaces that adjust both dimensions (`tube`, `box`, etc) are a bad fit for a scrollable: they bring ambiguity into canvas selection and are not meant to be scrolled anyway, so no special mode is supported for these (best would be to use `planar` anyway)
+- spaces that adjust both dimensions (`tube`, `box`, etc) are a bad fit for a scrollable: they bring ambiguity into canvas selection and are not meant to be scrolled anyway, so no special mode is supported for these (best would be to use `planar`)
 
 </details>
 
