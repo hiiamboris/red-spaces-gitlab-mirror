@@ -126,7 +126,6 @@ do with [
 	define-styles/unique reshape [
 		host: [
 			below: [
-				pen off
 				fill-pen !(svmc/panel)
 				font     !(fonts/text)
 				line-width 2
@@ -141,8 +140,7 @@ do with [
 		]
 
 		field: [
-			default font: fonts/text
-			maybe   margin: 3x3							;-- better default when having a frame
+			maybe margin: 3x3							;-- better default when having a frame (and frame comes from style, not template)
 			below: [(make-box size 1 select self 'color none)]
 		]
 		field/caret: [

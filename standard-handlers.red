@@ -332,16 +332,16 @@ define-handlers [
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
 
 		on-down [space path event] [
-			new-ofs: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
+			new-ofs: space/offset-to-caret path/2
 			space/edit compose [select none move to (new-ofs)]
 			start-drag path
 		]
 		
 		on-over [space path event] [
-			#assert [space/layout]
+			#assert [space/spaces/text/layout]
 			dpath: drag-path
 			if all [dpath dpath/1 =? path/1] [			;-- if started dragging also on this field
-				new-ofs: -1 + offset-to-caret space/layout path/2 - (space/origin by 0)
+				new-ofs: space/offset-to-caret path/2
 				space/edit compose [select to (new-ofs)]
 				update									;-- let styles update
 			]

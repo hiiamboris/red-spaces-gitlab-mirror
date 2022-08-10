@@ -1352,6 +1352,20 @@ problem with scrollers now...
 	- 'vertical - for list-view, texts - 1st render on full canvas, 2nd (if doesn't fit) - without vertical scrollbar
 	- 'horizontal - for (unused now) horizontal lists - 1st on full canvas, 2nd (if doesn't fit) - without horizontal scrollbar
 	because I simply have no idea how to properly feed the canvas sizes to a content which extension strategy is unknown 
+field/draw is quite sophisticated and an attempt to (deeply) style it requires duplicating it's logic
+	initial idea was to base it on `text` to avoid two-way syncing of facets
+	maybe field can render itself as text?
+	but this would mean the same space appearing in the cache under varying style names, bad idea
+	can /text be synced then between field and field/text-space?
+	possible but will have to reassign it after every change
+	or it could be the *same* series, just synced on assignment (but also two-way on-change mirroring for react support)
+	in these however I would have to replicate: text, font, flags and color
+	ok what if field didn't call render 'text, but text-draw, no that's exactly the current problem
+	no way around mirroring then, like in label.. unless this can be solved generally by design somehow?
+	a little problematic is only that unlike label, field can change rapidly in event handler or even by programmatic `edit` invocation
+	which may work for a field, but will slow down `area` when I get to it
+	it could probably hold a spare `text` (another object) and `set` it (which should be faster)
+	and I will ensure edits are grouped and applied as one, to keep updates to minimum 
 	
 	
 	
@@ -4559,4 +4573,40 @@ glossy triangles - decided against it, less code
 		; (draw-triangular-frame size bgnd dir) 
 		; (draw-triangular-sheen size dir sheen)
 	; ]
+; ]
+
+initial design of field, not so stylable as I would like it to be
+; on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
+	; switch to word! word [
+		; origin selected [invalidate-cache field]	;-- invalidating just cache in enough since text is the same
+		; text [
+			; field/caret/offset: length? new			;-- auto position at the tail; invalidated by text
+			; mark-history field
+		; ]
+	; ]
+	; field/text-on-change word :old :new
+; ]
+; ;@@ field will need on-change handler & actor support for better user friendliness!
+; ;; based directly on text to expose /text facet which would be hard to sync both ways otherwise
+; templates/field: make-template 'text [
+	; weight:    1
+	; origin:    0
+	; selected:  none
+	; history:   make block! 100						;-- saved states
+	
+	; caret:     make-space 'caret []
+	; selection: make-space 'rectangle []				;-- can be styled
+	
+	; edit: func [
+		; "Apply a sequence of edits to the text"
+		; plan [block!]
+	; ][
+		; ~/edit self plan
+	; ]
+	
+	; text-draw: :draw
+	; draw: func [/on canvas [none! pair!]] [~/draw self canvas]
+	
+	; text-on-change: :on-change*
+	; #on-change-redirect
 ; ]
