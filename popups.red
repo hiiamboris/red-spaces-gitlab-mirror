@@ -171,7 +171,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 	=menu=:      [opt =flags= any =menu-item= #expect end]
 	=flags=:     [ahead block! into [any =flag=]]
 	=flag=:      [set radial? 'radial | set round? 'round]
-	=menu-item=: [=content= (do new-item) ahead #expect [paren! | block!] [=code= | =submenu=]]
+	=menu-item=: [not end =content= (do new-item) ahead #expect [paren! | block!] [=code= | =submenu=]]
 	=content=:   [ahead #expect [word! | string! | char! | image! | logic!] some [=data= | =space=]]
 	=data=:      [collect into data* some keep [string! | char! | image! | logic!] (do flush-data)]
 	=space=:     [set name word! (#assert [space? get/any name]) (append row* name)]

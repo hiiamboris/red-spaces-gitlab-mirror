@@ -23,7 +23,7 @@ Red [
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	; #debug off
+	#debug off
 	; #debug on											;-- general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times

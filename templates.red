@@ -2512,7 +2512,6 @@ field-ctx: context [
 		cx: first caret-to-offset layout co
 		min-org: min 0 cmargin - cx
 		max-org: clip [min-org 0] view-width - cx - cw - cmargin
-		; ?? min-org ?? max-org ?? field/origin
 		clip [min-org max-org] field/origin
 	]
 		
@@ -2541,20 +2540,20 @@ field-ctx: context [
 		cxy1: caret-to-offset       ctext/layout co
 		cxy2: caret-to-offset/lower ctext/layout co
 		csize: field/caret/width by (cxy2/y - cxy1/y)
-		if viewport/x - (2 * cmargin) < ctext/layout/size/x [	;-- field width may be smaller/bigger than that of text
-			;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
-			;; aim is: have caret always visible, ideally with a few chars of look-around
-			min-org: min 0 cmargin - cxy1/x
-			max-org: clip [min-org 0] viewport/x - cxy2/x - cmargin
-			maybe field/origin: clip [min-org max-org] field/origin
+		; if viewport/x - (2 * cmargin) < ctext/layout/extra/x [	;-- field width may be smaller/bigger than that of text
+			; ;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
+			; ;; aim is: have caret always visible, ideally with a few chars of look-around
+			; min-org: min 0 cmargin - cxy1/x
+			; max-org: clip [min-org 0] viewport/x - cxy2/x - cmargin
+			; maybe field/origin: clip [min-org max-org] field/origin
 			; print [min-org max-org field/origin]
-		]
+		; ]
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
 			invalidate-cache/only field/caret
 		]
-		; maybe field/origin: origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`
-		origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`; requires /size set!
+		maybe field/origin: origin: adjust-origin field
+		; origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`; requires /size set!
 		if sel: field/selected [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
 			sxy2: caret-to-offset/lower ctext/layout sel/2

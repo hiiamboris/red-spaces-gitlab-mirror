@@ -382,7 +382,7 @@ VID: context [
 			def/reactions: make block! 2
 			def/with:      make block! 8
 		]
-		=vids=:              [any [(do reset) =do= | =styling= | =instantiating=]]
+		=vids=:              [any [end | (do reset) =do= | =styling= | =instantiating=]]
 		=styling=:           [
 			ahead word! 'style (def/styling?: yes)
 			ahead #expect set-word! =space-name=

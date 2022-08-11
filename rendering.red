@@ -450,7 +450,7 @@ context [
 				; commit-cache space canvas render
 				
 				#debug profile [prof/manual/end name]
-				#assert [any [space/size name = 'grid] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
+				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
 			]
 		]
 		#debug profile [prof/manual/end 'render]	
