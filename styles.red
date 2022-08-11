@@ -50,7 +50,7 @@ define-styles: function [
 	/local style
 ][
 	=style-name=: [set-word! | set-path!]
-	=names=:  [not tail ahead #expect =style-name= copy names some =style-name=]
+	=names=:  [not end ahead #expect =style-name= copy names some =style-name=]
 	=expr=:   [p: (set/any 'style do/next p 'p) :p]
 	=commit=: [(
 		foreach name names [
@@ -250,21 +250,19 @@ do with [
 			below: [(make-box/round size 1 none none 50)]
 		]
 		
-		hint: [
-			function [box] [
-				drawn: box/draw							;-- draw to obtain the size
-				m: box/margin / 2
-				matrix: arrow: []						;-- no arrow if hint was adjusted by window borders
-				if o: box/origin [
-					;@@ TODO: arrow can be placed anywhere really, just more math needed
-					if o <> 0x0 [matrix: compose/deep [matrix [1 0 0 -1 0 (box/size/y)]]]
-					arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
-				]
-				compose/only/deep [
-					(make-box/round/margin box/size 1 none none 3 1x1 + m)
-					push [(matrix) (arrow)]
-					(wrap drawn)
-				]
+		hint: function [box] [
+			drawn: box/draw								;-- draw to obtain the size
+			m: box/margin / 2
+			matrix: arrow: []							;-- no arrow if hint was adjusted by window borders
+			if o: box/origin [
+				;@@ TODO: arrow can be placed anywhere really, just more math needed
+				if o <> 0x0 [matrix: compose/deep [matrix [1 0 0 -1 0 (box/size/y)]]]
+				arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
+			]
+			compose/only/deep [
+				(make-box/round/margin box/size 1 none none 3 1x1 + m)
+				push [(matrix) (arrow)]
+				(wrap drawn)
 			]
 		]
 		
