@@ -858,6 +858,7 @@ context [
 	;; rich text does not require any of that however, so I mimick it using a non-reactive object
 	;; achieved construction time is 16us vs 200us
 	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
+	light-face!/para: make para! [wrap?: on]
 	rtd-template: compose [                                    
 		on-change*: does []								;-- for whatever reason, crashes without this
 		on-deep-change: none
