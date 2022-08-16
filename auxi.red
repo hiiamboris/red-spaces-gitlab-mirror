@@ -266,12 +266,13 @@ only: function [
 ; when: func [test value] [only if :test [do :value]]
 
 ;-- `compose` readability helper variant 3
+;-- by the way, works in rejoin/composite as empty block results in empty string!!!
 when: func [
 	"If TEST is truthy, return VALUE, otherwise an empty block"
 	test   [any-type!]
-	:value [paren! block!] "Paren is evaluated, block is returned as is"
+	:value [any-type!] "Paren is evaluated, block or other value is returned as is"
 ][
-	only if :test [either paren? :value [do :value][:value]]
+	only if :test [either paren? :value [do value][:value]]
 ]
 
 ;-- simple shortcut for `compose` to produce blocks only where needed
