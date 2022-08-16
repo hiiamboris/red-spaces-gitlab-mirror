@@ -326,7 +326,6 @@ define-handlers [
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
 			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
-			update
 		]
 
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
@@ -343,7 +342,8 @@ define-handlers [
 			if all [dpath dpath/1 =? path/1] [			;-- if started dragging also on this field
 				new-ofs: space/offset-to-caret path/2
 				space/edit compose [select to (new-ofs)]
-				update									;-- let styles update
+				quietly space/origin: field-ctx/adjust-origin space
+				; update									;-- let styles update
 			]
 		]
 		

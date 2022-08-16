@@ -601,7 +601,7 @@ paragraph-ctx: context [
 		]
 		;; NOTE: #4783 to keep in mind
 		quietly layout/extra: size-text layout			;-- 'size-text' is slow, has to be cached (by using on-change)
-		quietly space/layout: layout
+		quietly space/layout: layout					;-- must return layout
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
@@ -2347,10 +2347,11 @@ caret-ctx: context [
 	]
 	
 	templates/caret: make-template 'rectangle [		;-- caret has to be a separate space so it can be styled
-		width:       1
+		offset:      0				;-- [0..length] should be kept even when not focused, so tabbing in leaves us where we were
+		width:       1				;-- width in pixels
 		look-around: 10				;-- how close caret is allowed to come to field borders
-		offset:      0				;-- should be kept even when not focused, so tabbing in leaves us where we were
-		visible?:    no
+		anchor:      0.0			;-- [0..1] viewport-relative location of caret within field
+		visible?:    no				;-- controlled by focus
 		
 		rectangle-draw: :draw
 		draw: does [when visible? (rectangle-draw)]
@@ -2499,31 +2500,31 @@ field-ctx: context [
 		cmargin: field/caret/look-around
 		#assert [field/size]							;-- must be rendered first!
 		;; layout may be invalidated by a series of keys, second key will call `adjust` with no layout
-		;; field can just rebuild it since canvas is always known (infinite)
-		;@@ this hack won't work for area - will have to rethink the model!
-		layout: any [field/spaces/text/layout  paragraph-ctx/lay-out field/spaces/text infxinf/x]
+		;; also changes to text in the event handler effectively make current layout obsolete for caret-to-offset estimation
+		;; field can just rebuild it since canvas is always known (infinite) ;@@ area will require different canvas..
+		layout: paragraph-ctx/lay-out field/spaces/text infxinf/x
 		#assert [object? layout]
 		view-width: field/size/x - first (2x2 * field/margin)
 		text-width: layout/extra/x
-		; ?? field/size ?? view-width ?? text-width
 		cw: field/caret/width
 		if view-width - cmargin - cw >= text-width [return 0]	;-- fully fits, no origin offset required
 		co: field/caret/offset + 1
-		cx: first caret-to-offset layout co
+		cx: first system/words/caret-to-offset layout co
 		min-org: min 0 cmargin - cx
 		max-org: clip [min-org 0] view-width - cx - cw - cmargin
 		clip [min-org max-org] field/origin
 	]
-		
+			
 	offset-to-caret: func [
 		"Get caret location [0..length] closest to given OFFSET within FIELD"
-		field [object!] offset [pair!]
+		field [object!] offset [pair! integer!]
 	][
+		if integer? offset [offset: offset by 0]
 		-1 + system/words/offset-to-caret
 			field/spaces/text/layout
 			offset - field/margin - (field/origin by 0)
 	]
-			
+
 	draw: function [field [object!] canvas [none! pair!]] [
 		ctext: field/spaces/text						;-- text content
 		invalidate-cache/only ctext						;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
@@ -2540,37 +2541,35 @@ field-ctx: context [
 		cxy1: caret-to-offset       ctext/layout co
 		cxy2: caret-to-offset/lower ctext/layout co
 		csize: field/caret/width by (cxy2/y - cxy1/y)
-		; if viewport/x - (2 * cmargin) < ctext/layout/extra/x [	;-- field width may be smaller/bigger than that of text
-			; ;@@ not sure it's a good idea to correct origin here! may play foul within a tube or somewhere
-			; ;; aim is: have caret always visible, ideally with a few chars of look-around
-			; min-org: min 0 cmargin - cxy1/x
-			; max-org: clip [min-org 0] viewport/x - cxy2/x - cmargin
-			; maybe field/origin: clip [min-org max-org] field/origin
-			; print [min-org max-org field/origin]
-		; ]
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
 			invalidate-cache/only field/caret
 		]
-		maybe field/origin: origin: adjust-origin field
-		; origin: adjust-origin field						;-- only temporary adjustment on draw, see `comments`; requires /size set!
+		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		if sel: field/selected [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
 			sxy2: caret-to-offset/lower ctext/layout sel/2
-			maybe field/selection/size: sxy2 - sxy1
-			sdrawn: compose/only [translate (sxy1) (render in field 'selection)]
+			maybe field/selection/size: ssize: sxy2 - sxy1
+			sdrawn: compose/only [(render in field 'selection)]
 		]
 		cdrawn: render in field 'caret
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
-		;@@ construct a map!
-		compose/only/deep [
+		ofs: field/origin by 0
+		quietly field/map: compose/deep [
+			(in field/spaces 'text)          [offset: (ofs) size: (ctext/size)]
+			(when sel (compose/deep [					;@@ use reshape when it gets fast enough, what a mess
+				(in field/spaces 'selection) [offset: (ofs + mrg + sxy1) size: (ssize)]
+			]))
+			(in field/spaces 'caret)         [offset: (ofs + mrg + cxy1) size: (csize)]
+		]
+		compose/only/deep [								;@@ can compose-map be used without re-rendering?
 			clip (mrg) (field/size - mrg) [
-				translate (origin by 0 + mrg) [
-					(only sdrawn)
-					translate (0x0 - mrg) (drawn)
-					translate (cxy1) (cdrawn)
+				translate (ofs) [
+					(when sel (compose [translate (mrg + sxy1) (sdrawn)]))
+					translate 0x0 (drawn)
+					translate (mrg + cxy1) (cdrawn)
 					;@@ workaround for #4901 which draws white background under text over the selection:
-					#if linux? [(only sdrawn)]
+					#if linux? [(when sel (compose [translate (mrg + sxy1) (sdrawn)]))]
 				]
 			]
 		]
@@ -2594,9 +2593,10 @@ field-ctx: context [
 	templates/field: make-template 'space [
 		;; own facets:
 		weight:   1
-		origin:   0
-		selected: none
+		origin:   0										;-- non-positive, offset(px) of text within the field
+		selected: none									;-- none or pair (offsets of selection start & end)
 		history:  make block! 100						;-- saved states
+		map:      []
 
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field

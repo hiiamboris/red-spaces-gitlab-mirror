@@ -1196,6 +1196,22 @@ field origin is tricky!
 	or simply do not call constrain in render, call it in each space when setting size?
 	on-change can't work here since this size should also apply to other things
 	;@@ `none` canvas should probably be normalized to infxinf by render itself though; removes `default` from everywhere
+	non-finalized origin leads to all kinds of glitches / unexpected behavior (e.g. on clicking)
+	solution? what if origin is signed? when caret's on the left, it's positive, on the right it's negative
+	problem then what if it's inbetween?
+	origin could be anchored to the last caret-induced scroll (i.e. whether one moved right or left at the time)
+	or what if it's anchored to the caret?
+	or origin = caret's relative offset from one of the edges?
+	what if there'll be a segment from left margin + 10px to right margin - 10px
+	and origin will be relative position of caret within this segment (0..1 but can go negative and even >1)?
+	segment width change would align caret relatively the same way: if it's at end it's at end
+	risky a bit: area outside of 0..1 may result in caret hidden
+	so less risky would be to map 0..1 to whole field, and keys/interaction may then jump a little but not much
+	name? anchor would do, while origin will be a write-only thing, only used by offset-to-caret computation
+	what will anchor be for area? can't have floating point pairs.. block of 2 floats? pair * 1e6?
+	workflow? draw only adjusts origin knowing anchor, events adjust anchor within current origin and look-around
+	or maybe to hell with it? why should draw adjust origin? let only events do that -- and this works good enough!
+	ok the glitch was that text/layout (used for caret-to-offset) is invalid after `edit` and until redraw, have to force it immediately
 scrollable origin is tricky too!
 	when scrollable is inside tube - tube calls it on a 0 canvas and scrollable adjusts it's origin
 	since this happens all the time, it becomes impossible to scroll after a certain length
@@ -4610,3 +4626,14 @@ initial design of field, not so stylable as I would like it to be
 	; text-on-change: :on-change*
 	; #on-change-redirect
 ; ]
+
+field-ctx/caret-to-offset but it's not yet needed
+; caret-to-offset: func [
+	; "Get (absolute) offset (as integer) of a caret location [0..length] from text beginning"	;@@ need a pair return?
+	; field [object!] location [integer!]
+; ][
+	; first system/words/caret-to-offset layout
+		; field/spaces/text/layout
+		; location + 1
+; ]
+			
