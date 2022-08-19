@@ -459,6 +459,8 @@ scrollable-space: context [
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
 		maybe space/size: box: constrain finite-canvas canvas space/limits
 		if zero? area? box [
+			;@@ this complains if I override default 50x50 limit with e.g. `100` (no vertical limit)
+			;@@ I need to make it work on zero canvas too
 			#assert [false "Somehow scrollable has no size!"]
 			return quietly space/map: []
 		]
