@@ -28,7 +28,7 @@ context [
 			none										;-- the event can be processed by other handlers
 		]
 	]
-	unless find/same system/view/handlers :host-event-func [
+	unless find/same system/view/handlers :host-event-func [	;@@ check shouldn't be needed anymore
 		insert-event-func :host-event-func
 	]
 ]

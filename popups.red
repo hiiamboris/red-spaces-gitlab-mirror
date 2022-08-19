@@ -251,7 +251,7 @@ context [
 			none   										;-- the event can be processed by other handlers
 		]
 	]
-	unless find/same system/view/handlers :popup-event-func [
+	unless find/same system/view/handlers :popup-event-func [	;@@ check shouldn't be needed anymore
 		insert-event-func :popup-event-func
 	]
 	

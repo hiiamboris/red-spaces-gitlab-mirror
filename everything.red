@@ -69,7 +69,7 @@ do/expand [
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
 		spaces: context [
-			ctx: context [							;-- put all space things into a single context
+			ctx: context [								;-- put all space things into a single context
 				#include %debug-helpers.red
 				#include %auxi.red
 				#include %styles.red
@@ -78,7 +78,7 @@ do/expand [
 				#include %vid.red
 				#include %events.red
 				#include %templates.red
-				#include %timers.red						;-- must come after events and templates
+				#include %timers.red					;-- must come after events (to set events/on-time) and templates
 				#include %popups.red
 				#include %traversal.red
 				#include %focus.red

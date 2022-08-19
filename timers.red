@@ -41,7 +41,7 @@ context [
 	timer-resolution: 0:0								;-- measured automatically
 	timer-host: none									;-- a single host face that is used for resolution estimation
 
-	events/on-time: function [face [object!] event [event!]] [
+	events/on-time: function [face [object!] event [event!]] [	;-- events reserve this slot
 		#debug profile [prof/manual/start 'timers]
 		either face =? timer-host [update-resolution][update-timer-host face]
 		process-timers face event
