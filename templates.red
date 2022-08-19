@@ -2491,6 +2491,7 @@ field-ctx: context [
 					mark-history field
 				]
 			)
+		|	end
 		|	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
 		]]
 	]
