@@ -62,7 +62,7 @@ Good enough to write basic apps with. Design enhancements proposals and feature 
 | Widget reference | [Written](reference.md) |
 | Creator's guide | [Written](creators.md) |
 | Templates | None made so far |
-| Alternate stylesheets | [Glossy](stylesheets/#glossy) |
+| Alternate stylesheets | [Glossy](stylesheets/#glossy-glossy-red) |
 
 
 ## Goals
