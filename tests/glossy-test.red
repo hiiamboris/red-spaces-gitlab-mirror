@@ -42,11 +42,9 @@ view/flags [
 					]
 				]
 			]
-			box [
-				column tight [
-					box [text white "List-view"]
-					list-view source= read %.
-				]
+			column tight weight= 1 [					;@@ make row/col weight=1 by default?
+				box [text white "List-view"]
+				list-view source= read %.
 			]
 		]
 	] react [
