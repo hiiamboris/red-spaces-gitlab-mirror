@@ -86,12 +86,12 @@ context [
 					; pages: 2
 					; limits: 30x30 .. 200x200
 					old-wrap-data: :wrap-data
-					wrap-data: func [xy data] [
+					wrap-data: func [data] [
 						either all [word? :data space? get/any data] [
 							;@@ maybe grid should wrap the word as space too?
 							make-space/name 'cell [align: -1x0 content: data]
 						][
-							old-wrap-data xy :data
+							old-wrap-data :data
 						]
 					]
 				]
