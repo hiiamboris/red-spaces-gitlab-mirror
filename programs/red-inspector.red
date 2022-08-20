@@ -293,7 +293,11 @@ context [
 		]
 	]
 	
-	set 'inspect function ['target [path! word! unset!] /local value] [
+	set 'inspect function [
+		"Open Red Inspector window on the TARGET"
+		'target [path! word! unset!] "Path or word to inspect"
+		/local value
+	][
 		if unset? :target [target: 'system]
 		history: reduce [to path! target]
 		
