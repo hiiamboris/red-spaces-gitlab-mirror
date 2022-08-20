@@ -46,7 +46,7 @@ ARGUMENTS:
 ```
 [`example.red`](example.red) is a demo script that uses `inspect` function to inspect it's state.
 
-To run Inspector from sources, you'll need the [`cli` library](https://gitlab.com/hiiamboris/red-cli/) along with `spaces` & `common` usual setup.
+If you'd rather run Inspector from sources, you'll need the [`cli` library](https://gitlab.com/hiiamboris/red-cli/) along with `spaces` & `common` usual setup. Otherwise use provided binaries.
 
 ## VID/S Polygon
 
