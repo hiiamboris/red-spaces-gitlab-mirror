@@ -15,6 +15,10 @@ Red [
 ; #do [disable-space-cache?: yes]
 #include %../everything.red
 
+; #process off											;@@ hack to avoid #include bugs
+; do/expand [#include %../stylesheets/glossy.red]
+; #process on
+
 import/only spaces/ctx [top]
 append spaces/keyboard/focusable 'tube
 
@@ -27,7 +31,7 @@ context [
 	
 	define-styles [
 		cell/ellipsized-text: cell/text: grid/cell/text: grid/cell/paragraph: [
-			maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
+			; maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
 				[union   flags [bold]]
 				[exclude flags [bold]]
 			maybe/same font: code-font
