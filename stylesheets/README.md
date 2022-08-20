@@ -16,7 +16,7 @@ By-design look (on [`glossy-test.red`](../tests/glossy-test.red)):
 
 And here's Red Inspector with it included (though Inspector declares it's own styles which replace those from the stylesheet so it's *not fully* styled, and has a glitch with `hscroll`):
 
-![](https://i.ibb.co/0YJTpcw/GIF-20-Aug-22-15-29-52.gif)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-red-inspector-glossy-styled.gif)
 
 Of course for full effect you will need to remove the OS frame and draw it yourself on a borderless window.
 
