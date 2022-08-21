@@ -53,7 +53,10 @@ apply-current-style: function [
 			do with space style							;-- eval the style to preset facets
 			style-ctx									;-- return the context for later above/below lookup & composition
 		]
-		'else [empty-context]							;-- returns empty context if no /above or /below defined
+		'else [
+			do with space style							;-- eval the style to preset facets
+			empty-context								;-- returns empty context if no /above or /below defined
+		]
 	]
 ]
 
