@@ -486,7 +486,7 @@ scrollable-space: context [
 		;@@ origin clipping in tube makes it impossible to scroll to the bottom because of window resizes!
 		;@@ I need a better idea, how to apply it without breaking things, until then - not clipped
 		; maybe space/origin: clip [origin 0x0] box - scrollers - csz
-		maybe space/origin: origin
+		; maybe space/origin: origin
 		; print [space/content csz space/origin]
 		
 		;; determine what scrollers to show
