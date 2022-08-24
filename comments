@@ -1382,7 +1382,22 @@ field/draw is quite sophisticated and an attempt to (deeply) style it requires d
 	which may work for a field, but will slow down `area` when I get to it
 	it could probably hold a spare `text` (another object) and `set` it (which should be faster)
 	and I will ensure edits are grouped and applied as one, to keep updates to minimum 
-	
+how will ellipsizing work on text/paragraph?
+	on text I decided to make a function that takes facets of rich-text and uses offset-to-caret to estimate it's width
+	it will have to measure `...` with the same facets first and subtract that from width
+	for paragraph the mechanic will be more complex:
+	- i: offset-to-caret at bottom right corner of the canvas
+	- y: second caret-to-offset/lower i to get how far the last visible line extends
+	if it extends a few px beyond the viewport, previous line is chosen to be ellipsized:
+	- y: second caret-to-offset i tells where the current line starts
+	- i: offset-to-caret y - 1 of right margin is on the previous line now
+	then:
+	- i0: offset-to-caret y - 1 or y of left margin (zero) is the start of the chosen line
+	- measure `...` and then subtract it from right margin
+	- i1: offset-to-caret y/y-1 of right margin minus `...` width is the last text char
+	now, either text of the face itself is copied and ellipsized, or it's somehow imposed on top of the full text face
+	presumably first way is faster and simpler
+	maybe it should test if face/text is not *same* as space/text and append-clear instead of a copy
 	
 	
 

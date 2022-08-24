@@ -588,31 +588,83 @@ paragraph-ctx: context [
 	~: self
 	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
-	lay-out: function [space [object!] width [integer! none!] "wrap margin"] [
-		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
+	lay-out: function [space [object!] canvas [pair!] "positive!" ellipsize? [logic!]] [
+		#assert [0x0 +<= canvas]
+		width:  canvas/x
+		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
 		layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]
 		flags:  compose [(1 by length? space/text) (space/flags)]
-		remove find flags 'wrap							;-- otherwise rich-text throws an error
-		quietly layout/text: as string! space/text
+		remove find flags 'wrap							;-- leave no custom flags, otherwise rich-text throws an error
+		remove find flags 'ellipsize					;-- this is way faster than `exclude`
+		mrg2: 2x2 * space/margin
+		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
+		quietly layout/size: size: max 1x1 canvas - mrg2	;-- width has to be set to determine height (can be inf)
 		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
 		quietly layout/data: flags						;-- support of font styles - affects width
-		
-		mrg2: 1x1 * space/margin
-		quietly layout/size: if width [					;-- wrap canvas, or none (no-wrap)
-			(max 1 width - mrg2/x) by infxinf/y			;-- width has to be set to determine height
+		either all [ellipsize? size +< infxinf] [		;-- size has to be limited from both directions for ellipsis to be present
+			buffer: unless layout/text =? space-text: as string! space/text [layout/text]
+			;; measuring "..." is unreliable because kerning between the last letter and first "." is not accounted for
+			;; resulting in random line wraps
+			quietly layout/text: "...."
+			ellipsis-width: first size-text layout
+			quietly layout/text: space-text
+			size-text layout							;@@ required to renew offsets/carets because I disabled on-change in layout!
+			last-visible-char: -1 + offset-to-caret layout size
+			; ?? size
+			; ?? last-visible-char
+			len: length? space-text
+			; if last-visible-char < len: length? space-text [	;-- doesn't fully fit
+				last-line-y2: -1 + second caret-to-offset/lower layout last-visible-char
+				if over?: last-line-y2 > size/y [					;-- last visible line is clipped too much?
+					;; go 1px above line's top, but not into negative (at least 1 line should be visible even if fully clipped)
+					; ?? last-line-y2
+					last-line-y2: max 0 -1 + second caret-to-offset layout last-visible-char
+					; ?? last-line-y2
+				]
+				; ?? over?
+				; ?? layout
+				; probe offset-to-caret layout 100x0
+				last-visible-char: -1 + offset-to-caret layout (max 0 size/x - ellipsis-width) by last-line-y2
+				if last-visible-char < len [			;-- doesn't fully fit with ellipsis
+					;; may still fit without ellipsis
+					last-visible-char': -1 + offset-to-caret layout size/x by last-line-y2
+					if last-visible-char' < len [		;-- doesn't fit either way, need to ellipsize
+						unless buffer [buffer: make string! last-visible-char + 3]
+						; ?? size
+						; ?? len
+						; ?? last-line-y2
+						; ?? last-visible-char
+						; ?? last-visible-char'
+						quietly layout/text: append append/part clear buffer space-text last-visible-char "..."
+					]
+				]
+			; ]
+		][
+			quietly layout/text: as string! space/text
 		]
+		
 		;; NOTE: #4783 to keep in mind
 		quietly layout/extra: size-text layout			;-- 'size-text' is slow, has to be cached (by using on-change)
 		quietly space/layout: layout					;-- must return layout
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
-		unless find space/flags 'wrap [canvas: infxinf]
-		layout:    space/layout
-		old-width: all [layout layout/size layout/size/x]		;@@ REP #113
-		new-width: either canvas [abs canvas/x][infxinf/x]		;-- no canvas is treated as infinity
-		unless old-width = new-width [							;-- redraw if: some facet / canvas width changed
-			lay-out space new-width
+		ellipsize?: to logic! find space/flags 'ellipsize
+		layout:     space/layout
+		either find space/flags 'wrap [
+			default canvas: infxinf						;-- none canvas is treated as infinity (need numbers for the layouts cache)
+			|canvas|: constrain abs canvas space/limits	;-- could care less about fill flag for text
+		][
+			|canvas|: infxinf
+		]
+		old-width:  all [layout layout/size layout/size/x]		;@@ REP #113
+		if any [										;-- redraw if:
+			old-width <> |canvas|/x						;-- some facet / canvas width changed..
+			if ellipsize? [								;-- ..or height changed and ellipsization is allowed
+				|canvas|/y <> old-height: if old-width [layout/size/y]
+			]					
+		][
+			lay-out space |canvas| ellipsize?
 		]
 		
 		;; size can be adjusted in various ways:
