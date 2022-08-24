@@ -587,6 +587,41 @@ scrollable-space: context [
 paragraph-ctx: context [
 	~: self
 	
+	ellipsize: function [layout [object!] text [string!] canvas [pair!]] [
+		;; save existing buffer for reuse (if it's different from text)
+		buffer: unless layout/text =? text [layout/text]
+		len: length? text
+		
+		;; measuring "..." (3 dots) is unreliable
+		;; because kerning between the last letter and first "." is not accounted for, resulting in random line wraps
+		quietly layout/text: "...."
+		ellipsis-width: first size-text layout
+		
+		quietly layout/text: text
+		text-size: size-text layout						;@@ required to renew offsets/carets because I disabled on-change in layout!
+		tolerance: 1									;-- prefer some insignificant clipping over ellipsization
+		if text-size/y + tolerance > canvas/y [			;-- no need to ellipsize if it fits
+			;; find out what are the extents of the last visible line:
+			last-visible-char: -1 + offset-to-caret layout canvas
+			last-line-dy: -1 + second caret-to-offset/lower layout last-visible-char
+			
+			;; if last visible line is too much clipped, discard it an choose the previous line (if one exists)
+			if over?: last-line-dy + tolerance > canvas/y [
+				;; go 1px above line's top, but not into negative (at least 1 line should be visible even if fully clipped)
+				last-line-dy: max 0 -1 + second caret-to-offset layout last-visible-char
+			]
+			
+			;; this only works if text width is >= ellipsis, otherwise ellipsis itself gets wrapped to an invisible line
+			;@@ more complex logic could account for ellipsis itself spanning 2-3 lines, but is it worth it?
+			ellipsis-location: (max 0 canvas/x - ellipsis-width) by last-line-dy
+			last-visible-char: -1 + offset-to-caret layout ellipsis-location
+			unless buffer [buffer: make string! last-visible-char + 3]		;@@ use `obtain` or rely on allocator?
+			quietly layout/text: append append/part clear buffer text last-visible-char "..."
+			text-size: size-text layout
+		]
+		text-size
+	]
+	
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] canvas [pair!] "positive!" ellipsize? [logic!]] [
 		#assert [0x0 +<= canvas]
@@ -598,53 +633,16 @@ paragraph-ctx: context [
 		remove find flags 'ellipsize					;-- this is way faster than `exclude`
 		mrg2: 2x2 * space/margin
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
-		quietly layout/size: size: max 1x1 canvas - mrg2	;-- width has to be set to determine height (can be inf)
+		quietly layout/size: max 1x1 canvas - mrg2		;-- width has to be set to determine height (can be inf)
 		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
 		quietly layout/data: flags						;-- support of font styles - affects width
-		either all [ellipsize? size +< infxinf] [		;-- size has to be limited from both directions for ellipsis to be present
-			buffer: unless layout/text =? space-text: as string! space/text [layout/text]
-			;; measuring "..." is unreliable because kerning between the last letter and first "." is not accounted for
-			;; resulting in random line wraps
-			quietly layout/text: "...."
-			ellipsis-width: first size-text layout
-			quietly layout/text: space-text
-			size-text layout							;@@ required to renew offsets/carets because I disabled on-change in layout!
-			last-visible-char: -1 + offset-to-caret layout size
-			; ?? size
-			; ?? last-visible-char
-			len: length? space-text
-			; if last-visible-char < len: length? space-text [	;-- doesn't fully fit
-				last-line-y2: -1 + second caret-to-offset/lower layout last-visible-char
-				if over?: last-line-y2 > size/y [					;-- last visible line is clipped too much?
-					;; go 1px above line's top, but not into negative (at least 1 line should be visible even if fully clipped)
-					; ?? last-line-y2
-					last-line-y2: max 0 -1 + second caret-to-offset layout last-visible-char
-					; ?? last-line-y2
-				]
-				; ?? over?
-				; ?? layout
-				; probe offset-to-caret layout 100x0
-				last-visible-char: -1 + offset-to-caret layout (max 0 size/x - ellipsis-width) by last-line-y2
-				if last-visible-char < len [			;-- doesn't fully fit with ellipsis
-					;; may still fit without ellipsis
-					last-visible-char': -1 + offset-to-caret layout size/x by last-line-y2
-					if last-visible-char' < len [		;-- doesn't fit either way, need to ellipsize
-						unless buffer [buffer: make string! last-visible-char + 3]
-						; ?? size
-						; ?? len
-						; ?? last-line-y2
-						; ?? last-visible-char
-						; ?? last-visible-char'
-						quietly layout/text: append append/part clear buffer space-text last-visible-char "..."
-					]
-				]
-			; ]
+		either all [ellipsize? layout/size +< infxinf] [	;-- size has to be limited from both directions for ellipsis to be present
+			quietly layout/extra: ellipsize layout (as string! space/text) layout/size
 		][
-			quietly layout/text: as string! space/text
+			quietly layout/text:  as string! space/text
+			;; NOTE: #4783 to keep in mind
+			quietly layout/extra: size-text layout		;-- 'size-text' is slow, has to be cached (by using on-change)
 		]
-		
-		;; NOTE: #4783 to keep in mind
-		quietly layout/extra: size-text layout			;-- 'size-text' is slow, has to be cached (by using on-change)
 		quietly space/layout: layout					;-- must return layout
 	]
 
