@@ -251,6 +251,7 @@ cell-ctx: context [
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
 		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
+		canvas: constrain canvas space/limits
 		mrg2:   2x2 * space/margin
 		drawn:  render/on space/content encode-canvas (subtract-canvas canvas mrg2) fill
 		cspace: get space/content
