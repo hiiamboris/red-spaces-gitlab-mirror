@@ -486,8 +486,10 @@ constrain: function [
 			;; no /max leaves unlimited size as `none`
 		]
 	]
-	unless size =? infxinf [size]						;-- normalization ;@@ need it?
+	size
 ]
+
+#assert [infxinf = constrain infxinf none]
 
 for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code [block!]] [
 	either all [integer? i1 integer? i2] [
