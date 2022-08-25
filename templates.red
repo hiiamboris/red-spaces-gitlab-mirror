@@ -599,17 +599,17 @@ paragraph-ctx: context [
 		
 		quietly layout/text: text
 		text-size: size-text layout						;@@ required to renew offsets/carets because I disabled on-change in layout!
-		tolerance: 1									;-- prefer some insignificant clipping over ellipsization
+		tolerance: 1									;-- prefer insignificant clipping over ellipsization ;@@ ideally, font-dependent
 		if any [										;-- need to ellipsize if:
-			text-size/y + tolerance > canvas/y				;-- doesn't fit vertically (for wrapped text)
-			text-size/x + tolerance > canvas/x				;-- doesn't fit horizontally (unwrapped text)
+			text-size/y - tolerance > canvas/y				;-- doesn't fit vertically (for wrapped text)
+			text-size/x - tolerance > canvas/x				;-- doesn't fit horizontally (unwrapped text)
 		][
 			;; find out what are the extents of the last visible line:
 			last-visible-char: -1 + offset-to-caret layout canvas
 			last-line-dy: -1 + second caret-to-offset/lower layout last-visible-char
 			
 			;; if last visible line is too much clipped, discard it an choose the previous line (if one exists)
-			if over?: last-line-dy + tolerance > canvas/y [
+			if over?: last-line-dy - tolerance > canvas/y [
 				;; go 1px above line's top, but not into negative (at least 1 line should be visible even if fully clipped)
 				last-line-dy: max 0 -1 + second caret-to-offset layout last-visible-char
 			]
