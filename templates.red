@@ -639,11 +639,9 @@ paragraph-ctx: context [
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
 		layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]
 		unless empty? flags: space/flags [
+			flags: compose [(1 by length? space/text) (space/flags)]
 			remove find flags 'wrap						;-- leave no custom flags, otherwise rich-text throws an error
 			remove find flags 'ellipsize				;-- this is way faster than `exclude`
-			unless tail? flags [
-				flags: compose [(1 by length? space/text) (space/flags)]
-			]
 		]
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		;; set width to determine height; but special case is ellipsization without wrapping: limited canvas but infinite layout
@@ -675,7 +673,7 @@ paragraph-ctx: context [
 		if any [										;-- redraw if:
 			none? layout												;-- facet changed?
 			if any [wrap? ellipsize?] [|canvas|/x <> layout/size/x]		;-- width changed and matters?
-			if ellipsize? [|canvas|/y <> layout/size/y]					;-- height changed and matters?
+			if all [wrap? ellipsize?] [|canvas|/y <> layout/size/y]		;-- height changed and matters?
 		][
 			lay-out space |canvas| ellipsize? wrap?
 		]
