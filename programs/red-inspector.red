@@ -30,7 +30,7 @@ context [
 	copy-func: func [f [function!]] [func spec-of :f copy/deep body-of :f]
 	
 	define-styles [
-		cell/ellipsized-text: cell/text: grid/cell/text: grid/cell/paragraph: [
+		cell/text: grid/cell/text: grid/cell/paragraph: [
 			; maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
 				[union   flags [bold]]
 				[exclude flags [bold]]
@@ -166,59 +166,6 @@ context [
 	]
 	
 	
-	;; style for ellipsizing text in the cell
-	;@@ should be generally available, but need to think in what form
-	;@@ and in that case it might need optimization, maybe newtonian search
-	elli-text-ctx: context [
-		~: self
-		
-		split-text: function [rich-text [object!] limit [integer!] /chars /non-empty] [
-			; prof/manual/start 'split-text
-			olde-size: rich-text/size
-			olde-text: rich-text/text
-			quietly rich-text/size: infxinf
-			quietly rich-text/text: text: clear {}
-			delim: pick [[skip] #" "] chars 
-			forparse [end: [delim | end]] bgn: olde-text [	;-- text should not contain any other whitespace than space!
-				append/part text bgn end 
-				size: size-text rich-text
-				if size/x > limit [break]
-				bgn: end
-			]
-			r: offset? olde-text bgn
-			if all [non-empty r = 0] [
-				bgn: olde-text
-				clear text
-				repeat r length? bgn [
-					append text bgn/:r
-					size: size-text rich-text
-					if size/x > limit [r: max 1 r - 1 break]
-				]
-			]
-			quietly rich-text/size: olde-size
-			quietly rich-text/text: olde-text
-			; prof/manual/end 'split-text
-			r
-		]
-		
-		ellipsis: make-space 'text [text: "..." font: code-font]
-		render 'ellipsis
-		
-		spaces/templates/ellipsized-text: make-template 'text [
-			text-draw: :draw
-			draw: function [/on canvas [pair! none!]] [
-				if layout [quietly layout/text: text]
-				drawn: text-draw/on canvas
-				set [canvas: fill:] spaces/ctx/decode-canvas canvas
-				if size/x > canvas/x [
-					len: split-text/chars layout canvas/x - ellipsis/size/x
-					append clear skip layout/text len "..." 
-				]
-				drawn
-			]
-		]
-	]
-	
 	;; advanced data view style with depth control
 	cell-data-view-ctx: context [
 		~: self
@@ -231,7 +178,10 @@ context [
 		
 		too-deep: function [space [object!] canvas [none! pair!]] [
 			default canvas: 0x0
-			make-space/name 'ellipsized-text [text: mold/flat/part :space/data 1000]
+			make-space/name 'text [
+				text: mold/flat/part :space/data 1000
+				flags: [ellipsize]
+			]
 		]
 		
 		draw: function [space [object!] canvas [none! pair!] /extern depth] [
