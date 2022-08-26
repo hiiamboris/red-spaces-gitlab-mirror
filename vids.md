@@ -324,7 +324,8 @@ Each style has it's own set of supported flags. Currently these are:
 - `left`, `center`, `right` - control horizontal alignment of containers (row, column, box, cell)
 - `top`, `middle`, `bottom` - control vertical alignment of containers (row, column, box, cell)
 - `tight` - sets container spacing and margin to zero (hlist, vlist, row, column, list-view, grid)
-- `bold`, `italic`, `underline` - control font properties of text (text, paragraph, field)
+- `bold`, `italic`, `underline` - control font properties of text (text, paragraph, link, field)
+- `ellipsize` - controls automatic ellipsization (text, paragraph, link)
  
 [comment]: # (wrap flag should be supported for text? list it here then, area should support font flags)
 
