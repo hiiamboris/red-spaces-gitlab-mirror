@@ -303,7 +303,6 @@ Basic multi-line text renderer. Wrap margin is controlled by canvas size, which 
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-paragraph.png) | <pre>paragraph with [<br>    margin: 20x10<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.gif) | Ellipsization example:<br><b><pre>row [<br>	box cyan [t: paragraph blue ellipsize "Maecenas ut nulla faucibus, ultrices lectus sed, ullamcorper neque. Integer consectetur eu ipsum quis aliquet. In hac habitasse platea dictumst. Maecenas sodales vel diam vitae hendrerit."]<br>	box pink [text ellipsize text= t/text]<br>]</pre></b> |
 
 | facet  | type  | description |
 |-|-|-|

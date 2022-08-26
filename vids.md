@@ -329,7 +329,7 @@ Each style has it's own set of supported flags. Currently these are:
  
 [comment]: # (wrap flag should be supported for text? list it here then, area should support font flags)
 
-Example:
+Examples:
 ```
 view [host [
 	column 200x200 bottom right [
@@ -340,6 +340,18 @@ view [host [
 ]]
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-flags-setting.png)
+
+---
+```
+view [host [
+	row [
+		box cyan [t: paragraph blue ellipsize "Maecenas ut nulla faucibus, ultrices lectus sed, ullamcorper neque. Integer consectetur eu ipsum quis aliquet. In hac habitasse platea dictumst. Maecenas sodales vel diam vitae hendrerit."]
+		box pink [text ellipsize text= t/text]
+	]
+]]
+```
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.gif)
+
 
 ### Coloring
 
