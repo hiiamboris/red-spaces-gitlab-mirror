@@ -350,7 +350,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.gif)
+<img src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.gif width=300></img>
 
 
 ### Coloring
