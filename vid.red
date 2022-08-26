@@ -35,6 +35,8 @@ VID: context [
 			bold      [flags: append flags 'bold]
 			italic    [flags: append flags 'italic]
 			underline [flags: append flags 'underline]
+			ellipsize [flags: append flags 'ellipsize]
+			; wrap      [flags: append flags 'wrap]		;-- no wrap flag by design, choose text vs paragraph instead 
 		]]
 		
 		;; specifications for VID/S styles available in `lay-out-vids`
