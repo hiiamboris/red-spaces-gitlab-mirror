@@ -295,7 +295,7 @@ Basic single-line text renderer.
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color |
-| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
 
 ## Paragraph
 
@@ -303,6 +303,7 @@ Basic multi-line text renderer. Wrap margin is controlled by canvas size, which 
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-paragraph.png) | <pre>paragraph with [<br>    margin: 20x10<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
 |-|-|
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.png) | Ellipsization example:<br><b><pre>row [<br>box cyan [t: paragraph blue ellipsize "Maecenas ut nulla faucibus, ultrices lectus sed, ullamcorper neque. Integer consectetur eu ipsum quis aliquet. In hac habitasse platea dictumst. Maecenas sodales vel diam vitae hendrerit."]<br>box pink [text ellipsize text= t/text]<br>]</pre></b> |
 
 | facet  | type  | description |
 |-|-|-|
@@ -310,7 +311,7 @@ Basic multi-line text renderer. Wrap margin is controlled by canvas size, which 
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color |
-| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`); `flags: [wrap]` is the default, without it would behave like `text` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); `flags: [wrap]` is the default, without it would behave like `text` |
 
 ## Link
 
@@ -327,7 +328,7 @@ Inherits all of `paragraph` facets:
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color; defaults to light blue |
-| `flags` | block! | a list of rich-text flags, defaults to `flags: [wrap underline]` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); defaults to `flags: [wrap underline]` |
 
 Introduces new facets:
 
