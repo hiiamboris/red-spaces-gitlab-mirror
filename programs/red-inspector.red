@@ -31,7 +31,7 @@ context [
 	
 	define-styles [
 		cell/text: grid/cell/text: grid/cell/paragraph: [
-			; maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
+			maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
 				[union   flags [bold]]
 				[exclude flags [bold]]
 			maybe/same font: code-font
