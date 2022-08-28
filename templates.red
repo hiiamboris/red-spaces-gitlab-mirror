@@ -2568,7 +2568,7 @@ field-ctx: context [
 		;; layout may be invalidated by a series of keys, second key will call `adjust` with no layout
 		;; also changes to text in the event handler effectively make current layout obsolete for caret-to-offset estimation
 		;; field can just rebuild it since canvas is always known (infinite) ;@@ area will require different canvas..
-		layout: paragraph-ctx/lay-out field/spaces/text infxinf/x
+		layout: paragraph-ctx/lay-out field/spaces/text infxinf no no
 		#assert [object? layout]
 		view-width: field/size/x - first (2x2 * field/margin)
 		text-width: layout/extra/x
