@@ -127,6 +127,55 @@ box-distance?: function [
 ; test for it:
 ; view [a: base 100x20 loose b: base 20x100 loose return t: text 100 react [t/text: form box-distance? a/offset a/offset + a/size b/offset b/offset + b/size]]
 
+interpolate: function [
+	"Interpolate a value between V1 and V2"
+	v1 [number!]
+	v2 [number!]
+	t  [number!] "[0..1] corresponds to [V1..V2]"
+	/clip        "Force T within [0..1], making outside regions constant"
+	/reverse     "Treat T as a point on [V1..V2], return a point on [0..1]"
+][
+	case/all [
+		reverse     [t: t - v1 / (v2 - v1)]
+		clip        [t: max 0.0 min 1.0 t]
+		not reverse [t: add  v1 * (1.0 - t)  v2 * t]
+	]
+	t
+]
+
+#assert [
+	50% = interpolate -100% 200% 0.5
+]
+
+~=: make op! function [a [number!] b [number!]] [
+	to logic! any [
+		a = b
+		(abs a - b) < 1e-10
+	]
+]
+
+; slope?: function [
+	; "Get the slope of the line (X1,Y1)-(X2,Y2)"
+	; x1 [float!] y1 [float!]
+	; x2 [float!] y2 [float!]
+; ][
+	; (y2 - y1) / (x2 - x1)
+; ]
+
+; zip: function [
+	; "Interleave a list of series of equal length"
+	; list [block!]
+; ][
+	; case [
+		; tail?   list [copy []]
+		; single? list [copy :list/1]
+		; 'else [
+			; r: make :list/1 (w: length? list) * h: length? :list/1
+			; repeat y h [repeat x w [append/only r :list/:y/:x]]
+		; ]
+	; ]
+; ]
+
 
 ;; need this to be able to call event functions recursively with minimum allocations
 ;; can't use a static block but can use one block per recursion level
@@ -288,6 +337,10 @@ area?: func [xy [pair!]] [xy/x * xy/y]
 skip?: func [series [series!]] [-1 + index? series]
 
 ;-- `clip [a b] v` is far easier to understand than `max a min b v`
+;@@ although block-form [a b] requires extra reduction; maybe use just `clip a b v`?
+;@@ v is at the end because it's usually a big expression, OTOH order is not so relevant here:
+;@@ (clip [1 2] 3) = (clip [1 3] 2) = (clip [2 3] 1) - segment bounds just have to be sorted (not clip [3 1] 2)
+;@@ this means there really is no need to remember the argument order!
 clip: func [
 	"Get VALUE or margin closest to it if it's outside of [range/1 range/2] segment"
 	range [block!]  "Reduced"
@@ -862,9 +915,10 @@ context [
 	;; achieved construction time is 16us vs 200us
 	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
 	light-face!/para: make para! [wrap?: on]
-	rtd-template: compose [                                    
+	; rtd-template: make face! compose [
+	rtd-template: compose [
 		on-change*: does []								;-- for whatever reason, crashes without this
-		on-deep-change: none
+		on-deep-change*: does []
 		(system/view/VID/styles/rich-text/template)
 	]
 	set 'new-rich-text does [make light-face! rtd-template]
