@@ -1608,7 +1608,7 @@ grid-ctx: context [
 	get-offset-from: function [grid [object!] c1 [pair!] c2 [pair!]] [
 		r: 0x0
 		foreach [x wh?] [x grid/col-width? y grid/row-height?] [
-			x1: min c1/:x c1/:x
+			x1: min c1/:x c2/:x
 			x2: max c1/:x c2/:x
 			if x1 = x2 [continue]
 			wh?: get/any wh?							;@@ workaround for #4988
