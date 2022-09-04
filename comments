@@ -123,6 +123,12 @@ debug-draw should become a fully-featured layout explorer to help users understa
 make tree-view widget a widget creation case study (document the whole process) ?
 pekr's idea is to rename `host` to `spaces` in VID/S, and it's reasonable but.. has drawbacks too - need more consideration and input
 	dsunanda's vote: "A SPAN is a collection of SPACES held in one VID face"
+centered text style for (wrapped) captions, and h-alignment for text faces - controlled by para! [wrap?: on align: 'center]
+	also 'strike' style is supported by RTD, need to add it
+high level box-like container with caption support?
+have this idea of a series of short documents, "design cards", where tricky algorithms will be explained
+	on one hand, code will be more maintainable (algorithms get forgotten over the years) and others will be able to verify it
+	on another, it will inspire confidence in the work
 
 
 key aspects: draggable columns, rearrange by styles
@@ -1398,6 +1404,131 @@ how will ellipsizing work on text/paragraph?
 	now, either text of the face itself is copied and ellipsized, or it's somehow imposed on top of the full text face
 	presumably first way is faster and simpler
 	maybe it should test if face/text is not *same* as space/text and append-clear instead of a copy
+grid autofitting
+	my initial simple attempt just tries tossing column widths around until they're even (and that's very prone to local minima)
+	this only will work fine for flow layouts of many very small items
+	for text best case would be to measure text length in each cell, then at least use that as a starting point
+	of course, quite hard to predict where text will wrap (or too expensive to bother)
+	maybe ideally it should inspect cells content names and decide from that?
+	but even `image` may adapt it's size very non-trivially, this is going to be way too complex
+	so maybe it should estimate each column at multiple widths from 5% (or chosen min) to 90% (or what's left) of the whole width in some steps
+	that would attain approximate curves how each column resizes, turn discrete optimization task into a continuous one
+	number of points may depend on the slope, e.g. limits first, then center, then centers of centers, until e.g. 5-10px vertical threshold
+	then I just find a point where curves max is at the minimum using linear interpolation
+	is there analytical solution? https://i.gyazo.com/74fa7ecc2e53170c7be9aa9c1ec65f28.png
+	I plot sum(wi) over hi, find a point where sum(wi) = total-width, that gives me height
+	then find each wi where hi=height, and I have all the column widths
+	that'll work more or less for good grids, but cannot account for spanned cells
+	any complex data, ideally needs many many random points, but that'll be slow esp if grid is big, may take seconds to minutes
+	SO lists some rather naive methods too:
+	https://stackoverflow.com/questions/22206825/algorithm-for-calculating-variable-column-widths-for-set-table-width
+	but a good idea is to find the biggest word! - didn't occur to me, need to consider
+	html uses min/max widths defined for each cell.. well.. I hate micromanagement
+	but in case someone sets /limits for cells, e.g. via `cells` picker, it may be worthy of consideration
+	https://drafts.csswg.org/css3-tables-algorithms/Overview.src.htm
+	https://www.w3.org/TR/CSS2/tables.html#auto-table-layout
+	a good note is that I should consider a case where the table doesn't fit into the given width, and must be extended
+	what makes a minimum?
+	- /limits of cells
+	  I don't envy who's going to fill those lol, very low priority
+	- cell may be complex and it's content may have explicit or implicit min limit
+	- words
+	  and this is shit - need to render every word separately, but don't know their fonts/styles
+	  besides don't know how content behaves in regard of it's text - maybe there's padding around words or they're all differently styled
+	  perhaps rich-text can be made to not wrap single words and size-text can be used by `paragraph` to determine it's min width
+	  (I see one way: replace all spaces with new-lines and size-text it on infinite canvas)
+	  in this case it will also work under the general algorithm, not text-specific
+	  perhaps this should be decided by a flag in text spaces, not on table level
+	  table will just render each cell on min canvas and use the achieved size for computations
+	  also, text may have an ellipsize flag in which case it should never have a minimum width, or at least not bigger than ellipsis
+	rendering accounts for all of this
+	then question is whether to go beyond minimum if width is over given one, or respect minimum but go over width?
+	clipping is usually bad, so going for the second option
+	ignore spanned cells?
+	btw, minimum column width may save quite a bit of renders - those between zero and minwidth won't be needed
+	so there's extra-space = maxwidth - minwidth, if it's positive, can be divided by step (e.g. 10-50px)
+	and each column rendered on widths minwidth + n*step
+	one algorithm's idea, but `distribute` is not really a good fit here, as it doesn't aim for the minimum (although it's fast & precise):
+	1. render all columns on zero, get their min widths W1i and heights H1i
+	2. estimate space left SL = TW - sum(W1i), TW is total-width requested
+	3. if SL <= 0, end here, set widths to found amounts
+	4. SL > 0 case: render all columns on W1i + SL, now I have heights H2i
+	5. have a vector of weights wi=(H1i-H2i)/(W2i-W1i), good thing is if H1i=H2i, weight is zero and column won't be expanded
+	6. use `distribute` on SL width given W1i -> this gives a new width estimate WEi
+	7. render all columns on their WEi, getting heights HEi
+	more perfect algorithm:
+	1. render all columns on zero, get their min widths W1i and heights H1i
+	2. estimate space left SL = TW - sum(W1i), TW is total-width requested
+	3. if SL <= 0, end here, set widths to found amounts
+	4. SL > 0 case: render all columns on W2i = W1i + SL, now I have heights H2i
+	5. arrange all heights H1i and H2i in a vector, sort it by height, remembering i and 1/2 for each height
+	6. first point is the global minimum H0 = min(H2i)
+	   (oops, unused)
+	7. walk over this vector and for each point compute total width TWj (j now is sorted index on the vector)
+	   this assumes linear H/W between H1 and H2 for each column, but that's an approximation for now
+	8. save found total H/W coefficients kj of each segment in the vector, found as kj = Hj+1 - Hj / (TWj+1 - TWj)
+	   (oops, this step is not needed even, just the total widths are used)
+	9. during the scan, choose the segment j=m where TWm < TW < TWm+1
+	10. on segment m linearly interpolate width TW = TWm+1 * f + TWm * (1 - f), f = (TW - TWm) / (TWm+1 - TWm)
+	    this gives height estimate HE = Hj+1 * f + Hj * (1 - f)
+	11. width estimates of all columns can be found by lerping as WEi = W1i + (W2i - W1i) * (HE - H1i)
+	    they should in total sum to TW (need assertion here)
+	12. render all columns on WEi, getting Wi and Hi
+	    ideally Wi should equal WEi, but if it's stepwise, it can be a bit less that's fine
+	13. result can be used already, but if more precision required, then Wi,Hi is a third point between W1i,H1i and W2i,H2i
+	    and in the general case W1i will be less than WEi, so Wi,Hi vector may be renamed to new W1i, H1i and repeat from step 4
+	    end condition may be the number 0+ of estimate repetitions, I think this makes most sense
+	    alternatively, max (WEi-Wi) threshold
+	what about constant-width columns? e.g. single word in a cell may set min & max width to the same amount
+		their H1i and H2i appear next to each other in the vector, giving zero kj for the segment
+		an exception can be made for such columns - their width should not be increased, i.e. their max width should be the same as min
+		then more adaptable columns may be expanded in their stead, even though height won't be affected anymore past that
+		(it should be an option, maybe not yet exposed but controllable)
+	what about columns that have a reversed curve? e.g. a column of images may be small given zero width and big given big width
+		perhaps these should be treated as constant-width ones,
+		and maybe accounted for by some min-column-width setting (mb per-column)
+		of course min-width is not a requirement, as one can always set /limits/min for the images or at least one
+	spanned cells can either be ignored or their widths divided by the number of columns spanned
+	in that case it may be rendered for each column where it appears
+	how can I make a general algorithm, a functor over function that does all the renders and details?
+		need lerp func and it's reverse, outside of the segment should be considered constant
+		need function that takes a column index and width, renders it and returns total size, accounted for spans
+	problem is that measurements have to apply full styles! e.g. host/grid-view/grid/cell
+	otherwise it's not reliable
+	so solution should be to *delay* fitting until next render, where draw will call it with canvas' width
+	also this function will need the window size, as grid may be infinite or big, and it's also known to draw only
+	but what if first canvas width is zero? should autofit only fire with fill/x flag?
+	can/should it fire always with fill/x flag if sum of widths <> canvas/x? makes sense on resizing
+	should there be another cache in the grid, widths-cache, wcache?
+	OK this algorithm is almost okay, the only issue is H/W approximation should not be linear, but hyperbolic! H*W = const (area)
+		then single iteration should suffice in most case
+		how to modify it so?
+		log(HW) = log(C) => log(H) + log(W) = log(C)
+		won't work since TW is a sum of hyperbolae, but this sum is not a hyperbola itself
+	easier then.. knowing all H1,H2,W1,W2(i) is enough to find the segment where TW lies, because TWj can be found
+	then I just calculate all heights for that segment knowing widths
+	since it's not a perfect hyperbola, H1*W1 <> H2*W2 generally, so how to express it?
+	makes more sense to rely on H2,W2 than H1,W1 for const estimation, as W1 is usually random (whatever word sticks out)
+	hyperbolic curve is then: H1*(W1+C) = H2*(W2+C) = const(unknown) => C(H1-H2) + H1*W1 - H2*W2 = 0
+		=> C = (H1*W1 - H2*W2) / (H1 - H2), C specific for each curve, Ci
+	so H*(W+C) = H2*(W2+C), and for individual curves inside their segment I can find H/W relations:
+		H = H2*(W2+C)/(W+C),
+		W = H2*(W2+C)/H - C
+	TWj = sum(Wi(Hj)) over i = sum(W1i + (H2i*W2i/(Hj-H2i))) with the exception of constant-width regions outside segment of definition
+	reverse task is impossible: find height estimate HE given TW, even when segment TWj..TWj+1 is known
+	so have to numerically find an estimate (precision may suck because hyperbolae are approximate anyway)
+	assuming it's still a hyperbola: Hj*(TWj + Cj) = Hj+1*(TWj+1 + Cj) = HE(TW + Cj)
+		=> Cj = (Hj*TWj - Hj+1*TWj+1) / (Hj - Hj+1), however this estimation is much worse than binary search
+		HE = Hj*(Wj+Cj)/(TW+Cj) => then find TWE as sum and compare to TW
+		if too far, repeat with new TWj or TWj+1
+	omg I thought making more than one iteration will be piece of cake, but it's not!
+		how to choose the new W1/W2/H1/H2 for each column?
+		W1/W2 I don't know what they should become, I only know total width
+		H1/H2? perhaps choose the segment that gets intersected by newly found total height?
+		and if total height is bigger than both H1 & H2?
+		what if H1 is just near the total height? then by discarding H2 I lose the option to go beyond it
+		which may still be better than nothing...
+		ideally, I need to add another free parameter and have a 3-point hyperbola, then 4-point, etc, but that's too much trouble
 	
 	
 
@@ -4651,4 +4782,67 @@ field-ctx/caret-to-offset but it's not yet needed
 		; field/spaces/text/layout
 		; location + 1
 ; ]
-			
+
+first iteration of the autofit, worked but not so resilient			
+; ;; this should not use hcache, or it will have to be cleared all the time
+; col-height?: function [grid [object!] col [integer!] width [integer!] rows [integer!]] [	;-- used by autofit only
+	; r: 0
+	; canvas: encode-canvas width by infxinf/y 1x-1
+	; repeat i rows [
+		; xy: col by i
+		; h: any [grid/heights/:i grid/heights/default]		;-- row may be fixed
+		; unless integer? h [
+			; space: get name: any [grid/ccache/:xy  grid/wrap-space xy grid/cells/pick xy]
+			; render/on name canvas
+			; h: space/size/y
+		; ]
+		; r: r + h									;-- does not use any spacing or margins
+	; ]
+	; r
+; ]
+; ;; stochastic content-agnostic column width fitter
+; autofit: function [
+	; "Automatically adjust GRID column widths for best look"
+	; grid  [object!]
+	; width [integer!] "Total grid width to fit into"
+; ][
+	; #assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
+	; ;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
+	; bounds: grid/cells/size
+	; nx: bounds/x  ny: bounds/y
+	; if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
+	
+	; widths: grid/widths
+	; w0: to integer! width / nx
+	; repeat i nx [widths/:i: w0]						;-- starting point - uniform
+	
+	; min-width: any [grid/widths/min 5]
+	; precision: 5									;-- limit when to stop adjusting (pixels)
+	; loop 10 [										;-- prevent deadlocks
+		; adjustment: 0
+		; h2: col-height? grid 1 widths/1 ny
+		; for x: 2 nx [
+			; w1: widths/(x - 1)  w2: widths/:x
+			; h1: h2  h2: col-height? grid x w2 ny
+			; if h1 = h2 [continue]					;-- balanced - don't touch this time
+			; ;@@ maybe make a few attempts? e.g. 50% 100% 150% 200% of dw, or a few random points?
+			; ;@@ random might be bad for result stability, but more reliable in case of big spaces within
+			; dh: clip [5% 50%] 50% * (h2 - h1) / (max 1 min h1 h2)
+			; dw: to integer! (min w1 w2) * dh
+			; w1: max min-width w1 - dw
+			; w2: max min-width w2 + dw
+			; new-h1: col-height? grid x - 1 w1 ny
+			; new-h2: col-height? grid x     w2 ny
+			; print [h1 h2 '-> new-h1 new-h2]
+			; if positive? win: (max h1 h2) - (max new-h1 new-h2) [	;@@ maybe also smaller attempts?
+				; h2: new-h2
+				; widths/(x - 1): w1
+				; widths/:x:      w2
+				; adjustment: max adjustment win
+			; ]
+		; ]
+		; ?? adjustment
+		; if adjustment <= precision [break]
+	; ]
+	; invalidate grid									;-- also clears hcache
+; ]

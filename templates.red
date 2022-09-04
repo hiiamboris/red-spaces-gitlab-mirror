@@ -461,7 +461,7 @@ scrollable-space: context [
 		maybe space/size: box: constrain finite-canvas canvas space/limits
 		if zero? area? box [
 			;@@ this complains if I override default 50x50 limit with e.g. `100` (no vertical limit)
-			;@@ I need to make it work on zero canvas too
+			;@@ I need to make it work on zero canvas too (which should also make it faster on pre-renders)
 			#assert [false "Somehow scrollable has no size!"]
 			return quietly space/map: []
 		]
@@ -599,7 +599,8 @@ paragraph-ctx: context [
 		ellipsis-width: first size-text layout
 		
 		quietly layout/text: text
-		text-size: size-text layout						;@@ required to renew offsets/carets because I disabled on-change in layout!
+; system/view/platform/update-view layout
+		text-size: size-text layout						;@@ size-text required to renew offsets/carets because I disabled on-change in layout!
 		tolerance: 1									;-- prefer insignificant clipping over ellipsization ;@@ ideally, font-dependent
 		if any [										;-- need to ellipsize if:
 			text-size/y - tolerance > canvas/y				;-- doesn't fit vertically (for wrapped text)
@@ -621,6 +622,7 @@ paragraph-ctx: context [
 			last-visible-char: -1 + offset-to-caret layout ellipsis-location
 			unless buffer [buffer: make string! last-visible-char + 3]		;@@ use `obtain` or rely on allocator?
 			quietly layout/text: append append/part clear buffer text last-visible-char "..."
+			; system/view/platform/update-view layout
 			text-size: size-text layout
 		]
 		text-size
@@ -637,7 +639,8 @@ paragraph-ctx: context [
 		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
-		layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]
+		layout: any [new-rich-text]
+		; layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]	@@ this creates unexplainable random glitches!
 		unless empty? flags: space/flags [
 			flags: compose [(1 by length? space/text) (space/flags)]
 			remove find flags 'wrap						;-- leave no custom flags, otherwise rich-text throws an error
@@ -652,6 +655,7 @@ paragraph-ctx: context [
 			quietly layout/extra: ellipsize layout (as string! space/text) canvas
 		][
 			quietly layout/text:  as string! space/text
+			; system/view/platform/update-view layout
 			;; NOTE: #4783 to keep in mind
 			quietly layout/extra: size-text layout		;-- 'size-text' is slow, has to be cached (by using on-change)
 		]
@@ -722,7 +726,7 @@ paragraph-ctx: context [
 		weight: 1
 
 		;; this is required because rich-text object is shared and every change propagates onto the draw block 
-		layouts: make map! 10							;-- map of width -> rich-text object
+		; layouts: make map! 10							;-- map of width -> rich-text object ;@@ creates random glitches if rtd face is not new!
 		layout:  none									;-- last chosen layout, text size is kept in layout/extra
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		invalidate: does [quietly layout: none]			;-- will be laid out on next `draw`
@@ -1881,6 +1885,8 @@ grid-ctx: context [
 		cache: grid/size-cache
 		set cache none
 
+; autofit grid canvas/x
+ 	
 		cache/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
 		#assert [cache/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
@@ -1939,70 +1945,225 @@ grid-ctx: context [
 		]
 	]
 	
-	;; this should not use hcache, or it will have to be cleared all the time
-	col-height?: function [grid [object!] col [integer!] width [integer!] rows [integer!]] [	;-- used by autofit only
-		r: 0
-		canvas: encode-canvas width by infxinf/y 1x-1
-		repeat i rows [
-			xy: col by i
-			h: any [grid/heights/:i grid/heights/default]		;-- row may be fixed
-			unless integer? h [
-				space: get name: any [grid/ccache/:xy  grid/wrap-space xy grid/cells/pick xy]
+	;; NOTE: to properly apply styles this should only be called from within draw
+	measure-column: function [
+		"Measure single column's extent on the canvas of WIDTHxINF (returned size/x may be less than WIDTH)"
+		grid  [object!]  "Uses only Y part from margin and spacing"
+		index [integer!] "Column's index, >= 1"
+		width [integer!] "Allowed column width in pixels"
+		row1  [integer!] "Limit estimation to a given row span"
+		row2  [integer!]
+	][
+		canvas: encode-canvas width by infxinf/y -1x-1	;-- no fill flag is set
+		size: grid/margin * 0x2
+		spc:  grid/spacing/y
+		if row2 > row1 [size/y: size/y - spc]
+		for irow row1 row2 [
+			cell: index by irow
+			cspace: get name: any [grid/ccache/:cell  grid/wrap-space cell grid/cells/pick cell]
+			canvas': either integer? h: any [grid/heights/:i grid/heights/default] [	;-- row may be fixed
+				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width
+			][
 				render/on name canvas
-				h: space/size/y
+				h: cspace/size/y
 			]
-			r: r + h									;-- does not use any spacing or margins
+			span: grid/get-span cell1: grid/get-first-cell cell
+			irow: cell1/y + span/y - 1
+			;@@ make an option to ignore spanned cells?
+			size/y: size/y + spc + to integer! h / span/x		;-- span/x is accounted for only approximately
+			size/x: max size/x cspace/size/x
 		]
-		r
+		size
 	]
 	
-	;; stochastic content-agnostic column width fitter
-	;@@ should also account for minimum cell width - don't make columns less than that (at least optionally)
-	;@@ make it available from grid/ or grid-view/
+	;; fast stable content-agnostic column width fitter
+	;; NOTE: to properly apply styles this should only be called from within draw (doesn't invalidate for that reason)
 	autofit: function [
-		"Automatically adjust GRID column widths for best look"
-		grid  [object!]
-		width [integer!] "Total grid width to fit into"
+		"Automatically adjust GRID column widths to minimize grid height"
+		grid        [object!]
+		total-width [integer!] "Total grid width to fit into"
+		/only "Limit row span"
+			row1 [integer! none!] row2 [integer! none!]
 	][
-		#assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
+		#assert [any [row2 not grid/infinite?] "Adjustment of infinite grid will take infinite time!"]
 		;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
 		bounds: grid/cells/size
 		nx: bounds/x  ny: bounds/y
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
 		
-		widths: grid/widths
-		w0: to integer! width / nx
-		repeat i nx [widths/:i: w0]						;-- starting point - uniform
+		default row1: 1
+		default row2: ny
+		margin:  1x1 * grid/margin
+		spacing: 1x1 * grid/spacing
+		widths: grid/widths								;-- modifies widths map in place
+		min-width: any [widths/min 5]					;@@ make an option to control this?
 		
-		min-width: any [grid/widths/min 5]
-		precision: 5									;-- limit when to stop adjusting (pixels)
-		loop 10 [										;-- prevent deadlocks
-			adjustment: 0
-			h2: col-height? grid 1 widths/1 ny
-			for x: 2 nx [
-				w1: widths/(x - 1)  w2: widths/:x
-				h1: h2  h2: col-height? grid x w2 ny
-				if h1 = h2 [continue]					;-- balanced - don't touch this time
-				;@@ maybe make a few attempts? e.g. 50% 100% 150% 200% of dw, or a few random points?
-				;@@ random might be bad for result stability, but more reliable in case of big spaces within
-				dh: clip [5% 50%] 50% * (h2 - h1) / (max 1 min h1 h2)
-				dw: to integer! (min w1 w2) * dh
-				w1: max min-width w1 - dw
-				w2: max min-width w2 + dw
-				new-h1: col-height? grid x - 1 w1 ny
-				new-h2: col-height? grid x     w2 ny
-				; print [h1 h2 '-> new-h1 new-h2]
-				if positive? win: (max h1 h2) - (max new-h1 new-h2) [	;@@ maybe also smaller attempts?
-					h2: new-h2
-					widths/(x - 1): w1
-					widths/:x:      w2
-					adjustment: max adjustment win
+		set-widths: [
+			error: 0									;-- accumulated rounding error is added to next column
+			repeat i nx [
+				widths/:i: hit: round/to aim: W/:i + error 1
+				error: aim - hit
+			]
+		]
+		
+		loop 1 [
+			;@@ perhaps an optimization case for very small total-width here?
+			;@@ although by current convention it should return minimal rendered widths
+			
+			;; render all columns on zero, get their min widths W1i and heights H1i
+			W1: make vector! reduce ['float! 64 nx]
+			H1: copy W1
+			repeat i nx [
+				size: measure-column grid i 0 row1 row2
+				W1/:i: to float! max min-width size/x
+				H1/:i: to float! size/y
+			]
+			
+			;; estimate space left SL = TW - sum(W1i), TW is total-width requested
+			TW: total-width - (2 * margin/x) - (nx - 1 * spacing/x)
+			SL: TW - TW0: sum W1
+			; echo [total-width TW SL TW0]
+			; ?? W1 ?? H1
+			
+			;; if SL <= 0, end here, set widths to found amounts
+			if SL <= 0 [W: W1  do set-widths  break]
+			
+			;; SL > 0 case: render all columns on W2i = W1i + SL, now I have heights H2i
+			W2: copy W1
+			H2: copy H1
+			repeat i nx [
+				size: measure-column grid i to integer! W1/:i + SL row1 row2
+				W2/:i: to float! max W1/:i size/x			;-- generally W2i <= W1i + SL
+				H2/:i: to float! min H1/:i - 1 size/y		;-- 1px to avoid zero division, and ensure strict monotony
+			]
+			TW2: sum W2
+			
+			;; if maximum possible width is less than requested, use it
+			;@@ maybe make an option to stretch the grid to TW even if there's no point?
+			if TW2 <= TW [W: W2  do set-widths  break]
+			
+			; ?? W2 ?? H2
+			
+			;; 'true' and '1' are equivalent; and if /autofit is off and function is called manually, it does a single iteration
+			iterations: either integer? n: grid/autofit [n][1]
+			
+			;; now given initial W1-W2/H1-H2 bounds, find an optimum once per allowed iteration
+			repeat n-iter iterations [
+			
+				C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-10)			;-- hyperbolae imperfection constants
+print "wtf"
+?? H1 ?? W1 ?? H2 ?? W2
+				?? C		
+W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
+?? W ?? W1
+			
+				;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
+				h-vector: clear any [h-vector  make block! nx * 2 * 2]
+				repeat i nx [									;@@ use map-each
+					repend h-vector [H1/:i 0  H2/:i 0]			;-- H1 >= H2, adding already back-sorted pair
+				]
+				sort/skip/reverse h-vector 2					;-- sorted from the biggest height
+				
+				;; walk over this vector and for each point compute total width TWj (j now is sorted index on the vector)
+				;; during the scan, choose the segment j=m where TWm < TW < TWm+1
+				h-vector/2: TW0									;-- start from min. total width
+				; for-each [pos: Hj TWj | Hj+1] h-vector [...]
+				repeat j nx * 2 - 1 [							;@@ what a mess, use for-each when it's fast
+					set [Hj: TWj: Hj+1:] pos: skip h-vector j - 1 * 2
+					W: (copy W2) + C * H2 / Hj+1 - C			;-- (W + C) * H = (W2 + C) * H2
+					?? W
+					TWj+1: 0.0
+					repeat i nx [TWj+1: TWj+1 + clip [W1/:i W2/:i] W/:i]	;-- clip within the segment of definition [W1i,W2i]
+					?? TWj+1
+					pos/4: TWj+1
+					#assert [TWj+1 >= TWj]
+					if all [TWj <= TW  TW < TWj+1] [			;-- found the j-th segment containing desired total width
+						H+:  Hj   H-:  Hj+1
+						TW-: TWj  TW+: TWj+1
+						break
+					]
+				]
+				?? h-vector
+				echo [H- H+ TW- TW+]
+				
+				;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [Hj+1,Hj] using binary search
+				threshold: 10									;-- total width estimation precision (bigger requires less iterations)
+				either not H- [									;-- if total width is too big, no segment found
+					HE: Hj+1									;-- choose max width/min height
+				][
+					HE: H+  TWE: TW-							;-- initial estimate is bigger height so TWE <= TW+
+					print "-- going into the search --"
+					?? TW ?? TW- ?? TW+ ?? HE ?? TWE 
+					forever [									;-- perform binary search
+						; ?? TWE
+						if all [TWE <= TW  TW <= (TWE + threshold)] [break]		;-- found it already; segment is too narrow
+						HE: H+ + H- / 2
+						WE: (copy W2) + C * H2 / HE - C
+						TWE: 0.0
+						repeat i nx [TWE: TWE + clip [W1/:i W2/:i] WE/:i]		;-- clip within the segment of definition [W1i,W2i]
+						either TWE <= TW						;-- use TWE as new low or high boundary
+							[TW-: TWE H+: HE]					;-- TWE(TW-) <= TW <= TW+
+							[TW+: TWE H-: HE]					;-- TW- <= TW < TWE(TW+)
+					]
+					print ["found"]
+					?? TWE ?? H- ?? H+ ?? WE
+				]
+				#assert [(abs TWE - TW) <= threshold]
+				
+				W: (copy W2) + C * H2 / HE - C
+				repeat i nx [W/:i: clip [W1/:i W2/:i] W/:i]
+				; ?? W
+				W: W + (TW - TWE / length? W)					;-- evenly distribute remaining space
+				do set-widths
+	
+				;; they should in total sum to TW (need assertion here)
+				#assert [TW ~= sum W]
+				
+				;; prepare the next iteration: render columns on newly found widths and use that as new W1/H1 or W2/H2
+				;; (otherwise it's up to `render` to draw everything)
+				if n-iter <> iterations [
+					print "-- iteration preparation --"
+					;; estimate column sizes, to get total height
+					W: copy W1  H: copy H1
+					repeat i nx [
+						size: measure-column grid i widths/:i row1 row2
+						W/:i: to float! clip [W1/:i W2/:i] size/x		;-- whatever happens to new width, put it within [W1,W2]
+						H/:i: to float! clip [H2/:i H1/:i] size/y
+					]
+					total-height: last sort copy H
+					
+					;; decide which points to use in the new iteration for each column
+					tolerance: 10						;-- distance from real to estimated column height that should be considered precise
+					limits-adjusted?: no
+					?? W1 ?? W2 ?? H1 ?? H2 ?? W ?? H
+					?? HE ?? TWE
+					repeat i nx [
+						if case [
+							true [
+								W1/:i: W/:i
+								H1/:i: H/:i
+							]
+							; H/:i < (HE - tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
+							W/:i * H/:i > (WE/:i * HE + tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
+								H2/:i: H/:i
+								W2/:i: W/:i
+							]
+							; H/:i > (HE + tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
+							W/:i < (WE/:i - tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
+								H1/:i: H/:i
+								W1/:i: W/:i
+							]
+							;; if it's near estimate, it's an ideal hyperbola and no correction needed
+						] [limits-adjusted?: yes]
+					]
+					unless limits-adjusted? [break]		;-- stop iterating if W/H vectors are precise and didn't change
+					?? W1 ?? W2 ?? H1 ?? H2
+					TW0: sum W1
 				]
 			]
-			; ?? adjustment
-			if adjustment <= precision [break]
 		]
-		invalidate grid									;-- also clears hcache
+		
+		clear grid/hcache								;-- line height cache is no longer valid after widths have changed
 	]
 	
 	;; called by global invalidate
@@ -2033,8 +2194,9 @@ grid-ctx: context [
 		content: make map! 8				;-- XY coordinate -> space-name
 		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;@@ all this should be in the reference docs instead
-		;; widths/min used in `autofit` to ensure no column gets zero size even if it's empty
+		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
+		autofit: 2;yes						;-- automatically adjust column widths? number of iterations or 'true' for one iteration
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
@@ -2696,6 +2858,8 @@ field-ctx: context [
 	
 ]
 
+;@@ native area when wrapped supports caret both at the end of the line and beginning of the next
+;@@ so just integer offset is not enough! but should I bother?
 ; area-ctx: context [
 	; ~: self
 	
