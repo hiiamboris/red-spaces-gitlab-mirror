@@ -190,6 +190,10 @@ probe~: function [
 	]
 ]
 
+echo: function [values [block!]] [
+	print form map-each/eval word values [[mold to set-word! word mold/part get/any word 20 ""]]
+]
+
 
 ;-- experimental probe with depth control
 context [
