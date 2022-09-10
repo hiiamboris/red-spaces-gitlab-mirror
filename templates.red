@@ -1770,6 +1770,7 @@ grid-ctx: context [
 			cell1: grid/get-first-cell xy
 			height1: 0
 			if content: grid/cells/pick cell1 [
+				set-quiet 'rendered-xy cell1			;@@ temporary kludge until apply!
 				render/on grid/wrap-space cell1 content canvas	;-- render to get the size
 				cspace: get content
 				height1: cspace/size/y
@@ -1855,6 +1856,7 @@ grid-ctx: context [
 			] [continue]
 			done/:mcell: true							;-- mark it as drawn
 			
+			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply!
 			pinned?: grid/is-cell-pinned? cell
 			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
@@ -1863,6 +1865,7 @@ grid-ctx: context [
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
 			render/on mcname encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
+			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply! (could have been reset by inner grids)
 			mcdraw: render/on mcname encode-canvas mcsize 1x1	;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
@@ -1874,7 +1877,12 @@ grid-ctx: context [
 		reduce [map drawn]
 	]
 	;@@ this hack allows styles to know whether this cell is pinned or not
-	pinned?: does [get bind 'pinned? :draw]
+	;@@ only a temporary kludge! until we get apply func, so I can pass /extra to render
+	rendered-xy: 1x1
+	pinned?: function [] [
+		grid: get bind 'grid :draw
+		grid/is-cell-pinned? rendered-xy
+	]
 
 	;; uses canvas only to figure out what cells are visible (and need to be rendered)
 	draw: function [grid [object!] canvas [none! pair!] wxy1 [none! pair!] wxy2 [none! pair!]] [
@@ -1885,7 +1893,8 @@ grid-ctx: context [
 		cache: grid/size-cache
 		set cache none
 
-; autofit grid canvas/x
+		;; prepare column widths before any offset-to-cell mapping, and before hcache is filled
+		if all [grid/autofit not grid/infinite?] [autofit grid canvas/x grid/autofit]
  	
 		cache/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
 		#assert [cache/bounds]
@@ -1896,7 +1905,6 @@ grid-ctx: context [
 		xy2: min xy1 + canvas wxy2
 
 		;; affects xy1 so should come before locate-point
-		pinned?: yes									;@@ hack for styles - need a better design!
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
 			xy0: grid/margin + xy1						;-- location of drawn pinned cells relative to grid's origin
 			set [map: drawn-common-header:] draw-range grid 1x1 pinned xy0
@@ -1928,7 +1936,6 @@ grid-ctx: context [
 			append new-map map  stash map
 		]
 
-		pinned?: no
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
 		append new-map map  stash map
 		;-- note: draw order (common -> headers -> normal) is important
@@ -1962,7 +1969,7 @@ grid-ctx: context [
 			cell: index by irow
 			cspace: get name: any [grid/ccache/:cell  grid/wrap-space cell grid/cells/pick cell]
 			canvas': either integer? h: any [grid/heights/:i grid/heights/default] [	;-- row may be fixed
-				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width
+				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
 				render/on name canvas
 				h: cspace/size/y
@@ -1976,193 +1983,114 @@ grid-ctx: context [
 		size
 	]
 	
+	;@@ when I document these, need a few showcase tables (text, text+images, fields maybe) and how each one works
+	;@@ big image + text cell will be a good showcase for hyperbolic algo
+	;@@ need a flag for paragraph to never wrap partial words
 	;; fast stable content-agnostic column width fitter
 	;; NOTE: to properly apply styles this should only be called from within draw (doesn't invalidate for that reason)
 	autofit: function [
 		"Automatically adjust GRID column widths to minimize grid height"
 		grid        [object!]
 		total-width [integer!] "Total grid width to fit into"
-		/only "Limit row span"
-			row1 [integer! none!] row2 [integer! none!]
+		method      [word!]    "One of supported fitting methods: [hyperbolic weighted simple-weighted]"	;@@
 	][
-		#assert [any [row2 not grid/infinite?] "Adjustment of infinite grid will take infinite time!"]
+		#assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
 		;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
-		bounds: grid/cells/size
-		nx: bounds/x  ny: bounds/y
+		set-pair [nx: ny:] bounds: grid/cells/size
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
 		
-		default row1: 1
-		default row2: ny
-		margin:  1x1 * grid/margin
-		spacing: 1x1 * grid/spacing
-		widths: grid/widths								;-- modifies widths map in place
+		margin:    1x1 * grid/margin
+		spacing:   1x1 * grid/spacing
+		widths:    grid/widths							;-- modifies widths map in place
 		min-width: any [widths/min 5]					;@@ make an option to control this?
-		
-		set-widths: [
-			error: 0									;-- accumulated rounding error is added to next column
-			repeat i nx [
-				widths/:i: hit: round/to aim: W/:i + error 1
-				error: aim - hit
-			]
-		]
-		
-		loop 1 [
-			;@@ perhaps an optimization case for very small total-width here?
-			;@@ although by current convention it should return minimal rendered widths
-			
+				
+		;@@ TODO: W1/W2 can most of the time be cached (should be an option), saving 2 renders
+		loop 1 [										;-- needed to use `break`
 			;; render all columns on zero, get their min widths W1i and heights H1i
 			W1: make vector! reduce ['float! 64 nx]
 			H1: copy W1
 			repeat i nx [
-				size: measure-column grid i 0 row1 row2
-				W1/:i: to float! max min-width size/x
-				H1/:i: to float! size/y
+				size: measure-column grid i 0 1 ny
+				W1/:i: 1.0 * max min-width size/x
+				H1/:i: 1.0 * size/y
 			]
 			
 			;; estimate space left SL = TW - sum(W1i), TW is total-width requested
 			TW: total-width - (2 * margin/x) - (nx - 1 * spacing/x)
 			SL: TW - TW0: sum W1
-			; echo [total-width TW SL TW0]
-			; ?? W1 ?? H1
 			
 			;; if SL <= 0, end here, set widths to found amounts
-			if SL <= 0 [W: W1  do set-widths  break]
+			if SL <= 0 [W: W1  break]
 			
-			;; SL > 0 case: render all columns on W2i = W1i + SL, now I have heights H2i
+			;; SL > 0 case: render all columns on infinite canvas, now I have min heights H2i and max widths W2i
 			W2: copy W1
 			H2: copy H1
 			repeat i nx [
-				size: measure-column grid i to integer! W1/:i + SL row1 row2
-				W2/:i: to float! max W1/:i size/x			;-- generally W2i <= W1i + SL
-				H2/:i: to float! min H1/:i - 1 size/y		;-- 1px to avoid zero division, and ensure strict monotony
+				size: measure-column grid i infxinf/x 1 ny
+				W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
+				H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
 			]
 			TW2: sum W2
 			
 			;; if maximum possible width is less than requested, use it
 			;@@ maybe make an option to stretch the grid to TW even if there's no point?
-			if TW2 <= TW [W: W2  do set-widths  break]
+			if TW2 <= TW [W: W2  break]
 			
-			; ?? W2 ?? H2
-			
-			;; 'true' and '1' are equivalent; and if /autofit is off and function is called manually, it does a single iteration
-			iterations: either integer? n: grid/autofit [n][1]
-			
-			;; now given initial W1-W2/H1-H2 bounds, find an optimum once per allowed iteration
-			repeat n-iter iterations [
-			
-				C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-10)			;-- hyperbolae imperfection constants
-print "wtf"
-?? H1 ?? W1 ?? H2 ?? W2
-				?? C		
-W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
-?? W ?? W1
-			
-				;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
-				h-vector: clear any [h-vector  make block! nx * 2 * 2]
-				repeat i nx [									;@@ use map-each
-					repend h-vector [H1/:i 0  H2/:i 0]			;-- H1 >= H2, adding already back-sorted pair
+			switch/default method [
+				simple-weighted [
+					W: W2 - W1
+					W: W / sum W
+					W: W * SL + W1
 				]
-				sort/skip/reverse h-vector 2					;-- sorted from the biggest height
 				
-				;; walk over this vector and for each point compute total width TWj (j now is sorted index on the vector)
-				;; during the scan, choose the segment j=m where TWm < TW < TWm+1
-				h-vector/2: TW0									;-- start from min. total width
-				; for-each [pos: Hj TWj | Hj+1] h-vector [...]
-				repeat j nx * 2 - 1 [							;@@ what a mess, use for-each when it's fast
-					set [Hj: TWj: Hj+1:] pos: skip h-vector j - 1 * 2
-					W: (copy W2) + C * H2 / Hj+1 - C			;-- (W + C) * H = (W2 + C) * H2
-					?? W
-					TWj+1: 0.0
-					repeat i nx [TWj+1: TWj+1 + clip [W1/:i W2/:i] W/:i]	;-- clip within the segment of definition [W1i,W2i]
-					?? TWj+1
-					pos/4: TWj+1
-					#assert [TWj+1 >= TWj]
-					if all [TWj <= TW  TW < TWj+1] [			;-- found the j-th segment containing desired total width
-						H+:  Hj   H-:  Hj+1
-						TW-: TWj  TW+: TWj+1
-						break
+				; weighted [
+				; ]
+			
+				hyperbolic [
+					;@@ observe off-hyperbola estimate misses (and imperfection constants) and check them vs other algorithms?
+					;; now given initial W1-W2/H1-H2 bounds, find an optimum
+					C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae imperfection constants, +epsilon to avoid zero division
+				
+					;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
+					h-vector: clear any [h-vector  make block! nx * 2 * 2]
+					repeat i nx [								;@@ use map-each
+						repend h-vector [H1/:i 0  H2/:i 0]		;-- H1 >= H2, adding already back-sorted pair
 					]
-				]
-				?? h-vector
-				echo [H- H+ TW- TW+]
-				
-				;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [Hj+1,Hj] using binary search
-				threshold: 10									;-- total width estimation precision (bigger requires less iterations)
-				either not H- [									;-- if total width is too big, no segment found
-					HE: Hj+1									;-- choose max width/min height
-				][
-					HE: H+  TWE: TW-							;-- initial estimate is bigger height so TWE <= TW+
-					print "-- going into the search --"
-					?? TW ?? TW- ?? TW+ ?? HE ?? TWE 
-					forever [									;-- perform binary search
-						; ?? TWE
-						if all [TWE <= TW  TW <= (TWE + threshold)] [break]		;-- found it already; segment is too narrow
-						HE: H+ + H- / 2
-						WE: (copy W2) + C * H2 / HE - C
-						TWE: 0.0
-						repeat i nx [TWE: TWE + clip [W1/:i W2/:i] WE/:i]		;-- clip within the segment of definition [W1i,W2i]
-						either TWE <= TW						;-- use TWE as new low or high boundary
-							[TW-: TWE H+: HE]					;-- TWE(TW-) <= TW <= TW+
-							[TW+: TWE H-: HE]					;-- TW- <= TW < TWE(TW+)
-					]
-					print ["found"]
-					?? TWE ?? H- ?? H+ ?? WE
-				]
-				#assert [(abs TWE - TW) <= threshold]
-				
-				W: (copy W2) + C * H2 / HE - C
-				repeat i nx [W/:i: clip [W1/:i W2/:i] W/:i]
-				; ?? W
-				W: W + (TW - TWE / length? W)					;-- evenly distribute remaining space
-				do set-widths
-	
-				;; they should in total sum to TW (need assertion here)
-				#assert [TW ~= sum W]
-				
-				;; prepare the next iteration: render columns on newly found widths and use that as new W1/H1 or W2/H2
-				;; (otherwise it's up to `render` to draw everything)
-				if n-iter <> iterations [
-					print "-- iteration preparation --"
-					;; estimate column sizes, to get total height
-					W: copy W1  H: copy H1
-					repeat i nx [
-						size: measure-column grid i widths/:i row1 row2
-						W/:i: to float! clip [W1/:i W2/:i] size/x		;-- whatever happens to new width, put it within [W1,W2]
-						H/:i: to float! clip [H2/:i H1/:i] size/y
-					]
-					total-height: last sort copy H
+					sort/skip/reverse h-vector 2				;-- sorted from the biggest height
 					
-					;; decide which points to use in the new iteration for each column
-					tolerance: 10						;-- distance from real to estimated column height that should be considered precise
-					limits-adjusted?: no
-					?? W1 ?? W2 ?? H1 ?? H2 ?? W ?? H
-					?? HE ?? TWE
-					repeat i nx [
-						if case [
-							true [
-								W1/:i: W/:i
-								H1/:i: H/:i
-							]
-							; H/:i < (HE - tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
-							W/:i * H/:i > (WE/:i * HE + tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
-								H2/:i: H/:i
-								W2/:i: W/:i
-							]
-							; H/:i > (HE + tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
-							W/:i < (WE/:i - tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
-								H1/:i: H/:i
-								W1/:i: W/:i
-							]
-							;; if it's near estimate, it's an ideal hyperbola and no correction needed
-						] [limits-adjusted?: yes]
+					;; walk over this vector and for each point compute total width TWj(TW-) (j now is sorted index on the vector)
+					;; during the scan, choose the segment j where TWj(TW-) < TW < TWj+1(TW+)
+					h-vector/2: TW0								;-- start from min. total width
+					; for-each [pos: H+ TW- | H-] h-vector [...]
+					repeat j nx * 2 - 1 [						;@@ what a mess, use for-each when it's fast
+						set [H+: TW-: H-:] pos: skip h-vector j - 1 * 2
+						W: (copy W2) + C * H2 / H- - C			;-- (W + C) * H = (W2 + C) * H2
+						pos/4: TW+: sum clip-vector W W1 W2		;-- clip within [W1i,W2i] since hyperbola extends outside this segment
+						#assert [TW+ >= TW-]
+						if all [TW- <= TW  TW < TW+] [break]	;-- found the j-th segment containing desired total width
 					]
-					unless limits-adjusted? [break]		;-- stop iterating if W/H vectors are precise and didn't change
-					?? W1 ?? W2 ?? H1 ?? H2
-					TW0: sum W1
+					
+					;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [H-..H+] using binary search
+					threshold: 10								;-- total width estimation precision (bigger requires less iterations)
+					set [H-: TW+: HE: TWE:]						;-- use lower width as estimate since it's <= TW
+						binary-search/with HE H- H+ TW threshold [
+							WE: (copy W2) + C * H2 / HE - C
+							sum clip-vector WE W1 W2			;-- clip within [W1i,W2i] since hyperbola extends outside this segment
+						] TW+ TW-
+					#assert [(abs TWE - TW) <= threshold]
+									
+					W: (copy W2) + C * H2 / HE - C
+					W: clip-vector W W1 W2
+					W: W + (TW - TWE / length? W)				;-- evenly distribute remaining space
 				]
-			]
+			] [ERROR "Unknown fitting method: (method)"]
 		]
+		;; widths should in total sum to TW
+		#assert [TW ~= sum W]
 		
+		;; set widths map to found W vector
+		W: quantize W
+		repeat i nx [widths/:i: W/:i]
 		clear grid/hcache								;-- line height cache is no longer valid after widths have changed
 	]
 	
@@ -2191,12 +2119,12 @@ W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
 		margin:  5x5
 		spacing: 5x5
 		origin:  0x0						;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin
-		content: make map! 8				;-- XY coordinate -> space-name
+		content: make map! 8				;-- XY coordinate -> space-name (not cell, but cells content name)
 		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;@@ all this should be in the reference docs instead
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
-		autofit: 2;yes						;-- automatically adjust column widths? number of iterations or 'true' for one iteration
+		autofit: 'hyperbolic					;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
@@ -2209,7 +2137,8 @@ W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
 		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
 		;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
 		;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
-		ccache:  make map!  20				;-- filled by render and height estimator
+		ccache:  make map! 20				;-- filled by render and height estimator
+		;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
@@ -2220,7 +2149,7 @@ W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
 		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
 			cell: get name
-			maybe/same cell/content: space				;-- prevent unnecessary invalidation
+			maybe/same cell/content: space				;-- prevent unnecessary invalidation if cached
 			name
 		]
 
