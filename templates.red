@@ -648,12 +648,22 @@ paragraph-ctx: context [
 		]
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		;; set width to determine height; but special case is ellipsization without wrapping: limited canvas but infinite layout
-		quietly layout/size: either wrap? [max 1x1 canvas][infxinf]
 		quietly layout/font: space/font					;@@ careful: fonts are not collected by GC, may run out of them easily
 		quietly layout/data: flags						;-- support of font styles - affects width
 		either all [ellipsize? canvas +< infxinf] [		;-- size has to be limited from both directions for ellipsis to be present
+			;; ellipsization prioritizes the canvas, so may split long words
+			quietly layout/size:  max 1x1 canvas
 			quietly layout/extra: ellipsize layout (as string! space/text) canvas
 		][
+			;; normal mode prioritizes words, so have to estimate min. width from the longest word
+			quietly layout/size: infxinf
+			if wrap? [									;@@ perhaps this too should be a flag?
+				words: append clear "" as string! space/text
+				parse/case words [any [to #" " p: skip (change p #"^/")]]
+				quietly layout/text: words
+				min-width: 1x0 * size-text layout
+				quietly layout/size: max 1x1 max canvas min-width
+			]
 			quietly layout/text:  as string! space/text
 			; system/view/platform/update-view layout
 			;; NOTE: #4783 to keep in mind
@@ -2125,6 +2135,7 @@ grid-ctx: context [
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
 		autofit: 'hyperbolic					;-- automatically adjust column widths? method name or none
+		; autofit: 'simple-weighted					;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
