@@ -351,6 +351,12 @@ clip: func [
 	min range/2 max range/1 value
 ]
 
+;@@ this should be just `clip` but min/max have no vector support
+clip-vector: function [v1 [vector!] v2 [vector!] v3 [vector!]] [
+	repeat i length? r: copy v1 [r/:i: clip [v2/:i v3/:i] v1/:i]
+	r
+]
+
 resolve-color: function [color [tuple! word! issue!]] [
 	case [
 		word?  color [system/view/metrics/colors/:color]
@@ -503,6 +509,50 @@ max-safe: function [a [scalar! none!] b [scalar! none!]] [
 
 half: func [x] [x / 2]
 
+quantize: function [
+	"Quantize a float sequence into integers, minimizing the overall bias"
+	vector [vector! block!]
+][
+	r: make vector! n: length? vector
+	error: 0											;-- accumulated rounding error is added to next value
+	repeat i n [
+		r/:i: hit: round/to aim: vector/:i + error 1
+		error: aim - hit
+	]
+	r
+]
+
+context [
+	set 'binary-search function [
+		"Look for optimum F(x)=Fopt on a segment [X1..X2] using binary search, return [X1 F1 X2 F2]"
+		'word [word! set-word!] "Argument name for the loop"
+		X1    [number!]
+		X2    [number!]
+		Fopt  [number!] "Optimum to find"
+		dF    [number!] "Minimum acceptable error to stop search"
+		F     [block!]  "Function F(x)"
+		/with "Provide F(X1) and F(X2) if they are known"
+			F1    [number!] 
+			F2    [number!] 
+	][
+		f1: any [f1 call-f x1] 
+		f2: any [f2 call-f x2] 
+		#assert [fopt = clip [min f1 f2 max f1 f2] fopt  "Optimum value should be within [F1,F2]"]	;@@ rephrase when clip updates
+		sign: sign? (f2 - f1) * (x2 - x1)				;-- + if ascending
+		repeat n 1e6 [
+			if df >= abs f2 - f1 [break]				;-- found it already; segment is too narrow
+			y: call-f x: x1 + x2 / 2
+			;; in / case: y < fopt < y2 means x is new x1; in \ case: x is new x2
+			either positive? fopt - y * sign [x1: x f1: y][x2: x f2: y]		;-- use new low or high boundary
+		]
+		; print `"Spent (n - 1) iterations in search"`
+		if n = 1e6 [ERROR "Binary search deadlocked"]
+		reduce [x1 f1 x2 f2]
+	]
+	
+	call-f: func [x] with :binary-search [set word x do f]
+]
+
 ;; constraining is used by `render` to impose soft limits on space sizes
 ;; constraining logic:
 ;; no canvas (unlimited) and no limits (unlimited) => return `none` (also unlimited)
@@ -590,6 +640,15 @@ ortho: func [
 	;; switch here is ~20% faster than select/skip
 	; select/skip [x y y x 0x1 1x0 1x0 0x1] xy 2
 	switch xy [x ['y] y ['x] 0x1 [1x0] 1x0 [0x1]]
+]
+
+set-pair: function [
+	"Set words to components of a pair value"
+	words [block!]
+	pair  [pair!]
+][
+	set words/1 pair/x
+	set words/2 pair/y
 ]
 
 make-pair: function [
