@@ -247,10 +247,10 @@ layouts: context [
 				][										;-- else move this item to next row
 					append (new-row: obtain block! length? row) row
 					repend rows [row-size row-weight new-row]
+					total-length: total-length + row-size/y		;-- add before resetting row-size
 					clear row
 					row-size: reverse? space/size
 					row-weight: weight
-					total-length: total-length + row-size/y
 				]
 				peak-row-width: max peak-row-width row-size/x
 				repend row [name space drawn available weight]
