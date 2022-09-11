@@ -199,7 +199,7 @@ image-ctx: context [
 			high-lim:  max low-lim 1x1 * min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be unscaled
 			;; for uniform scaling, compute min/max scale applicable
 			lim:       max 1x1 low-lim - mrg - mrg
-			min-scale: max  lim/x / isize/x  lim/y / isize/y
+			min-scale: min  lim/x / isize/x  lim/y / isize/y
 			if high-lim [
 				lim: max 1x1 high-lim - mrg - mrg
 				max-scale: min  lim/x / isize/x  lim/y / isize/y
@@ -210,6 +210,7 @@ image-ctx: context [
 				all [max-scale max-scale < 1] [max-scale]		;-- downscale if canvas or limits/max requires
 				'unconstrained [1]
 			]
+			; echo [canvas low-lim high-lim scale min-scale max-scale lim isize]
 			maybe image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
 		][
