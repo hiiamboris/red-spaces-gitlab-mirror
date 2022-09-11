@@ -210,7 +210,6 @@ image-ctx: context [
 				all [max-scale max-scale < 1] [max-scale]		;-- downscale if canvas or limits/max requires
 				'unconstrained [1]
 			]
-			; echo [canvas low-lim high-lim scale min-scale max-scale lim isize]
 			maybe image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
 		][
@@ -230,6 +229,7 @@ image-ctx: context [
 	templates/image: make-template 'space [
 		size:   none									;@@ should fixed size be used as an override?
 		margin: 0
+		weight: 1
 		data:   none									;-- images are not recyclable, so `none` by default
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		space-on-change: :on-change*
