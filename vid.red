@@ -205,7 +205,7 @@ VID: context [
 			logic!  [make-space/name 'logic [state: value]]
 			image!  [make-space/name 'image [data:  value]]
 			url!    [make-space/name 'link  [data:  value]]
-			block!  [anonymize 'row either wrap? [lay-out-data/wrap new][lay-out-data new]]
+			block!  [anonymize 'tube either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
 		] [make-space/name 'text [text: mold :value]]
 	]
 	
