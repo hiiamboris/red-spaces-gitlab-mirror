@@ -2037,8 +2037,8 @@ grid-ctx: context [
 			H2: copy H1
 			repeat i nx [
 				size: measure-column grid i infxinf/x 1 ny
-				W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
-				H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
+				W2/:i: max W1/:i 1.0 * size/x			;-- ensure monotony:
+				H2/:i: min H1/:i 1.0 * size/y			;-- W2 >= W1, H2 <= H1
 			]
 			TW2: sum W2
 			
@@ -2047,19 +2047,38 @@ grid-ctx: context [
 			if TW2 <= TW [W: W2  break]
 			
 			switch/default method [
-				simple-weighted [
-					W: W2 - W1
-					W: W / sum W
-					W: W * SL + W1
+				;; free space (over W1) is distributed by weights=(W2-W1)
+				free [									;-- this is what browsers are using, at least PaleMoon
+					weights: W2 - W1					;-- tried just W2, but it generates too much unused space in columns
+					W: weights / (sum weights) * SL + W1
 				]
 				
-				; weighted [
-				; ]
-			
-				hyperbolic [
-					;@@ observe off-hyperbola estimate misses (and imperfection constants) and check them vs other algorithms?
+				;; total space is distributed by weights=W2, but no less than W1
+				;@@ externalize this algo
+				total [
+					weights:  copy W2
+					w-vector: make block! nx * 4
+					repeat i nx [						;@@ use map-each
+						repend w-vector [W1/:i / weights/:i  W1/:i  weights/:i  i]
+					]
+					sort/reverse/skip w-vector 4		;-- sorted from most oversized to most flexible
+					left: TW
+					W:    copy W2
+					wsum: sum weights
+					foreach [_ wmin wgt i] w-vector [
+						we:   wgt / wsum * left			;-- estimated weighted width for the column
+						W/:i: max wmin we				;-- don't let it go lower than W1 (wmin)
+						wsum: wsum - wgt				;-- next time normalize to the new sum of weights
+						left: left - W/:i
+					]
+				]
+				
+			    ;; assumes constant (W*H+C) for each column, finds optimum height estimate for sum of hyperbolae = TW
+				;; conflates to weighted total if C=0
+				total-offset [
 					;; now given initial W1-W2/H1-H2 bounds, find an optimum
-					C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae imperfection constants, +epsilon to avoid zero division
+					C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae offsets, +epsilon to avoid zero division
+					; C: (copy W2) * 0.0
 				
 					;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
 					h-vector: clear any [h-vector  make block! nx * 2 * 2]
@@ -2071,7 +2090,6 @@ grid-ctx: context [
 					;; walk over this vector and for each point compute total width TWj(TW-) (j now is sorted index on the vector)
 					;; during the scan, choose the segment j where TWj(TW-) < TW < TWj+1(TW+)
 					h-vector/2: TW0								;-- start from min. total width
-					; for-each [pos: H+ TW- | H-] h-vector [...]
 					repeat j nx * 2 - 1 [						;@@ what a mess, use for-each when it's fast
 						set [H+: TW-: H-:] pos: skip h-vector j - 1 * 2
 						W: (copy W2) + C * H2 / H- - C			;-- (W + C) * H = (W2 + C) * H2
@@ -2080,8 +2098,10 @@ grid-ctx: context [
 						if all [TW- <= TW  TW < TW+] [break]	;-- found the j-th segment containing desired total width
 					]
 					
+					;; total width estimation precision (bigger requires less iterations but is more jumpy when resizing)
+					threshold: 5
+					
 					;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [H-..H+] using binary search
-					threshold: 10								;-- total width estimation precision (bigger requires less iterations)
 					set [H-: TW+: HE: TWE:]						;-- use lower width as estimate since it's <= TW
 						binary-search/with HE H- H+ TW threshold [
 							WE: (copy W2) + C * H2 / HE - C
@@ -2094,9 +2114,8 @@ grid-ctx: context [
 					W: W + (TW - TWE / length? W)				;-- evenly distribute remaining space
 				]
 			] [ERROR "Unknown fitting method: (method)"]
+			#assert [TW ~= sum W  "widths should in total sum to TW"]
 		]
-		;; widths should in total sum to TW
-		#assert [TW ~= sum W]
 		
 		;; set widths map to found W vector
 		W: quantize W
@@ -2134,8 +2153,7 @@ grid-ctx: context [
 		;@@ all this should be in the reference docs instead
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
-		autofit: 'hyperbolic					;-- automatically adjust column widths? method name or none
-		; autofit: 'simple-weighted					;-- automatically adjust column widths? method name or none
+		autofit: 'total						;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
