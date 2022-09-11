@@ -150,7 +150,7 @@ interpolate: function [
 ~=: make op! function [a [number!] b [number!]] [
 	to logic! any [
 		a = b
-		(abs a - b) < 1e-10
+		(abs a - b) < 1e-6
 	]
 ]
 
