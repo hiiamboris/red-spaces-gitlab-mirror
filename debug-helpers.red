@@ -191,7 +191,9 @@ probe~: function [
 ]
 
 echo: function [values [block!]] [
-	print form map-each/eval word values [[mold to set-word! word mold/part/flat get/any word 20 ""]]
+	print form map-each/eval word values [
+		[append mold word ":" mold/part/flat get/any word 20 ""]
+	]
 ]
 
 
