@@ -1980,7 +1980,7 @@ grid-ctx: context [
 		for irow row1 row2 [
 			cell: index by irow
 			cspace: get name: any [grid/ccache/:cell  grid/wrap-space cell grid/cells/pick cell]
-			canvas': either integer? h: any [grid/heights/:i grid/heights/default] [	;-- row may be fixed
+			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
 				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
 				render/on name canvas
