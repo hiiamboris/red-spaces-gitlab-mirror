@@ -15,6 +15,7 @@ view/no-wait/options [
 		gv: grid-view focus 400x400 
 		source= #(1x2 "1x2" 2x2 "2x2" 1x1 "1x1" size: 10x10)
 		with [
+			grid/autofit: none
 			; grid/bounds: 10x10
 			; grid/bounds: [x: 10 y: auto]
 			grid/set-span 1x1 2x1

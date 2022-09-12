@@ -32,6 +32,7 @@ view/no-wait/options [
 	b: host [
 		grid-view 500x300 with [
 			ratio: 5
+			grid/autofit: none
 			; cache?: grid/cache?: window/cache?: spaces/templates/cell/cache?: off
 			; grid/pinned: 2x1
 			; grid/bounds: [x: #[none] y: #[none]]

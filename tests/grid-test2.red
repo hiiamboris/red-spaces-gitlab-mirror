@@ -15,7 +15,7 @@ remove-style 'grid/cell
 view/no-wait/options [
 	below
 	b: host [
-		grid 5x5 [; bounds=[x: 10 y: auto]
+		grid 5x5 autofit= none [; bounds=[x: 10 y: auto]
 			; below 
 			; button "button1"
 			; button 80x80 .. none

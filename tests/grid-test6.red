@@ -61,6 +61,7 @@ view/no-wait/options [
 	b: host [
 		z: zoomer [
 			gv: grid-view 500x300 with [
+				grid/autofit: none
 				; grid/pinned: 2x1
 				; grid/bounds: [x: #[none] y: #[none]]
 				grid/set-span 6x1 1x5					;-- unify outside cells for more fps

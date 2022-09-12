@@ -26,6 +26,7 @@ view/no-wait/options [
 	text 500 center white red font-size 20 "Rendering this should take a while..."
 	b: host [
 		grid-view 500x300 with [
+			grid/autofit: none
 			; grid/pinned: 2x1
 			; grid/bounds: [x: #[none] y: #[none]]
 			; cell-size: 200x150
