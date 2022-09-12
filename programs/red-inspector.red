@@ -43,6 +43,7 @@ context [
 	spaces/templates/grid: make-template 'grid [
 		margin:  2x2
 		spacing: 1x1
+		autofit: none
 		heights: copy #(min 10 default auto)
 		widths:  copy #(default 80)
 	]
