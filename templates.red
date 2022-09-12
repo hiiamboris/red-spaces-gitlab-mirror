@@ -659,7 +659,7 @@ paragraph-ctx: context [
 		][
 			;; normal mode prioritizes words, so have to estimate min. width from the longest word
 			quietly layout/size: infxinf
-			if wrap? [									;@@ perhaps this too should be a flag?
+			if all [wrap? canvas/x < infxinf/x] [		;@@ perhaps this too should be a flag?
 				words: append clear "" as string! space/text
 				parse/case words [any [to #" " p: skip (change p #"^/")]]
 				quietly layout/text: words
@@ -2008,7 +2008,8 @@ grid-ctx: context [
 	][
 		#assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
 		;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
-		set-pair [nx: ny:] bounds: grid/cells/size
+		bounds: grid/cells/size
+		nx: bounds/x  ny: bounds/y
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
 		
 		margin:    1x1 * grid/margin
