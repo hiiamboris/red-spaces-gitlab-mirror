@@ -189,28 +189,32 @@ image-ctx: context [
 	draw: function [image [object!] canvas [pair! none!]] [
 		either image? image/data [
 			default canvas: infxinf
-			set [canvas: _:] decode-canvas canvas		;-- image does not respect fill flag; scale is more important
-			mrg:       image/margin * 1x1 
-			limits:    image/limits
-			isize:     image/data/size
+			set [canvas: fill:] decode-canvas canvas
+			mrg2: 2 * mrg: image/margin * 1x1 
+			limits:        image/limits
+			isize:         image/data/size
 			;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
-			low-lim:   1x1 * any [if limits [limits/min] 0x0]	;-- default to 0x0 as min size; * 1x1 in case it's integer
-			;; infinite canvas is fine here - it just won't affect the scale
-			high-lim:  max low-lim 1x1 * min-safe canvas if limits [limits/max]	;@@ REP #113 & 122 ;-- if no canvas, will be unscaled
-			;; for uniform scaling, compute min/max scale applicable
-			lim:       max 1x1 low-lim - mrg - mrg
-			min-scale: min  lim/x / isize/x  lim/y / isize/y
-			if high-lim [
-				lim: max 1x1 high-lim - mrg - mrg
-				max-scale: min  lim/x / isize/x  lim/y / isize/y
+			if all [limits  limits/min  low-lim:  max 0x0 limits/min - mrg2] [	;@@ REP #113 & 122
+				min-scale: max  low-lim/x / isize/x  low-lim/y / isize/y	;-- use bigger one to not let it go below low limit
 			]
-			;; then choose
-			scale: case [
-				min-scale > 1 [min-scale]						;-- upscale if limits/min requires only
-				all [max-scale max-scale < 1] [max-scale]		;-- downscale if canvas or limits/max requires
-				'unconstrained [1]
+			if all [limits  limits/max  high-lim: max 0x0 limits/max - mrg2] [	;@@ REP #113 & 122
+				max-scale: min  high-lim/x / isize/x  high-lim/y / isize/y	;-- use lower one to not let it go above high limit
 			]
-			; echo [canvas low-lim high-lim scale min-scale max-scale lim isize]
+			if all [image/weight > 0  canvas <> infxinf] [		;-- if inf canvas, will be unscaled, otherwise uses finite dimension
+				set-pair [cx: cy:] subtract-canvas canvas mrg2
+				if cx = infxinf/x [cx: 1.#inf]
+				if cy = infxinf/x [cy: 1.#inf]
+				canvas-max-scale: min  cx / isize/x  cy / isize/y	;-- won't be bigger than the canvas
+				if fill/x <= 0 [cx: 1.#inf]						;-- don't stick to dimensions it's not supposed to fill
+				if fill/y <= 0 [cy: 1.#inf]  
+				canvas-scale: min  cx / isize/x  cy / isize/y	;-- optimal scale to fill the chosen canvas dimensions
+				canvas-scale: min canvas-scale canvas-max-scale
+			]
+			default min-scale:    0.0
+			default max-scale:    1.#inf
+			default canvas-scale: 1.0
+			scale: clip [min-scale max-scale] canvas-scale
+			; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
 			maybe image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
 		][
@@ -230,7 +234,7 @@ image-ctx: context [
 	templates/image: make-template 'space [
 		size:   none									;@@ should fixed size be used as an override?
 		margin: 0
-		weight: 1
+		weight: 0
 		data:   none									;-- images are not recyclable, so `none` by default
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		space-on-change: :on-change*
