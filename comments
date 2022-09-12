@@ -129,6 +129,10 @@ high level box-like container with caption support?
 have this idea of a series of short documents, "design cards", where tricky algorithms will be explained
 	on one hand, code will be more maintainable (algorithms get forgotten over the years) and others will be able to verify it
 	on another, it will inspire confidence in the work
+eventually field/area should have a blinking caret, but it's problematic because it should not cause redraws of everything
+	e.g. if it's inside a grid's cell, blinking every 100ms, that's 10fps grid redraw and quite some CPU load
+perhaps I could use base's panel to put popups/caret there instead of parent's pane?
+	that would further limit the clipping region for popups, but for caret it should work, but only if it won't steal focus	
 
 
 key aspects: draggable columns, rearrange by styles
@@ -1127,7 +1131,29 @@ fast hittesting over grid - how?
 	nor scache worked for pinned-or-not cell identification, because grid/cell style has no access to grid!
 	as a result, pinned cells cannot have different size (only colors),
 	because grid-ctx/pinned? does not affect rendering from calc-height (and locate-line)
-	for the time being: using locate-point (until proven slow) 
+	for the time being: using locate-point (until proven slow)
+	oh shit it does affect it! 
+pinned flag causes trouble in draw: cells are sized for bold (pinned) font style while they are not
+	apparently pinned flag is true at the time hcache is filled, during calc-size
+	since there's no way coordinate can be passed into style, only options:
+	- have a func that given cell object gets it's coordinate (what if it's shared??)
+	  such cells won't ever be GCed
+	- each cell has a coordinate field (same problem!)
+	  but that and above gives no info because cell doesn't know in which grid it is rendered, and only grid has /pinned info
+	  handlers can at least use paths 
+	- renew some pinned flag before each cell's render?
+	  global? grid can include grids so it will mess everything up, needs a stack
+	  per-grid? cell doesn't know what grid it's in
+	- renew per-cell pinned flag before every cell's render? might work
+	- have pinned-cell style separate from cell? give render a name that depends on coordinate?
+	  seems like the most idiomatic and simple solution except..
+	  pinned changes -> changes cell's name in focused path, in ccache -> it's not focused anymore
+	  guess will have to live with this minor problem
+	better idea: pass /extra parameter to render, let it pass it to style and eventually /draw
+	this will be useful for lists as well, e.g. to render odd/even items with different background
+	the only issue is this will heavily complicate render in absence of apply func
+	so temporarily need another solution, global flag seems simplest
+TODO: get rid of ccache, cache only one cell, or maybe last 10 focused cells
 infinite canvas bores me to death already
 	main reason - I'm treating infinite dimensions somewhere as 0, somewhere as alias to limits/max, it's a mess
 	can I get rid of it? use only finite and 0?
@@ -1529,8 +1555,49 @@ grid autofitting
 		what if H1 is just near the total height? then by discarding H2 I lose the option to go beyond it
 		which may still be better than nothing...
 		ideally, I need to add another free parameter and have a 3-point hyperbola, then 4-point, etc, but that's too much trouble
-	
-	
+	(W+C)*H = (W2+C)*H2
+	WH+CH = W2H2 + CH2
+	C(H - H2) = W2H2 - WH
+	C = (W2*H2 - W*H) / (H - H2)
+	it seems that browsers are using yet different algorithm:
+	1. determine min widths
+	2. determine max widths
+	3. assign weights according to max widths only
+	4. distribute space over min widths by assigned weights
+	   linear or not?
+	still 2 renders, and less optimal than hyperbolic, but the advantage is smooth column resizing
+	other ideas:
+	- golden ratio search, but maybe quite suboptimal for multiple columns
+	- estimate HE, but on lower width (eg 80%) for all iterations except the last
+	  this will increase the likelihood that found heights will bound the ideal from above
+	- browser-like weight assignment but not above the minimum but intersecting it
+	  something like what `distribute` does but with minimum instead of maximum
+	  though maybe I can reverse it? unlikely
+	  @@ need simpler distribute version (browser-like)
+	  basically, looped simple distribute: reduce `free` space for each column that is over it
+autofit+big/infinite data - dropped the idea
+	although it's possible to choose rows used in autofitting, and it might even perform okay
+	problem is identifying the rows range! because I only have window size and origin
+	but window is translated into the rows/cols based on column widths
+	so these widths must be set before such translation, and it's a catch-22
+choice of algorithm to replace all spaces with newlines:
+	>> s: "C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"
+	59.3 μs	[parse copy s [any [thru change #" " #"^/"]]]
+	71.0 μs	[replace/all copy s #" " #"^/"]
+	67.2 μs	[p: copy s while [p: find p #" "] [p: change p #"^/"]]
+	66.3 μs	[p: copy s while [p: find p #" "] [p: change p #"^/"]]
+	343 μs	[forparse [p: #" "] copy s [change p #"^/"]]		;) slow because of apply usage :(
+	50.1 μs	[parse copy s [any [to #" " p: (change p #"^/") skip]]]
+	>> s: "Sed vehicula, sapien et consectetur vulputate, turpis ipsum viverra sem, in efficitur quam erat sit amet ligula"
+	11.9 μs	[parse copy s [any [to #" " p: skip (change p #"^/")]]]
+	21.5 μs	[replace/all copy s #" " #"^/"]
+	20.2 μs	[p: copy s while [p: find p #" "] [p: change p #"^/"]]
+	25.0 μs	[parse copy s [any [thru change #" " #"^/"]]]
+	34.0 μs	[parse copy s [any [thru [p: #" "] (change p #"^/")]]]
+	40.5 μs	[p: copy s forall p [if p/1 =? #" " [change p #"^/"]]]
+	39.6 μs	[p: clear copy s parse/case s [collect into p any [#" " keep (#"^/") | keep skip]]]
+	35.1 μs	[p: clear copy s parse/case s [collect into p any [keep thru [#" " | end] keep (#"^/")]]]
+	17.4 μs	[p: clear copy s parse/case s [collect into p any [keep [thru #" " | thru end] keep (#"^/")]]]
 
 
 Timer design:
@@ -4845,4 +4912,195 @@ first iteration of the autofit, worked but not so resilient
 		; if adjustment <= precision [break]
 	; ]
 	; invalidate grid									;-- also clears hcache
+; ]
+
+hyperbolic autofit that still supported multiple iterations, but it's totally not worth it, too slow for naught
+; autofit: function [
+	; "Automatically adjust GRID column widths to minimize grid height"
+	; grid        [object!]
+	; total-width [integer!] "Total grid width to fit into"
+	; method      [word!]    "One of supported fitting methods: [hyperbolic weighted simple-weighted]"	;@@
+; ][
+	; #assert [any [row2 not grid/infinite?] "Adjustment of infinite grid will take infinite time!"]
+	; ;; does not modify grid/heights - at least some of them must be `auto` for this func to have effect
+	; bounds: grid/cells/size
+	; nx: bounds/x  ny: bounds/y
+	; if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
+	
+	; margin:  1x1 * grid/margin
+	; spacing: 1x1 * grid/spacing
+	; widths: grid/widths								;-- modifies widths map in place
+	; min-width: any [widths/min 5]					;@@ make an option to control this?
+	
+	; set-widths: [
+		; error: 0									;-- accumulated rounding error is added to next column
+		; repeat i nx [
+			; widths/:i: hit: round/to aim: W/:i + error 1
+			; error: aim - hit
+		; ]
+	; ]
+	
+	; ;@@ TODO: min/max widths can most of the time be cached (should be an option), saving 2 renders
+	; loop 1 [
+		; ;@@ perhaps an optimization case for very small total-width here?
+		; ;@@ although by current convention it should return minimal rendered widths
+		
+		; ;; render all columns on zero, get their min widths W1i and heights H1i
+		; W1: make vector! reduce ['float! 64 nx]
+		; H1: copy W1
+		; repeat i nx [
+			; size: measure-column grid i 0 1 ny
+			; W1/:i: to float! max min-width size/x
+			; H1/:i: to float! size/y
+		; ]
+		
+		; ;; estimate space left SL = TW - sum(W1i), TW is total-width requested
+		; TW: total-width - (2 * margin/x) - (nx - 1 * spacing/x)
+		; SL: TW - TW0: sum W1
+		; echo [total-width TW SL TW0]
+		; ?? W1 ?? H1
+		
+		; ;; if SL <= 0, end here, set widths to found amounts
+		; if SL <= 0 [W: W1  do set-widths  break]
+		
+		; ;; SL > 0 case: render all columns on W2i = W1i + SL, now I have heights H2i
+		; W2: copy W1
+		; H2: copy H1
+		; repeat i nx [
+			; if iterations > 1 [HE: HE + (pick tail h-vector -2) / 2]
+			; size: measure-column grid i to integer! W1/:i + SL 1 ny
+			; size: measure-column grid i infxinf/x 1 ny
+			; W2/:i: to float! max W1/:i size/x			;-- generally W2i <= W1i + SL
+			; H2/:i: to float! min H1/:i - 1 size/y		;-- 1px to avoid zero division, and ensure strict monotony
+		; ]
+		; TW2: sum W2
+		
+		; ;; if maximum possible width is less than requested, use it
+		; ;@@ maybe make an option to stretch the grid to TW even if there's no point?
+		; if TW2 <= TW [W: W2  do set-widths  break]
+		
+		; ?? W2 ?? H2
+		
+		; ;; 'true' and '1' are equivalent; and if /autofit is off and function is called manually, it does a single iteration
+		; iterations: either integer? n: grid/autofit [n][1]
+		
+		; ;@@ observe off-hyperbola estimate misses (and imperfection constants) and check them vs other algorithms?
+		; ;; now given initial W1-W2/H1-H2 bounds, find an optimum once per allowed iteration
+		; repeat n-iter iterations [
+		
+			; C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-10)	;-- hyperbolae imperfection constants, epsilon to avoid zero division
+; print "wtf"
+; ?? H1 ?? W1 ?? H2 ?? W2
+			; ?? C		
+; W: (copy W2) + C * H2 / H1 - C			;-- (W + C) * H = (W2 + C) * H2
+; ?? W ?? W1
+		
+			; ;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
+			; h-vector: clear any [h-vector  make block! nx * 2 * 2]
+			; repeat i nx [									;@@ use map-each
+				; repend h-vector [H1/:i 0  H2/:i 0]			;-- H1 >= H2, adding already back-sorted pair
+			; ]
+			; sort/skip/reverse h-vector 2					;-- sorted from the biggest height
+			
+			; ;; walk over this vector and for each point compute total width TWj (j now is sorted index on the vector)
+			; ;; during the scan, choose the segment j=m where TWm < TW < TWm+1
+			; h-vector/2: TW0									;-- start from min. total width
+			; for-each [pos: Hj TWj | Hj+1] h-vector [...]
+			; repeat j nx * 2 - 1 [							;@@ what a mess, use for-each when it's fast
+				; set [Hj: TWj: Hj+1:] pos: skip h-vector j - 1 * 2
+				; W: (copy W2) + C * H2 / Hj+1 - C			;-- (W + C) * H = (W2 + C) * H2
+				; ?? W
+				; TWj+1: 0.0
+				; repeat i nx [TWj+1: TWj+1 + clip [W1/:i W2/:i] W/:i]	;-- clip within the segment of definition [W1i,W2i]
+				; ?? TWj+1
+				; pos/4: TWj+1
+				; #assert [TWj+1 >= TWj]
+				; if all [TWj <= TW  TW < TWj+1] [			;-- found the j-th segment containing desired total width
+					; H+:  Hj   H-:  Hj+1
+					; TW-: TWj  TW+: TWj+1
+					; break
+				; ]
+			; ]
+			; ?? h-vector
+			; echo [H- H+ TW- TW+]
+			
+			; ;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [Hj+1,Hj] using binary search
+			; threshold: 10									;-- total width estimation precision (bigger requires less iterations)
+			; either not H- [									;-- if total width is too big, no segment found
+				; HE: Hj+1									;-- choose max width/min height
+			; ][
+				; HE: H+  TWE: TW-							;-- initial estimate is bigger height so TWE <= TW+
+				; print "-- going into the search --"
+				; ?? TW ?? TW- ?? TW+ ?? HE ?? TWE 
+				; forever [									;-- perform binary search
+					; ?? TWE
+					; if all [TWE <= TW  TW <= (TWE + threshold)] [break]		;-- found it already; segment is too narrow
+					; HE: H+ + H- / 2
+					; WE: (copy W2) + C * H2 / HE - C
+					; TWE: 0.0
+					; repeat i nx [TWE: TWE + clip [W1/:i W2/:i] WE/:i]		;-- clip within the segment of definition [W1i,W2i]
+					; either TWE <= TW						;-- use TWE as new low or high boundary
+						; [TW-: TWE H+: HE]					;-- TWE(TW-) <= TW <= TW+
+						; [TW+: TWE H-: HE]					;-- TW- <= TW < TWE(TW+)
+				; ]
+				; print ["found"]
+				; ?? TWE ?? H- ?? H+ ?? WE
+			; ]
+			; #assert [(abs TWE - TW) <= threshold]
+							
+			; W: (copy W2) + C * H2 / HE - C
+			; repeat i nx [W/:i: clip [W1/:i W2/:i] W/:i]
+			; ?? W
+			; W: W + (TW - TWE / length? W)					;-- evenly distribute remaining space
+			; do set-widths
+
+			; ;; they should in total sum to TW (need assertion here)
+			; #assert [TW ~= sum W]
+			
+			; ;; prepare the next iteration: render columns on newly found widths and use that as new W1/H1 or W2/H2
+			; ;; (otherwise it's up to `render` to draw everything)
+			; if n-iter <> iterations [
+				; print "-- iteration preparation --"
+				; ;; estimate column sizes, to get total height
+				; W: copy W1  H: copy H1
+				; repeat i nx [
+					; size: measure-column grid i widths/:i 1 ny
+					; W/:i: to float! clip [W1/:i W2/:i] size/x		;-- whatever happens to new width, put it within [W1,W2]
+					; H/:i: to float! clip [H2/:i H1/:i] size/y
+				; ]
+				; total-height: last sort copy H
+				
+				; ;; decide which points to use in the new iteration for each column
+				; tolerance: 10						;-- distance from real to estimated column height that should be considered precise
+				; limits-adjusted?: no
+				; ?? W1 ?? W2 ?? H1 ?? H2 ?? W ?? H
+				; ?? HE ?? TWE
+				; repeat i nx [
+					; if case [
+						; true [
+							; W1/:i: W/:i
+							; H1/:i: H/:i
+						; ]
+						; H/:i < (HE - tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
+						; W/:i * H/:i > (WE/:i * HE + tolerance) [	;-- real height below the estimate, use it as new low limit (H2)
+							; H2/:i: H/:i
+							; W2/:i: W/:i
+						; ]
+						; H/:i > (HE + tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
+						; W/:i < (WE/:i - tolerance) [	;-- real height above the estimate, use it as new high limit (H1)
+							; H1/:i: H/:i
+							; W1/:i: W/:i
+						; ]
+						; ;; if it's near estimate, it's an ideal hyperbola and no correction needed
+					; ] [limits-adjusted?: yes]
+				; ]
+				; unless limits-adjusted? [break]		;-- stop iterating if W/H vectors are precise and didn't change
+				; ?? W1 ?? W2 ?? H1 ?? H2
+				; TW0: sum W1
+				; ;@@ make 2 algorithms: hyperbolic and golden section
+			; ]
+		; ]
+	; ]
+	
+	; clear grid/hcache								;-- line height cache is no longer valid after widths have changed
 ; ]
