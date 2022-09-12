@@ -196,7 +196,9 @@ layouts: context [
 			;; along Y canvas becomes infinite, later expanded to fill the row
 			;@@ should it always be 0xinf maybe?
 			; stripe: round/to subtract-canvas canvas 2 * margin infxinf * ox		;@@ #5151
-			stripe: reverse? encode-canvas  0 by ccanvas/:y  0x-1	;-- fill is not used for 1st render
+			; stripe: reverse? encode-canvas  0 by ccanvas/:y  0x-1	;-- fill is not used for 1st render
+			stripe: encode-canvas ccanvas reverse? 0x-1	;-- fill is not used for 1st render
+			; stripe: reverse? encode-canvas  infxinf/x by ccanvas/:y  0x-1	;-- fill is not used for 1st render
 			; stripe: subtract-canvas canvas 2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
@@ -258,9 +260,10 @@ layouts: context [
 			repend rows [row-size row-weight row]
 			total-length: total-length + row-size/y
 			#leaving [foreach [_ _ row] rows [stash row]  stash rows]
-			
+
 			;; expand row items - facilitates a second render cycle of the row
 			;; this collects row heights (canvas/:y is still infinite)
+			; if all [fill/:x = 1 allowed-row-width < infxinf/x] [	;-- only if width is constrained and filling is enabled
 			if allowed-row-width < infxinf/x [			;-- only if width is constrained
 				peak-row-width: 0						;-- will have to recalculate it during expansion
 				total-length:   0
@@ -303,20 +306,24 @@ layouts: context [
 				]
 			]
 			
-			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
-			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
+			;; add spacing to total-length (previously not accounted for)
 			nrows: (length? rows) / 3
 			total-length: total-length + (nrows - 1 * spacing/:y)
-			free: ccanvas/:y - total-length
-			if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
-				weights: extract/into next rows 3 clear []	;@@ use map-each
-				extras:  append/dup clear [] free nrows
-				shares:  distribute free weights extras
-				repeat i nrows [						;@@ use for-each
-					i3: i - 1 * 3 + 1
-					rows/:i3/y: rows/:i3/y + shares/:i
+			
+			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
+			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
+			if fill/:y = 1 [
+				free: ccanvas/:y - total-length
+				if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
+					weights: extract/into next rows 3 clear []	;@@ use map-each
+					extras:  append/dup clear [] free nrows
+					shares:  distribute free weights extras
+					repeat i nrows [					;@@ use for-each
+						i3: i - 1 * 3 + 1
+						rows/:i3/y: rows/:i3/y + shares/:i
+					]
+					total-length: ccanvas/:y
 				]
-				total-length: ccanvas/:y
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
