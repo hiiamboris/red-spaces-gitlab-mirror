@@ -2178,10 +2178,10 @@ grid-ctx: context [
 		;@@       maybe just in lay-out-grid? or as some hacky map that can map rows/columns/cells to alignment?
 		map: []
 
-		wrap-space: function [xy [pair!] space [word!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
+		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
 			cell: get name
-			maybe/same cell/content: space				;-- prevent unnecessary invalidation if cached
+			maybe/same cell/content: any [space in generic 'empty]	;-- prevent unnecessary invalidation if cached
 			name
 		]
 
