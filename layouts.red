@@ -263,8 +263,8 @@ layouts: context [
 
 			;; expand row items - facilitates a second render cycle of the row
 			;; this collects row heights (canvas/:y is still infinite)
-			; if all [fill/:x = 1 allowed-row-width < infxinf/x] [	;-- only if width is constrained and filling is enabled
 			if allowed-row-width < infxinf/x [			;-- only if width is constrained
+				allowed-row-width: max allowed-row-width peak-row-width		;-- expand canvas to the biggest row
 				peak-row-width: 0						;-- will have to recalculate it during expansion
 				total-length:   0
 				forall rows [							;@@ use for-each
