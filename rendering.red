@@ -50,11 +50,11 @@ apply-current-style: function [
 			context? first pos
 		] [
 			set style-ctx none							;-- clean the context from old values
-			do with space style							;-- eval the style to preset facets
-			style-ctx									;-- return the context for later above/below lookup & composition
+			do bind style space							;-- eval the style to preset facets
+			copy/deep style-ctx							;-- return the context for later above/below lookup & composition
 		]
 		'else [
-			do with space style							;-- eval the style to preset facets
+			do bind style space							;-- eval the style to preset facets
 			empty-context								;-- returns empty context if no /above or /below defined
 		]
 	]
