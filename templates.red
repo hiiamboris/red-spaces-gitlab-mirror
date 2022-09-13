@@ -645,7 +645,7 @@ paragraph-ctx: context [
 		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
-		layout: any [new-rich-text]
+		layout: new-rich-text
 		; layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]	@@ this creates unexplainable random glitches!
 		unless empty? flags: space/flags [
 			flags: compose [(1 by length? space/text) (space/flags)]
