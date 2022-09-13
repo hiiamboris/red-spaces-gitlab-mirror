@@ -325,7 +325,9 @@ events: context [
 			#debug events [print ["dispatch path:" path]]
 			if path [
 				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
-				#assert [any [not empty? path  event/type = 'over]]	;-- empty when hovering out of the host or over empty area of it
+				;-- empty when hovering out of the host or over empty area of it
+				;-- actually also empty when clicking outside of other spaces, so disabled
+				; #assert [any [not empty? path  event/type = 'over]]
 				process-event path event [] focused?
 			]
 			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
