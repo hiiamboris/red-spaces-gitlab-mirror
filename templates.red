@@ -2055,15 +2055,15 @@ grid-ctx: context [
 			
 			switch/default method [
 				;; free space (over W1) is distributed by weights=(W2-W1)
-				free [									;-- this is what browsers are using, at least PaleMoon
+				width-difference [						;-- this is what browsers are using, at least PaleMoon
 					weights: W2 - W1					;-- tried just W2, but it generates too much unused space in columns
 					W: weights / (sum weights) * SL + W1
 				]
 				
-				;; total space is distributed by weights=W2, but no less than W1
+				;; total width is distributed by weights=W2, but no less than W1
 				;@@ externalize this algo
-				total [
-					weights:  copy W2
+				width-total area-total [
+					weights:  either method = 'width-total [copy W2][W2 * H2]
 					w-vector: make block! nx * 4
 					repeat i nx [						;@@ use map-each
 						repend w-vector [W1/:i / weights/:i  W1/:i  weights/:i  i]
@@ -2082,7 +2082,7 @@ grid-ctx: context [
 				
 			    ;; assumes constant (W*H+C) for each column, finds optimum height estimate for sum of hyperbolae = TW
 				;; conflates to weighted total if C=0
-				total-offset [
+				area-difference [
 					;; now given initial W1-W2/H1-H2 bounds, find an optimum
 					C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae offsets, +epsilon to avoid zero division
 					; C: (copy W2) * 0.0
@@ -2160,7 +2160,7 @@ grid-ctx: context [
 		;@@ all this should be in the reference docs instead
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
-		autofit: 'total						;-- automatically adjust column widths? method name or none
+		autofit: 'width-total					;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
