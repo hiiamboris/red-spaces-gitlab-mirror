@@ -529,24 +529,26 @@ context [
 		X1    [number!]
 		X2    [number!]
 		Fopt  [number!] "Optimum to find"
-		dF    [number!] "Minimum acceptable error to stop search"
+		error [number!] "Minimum acceptable error to stop search (along X or F)"
 		F     [block!]  "Function F(x)"
 		/with "Provide F(X1) and F(X2) if they are known"
 			F1    [number!] 
 			F2    [number!] 
 	][
 		f1: any [f1 call-f x1] 
-		f2: any [f2 call-f x2] 
+		f2: any [f2 call-f x2]
 		#assert [fopt = clip [min f1 f2 max f1 f2] fopt  "Optimum value should be within [F1,F2]"]	;@@ rephrase when clip updates
 		sign: sign? (f2 - f1) * (x2 - x1)				;-- + if ascending
-		repeat n 1e6 [
-			if df >= abs f2 - f1 [break]				;-- found it already; segment is too narrow
+		repeat n 1e3 [
+			df: abs f2 - f1
+			dx: abs x2 - x1
+			if error >= max abs f2 - f1 abs x2 - x1 [break]		;-- found it already; segment is too narrow
 			y: call-f x: x1 + x2 / 2
 			;; in / case: y < fopt < y2 means x is new x1; in \ case: x is new x2
 			either positive? fopt - y * sign [x1: x f1: y][x2: x f2: y]		;-- use new low or high boundary
 		]
 		; print `"Spent (n - 1) iterations in search"`
-		if n = 1e6 [ERROR "Binary search deadlocked"]
+		if n = 1e3 [ERROR "Binary search deadlocked"]	;-- too much precision will slow it down, better to error out
 		reduce [x1 f1 x2 f2]
 	]
 	
