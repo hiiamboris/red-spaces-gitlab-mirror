@@ -1993,6 +1993,7 @@ grid-ctx: context [
 			span: grid/get-span cell1: grid/get-first-cell cell
 			irow: cell1/y + span/y - 1
 			;@@ make an option to ignore spanned cells?
+			;@@ and theoretically I could subtract spacing from the spanned cells (in case it's big), but lazy for now
 			size/y: size/y + spc + to integer! h / span/x		;-- span/x is accounted for only approximately
 			size/x: max size/x cspace/size/x
 		]
@@ -2021,15 +2022,18 @@ grid-ctx: context [
 		widths:    grid/widths							;-- modifies widths map in place
 		min-width: any [widths/min 5]					;@@ make an option to control this?
 				
-		;@@ TODO: W1/W2 can most of the time be cached (should be an option), saving 2 renders
+		set [W1 H1 W2 H2] grid/fitcache					;-- if W1/H1/W2/H2 are cached, use them
+		
 		loop 1 [										;-- needed to use `break`
 			;; render all columns on zero, get their min widths W1i and heights H1i
-			W1: make vector! reduce ['float! 64 nx]
-			H1: copy W1
-			repeat i nx [
-				size: measure-column grid i 0 1 ny
-				W1/:i: 1.0 * max min-width size/x
-				H1/:i: 1.0 * size/y
+			unless all [W1 H1] [
+				W1: make vector! reduce ['float! 64 nx]
+				H1: copy W1
+				repeat i nx [
+					size: measure-column grid i 0 1 ny
+					W1/:i: 1.0 * max min-width size/x
+					H1/:i: 1.0 * size/y
+				]
 			]
 			
 			;; estimate space left SL = TW - sum(W1i), TW is total-width requested
@@ -2040,12 +2044,14 @@ grid-ctx: context [
 			if SL <= 0 [W: W1  break]
 			
 			;; SL > 0 case: render all columns on infinite canvas, now I have min heights H2i and max widths W2i
-			W2: copy W1
-			H2: copy H1
-			repeat i nx [
-				size: measure-column grid i infxinf/x 1 ny
-				W2/:i: max W1/:i 1.0 * size/x			;-- ensure monotony:
-				H2/:i: min H1/:i 1.0 * size/y			;-- W2 >= W1, H2 <= H1
+			unless all [W2 H2] [
+				W2: copy W1
+				H2: copy H1
+				repeat i nx [
+					size: measure-column grid i infxinf/x 1 ny
+					W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
+					H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
+				]
 			]
 			TW2: sum W2
 			
@@ -2125,6 +2131,8 @@ grid-ctx: context [
 			#assert [TW ~= sum W  "widths should in total sum to TW"]
 		]
 		
+		if grid/fitcache [grid/fitcache: reduce [W1 H1 W2 H2]]	;-- save min/max sizes
+		
 		;; set widths map to found W vector
 		W: quantize W
 		repeat i nx [widths/:i: W/:i]
@@ -2141,6 +2149,7 @@ grid-ctx: context [
 			clear grid/hcache							;-- clear should never be called on big datasets
 			set grid/size-cache none					;-- reset calculated bounds
 		]
+		clear grid/fitcache
 	]
 	
 	on-change: function [grid [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
@@ -2176,6 +2185,8 @@ grid-ctx: context [
 		;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
 		ccache:  make map! 20				;-- filled by render and height estimator
 		;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
+		;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
+		fitcache: []						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
