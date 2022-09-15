@@ -2034,7 +2034,7 @@ grid-ctx: context [
 			
 			;; estimate space left SL = TW - sum(W1i), TW is total-width requested
 			TW: total-width - (2 * margin/x) - (nx - 1 * spacing/x)
-			SL: TW - TW0: sum W1
+			SL: TW - TW1: sum W1
 			
 			;; if SL <= 0, end here, set widths to found amounts
 			if SL <= 0 [W: W1  break]
@@ -2053,6 +2053,7 @@ grid-ctx: context [
 			;@@ maybe make an option to stretch the grid to TW even if there's no point?
 			if TW2 <= TW [W: W2  break]
 			
+			;; now given initial W1-W2/H1-H2 bounds, find an optimum
 			switch/default method [
 				;; free space (over W1) is distributed by weights=(W2-W1)
 				width-difference [						;-- this is what browsers are using, at least PaleMoon
@@ -2062,13 +2063,14 @@ grid-ctx: context [
 				
 				;; total width is distributed by weights=W2, but no less than W1
 				;@@ externalize this algo
-				width-total area-total [
-					weights:  either method = 'width-total [copy W2][W2 * H2]
+				width-total [
+					weights:  W2
+					norm-W1:  W1 / weights
 					w-vector: make block! nx * 4
 					repeat i nx [						;@@ use map-each
-						repend w-vector [W1/:i / weights/:i  W1/:i  weights/:i  i]
+						repend w-vector [norm-W1/:i  W1/:i  weights/:i  i]
 					]
-					sort/reverse/skip w-vector 4		;-- sorted from most oversized to most flexible
+					sort/reverse/skip w-vector 4		;-- sorted from most oversized to most relaxed
 					left: TW
 					W:    copy W2
 					wsum: sum weights
@@ -2080,42 +2082,41 @@ grid-ctx: context [
 					]
 				]
 				
-			    ;; assumes constant (W*H+C) for each column, finds optimum height estimate for sum of hyperbolae = TW
-				;; conflates to weighted total if C=0
-				area-difference [
-					;; now given initial W1-W2/H1-H2 bounds, find an optimum
-					C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae offsets, +epsilon to avoid zero division
-					; C: (copy W2) * 0.0
-				
-					;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
-					h-vector: clear any [h-vector  make block! nx * 2 * 2]
-					repeat i nx [								;@@ use map-each
-						repend h-vector [H1/:i 0  H2/:i 0]		;-- H1 >= H2, adding already back-sorted pair
+				;; unlike width-total, area-total may assign width > W2, so have to clip it, which complicates the algorithm
+				area-total			;-- assumes constant (W*H) for each column (equals W2*H2), special case of area-difference
+				area-difference [	;-- assumes constant (W*H+C) for each column (equals both W2*H2 and W1*H1)
+					either total?: method = 'area-total [
+						C:  0.0
+						W2*H2: W2 * H2					;-- weights basically
+						H+: maximum-of W2*H2 / W1		;-- height where all width estimates become <= W1
+					][
+						C:  (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae offsets, +epsilon to avoid zero division
+						H+: maximum-of H1
 					]
-					sort/skip/reverse h-vector 2				;-- sorted from the biggest height
+					H-: minimum-of H2
 					
-					;; walk over this vector and for each point compute total width TWj(TW-) (j now is sorted index on the vector)
-					;; during the scan, choose the segment j where TWj(TW-) < TW < TWj+1(TW+)
-					h-vector/2: TW0								;-- start from min. total width
-					repeat j nx * 2 - 1 [						;@@ what a mess, use for-each when it's fast
-						set [H+: TW-: H-:] pos: skip h-vector j - 1 * 2
-						W: (copy W2) + C * H2 / H- - C			;-- (W + C) * H = (W2 + C) * H2
-						pos/4: TW+: sum clip-vector W W1 W2		;-- clip within [W1i,W2i] since hyperbola extends outside this segment
-						#assert [TW+ >= TW-]
-						if all [TW- <= TW  TW < TW+] [break]	;-- found the j-th segment containing desired total width
-					]
+					;; total width estimation (im)precision; @@ should be a controllable parameter I guess
+					;; bigger requires less iterations but is more "jumpy" when resizing,
+					;; since it adds pixels to all columns
+					tolerance: 1
 					
-					;; total width estimation precision (bigger requires less iterations but is more jumpy when resizing)
-					threshold: 5
+					WE: copy W1							;-- shortcut for make vector! reduce ['float! 64 length]
+					HE2TWE: pick [[						;-- function TWE(HE) as F(x) for binary search
+						; WE: (copy W2*H2) / HE
+						WE: WE * 0.0 + W2*H2 / HE		;-- this spares me an extra copy on each iteration
+						sum clip-vector WE W1 W2		;-- clip within [W1i,W2i] since hyperbola extends outside this segment
+					][
+						; WE: (copy W2) + C * H2 / HE - C
+						WE: WE * 0.0 + W2 + C * H2 / HE - C
+						sum clip-vector WE W1 W2
+					]] total?
 					
-					;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [H-..H+] using binary search
+					;; now find height estimate HE corresponding to the closest width to TW using binary search
 					set [H-: TW+: HE: TWE:]						;-- use lower width as estimate since it's <= TW
-						binary-search/with HE H- H+ TW threshold [
-							WE: (copy W2) + C * H2 / HE - C
-							sum clip-vector WE W1 W2			;-- clip within [W1i,W2i] since hyperbola extends outside this segment
-						] TW+ TW-
-					#assert [(abs TWE - TW) <= threshold]
+						binary-search/with HE H- H+ TW tolerance HE2TWE TW2 TW1		;@@ use `apply` to make it readable!
+					#assert [(abs TWE - TW) <= tolerance]
 									
+					;; find final widths W from height estimate HE
 					W: (copy W2) + C * H2 / HE - C
 					W: clip-vector W W1 W2
 					W: W + (TW - TWE / length? W)				;-- evenly distribute remaining space
