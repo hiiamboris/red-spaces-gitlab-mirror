@@ -167,6 +167,6 @@ Stress test. An infinitely zooming animation for `grid-view` that contains itsel
 
 <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-text-all-methods.gif></img>
 
-Test for column autofit algorithms. 
+Test for column [autofit algorithms](../design-cards/grid-autofit.md). Contains grids with edge cases of text and (commented) images content.
 
 
