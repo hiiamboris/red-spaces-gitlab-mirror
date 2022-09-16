@@ -39,8 +39,8 @@ data-source: compose/deep/only [
 		; Lorem ipsum"
 		"Loremipsum loremipsum"
 		"Nam nec convallis purus"
-		; "C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"
-		(pics)
+		"C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"
+		; (pics)
 		; (reduce [pic "C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"])
 	]
 	[
@@ -53,26 +53,25 @@ data-source: compose/deep/only [
 		; "Sedvehiculasapienetconsecteturvulputateturpis ipsum"
 		; "Sedvehiculasapienetconsecteturvulputateturpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"
 		; "S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s"
-		; "S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s .   S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		"S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s .   S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s"
 		; "Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"
-		(pics)
+		; (pics)
 		; (reduce [pic "Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"])
 	]
 	[
 		3
 		"Cras et"
 		"Duis ac ex quis nisi tristique placerat quis eu magna"
-		; "V e s t i b u l u m   a u c t o r   u r n a   f a c i l i s i s   e n i m   s a g i t t i s ,   v e l   u l l a m c o r p e r   e n i m   v e n e n a t i s"
-		(pics)
+		"V e s t i b u l u m   a u c t o r   u r n a   f a c i l i s i s   e n i m   s a g i t t i s ,   v e l   u l l a m c o r p e r   e n i m   v e n e n a t i s"
+		; (pics)
 		; (reduce [pic "V e s t i b u l u m   a u c t o r   u r n a   f a c i l i s i s   e n i m   s a g i t t i s ,   v e l   u l l a m c o r p e r   e n i m   v e n e n a t i s"])
 	]
 ]
 
-; compare: [width-difference width-total area-total area-difference]
+compare: [width-difference width-total area-total area-difference]
 ; compare: [width-difference width-total]
 ; compare: [width-total area-total]
-compare: [area-total area-difference]
-
+; compare: [area-total area-difference]
 
 view/no-wait/options/flags reshape [
 	below
