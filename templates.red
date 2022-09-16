@@ -2063,7 +2063,7 @@ grid-ctx: context [
 			switch/default method [
 				;; free space (over W1) is distributed by weights=(W2-W1)
 				width-difference [						;-- this is what browsers are using, at least PaleMoon
-					weights: W2 - W1					;-- tried just W2, but it generates too much unused space in columns
+					weights: W2 - W1
 					W: weights / (sum weights) * SL + W1
 				]
 				

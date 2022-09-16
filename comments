@@ -1598,6 +1598,39 @@ choice of algorithm to replace all spaces with newlines:
 	39.6 μs	[p: clear copy s parse/case s [collect into p any [#" " keep (#"^/") | keep skip]]]
 	35.1 μs	[p: clear copy s parse/case s [collect into p any [keep thru [#" " | end] keep (#"^/")]]]
 	17.4 μs	[p: clear copy s parse/case s [collect into p any [keep [thru #" " | thru end] keep (#"^/")]]]
+image is damn problematic
+	with weight= 0 if I put it into tube it becomes 1x1 px (invisible)
+	with weight= 1 it gets space reserved for it but doesn't stretch past image/size, so space becomes unused
+		it only works fine if I specify limit explicitly
+		so maybe it should stretch itself by default with fill=1? and if weight=0 it will disable stretching?
+	OK:
+		weight=0 fill=0 - use image/size, constrain it by min-scale/max-scale
+		weight=0 fill=1 - ignore fill flag
+		weight>0 fill=0 - use image/size, constrain it by min-scale/max-scale
+		weight>0 fill=1 - fill provided canvas, constrain by min-scale/max-scale
+		what if fill/x <> fill/y ? perhaps should be the same as fill=1x1
+		although it's possible with fill=1x1 to make it bigger than the canvas, I think it shouldn't happen
+		what if canvas is smaller than image/size?
+		perhaps it should make itself smaller than canvas, but only if weight>0
+		;@@ document weight effect on image
+shit! bug in styling: I have a shared context per each style
+	so in scenario with e.g. `cell [cell [..]]` by the time first cell is composed, it's already bound to second cell!
+	well since the block is shared, it has to deal with state itself.. but this makes it dangerous to use..
+	solved that by copy/deep style-ctx for now.. don't like the overhead but it's worth the convenience of block styles 		
+tube caused problem in grid autofit:
+	when I write `row 1` it makes itself 1px wide, while content sticks out
+	it makes some sense: it fits what it can, the rest sticks out
+	on the other hand for grid this is bad as text made of single letters becomes real big
+	problem is: grid reports it's size as if it included the sticking out items, at the same time it doesn't let the other items expand
+	test code: 
+		cell green 50 [row blue [
+			image data= system/words/draw 100x100 [pen blue box 1x1 99x99]
+			paragraph "I n   p o s u e r e   p l a c e r a t   m a x i m u s . I n   p o s u e r e   p l a c e r a t   m a x i m u s . I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		]]
+	text should be sized to 120px wide, or returned size should be 50px, but not both
+	in this sense, weighted algorithms are more resilient to abuse
+
+	
 
 
 Timer design:
@@ -5103,4 +5136,44 @@ hyperbolic autofit that still supported multiple iterations, but it's totally no
 	; ]
 	
 	; clear grid/hcache								;-- line height cache is no longer valid after widths have changed
+; ]
+
+analytical (mostly) solution for area-difference fitting algo, which I see no point in
+binary search is shorter, simpler, and not slower, and if we add min/max support for vectors and fast sum, it will be faster
+; area-difference [
+	; ;; now given initial W1-W2/H1-H2 bounds, find an optimum
+	; C: (H2 * W2) - (H1 * W1) / (H1 - H2 + 1e-6)	;-- hyperbolae offsets, +epsilon to avoid zero division
+
+	; ;; arrange all heights H1i and H2i in a vector, sort it by height, remembering i for each height
+	; h-vector: clear any [h-vector  make block! nx * 2 * 2]
+	; repeat i nx [								;@@ use map-each
+		; repend h-vector [H1/:i 0  H2/:i 0]		;-- H1 >= H2, adding already back-sorted pair
+	; ]
+	; sort/skip/reverse h-vector 2				;-- sorted from the biggest height
+	
+	; ;; walk over this vector and for each point compute total width TWj(TW-) (j now is sorted index on the vector)
+	; ;; during the scan, choose the segment j where TWj(TW-) < TW < TWj+1(TW+)
+	; h-vector/2: TW1								;-- start from min. total width
+	; repeat j nx * 2 - 1 [						;@@ what a mess, use for-each when it's fast
+		; set [H+: TW-: H-:] pos: skip h-vector j - 1 * 2
+		; W: (copy W2) + C * H2 / H- - C			;-- (W + C) * H = (W2 + C) * H2
+		; pos/4: TW+: sum clip-vector W W1 W2		;-- clip within [W1i,W2i] since hyperbola extends outside this segment
+		; #assert [TW+ >= TW-]
+		; if all [TW- <= TW  TW < TW+] [break]	;-- found the j-th segment containing desired total width
+	; ]
+	
+	; ;; total width estimation precision (bigger requires less iterations but is more jumpy when resizing)
+	; threshold: 5
+	
+	; ;; now find height estimate HE corresponding to the closest width to TW on the j-th segment [H-..H+] using binary search
+	; set [H-: TW+: HE: TWE:]						;-- use lower width as estimate since it's <= TW
+		; binary-search/with HE H- H+ TW threshold [
+			; WE: (copy W2) + C * H2 / HE - C
+			; sum clip-vector WE W1 W2			;-- clip within [W1i,W2i] since hyperbola extends outside this segment
+		; ] TW+ TW-
+	; #assert [(abs TWE - TW) <= threshold]
+					
+	; W: (copy W2) + C * H2 / HE - C
+	; W: clip-vector W W1 W2
+	; W: W + (TW - TWE / length? W)				;-- evenly distribute remaining space
 ; ]
