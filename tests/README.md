@@ -161,4 +161,12 @@ Stress test. An infinitely zooming animation for `grid-view` that contains itsel
 
 Stress test. An infinitely zooming animation for `grid-view` that contains itself only in the central cell, which allows to render it quite deeply.
 
+---
+
+[**grid-test8.red**](grid-test8.red)
+
+<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-text-all-methods.gif></img>
+
+Test for column autofit algorithms. 
+
 
