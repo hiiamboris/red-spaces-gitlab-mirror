@@ -985,7 +985,7 @@ Features:
 - Grid can have infinite height.
 - Grid cells can span multiple rows and/or columns.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-grid.png) | <pre>grid [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-grid.png) | <pre>grid autofit= none [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
 |-|-|
 
 | facet  | type | description |
@@ -1031,8 +1031,9 @@ For more info about these functions, create a grid `g: make-space 'grid []` and 
 
 An [`inf-scrollable`](#inf-scrollable) wrapper around [`grid`](#grid), used to display finite or infinite amount of **data**.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [any [xy []]]<br>]</pre><br>Tip: `data` returns `[]` as size, so both `size/x` and `size/y` yield `none` (infinite in both directions) |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [either size [ [x #[none] y #[none]] ][ xy ]]<br>]</pre><br>Tip: `size/x = size/y = none` means infinite in both directions |
 |-|-|
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview-autofitted.gif) | <pre>grid-view source= [<br>	[1 "22 22"]<br>	["3 3 3" "4444 4444 4444 4444"]<br>]</pre> |
 
 Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 
