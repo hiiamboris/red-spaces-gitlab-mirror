@@ -13,16 +13,18 @@ Obviously there is no ultimate solution to this, only approximations. In Spaces,
 3. Each spanned cell affects evenly all columns it spans: it's rendered height is simply divided by the number of columns.
 4. Column height is a monotonically decreasing function of it's width.
 
-A total of four fitting algorithms is implemented (each with it's own strengths).
+A total of four fitting algorithms is implemented (each with it's own strengths). They all require 2 more rendering attempts to estimate min and max grid widths (although these are cached by default if `grid/fitcache` is not `none`).
 
 A key idea is to treat each cell as an aquarium: it's amount of liquid (area) doesn't change and if we stretch aquarium's width, it's waterline (height) comes down proportionally. Thus we get a hyperbola `W×H = const`. As such, it works best for flow layouts of small items (small individual letters of `text`, small images in a `row`).
 
-## `width-difference`
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/illustration-aquarium-cell.gif)
+
+## `width-difference` algorithm
 
 **Idea:** distribute free table width proportional to *difference* between min and max total *widths* of individual columns. 
 
 This is the simplest algorithm, which also seems employed by browsers:
-1. Minimum (<code>W₁<sub>i</sub></code>) and maximum (<code>W₂<sub>i</sub></code>) column widths are measured.
+1. Minimum <code>W₁<sub>i</sub></code> and maximum <code>W₂<sub>i</sub></code> column widths are measured.
 2. Minimum widths are summed to obtain minimum total width: <code>TW₁ = ΣW₁<sub>i</sub></code>.
 3. Max/min width differences <code>W₂<sub>i</sub> - W₁<sub>i</sub></code> are taken as `weights`.
 4. Difference between total requested width and minimum total width <code>TW - TW₁</code> is distributed across all columns proportional to `weights`, on top of <code>W₁<sub>i</sub></code>.
@@ -32,11 +34,12 @@ The whole algorithm is just two lines:
 weights: W2 - W1
 W: weights / (sum weights) * space-left + W1
 ```
-It's power is simplicity, relatively good performance (as proven by browsing experience) and good tolerance to edge cases.
+It's power is simplicity and relatively good performance (as proven by browsing experience).
 
 It is based on the following assumptions:
-1. Maximum widths <code>W₂<sub>i</sub></code> all correspond to the same column height. 
-2. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = TW₁<sub>i</sub> + H×ΣΔW<sub>i</sub> = TW₁<sub>i</sub> + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension
+1. Minimum widths <code>W₁<sub>i</sub></code> all correspond to the same column height.
+2. Maximum widths <code>W₂<sub>i</sub></code> all correspond to the same column height. 
+3. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension.
 
 Best case scenario:
 - all cells contain text of the same length (in pixels)
@@ -48,7 +51,7 @@ Bad edge cases:
 - some columns contain big words or objects, while others don't
 
 
-## `width-total`
+## `width-total` algorithm
 
 **Idea:** distribute total table width proportional to max *total widths* of individual columns.
 
@@ -60,6 +63,10 @@ The algorithm:
 3. Maximum widths <code>W₂<sub>i</sub></code> are taken as `weights`.
 4. Total width `TW` is distributed across all columns proportional to `weights`, correcting the result so it doesn't go below <code>W₁<sub>i</sub></code> (this requires sorting columns by their weight-to-min-width ratio and distributing `TW` in ratio ascending order).
 
+It is based on the following assumptions:
+1. Maximum widths <code>W₂<sub>i</sub></code> all correspond to the same column height. 
+2. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension.
+
 Best case scenario:
 - all cells contain text of the same length (in pixels)
 - all text is using font of the same size
@@ -68,7 +75,7 @@ Bad edge cases:
 - font size varies across columns, or some other objects of bigger-than-letter size are present
 
 
-## `area-total`
+## `area-total` algorithm
 
 **Idea:** distribute total table width proportional to max *total area* of individual columns.
 
@@ -78,16 +85,21 @@ This becomes trickier as whatever width estimates are obtained, they have to be 
 
 The algorithm is explained in `area-difference`, with the only distinction is that constants <code>C<sub>i</sub></code> are zeroes for this case.
 
+It is based on the following assumption:
+- Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension.
+
 Best case scenario:
 - all cells contain text of the same area (e.g. font height multiplied by text length) or objects of the same size
 
 Bad edge cases: none.
 
-## `area-difference`
+## `area-difference` algorithm
 
 **Idea:** fit hyperbolae `(W+C)×H` upon two points `(W₁,H₁)` and `(W₂,H₂)` for each column by introducing offset vector `C`, then find such height where sum of column widths equals total table width. 
 
 Key difference from `area-total` is in offset `C`, which allows hyperbola to cross not only point `(W₂,H₂)` but also `(W₁,H₁)`.
+
+Though this is the most complex algorithm, it's performance should still be negligible compared to the effort spent on grid rendering.
 
 The algorithm:
 1. Minimum (<code>W₁<sub>i</sub></code>) and maximum (<code>W₂<sub>i</sub></code>) column widths are measured.
@@ -95,6 +107,9 @@ The algorithm:
 3. Minimum (`H₋`) and maximum (`H₊`) table heights are obtained as the search segment boundaries.
 4. [Binary search](https://en.wikipedia.org/wiki/Binary_search_algorithm) is performed on `[H₋..H₊]` segment to obtain a table height estimate <code>H<sub>e</sub></code> where column widths sum is closest to total table width `TW`.
 5. Column widths are found from the <code>(W+C)×H<sub>e</sub> = (W₂+C)×H₂</code> vector equation.
+
+It is based on the following assumption:
+- Product of column's height by it's width offset by some constant `W₀` is itself constant: `(W-W₀)×H = const`, so <code>Σ(W<sub>i</sub>-W₀<sub>i</sub>)×H = H×Σ(W<sub>i</sub>-W₀<sub>i</sub>).
 
 Best case scenario:
 - all cells contain text of the same area (e.g. font height multiplied by text length) or objects of the same size
