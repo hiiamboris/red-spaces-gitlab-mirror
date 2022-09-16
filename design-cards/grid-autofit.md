@@ -39,7 +39,7 @@ It's power is simplicity and relatively good performance (as proven by browsing 
 It is based on the following assumptions:
 1. Minimum widths <code>W₁<sub>i</sub></code> all correspond to the same column height.
 2. Maximum widths <code>W₂<sub>i</sub></code> all correspond to the same column height. 
-3. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
+3. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁) = H₁×ΣW₁ = H₂×ΣW₂</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
 
 Best case scenario:
 - all cells contain text of the same length (in pixels)
@@ -65,7 +65,7 @@ The algorithm:
 
 It is based on the following assumptions:
 1. Maximum widths <code>W₂<sub>i</sub></code> all correspond to the same column height. 
-2. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
+2. Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁) = H₂×ΣW₂<sub>i</sub></code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
 
 Best case scenario:
 - all cells contain text of the same length (in pixels)
@@ -86,7 +86,7 @@ This becomes trickier as whatever width estimates are obtained, they have to be 
 The algorithm is explained in `area-difference`, with the only distinction is that constants <code>C<sub>i</sub></code> are zeroes for this case.
 
 It is based on the following assumption:
-- Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁)</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
+- Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁) = ΣW₂<sub>i</sub>×H₂</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
 
 Best case scenario:
 - all cells contain text of the same area (e.g. font height multiplied by text length) or objects of the same size
