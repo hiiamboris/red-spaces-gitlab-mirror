@@ -103,13 +103,13 @@ Though this is the most complex algorithm, it's performance should still be negl
 
 The algorithm:
 1. Minimum <code>W₁<sub>i</sub></code> and maximum <code>W₂<sub>i</sub></code> column widths are measured.
-2. <code>C<sub>i</sub></code> constants are found from the `(W₁-W₀)×H₁ = (W₂-W₀)×H₂` vector equation.
+2. <code>W₀<sub>i</sub></code> constants are found from the `(W₁-W₀)×H₁ = (W₂-W₀)×H₂` vector equation.
 3. Minimum (`H₋`) and maximum (`H₊`) table heights are obtained as the search segment boundaries.
 4. [Binary search](https://en.wikipedia.org/wiki/Binary_search_algorithm) is performed on `[H₋..H₊]` segment to obtain a table height estimate <code>H<sub>e</sub></code> where column widths sum is closest to total table width `TW`.
 5. Column widths are found from the <code>(W-W₀)×H<sub>e</sub> = (W₂-W₀)×H₂</code> vector equation.
 
 It is based on the following assumption:
-- Product of column's height by it's width offset by some constant `W₀` is itself constant: `(W-W₀)×H = const`, so <code>Σ(W<sub>i</sub>-W₀<sub>i</sub>)×H = H×Σ(W<sub>i</sub>-W₀<sub>i</sub>)</code>.
+- Product of column's height by it's width offset by some constant `W₀` is itself constant: `(W-W₀)×H = const`, so <code>Σ(W<sub>i</sub>-W₀<sub>i</sub>)×H = Σ(W₁<sub>i</sub>-W₀<sub>i</sub>)×H₁ = Σ(W₂<sub>i</sub>-W₀<sub>i</sub>)×H₂ = H×Σ(W<sub>i</sub>-W₀<sub>i</sub>)</code>.
 
 Best case scenario:
 - all cells contain text of the same area (e.g. font height multiplied by text length) or objects of the same size
