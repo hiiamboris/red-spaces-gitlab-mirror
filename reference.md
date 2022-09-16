@@ -994,7 +994,8 @@ Features:
 | `spacing` | pair! | horizontal and vertical space between adjacent cells |
 | `content` | map! of `pair! (col x row) -> word! (space name)` | used to place spaces at specific row/col positions |
 | `cells` | `func [/pick xy [pair!] /size]` | picker function that abstracts `content` |
-| `widths` | map! of `integer! (col) -> integer! (width)` | defines specific column widths in pixels; `widths/default` is a fallback value for absent column numbers; `widths/min` is only used by `autofit` function; columns are numbered from `1` |
+| `widths` | map! of `integer! (col) -> integer! (width)` | defines specific column widths in pixels; `widths/default` is a fallback value for absent column numbers; `widths/min` is only used by autofitting; columns are numbered from `1`; filled automatically if autofitting is on |
+| `autofit` | word! or none! | chooses one of automatic column width fitting methods: [`[width-difference width-total area-difference area-total]`](design-cards/grid-autofit.md); defaults to `area-total`; `none` to disable, always disabled on infinite grids |
 | `heights` | map! of `integer! (row) -> integer! or word! = 'auto` | defines specific row heights in pixels; `heights/default` is a fallback value that defaults to `auto`; `heights/min` sets the minimum height for `auto` rows (to prevent rows of zero size); rows are numbered from `1` |
 | `bounds` | pair! or block! `[x: lim-x y: lim-y]` | defines grid's number of rows and columns: `none` = infinite, `auto` = use upper bound of `cells`, integer = fixed |
 | `wrap-space` | `function! [xy [pair!] name [word!]] -> cell-name [word!]` | function that wraps spaces returned by `cells` into a `cell` template, for alignment and background drawing; can be overridden |
