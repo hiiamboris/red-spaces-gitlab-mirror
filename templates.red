@@ -2170,7 +2170,7 @@ grid-ctx: context [
 		;@@ all this should be in the reference docs instead
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
-		autofit: 'width-total					;-- automatically adjust column widths? method name or none
+		autofit: 'area-total					;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
