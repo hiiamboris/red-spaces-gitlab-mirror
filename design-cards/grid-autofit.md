@@ -3,7 +3,7 @@
 This is something we are all accustomed to and every table widget should support.
 
 All modern browsers implement such automatic estimation (on this gif - Pale Moon browser):
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-browser-autofit.gif></img>
+<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-browser-autofit.gif></img> <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-browser-autofit-pics.gif></img>
 
 The task is: knowing cells content (which can be arbitrary and can follow unknown scaling algorithms) and total width to fill, adjust all column widths so that the table would look pleasant to the human eye and these widths would sum to total width. And do that with as little rendering attempts as possible.
 
