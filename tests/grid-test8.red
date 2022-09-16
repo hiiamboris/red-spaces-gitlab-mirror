@@ -10,33 +10,107 @@ Red [
 
 append spaces/keyboard/focusable 'grid-view
 
-view/no-wait/options [
-	below
-	b: host [
-		gv: grid-view focus 400x400 
-		with [
-			source: #(
-				1x1 "1x1 abadh" 2x1 "2x1 afhoah afhohaf" 3x1 "3x1 afhyewon bwoy auojoo"
-				1x2 "1x2 hao" 2x2 "2x2 qupe opqie" 3x2 "3x2 zvnbi qvoeop qeboukj yhdu aohfoh yqweypy jobaod pjadph adobohdohoh"
-				1x3 "1x3 hafoyg fhuot" 2x3 "2x3 hjjdoyo" 3x3 "3x3 qyeyyndo" 
-				size: 3x3
-			)
-			spaces/ctx/grid-ctx/autofit grid 200
-			; grid/bounds: 10x10
-			; grid/bounds: [x: 10 y: auto]
-			; grid/set-span 1x1 2x1
-			; grid/set-span/force 2x2 3x2
-			; set-span/force 1x1 1x3
-			; grid/heights/2: 200
-			; grid/widths/default: 300
-			; grid/heights/default: 300
+spaces/templates/zoomer: make-template 'box [
+	zoom: [x: 1.0 y: 1.0]
+	draw: function [/on canvas [pair! none!]] [
+		canvas': if canvas [
+			as-pair
+				clip [negate infxinf/x infxinf/x] canvas/x / zoom/x
+				clip [negate infxinf/y infxinf/y] canvas/y / zoom/y
+		]
+		drawn: render/on content canvas'
+		size:  select get content 'size
+		maybe self/size: as-pair
+			size/x * zoom/x
+			size/y * zoom/y
+		compose/deep/only [
+			matrix [(zoom/x) 0 0 (zoom/y) 0 0]
+			(drawn)
 		]
 	]
-	on-over [
-		status/text: form hittest face/space event/offset
+]
+
+pic: draw 50x50 [box 1x1 49x49 rotate -40 25x25 text 7x14 "picture"]
+pics: reduce [pic pic pic pic pic pic pic]
+	
+data-source: compose/deep/only [
+	[
+		1
+		; Lorem ipsum"
+		"Loremipsum loremipsum"
+		"Nam nec convallis purus"
+		; "C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"
+		(pics)
+		; (reduce [pic "C u r a b i t u r   u r n a   m a u r i s ,   f a c i l i s i s   u t   s c e l e r i s q u e   v i v e r r a ,   f a c i l i s i s   n e c   n u n c"])
 	]
-	status: text 300x40
-] [offset: 10x10]
+	[
+		2
+		; "Nulla"
+		"Nulla nulla nulla"
+		; "Sedvehiculasapienetconsecteturvulputateturpis ipsum Sedvehiculasapienetconsecteturvulputateturpis ipsum Sedvehiculasapienetconsecteturvulputateturpis ipsum Sedvehiculasapienetconsecteturvulputateturpis ipsum Sedvehiculasapienetconsecteturvulputateturpis ipsum"
+		"Sed vehicula, sapien et consectetur vulputate, turpis ipsum viverra sem, in efficitur quam erat sit amet ligula"
+		; "Sed vehicula, sapien et consectetur vulputate, turpis ipsum viverra sem, in efficitur quam erat sit amet ligula Sed vehicula, sapien et consectetur vulputate, turpis ipsum viverra sem, in efficitur quam erat sit amet ligula"
+		; "Sedvehiculasapienetconsecteturvulputateturpis ipsum"
+		; "Sedvehiculasapienetconsecteturvulputateturpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		; "S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		; "S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s .   S e d   v e h i c u l a   s a p i e n e t   c o n s e c t e t u r   v u l p u t a t e   t u r p i s .   I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		; "Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"
+		(pics)
+		; (reduce [pic "Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s Sed vehicula sapienet consectetur vulputate turpis I n   p o s u e r e   p l a c e r a t   m a x i m u s"])
+	]
+	[
+		3
+		"Cras et"
+		"Duis ac ex quis nisi tristique placerat quis eu magna"
+		; "V e s t i b u l u m   a u c t o r   u r n a   f a c i l i s i s   e n i m   s a g i t t i s ,   v e l   u l l a m c o r p e r   e n i m   v e n e n a t i s"
+		(pics)
+		; (reduce [pic "V e s t i b u l u m   a u c t o r   u r n a   f a c i l i s i s   e n i m   s a g i t t i s ,   v e l   u l l a m c o r p e r   e n i m   v e n e n a t i s"])
+	]
+]
+
+; compare: [width-difference width-total area-total area-difference]
+; compare: [width-difference width-total]
+; compare: [width-total area-total]
+compare: [area-total area-difference]
+
+
+view/no-wait/options/flags reshape [
+	below
+	b: host 900x600 [
+		zoomer with [zoom: [x 0.5 y 0.5]] [
+			column [
+				row !(
+					map-each method compare [
+						compose/deep [box [text (form method) with [font: make font! [size: 20]]]]
+					]
+				)
+				row weight= 1 !(
+					map-each method compare [
+						compose/deep [
+							grid-view content-flow= 'vertical source= data-source
+							with [grid/autofit: quote (method)]
+						]
+					]
+				)
+			]
+		]
+	]
+	; on-over [
+		; status/text: form hittest face/space event/offset
+	; ]
+	; status: text 300x40
+][
+	offset: 10x10
+	actors: object [
+		on-resizing: func [window event] [
+			b/size: window/size - 20x60
+			; spaces/ctx/grid-ctx/autofit gv/grid b/size/x - 20
+			; gv/origin: 0x0
+			invalidate b
+			; b/dirty?: yes
+		]
+	]
+] 'resize
 
 ; spaces/ctx/grid-ctx/autofit gv/grid 200
 ; b/dirty?: yes
