@@ -18,6 +18,7 @@ view/flags/options compose [
 	text "VID/S code:" space: area 400x80 focus (text) return
 	host: host 400x300 white react [
 		try [
+			invalidate <everything>						;-- ensure clearing of unused spaces & their timers
 			data: load/all space/text
 			face/space: first lay-out-vids data
 			face/dirty?: yes
