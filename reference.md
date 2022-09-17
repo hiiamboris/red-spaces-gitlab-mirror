@@ -280,6 +280,7 @@ Basic image renderer. To be used in more complex templates or standalone. Canvas
 | `data` | image! or none! | image to draw |
 | `margin` | integer! or pair! | horizontal and vertical space between the bounding box and image itself; should be set in styles |
 | `limits` | range! or none! | can be used to control image size; image aims at 100% scale when possible |
+| `weight` | integer! or float! >= 0 | this common facet has more meaning in image: if zero, image will only adapt it's size to /limits but not to canvas it's rendered on; if positive, then if canvas fill is requested, it will try to fill the canvas' smaller dimension |
 
 
 ## Text

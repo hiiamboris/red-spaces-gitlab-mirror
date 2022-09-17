@@ -1612,7 +1612,6 @@ image is damn problematic
 		although it's possible with fill=1x1 to make it bigger than the canvas, I think it shouldn't happen
 		what if canvas is smaller than image/size?
 		perhaps it should make itself smaller than canvas, but only if weight>0
-		;@@ document weight effect on image
 shit! bug in styling: I have a shared context per each style
 	so in scenario with e.g. `cell [cell [..]]` by the time first cell is composed, it's already bound to second cell!
 	well since the block is shared, it has to deal with state itself.. but this makes it dangerous to use..
