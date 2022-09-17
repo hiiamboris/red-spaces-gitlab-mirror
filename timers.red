@@ -17,15 +17,22 @@ context [
 	rate-types!: make typeset! [integer! float! time!]
 	on-rate-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]][
 		if 'rate = word [
+			#debug events [#print "rate changes to (new) for (space/size) (skip mold/flat/part space 80 13)"]
 			pos: find/same rated-spaces space
 			either all [
 				find rate-types! type? :new
 				positive? rate: new
 			][											;-- enable timers
 				if number? rate [rate: 0:0:1 / rate]	;-- normalize rate in advance
-				unless pos [repend rated-spaces [space rate]]
+				unless pos [
+					#debug events [#print "adding rate=(new) to rated-spaces"]
+					repend rated-spaces [space rate]
+				]
 			][											;-- disable timers
-				if pos [fast-remove pos 2]
+				if pos [
+					#debug events [#print "removing rate=(old) from rated-spaces"]
+					fast-remove pos 2
+				]
 			]
 			rated-spaces
 		]
@@ -79,38 +86,37 @@ context [
 	process-timers: function [face [object!] event [event!] /extern time] [
 		;; timer has no target (as is the case with focused space or pointed at)
 		;; and scanning of the whole tree for `rate` facets, all the time, is out of question - or this code will take 99% CPU time
-		;; paths-from-space helps win performance at the cost of having to explicitly render each timer
+		;; path-from-space helps win performance at the cost of having to explicitly render each timer
 		handlers: events/handlers
 		hpath: as path! []
 		foreach [space rate] rated-spaces [
-			paths: paths-from-space space				;-- static, not copied, but it's ok since timer is not reentrant
-			foreach path paths [
-				pos: find/same/tail marks space
-				set [prev: bias:] any [pos [0:0 0:0]]
-				delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer
-				if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call it?
-				
-				args: reduce/into [to 1% delay / rate] clear []
-				path: new-line/all as [] path no
-				;; even if no time handler, actors or previewers/finalizers may be defined
-				events/do-previewers top path event args
-				forall path [
-					compose/into [handlers (path) on-time] clear hpath		;-- not allocated
-					unless block? try [list: get hpath] [continue]			;-- no time handler ;@@ REP #113
-					foreach handler list [									;-- call the on-time stack
-						#assert [function? :handler]
-						events/do-handler next hpath :handler top path event args 
-					]
+			unless path: path-from-space space [continue]
+			#debug events [#print "timer rate (rate) has path (path)"]
+			pos: find/same/tail marks space
+			set [prev: bias:] any [pos [0:0 0:0]]
+			delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer
+			if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call it?
+			
+			args: reduce/into [to 1% delay / rate] clear []
+			path: new-line/all as [] path no
+			;; even if no time handler, actors or previewers/finalizers may be defined
+			events/do-previewers top path event args
+			forall path [
+				compose/into [handlers (path) on-time] clear hpath		;-- not allocated
+				unless block? try [list: get hpath] [continue]			;-- no time handler ;@@ REP #113
+				foreach handler list [									;-- call the on-time stack
+					#assert [function? :handler]
+					events/do-handler next hpath :handler top path event args 
 				]
-				events/do-finalizers top path event args
-				
-				unless pos [pos: tail append marks space]
-				delay: min delay rate * 5					;-- avoid frame spikes after a lag or sleep
-				change change pos time bias + delay			;-- mark last timer call time for this space
-				;@@ TODO: cap bias at some maximum, for 50+ fps cases, so it won't run away
-				
-				time: now/utc/precise						;-- update time after handlers evaluation
 			]
+			events/do-finalizers top path event args
+			
+			unless pos [pos: tail append marks space]
+			delay: min delay rate * 5					;-- avoid frame spikes after a lag or sleep
+			change change pos time bias + delay			;-- mark last timer call time for this space
+			;@@ TODO: cap bias at some maximum, for 50+ fps cases, so it won't run away
+			
+			time: now/utc/precise						;-- update time after handlers evaluation
 		]
 	]
 

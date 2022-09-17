@@ -1629,6 +1629,13 @@ tube caused problem in grid autofit:
 		]]
 	text should be sized to 120px wide, or returned size should be 50px, but not both
 	in this sense, weighted algorithms are more resilient to abuse
+I need to drop multiple parent model entirely as it causes too many complications in both rendering cache and timer cache
+	memoized-paths used in timers was unreliable as there's no known moment when it will reliably find paths that will survive for long
+	and there is no moment when it's known that memoized-paths should be invalidated
+	then I tried to add it's buildup directly into render, but render would just append the same path over and over
+	same-path lookup in that array is very slow so not an option, so when should a path be removed? nasty...
+	from now on, only spaces with single parent can have a /rate, and I should probably move to single-parent model
+	;@@ and document this once decided
 
 	
 
@@ -5176,4 +5183,41 @@ binary search is shorter, simpler, and not slower, and if we add min/max support
 	; W: (copy W2) + C * H2 / HE - C
 	; W: clip-vector W W1 W2
 	; W: W + (TW - TWE / length? W)				;-- evenly distribute remaining space
+; ]
+
+failed attempt at timers optimization.. in vids-polygon no timers worked because memoizes an empty path before cell is finished
+; set 'paths-from-space function [
+	; "Get all paths for SPACE on the last rendered frame"
+	; space  [object!]
+	; return: [path! block!] "May return single path! or a block of"
+; ][
+	; #assert [is-face? host]
+	; unless result: select/same memoized-paths space [
+		; result: make [] 10
+		; path: clear []
+		; paths-continue* space path result
+	; ]
+	; result
+; ]
+	
+; paths-continue*: function [
+	; space  [object!]
+	; path   [block!]
+	; result [block!]
+; ][
+	; parents: select/same render-cache space
+	; either empty? parents [
+		; unless is-face? space [exit]				;-- not rendered space - cannot be traced to the root ;@@ is-face is slow for this!
+		; append/only result reverse copy head path
+	; ][
+		; append invalidation-stack space				;-- defence from cycles ;@@ rename since it's also used here?
+		; foreach [parent child-name] parents [
+			; unless find/same invalidation-stack parent [
+				; change path child-name
+				; paths-continue* parent next path result
+			; ]
+		; ]
+		; remove path
+		; remove top invalidation-stack
+	; ]
 ; ]

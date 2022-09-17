@@ -106,44 +106,15 @@ context [
 	
 	memoized-paths: make hash! 2 * 1024					;-- [space paths] - necessary to lighten the timers code!
 	
-	;@@ WARNING: does not copy! paths may change if not copied by the caller
-	;@@ and in case space was invalidated, this will not return anything - needs design improvement, maybe separate tree
-	set 'paths-from-space function [
-		"Get all paths for SPACE on the last rendered frame"
+	set 'path-from-space function [
+		"Get path for SPACE on the last rendered frame"	;@@ single parent model!!!
 		space  [object!]
-		; return: [path! block!] "May return single path! or a block of"
+		; return: [path!]
 	][
 		; #assert [is-face? host]
-		unless result: select/same memoized-paths space [
-			result: make [] 10
-			path: clear []
-			paths-continue* space path result
-			repend memoized-paths [space result]
-		]
-		result
+		select/same memoized-paths space
 	]
 		
-	paths-continue*: function [
-		space  [object!]
-		path   [block!]
-		result [block!]
-	][
-		parents: select/same render-cache space
-		either empty? parents [
-			unless is-face? space [exit]				;-- not rendered space - cannot be traced to the root
-			append/only result reverse copy head path
-		][
-			append invalidation-stack space				;-- defence from cycles ;@@ rename since it's also used here?
-			foreach [parent child-name] parents [
-				unless find/same invalidation-stack parent [
-					change path child-name
-					paths-continue* parent next path result
-				]
-			]
-			remove path
-			remove top invalidation-stack
-		]
-	]
 	
 	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
 	;@@ but maybe they won't be needed as I'm improving the design?
@@ -285,7 +256,7 @@ context [
 			'else [
 				parents: make hash! 2
 				if parent [reduce/into [parent name] parents]
-				repend render-cache [child parents make hash! slot-size * 4]
+				repend render-cache [child parents make hash! slot-size * 4]	;@@ doesn't seem to be any performance win from hash here
 			]
 		]
 	]
@@ -451,6 +422,17 @@ context [
 				leave-space
 				unless any [xy1 xy2] [commit-cache space canvas render]
 				; commit-cache space canvas render
+				
+				if select space 'rate [					;-- remember paths for spaces with timers, unfortunate optimization
+					path: copy current-path
+					;@@ I need to drop multiple parents model, as it complicates everything too much
+					;@@ this code uses single parent per timer-enabled space; otherwise no idea how to track those
+					either pos: find/same memoized-paths space [
+						pos/2: path
+					][
+						repend memoized-paths [space path]
+					]
+				]
 				
 				#debug profile [prof/manual/end name]
 				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
