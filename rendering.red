@@ -121,6 +121,7 @@ context [
 	set 'invalidate function [
 		"Invalidate SPACE content and cache, or use <everything> to affect all spaces' cache"
 		space [word! object! tag!] "If contains `invalidate` func, it is evaluated"
+		/local custom									;-- can be unset during construction
 	][
 		if word? space [
 			space: get space
@@ -129,7 +130,7 @@ context [
 		invalidate-cache space
 		all [
 			object? space
-			any-function? custom: select space 'invalidate
+			any-function? set/any 'custom select space 'invalidate
 			custom
 		]
 	]
