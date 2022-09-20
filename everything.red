@@ -23,8 +23,8 @@ Red [
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	#debug off
-	; #debug on											;-- general (unspecialized) debug logs
+	; #debug off
+	#debug on											;-- type checking and general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
@@ -65,6 +65,7 @@ do/expand [
 	#include %../common/do-queued-events.red
 	#include %../common/show-trace.red
 	#include %../common/do-atomic.red
+	#include %../common/classy-object.red
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
@@ -77,8 +78,8 @@ do/expand [
 				#include %layouts.red
 				#include %vid.red
 				#include %events.red
+				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %templates.red
-				#include %timers.red					;-- must come after events (to set events/on-time) and templates
 				#include %popups.red
 				#include %traversal.red
 				#include %focus.red

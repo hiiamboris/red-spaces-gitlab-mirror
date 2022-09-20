@@ -10,7 +10,7 @@ Red [
 
 append spaces/keyboard/focusable 'grid-view
 
-spaces/templates/zoomer: make-template 'box [
+declare-template 'zoomer/box [
 	zoom: [x: 1.0 y: 1.0]
 	draw: function [/on canvas [pair! none!]] [
 		canvas': if canvas [

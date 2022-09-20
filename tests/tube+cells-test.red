@@ -32,7 +32,7 @@ set-style 'tube function [tube /on canvas [pair! none!]] [
 	]
 ]
 
-spaces/templates/heading: make-template 'data-view []
+declare-template 'heading/data-view []
 
 boxes: map-each spec [
 	[60x30 "A"]

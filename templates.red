@@ -4,29 +4,24 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires `for` loop from auxi.red, layouts.red, export
+;-- requires `for` loop from auxi.red, layouts.red, export, `timers/on-rate-change` to enable it
 
 
 ;@@ TODO: also a `spaces` context to wrap everything, to save it from being overridden (or other name, or under system/)
 
 
-#macro [#on-change-redirect] func [s e] [				;@@ see REP #115
-	copy/deep [											;-- copy so it can be bound to various contexts
-		on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
-			~/on-change self word :old :new
-		]
-	]
-]
+; #macro [#on-change-redirect] func [s e] [				;@@ see REP #115
+	; copy/deep [											;-- copy so it can be bound to various contexts
+		; on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
+			; ~/on-change self word :old :new
+		; ]
+	; ]
+; ]
 
 
-exports: [make-space make-template space?]
+exports: [make-space declare-template space?]
 
-space-object!: object [									;@@ workaround for #3804
-	;; this slows down space creation a little but lightens it's `draw` which is more important
-	;; because if on-change can't be relied upon, all initialization has to be done inside draw
-	;; see label template for an example of the related house keeping
-	on-change*: func [word old [any-type!] new [any-type!]] []
-]
+space-object!: copy classy-object!
 
 make-space: function [
 	"Create a space from a template TYPE"
@@ -48,12 +43,23 @@ make-space: function [
 ]
 
 make-template: function [
-	"Declare a space template"
+	"Create a space template"
 	base [word!]  "Type it will be based on"  
 	spec [block!] "Extension code"
 ][
 	make-space/block base spec
 ]
+
+;@@ need to doc this func
+declare-template: function [
+	"Declare a named class and put into space templates"
+	name-base [path!] "template-name/prototype-name"
+	spec      [block!]
+][
+	set [name: base:] name-base
+	templates/:name: make-template base declare-class name-base spec
+]
+
 
 ;-- helps having less boilerplate when `map` is straightforward
 compose-map: function [
@@ -99,16 +105,30 @@ templates: #()											;-- map for extensibility
 ;; in this case zero (e.g. 0x100) should be used
 ;@@ doc this semantics once it's proven
 
-templates/space: [										;-- minimum basis to build upon
-	draw: []
-	size: 0x0
-	limits: none
+;; default on-change function to avoid replicating it in every template
+invalidates: function [space [object!] word [word!] value [any-type!]] [
+	invalidate space
+]
+
+templates/space: declare-class 'space [					;-- minimum basis to build upon
+	draw:   []
+	size:   0x0
 	cache?: on
+	#type =? :invalidates   limits: none
 	; rate: none
 ]
+
+modify-class 'space [									;-- a trick not to enforce `rate:` presence but still typecheck it
+	#type =? [none! integer! float! time!] :timers/on-rate-change
+	(any [rate =? none  rate >= 0])
+	rate: none
+]	
+
+;@@ TODO: use classes to replace this with a more reliable check
 space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
 
-templates/timer: make-template 'space [rate: none]		;-- template space for timers
+declare-template 'timer/space [rate: none]				;-- template space for timers
+
 
 ;; has to be an object so these words have binding and can be placed as words into content field
 ;@@ map is used to work around #5137 when compiling with -e!
@@ -118,7 +138,7 @@ generic: construct to [] make map! reduce [				;-- holds commonly used spaces ;@
 ]
 
 ;; empty stretching space used for alignment (static version and template)
-templates/stretch: put templates '<-> make-template 'space [	;@@ affected by #5137
+put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 	weight: 1
 	draw: function [/on canvas [pair! none!]] [
 		set [canvas: fill:] decode-canvas canvas
@@ -131,27 +151,17 @@ generic/stretch: set in generic '<-> make-space 'stretch []
 rectangle-ctx: context [
 	~: self
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		all [
-			find [size margin] word
-			not :old =? :new
-			invalidate-cache space
-		]
-		space/space-on-change word :old :new
-	]
-	
-	templates/rectangle: make-template 'space [
-		size:   20x10
-		margin: 0
+	declare-template 'rectangle/space [
+		#type =? :invalidates   size:   20x10
+		#type =? :invalidates   margin: 0
 		draw:   does [compose [box (margin * 1x1) (size - margin)]]
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
 ;@@ maybe this should be called `arrow`? because it doesn't have to be triangle-styled
 triangle-ctx: context [
 	~: self
+	
 	draw: function [space [object!]] [
 		set [p1: p2: p3:] select [
 			n [0x2 1x0 2x2]								;--   n
@@ -166,20 +176,13 @@ triangle-ctx: context [
 		]
 	]
 		
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		unless :old =? :new [invalidate-cache space]
-		space/space-on-change word :old :new
-	]
-		
-	templates/triangle: make-template 'space [
-		size:    16x10
-		dir:     'n
-		margin:  0
+	declare-template 'triangle/space [
+		#type =? :invalidates   size:    16x10
+		#type =  :invalidates   dir:     'n
+		#type =? :invalidates   margin:  0
 		
 		;@@ need `into` here? or triangle will be a box from the clicking perspective?
 		draw: does [~/draw self]
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -222,23 +225,14 @@ image-ctx: context [
 			[]
 		]
 	]
-	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if switch to word! word [
-			margin [:old <> :new]
-			data   [true] 								;-- can't know if image bits were changed, better to update
-		] [invalidate-cache space]
-		space/space-on-change word :old :new
-	]
-	
-	templates/image: make-template 'space [
-		size:   none									;@@ should fixed size be used as an override?
-		margin: 0
-		weight: 0
-		data:   none									;-- images are not recyclable, so `none` by default
+
+	declare-template 'image/space [
+		#type =? :invalidates   margin: 0
+		#type =? :invalidates   weight: 0
+		#type =? :invalidates   data:   none			;-- images are not recyclable, so `none` by default
+		
+		size: none
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -246,12 +240,6 @@ image-ctx: context [
 cell-ctx: context [
 	~: self
 
-	allowed-alignments: make hash! [
-		-1x-1 -1x0 -1x1
-		 0x-1  0x0  0x1
-		 1x-1  1x0  1x1
-	]
-	
 	draw: function [space [object!] canvas [pair! none!]] [
 		#assert [space/content]
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
@@ -278,41 +266,32 @@ cell-ctx: context [
 		drawn
 	]
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			align [
-				unless find allowed-alignments :new [	;@@ this is just an idea, not sure if worth it (maybe #debug?)
-					set-quiet in space word :old
-					ERROR "Invalid alignment specified: (mold/part :new 100)"
-				]
-				invalidate-cache space
-			]
-			;; `weight` invalidates parents by invalidating this cell
-			limits weight content [invalidate-cache space]
-		]
-		space/space-on-change word :old :new
+	allowed-alignments: make hash! [
+		-1x-1 -1x0 -1x1
+		 0x-1  0x0  0x1
+		 1x-1  1x0  1x1
 	]
 	
-	templates/box: make-template 'space [
+	declare-template 'box/space [
+		#type =? :invalidates   margin:  0x0			;-- useful for drawing inner frame, which otherwise would be hidden by content
+		#type =? :invalidates   weight:  1				;@@ what default weight to use? what default alignment?
+		
+		#type =? :invalidates (find allowed-alignments align)
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
-		margin:  0x0									;-- useful for drawing inner frame, which otherwise would be hidden by content
-		weight:  1										;@@ what default weight to use? what default alignment?
+		
+		#type =? :invalidates [word!]
 		content: in generic 'empty						;@@ consider `content: none` optimization if it's worth it
+		
 		map:     reduce [content [offset 0x0 size 0x0]]
-		;; cannot be cached, as content may change at any time and we have no way of knowing
-		; cache?:  off
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
 		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
-		
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 	
-	templates/cell: make-template 'box [margin: 1x1]	;-- same thing just with a border and background ;@@ margin - in style?
+	declare-template 'cell/box [margin: 1x1]			;-- same thing just with a border and background ;@@ margin - in style?
 ]
 
 ;@@ TODO: externalize all functions, make them shared rather than per-object
@@ -368,29 +347,23 @@ scrollbar: context [
 		]
 	]
 	
-	on-change: function [bar [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [offset amount size axis arrow-size [invalidate-cache bar]]
-		bar/space-on-change word :old :new
-	]
-				
-	templates/scrollbar: make-template 'space [
+	declare-template 'scrollbar/space [
 		;@@ maybe leverage canvas size?
-		size:       100x16								;-- opposite axis defines thickness
-		axis:       'x
-		offset:     0%
-		amount:     100%
-		arrow-size: 90%									;-- arrow length in percents of scroller's thickness 
-		map:        []
+		#type =? :invalidates   size:       100x16		;-- opposite axis defines thickness
+		#type =  :invalidates   axis:       'x
+		#type =? :invalidates   offset:     0%
+		#type =? :invalidates   amount:     100%
+		#type =? :invalidates   arrow-size: 90%			;-- arrow length in percents of scroller's thickness 
+		
+		map:         []
 		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] ;-- go back a step
 		back-page:   make-space 'rectangle [draw: []]           ;-- go back a page
 		thumb:       make-space 'rectangle [margin: 2x1]        ;-- draggable
 		forth-page:  make-space 'rectangle [draw: []]           ;-- go forth a page
 		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] ;-- go forth a step
+		
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
-		;@@ TODO: styling/external renderer
 		draw: does [~/draw self]
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -540,54 +513,47 @@ scrollable-space: context [
 		]
 	]
 		
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
+	on-origin-change: function [space [object!] word [word!] value [any-type!]] [
+		;@@ problem: changing origin requires up to date content (no sync guarantee)
+		;@@ maybe we shouldn't clip it right here?
 		;@@ clip origin here or clip inside event handler? box isn't valid until draw is called..
-		; print [mold word mold :old "->" mold :new]
-		switch to word! word [
-			;@@ problem: changing origin requires up to date content (no sync guarantee)
-			;@@ maybe we shouldn't clip it right here?
-			origin [
-				#debug grid-view [#print "on-change origin: (mold :old) -> (mold :new)"]
-				if all [pair? :new  word? space/content] [
-					cspace: get space/content
-					;; hardcoded 2 offset, because content may change and get out of sync with the frame
-					visible-size: either empty? space/map [0x0][space/map/2/size]
-					new: clip [(visible-size - cspace/size) 0x0] new 
-					maybe space/origin: new				;-- can't set quietly - watched by grid-view to set grid/origin
-					#debug grid-view [#print "on-change clipped to: (space/origin)"]
-					invalidate-cache space
-				]
-			]
-			content [invalidate-cache space]
+		;@@ or maybe clip it only inside draw and only for rendering purposes? let it otherwise roam free?
+		#debug grid-view [#print "on-change origin: (mold :old) -> (mold :value)"]
+		if all [pair? :value  word? :space/content] [
+			cspace: get space/content
+			;; hardcoded /2 offset, because content may change and get out of sync with the frame but /2 stays
+			visible-size: either empty? space/map [0x0][space/map/2/size]
+			value: clip [(visible-size - cspace/size) 0x0] value 
+			maybe space/origin: value					;-- can't set quietly - watched by grid-view to set grid/origin
+			#debug grid-view [#print "on-change clipped to: (space/origin)"]
+			invalidate-cache space
 		]
-		space/space-on-change word :old :new
 	]
 	
 	;@@ TODO: maybe make triangles *shared* for more juice? they always have the same size.. but this may limit styling
-	templates/scrollable: make-template 'space [
+	declare-template 'scrollable/space [
 		; cache?: off
 		;@@ make limits a block to save some RAM?
 		limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
-		weight: 1
-		origin: 0x0					;-- at which point `content` to place: >0 to right below, <0 to left above
-		content: in generic 'empty						;-- should be defined (overwritten) by the user
-		content-flow: 'planar							;-- one of: planar, vertical, horizontal ;@@ doc this!
+		
+		#type =? :on-origin-change   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
+		#type =? :invalidates   weight: 1
+		#type =? :invalidates   content: in generic 'empty		;-- should be defined (overwritten) by the user
+		#type =  :invalidates   content-flow: 'planar	;-- one of: planar, vertical, horizontal
+		
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		scroll-timer: make-space 'timer [rate: 0]
 
-		map: reduce [content [offset: 0x0 size: 0x0]]
+		map:  reduce [content [offset: 0x0 size: 0x0]]
 
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
 		]
 
 		draw: function [/on canvas [none! pair!]] [~/draw self canvas]
-
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -605,7 +571,6 @@ paragraph-ctx: context [
 		ellipsis-width: first size-text layout
 		
 		quietly layout/text: text
-; system/view/platform/update-view layout
 		text-size: size-text layout						;@@ size-text required to renew offsets/carets because I disabled on-change in layout!
 		tolerance: 1									;-- prefer insignificant clipping over ellipsization ;@@ ideally, font-dependent
 		if any [										;-- need to ellipsize if:
@@ -718,46 +683,35 @@ paragraph-ctx: context [
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
 		compose [text (1x1 * space/margin) (space/layout)]
 	]
-
-	watched: make hash! [text font margin flags weight color]	;@@ maybe put color change into space-object?
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if all [
-			find watched word
-			not :old =? :new
-		][
-			invalidate space
-		]
-		space/space-on-change word :old :new
-	]
 	
- 	templates/paragraph: make-template 'space [
+ 	declare-template 'paragraph/space [
 		size:   none									;-- only valid after `draw` because it applies styles
-		text:   ""
-		margin: 0x0										;-- default = no margin
+		
+		#type    :invalidates   text:   ""				;-- every assignment counts as space doesn't know if string itself changed
+		#type    :invalidates   flags:  [wrap]			;-- [bold italic underline wrap] supported
+		#type =? :invalidates   margin: 0x0				;-- default = no margin
 		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
 		;; styles may override `/font` with another font created in advance 
-		font:   none									;-- can be set in style, as well as margin
-		; color:  none									;-- placeholder for user to control
-		flags:  [wrap]									;-- [bold italic underline wrap] supported
-		weight: 1
+		#type =? :invalidates   font:   none			;-- can be set in style, as well as margin
+		;@@ maybe put color change into space-object?
+		#type =? :invalidates   color:  none			;-- placeholder for user to control
+		#type =? :invalidates   weight: 1
 
 		;; this is required because rich-text object is shared and every change propagates onto the draw block 
 		; layouts: make map! 10							;-- map of width -> rich-text object ;@@ creates random glitches if rtd face is not new!
 		layout:  none									;-- last chosen layout, text size is kept in layout/extra
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		invalidate: does [quietly layout: none]			;-- will be laid out on next `draw`
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 
 	;; unlike paragraph, text is never wrapped
-	templates/text: make-template 'paragraph [
+	declare-template 'text/paragraph [
 		weight: 0
 		flags:  []
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
-	templates/link: make-template 'paragraph [
+	declare-template 'link/paragraph [
 		flags:   [wrap underline]
 		color:   50.80.255								;@@ color should be taken from the OS theme
 		command: [browse as url! text]
@@ -811,16 +765,13 @@ container-ctx: context [
 		maybe cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
-	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [items content origin] to word! word [invalidate-cache space]
-		space/space-on-change word :old :new
-	]
 
-	templates/container: make-template 'space [
+	declare-template 'container/space [
 		size:    none									;-- only available after `draw` because it applies styles
-		origin:  0x0									;-- used by ring layout to center itself around the pointer
-		content: []
+		#type =? :invalidates   origin:  0x0			;-- used by ring layout to center itself around the pointer
+		#type    :invalidates   content: []
+		
+		#type =? :invalidates
 		items: function [/pick i [integer!] /size] [
 			either pick [content/:i][length? content]
 		]
@@ -836,9 +787,6 @@ container-ctx: context [
 			#assert [layout "container/draw requires layout to be provided"]
 			~/draw self type settings; xy1 xy2
 		]
-
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -846,22 +794,13 @@ container-ctx: context [
 ;@@ need to stash all these contexts somewhere for external access
 list-ctx: context [
 	~: self
-	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		all [
-			find [axis margin spacing] to word! word
-			:old <> :new
-			invalidate-cache space
-		]
-		space/container-on-change word :old :new
-	]
-	
-	templates/list: make-template 'container [
-		axis:    'x
+		
+	declare-template 'list/container [
+		#type =  :invalidates   axis:    'x
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
 		;@@ VID layout styles may include nonzero spacing as defaults, unless tight option is used
-		margin:  0x0
-		spacing: 0x0
+		#type =? :invalidates   margin:  0x0
+		#type =? :invalidates   spacing: 0x0
 		;@@ TODO: alignment?
 		; cache?:    off
 
@@ -870,68 +809,47 @@ list-ctx: context [
 			settings: [axis margin spacing canvas limits]
 			container-draw/layout 'list settings; xy1 xy2
 		]
-		
-		container-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
 ring-ctx: context [
 	~: self
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		all [
-			find [angle radius round?] to word! word
-			:old <> :new
-			invalidate-cache space
-		]
-		space/container-on-change word :old :new
-	]
-	
-	templates/ring: make-template 'container [
+	declare-template 'ring/container [
 		;; in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
-		angle:  0
+		#type =? :invalidates   angle:  0
 		;; minimum distance (pixels) from the center to the nearest point of arranged items
-		radius: 50
+		#type =? :invalidates   radius: 50
 		;; whether items should be considered round, not rectangular
-		round?: no
+		#type =? :invalidates   round?: no
 
 		container-draw: :draw
 		draw: does [container-draw/layout 'ring [angle radius round?]]
-		
-		container-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
 
 icon-ctx: context [
 	~: self
-	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			; axis margin spacing [invalidate-cache space]		;-- handled by list itself
-			image       [space/spaces/image/data: new]	;-- invalidation is done by inner spaces
-			text        [space/spaces/text/text:  new]
-		]
-		space/list-on-change word :old :new
-	]
-	
-	templates/icon: make-template 'list [
+		
+	declare-template 'icon/list [
 		axis:   'y
 		margin: 0x0
-		image:  none
-		text:   ""
 		
+		;@@ TODO: image should be also aligned by a box, when icon fills the canvas
+		;@@ or set icon weight to 0 and don't let list stretch zero-weight spaces
 		spaces: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
-			box:   make-space 'box [content: 'text]	;-- used to align paragraph
+			box:   make-space 'box [content: 'text]		;-- used to align paragraph
 			set 'content [image box]
 		]
+
+		#on-change [space word value] [space/spaces/image/data: value]
+		image:  none
 		
-		list-on-change: :on-change*
-		#on-change-redirect
+		#on-change [space word value] [space/spaces/text/text: value]
+		text:   ""
 	]
 ]
 
@@ -940,16 +858,11 @@ icon-ctx: context [
 tube-ctx: context [
 	~: self
 
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if find [margin spacing axes align] word [invalidate-cache space]
-		space/container-on-change word :old :new
-	]
-	
-	templates/tube: make-template 'container [
-		margin:  0x0
-		spacing: 0x0
-		axes:    [e s]
-		align:   -1x-1
+	declare-template 'tube/container [
+		#type =? :invalidates   margin:  0x0
+		#type =? :invalidates   spacing: 0x0
+		#type    :invalidates   axes:    [e s]
+		#type =? :invalidates   align:   -1x-1
 		
 		container-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
@@ -958,9 +871,6 @@ tube-ctx: context [
 			#debug sizing [print ["tube with" content "on" canvas "->" size]]
 			drawn
 		]
-
-		container-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -968,83 +878,64 @@ tube-ctx: context [
 switch-ctx: context [
 	~: self
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			; command [bind space/command space]
-			state [
-				if :old <> :new [
-					; do space/command
-					invalidate-cache space
-				]
-			]
-		]
-		space/space-on-change word :old :new
-	]
-	
-	templates/switch: make-template 'space [
-		state: off
+	declare-template 'switch/space [
+		#type =? :invalidates   state: off
 		; command: []
 		data: make-space 'data-view []					;-- general viewer to be able to use text/images
 		draw: func [/on canvas [none! pair!]] [
 			also data/draw/on canvas					;-- draw avoids extra 'data-view' style in the tree
 			size: data/size
 		]
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 	
-	templates/logic: make-template 'switch []			;-- uses different style
+	declare-template 'logic/switch []					;-- uses different style
 ]
 
 
 label-ctx: context [
 	~: self
 	
-	on-change: function [label [object!] word [any-word!] old [any-type!] new [any-type!]] [
-			spaces: label/spaces
-		switch to word! word [
-			image [
-				spaces/image-box/content: bind case [	;-- invalidated by cell
-					image? label/image [
-						spaces/image/data: label/image
-						'image
-					]
-					string? label/image [
-						spaces/sigil/text: label/image
-						'sigil
-					]
-					char? label/image [
-						spaces/sigil/text: form label/image
-						'sigil
-					]
-					'else [in generic 'empty]
-				] spaces
+	on-image-change: function [label [object!] word [word!] value [any-type!]] [
+		spaces: label/spaces
+		spaces/image-box/content: bind case [			;-- invalidated by cell
+			image? label/image [
+				spaces/image/data: label/image
+				'image
 			]
-			text [
-				type: either newline: find label/text #"^/" [
-					spaces/text/text: copy/part label/text newline
-					spaces/comment/text: copy next newline
-					'comment
-				][
-					spaces/text/text: label/text
-					'text
-				]
-				spaces/body/content: spaces/lists/:type	;-- invalidated by container
+			string? label/image [
+				spaces/sigil/text: label/image
+				'sigil
 			]
-			flags [
-				spaces/text/flags: spaces/comment/flags: label/flags
+			char? label/image [
+				spaces/sigil/text: form label/image
+				'sigil
 			]
+			'else [in generic 'empty]
+		] spaces
+	]
+
+	on-text-change: function [label [object!] word [word!] value [any-type!]] [
+		spaces: label/spaces
+		type: either newline: find label/text #"^/" [
+			spaces/text/text: copy/part label/text newline
+			spaces/comment/text: copy next newline
+			'comment
+		][
+			spaces/text/text: label/text
+			'text
 		]
-		label/list-on-change word :old :new				;-- handles axis margin spacing
+		spaces/body/content: spaces/lists/:type			;-- invalidated by container
 	]
 	
-	templates/label: make-template 'list [
+	on-flags-change: function [label [object!] word [word!] value [any-type!]] [
+		spaces: label/spaces
+		label/spaces/text/flags: label/spaces/comment/flags: label/flags
+	]
+	
+	declare-template 'label/list [
 		axis:    'x
 		margin:  0x0
 		spacing: 5x0
-		image:   none									;-- can be a string! as well
-		text:    ""
-		flags:   []										;-- transferred to text and comment
 		
 		spaces: object [								;-- all lower level spaces used by label
 			image:      make-space 'image []
@@ -1057,9 +948,10 @@ label-ctx: context [
 			lists: [text: [text] comment: [text comment]]		;-- used to avoid extra bind in on-change
 			set 'content [image-box text-box]
 		]
-		
-		list-on-change: :on-change*
-		#on-change-redirect
+
+		#on-change :on-image-change   image:   none		;-- can be a string! as well
+		#on-change :on-text-change    text:    ""
+		#on-change :on-flags-change   flags:   []		;-- transferred to text and comment
 	]
 ]
 
@@ -1070,37 +962,30 @@ label-ctx: context [
 data-view-ctx: context [
 	~: self
 
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		; print ["data-view/on-change" word mold/flat/part :old 40 "->" mold/flat/part :new 40]
-		push-font: [
-			cspace: get space/content
-			if all [in cspace 'font  not cspace/font =? space/font] [
-				cspace/font: space/font
-				invalidate space
-			]
+	push-font: function [space [object!]] [
+		cspace: get space/content
+		if all [in cspace 'font  not cspace/font =? space/font] [
+			cspace/font: space/font
+			invalidate space
 		]
-		switch to word! word [
-			spacing [invalidate-cache space]
-			font [do push-font]
-			data [
-				space/content: VID/wrap-value :new space/wrap?	;@@ maybe reuse the old space if it's available?
-				do push-font
-			]
-		]
-		space/box-on-change word :old :new
 	]
-			
-	templates/data-view: make-template 'box [			;-- inherit margin, content, map from the box
+	
+	declare-template 'data-view/box [					;-- inherit margin, content, map from the box
 		align:   -1x-1									;-- left-top aligned by default
-		data:    none									;-- ANY red value
-		spacing: 5x5									;-- used only when data is a block
+		
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
+		#on-change [space word value] [push-font space]
 		font:    none
-		wrap?:   off									;-- controls choice between text (off) and paragraph (on)
 		
-		box-on-change: :on-change*
-		#on-change-redirect
+		#type =? :invalidates   spacing: 5x5			;-- used only when data is a block
+		#type =? :invalidates   wrap?:   off			;-- controls choice between text (off) and paragraph (on)
+		
+		#on-change [space word value [any-type!]] [
+			space/content: VID/wrap-value :value space/wrap?	;@@ maybe reuse the old space if it's available?
+			push-font space
+		]
+		data:    none									;-- ANY red value
 	]
 ]
 
@@ -1155,24 +1040,17 @@ window-ctx: context [
 		compose/only [translate (org) (cdraw)]
 	]
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			origin limits pages content [invalidate-cache space]
-		]
-		space/space-on-change word :old :new
-	]
-		
-	templates/window: make-template 'space [
+	declare-template 'window/space [
 		;; when drawn auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
-		pages:  10x10							;-- window size multiplier in canvas sizes (= size of inf-scrollable)
-		origin: 0x0								;-- content's offset (negative)
+		#type =? :invalidates   pages:  10x10			;-- window size multiplier in canvas sizes (= size of inf-scrollable)
+		#type =? :invalidates   origin: 0x0				;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
-		content: generic/empty
+		#type =? :invalidates   content: generic/empty
 		map: []
-
+		
 		available?: func [
-			"Should return number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
+			"Returns number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
 			axis      [word!]    "x/y"
 			dir       [integer!] "-1/1"
 			from      [integer!] "axis coordinate to look ahead from"
@@ -1182,9 +1060,6 @@ window-ctx: context [
 		]
 	
 		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
-		
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -1241,7 +1116,7 @@ inf-scrollable-ctx: context [
 		drawn
 	]
 	
-	templates/inf-scrollable: make-template 'scrollable [	;-- `infinite-scrollable` is too long for a name
+	declare-template 'inf-scrollable/scrollable [		;-- `infinite-scrollable` is too long for a name
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 
@@ -1469,19 +1344,34 @@ list-view-ctx: context [
 		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
 	]
 	
-	list-on-change: function [lview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
-		if all [
-			word = 'axis
-			lview/size									;-- do not trigger during initialization
-		][
-			#assert [find [x y] :new]
-			lview/content-flow: switch new [x ['horizontal] y ['vertical]]
-			if :old <> :new [invalidate-cache lview/list]
-		]
-		lview/list/list-on-change word :old :new
+	on-axis-change: function [list [object!] word [word!] value [word!]] [
+		lview: get list/owner
+		lview/content-flow: switch value [x ['horizontal] y ['vertical]]
+		if lview/size [invalidate list]	;@@ invalidate should check /size itself?
 	]
 		
-	templates/list-view: make-template 'inf-scrollable [
+	list-template: declare-class/manual 'list-in-list-view/list [		;-- new class needed for custom on-change
+		owner: none								;@@ remove me and use `react` to tie content-flow & axis when it's scalable!
+		
+		#type = :on-axis-change (find/case [x y] axis)
+		axis: none								;@@ must be set by list-view after /owner
+		
+		;; cache of last rendered item spaces (as words)
+		;; this persistency is required by the focus model: items must retain sameness
+		;; an int->word map! - for flexibility in caching strategies (which items to free and when)
+		;@@ when to forget these? and why not keep only focused item?
+		icache: make map! []	
+		items: none
+		
+		available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+			;; must pass positive canvas (uses last rendered list-view size)
+			~/available? self size axis dir from requested
+		]
+
+		classify-object 'list-in-list-view self			;-- on-change is not primed until /owner is set
+	]
+
+	declare-template 'list-view/inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
@@ -1497,34 +1387,19 @@ list-view-ctx: context [
 		]
 
 		window/content: 'list
-		list: make-space 'list [
-			axis: 'y
-			
-			;; cache of last rendered item spaces (as words)
-			;; this persistency is required by the focus model: items must retain sameness
-			;; an int->word map! - for flexibility in caching strategies (which items to free and when)
-			;@@ when to forget these? and why not keep only focused item?
-			icache: make map! []	
-			items: function [/pick i [integer!] /size] [
-				either pick [
-					any [
-						icache/:i
-						icache/:i: wrap-data data/pick i
-					]
-				][data/size]
-			]
-
-			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
-				;; must pass positive canvas (uses last rendered list-view size)
-				~/available? self size axis dir from requested
-			]
-			
-			list-on-change: :on-change*
+		list: make-space 'list list-template
+		quietly list/owner: anonymize 'list-view self	;@@ find a better solution!
+		list/axis: 'y									;-- will trigger content-flow update
+		
+		list/items: function [/pick i [integer!] /size] with list [
+			either pick [
+				any [
+					icache/:i
+					icache/:i: wrap-data data/pick i
+				]
+			][data/size]
 		]
-
-		list/on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
-			~/list-on-change self word :old :new
-		]
+		
 		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair! none!]] [
 			~/list-draw self canvas xy1 xy2
 		]
@@ -2151,33 +2026,25 @@ grid-ctx: context [
 		]
 		clear grid/fitcache
 	]
-	
-	on-change: function [grid [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
-		;@@ protect widths, spans, heights? - not for tampering
-		switch to word! word [
-			cells margin spacing pinned bounds [invalidate grid]
-		]
-		grid/space-on-change word :old :new
-	]
 		
-	templates/grid: make-template 'space [
+	declare-template 'grid/space [
 		size:    none				;-- only available after `draw` because it applies styles
-		margin:  5x5
-		spacing: 5x5
-		origin:  0x0						;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin
+		#type =? :invalidates   margin:  5x5
+		#type =? :invalidates   spacing: 5x5
+		#type =? :invalidates   origin:  0x0	;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
 		content: make map! 8				;-- XY coordinate -> space-name (not cell, but cells content name)
 		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
-		;@@ all this should be in the reference docs instead
+		;@@ protect widths, spans, heights? - not for tampering
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
 		autofit: 'area-total					;-- automatically adjust column widths? method name or none
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
-		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
+		#type =? :invalidates   pinned:  0x0	;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
 		;@@ bounds/.. = none means unlimited, but it will render scrollers useless
 		;@@ and cannot be drawn without /only - will need a window over it anyway (used by grid-view)
-		bounds:  [x: auto y: auto]			;-- max number of rows & cols, auto=bound `cells`, integer=fixed
+		#type    :invalidates   bounds:  [x: auto y: auto]		;-- max number of rows & cols, auto=bound `cells`, integer=fixed
 											;-- 'auto will have a problem inside infinite grid with a sliding window
 
 		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
@@ -2201,6 +2068,7 @@ grid-ctx: context [
 			name
 		]
 
+		#on-change :invalidates
 		cells: func [/pick xy [pair!] /size] [					;-- up to user to override
 			either pick [content/:xy][calc-bounds]
 		]
@@ -2311,14 +2179,10 @@ grid-ctx: context [
 			~/invalidate* self xy
 		]
 
-
 		;; does not use canvas, dictates it's own size
 		draw: function [/on canvas [pair! none!] /window xy1 [none! pair!] xy2 [none! pair!]] [
 			~/draw self canvas xy1 xy2
 		]
-	
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -2349,23 +2213,18 @@ grid-view-ctx: context [
 		r
 	]
 	
-	on-change: function [gview [object!] word [word! set-word!] old [any-type!] new [any-type!]] [
-		switch to word! word [
-			;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
-			;@@ situation when jump clears a part of a viewport should never happen at runtime
-			size [quietly gview/jump-length: min gview/size/x gview/size/y]
-			axis [
-				if :old <> :new [
-					#assert [find [x y] :new]
-					invalidate-cache gview
-				]
-			]
-			origin [gview/grid/origin: new]
+	declare-template 'grid-view/inf-scrollable [
+		;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
+		;@@ situation when jump clears a part of a viewport should never happen at runtime
+		#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
+		size: 0x0
+		
+		#type =? #on-change [space word value] [
+			space/grid/origin: value
+			scrollable-space/on-origin-change space word value	;@@ keep this in sync with scrollable/origin on-change which I override
 		]
-		gview/inf-scrollable-on-change word :old :new
-	]
-	
-	templates/grid-view: make-template 'inf-scrollable [
+		origin: 0x0
+		
 		content-flow: 'planar
 		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
@@ -2422,9 +2281,6 @@ grid-view-ctx: context [
 		draw: function [/on canvas [pair! none!]] [
 			inf-scrollable-draw/on canvas
 		]
-		
-		inf-scrollable-on-change: :on-change*
-		#on-change-redirect
 	]
 ]
 
@@ -2432,27 +2288,20 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
-	on-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		if all [word = 'pushed?  :old <> :new] [
-			invalidate-cache space
-			;; prevents command from being evaluated multiple times on key press & hold:
-			if :old [do space/command]
-		]
-		space/data-view-on-change word :old :new
+	on-pushed-change: function [space [object!] word [word!] value [any-type!]] [
+		invalidate space
+		unless value [do space/command]					;-- trigger when released
 	]
 	
-	templates/clickable: make-template 'data-view [
+	declare-template 'clickable/data-view [
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
-		pushed?:  no									;-- becomes true when user pushes it; triggers `command`
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
+		#type =? :on-pushed-change   pushed?:  no		;-- becomes true when user pushes it; triggers `command`
 		;@@ should command be also a function (actor)? if so, where to take event info from?
-
-		data-view-on-change: :on-change*
-		#on-change-redirect
 	]
 	
-	templates/button: make-template 'clickable [		;-- styled with decor
+	declare-template 'button/clickable [				;-- styled with decor
 		weight:   0
 		margin:   10x5
 		rounding: 5										;-- box rounding radius in px
@@ -2461,9 +2310,9 @@ button-ctx: context [
 
 
 ;@@ this should not be generally available, as it's for the tests only - remove it!
-templates/rotor: make-template 'space [
-	content: none
-	angle: 0
+declare-template 'rotor/space [
+	#on-change :invalidates   content: none
+	#on-change :invalidates   angle: 0
 
 	ring: make-space 'space [size: 360x10]
 	tight?: no
@@ -2473,12 +2322,6 @@ templates/rotor: make-template 'space [
 		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
 	]
 	
-	on-change*: function [word [any-word!] old [any-type!] new [any-type!]] [
-		if find [angle content] word [
-			invalidate-cache self
-		]
-	]
-
 	into: function [xy [pair!] /force name [word! none!]] [
 		unless content [return none]
 		spc: get content
@@ -2539,29 +2382,20 @@ templates/rotor: make-template 'space [
 caret-ctx: context [
 	~: self
 	
-	on-change: function [caret [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		unless :old =? :new [
-			switch to word! word [
-				width [maybe caret/size: new by caret/size/y]	;-- rectangle invalidates itself
-				visible? [invalidate-cache caret]
-				offset [if caret/visible? [invalidate-cache caret]]
-			]
-		]
-		caret/rectangle-on-change word :old :new
-	]
-	
-	templates/caret: make-template 'rectangle [		;-- caret has to be a separate space so it can be styled
-		offset:      0				;-- [0..length] should be kept even when not focused, so tabbing in leaves us where we were
-		width:       1				;-- width in pixels
-		look-around: 10				;-- how close caret is allowed to come to field borders
-		anchor:      0.0			;-- [0..1] viewport-relative location of caret within field
-		visible?:    no				;-- controlled by focus
+	declare-template 'caret/rectangle [					;-- caret has to be a separate space so it can be styled
+		#on-change [space word value] [space/size: value by space/size/y]
+		#type =?   width:       1						;-- width in pixels
+		
+		#type =? :invalidates   visible?:    no			;-- controlled by focus
+		
+		#on-change [space word value] [if space/visible? [invalidate space]]
+		#type =?   offset:      0				;-- [0..length] should be kept even when not focused, so tabbing in leaves us where we were
+		
+		look-around: 10									;-- how close caret is allowed to come to field borders
+		anchor:      0.0								;-- [0..1] viewport-relative location of caret within field
 		
 		rectangle-draw: :draw
 		draw: does [when visible? (rectangle-draw)]
-		
-		rectangle-on-change: :on-change*
-		#on-change-redirect 
 	]
 ]
 
@@ -2780,26 +2614,24 @@ field-ctx: context [
 		]
 	]
 		
-	on-change: function [field [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		switch word: to word! word [
-			origin selected [invalidate-cache field]	;-- invalidating just cache in enough since text is the same
+	on-change: function [field [object!] word [word!] value [any-type!]] [
+		switch word [
 			margin text font flags color [
-				set/any 'field/spaces/text/:word :new	;-- sync these to text space; invalidated by text
+				set/any 'field/spaces/text/:word :value	;-- sync these to text space; invalidated by text
 				if word = 'text [
-					field/caret/offset: length? new		;-- auto position at the tail
+					field/caret/offset: length? value	;-- auto position at the tail
 					mark-history field
 				]
 			]
 		]
-		field/space-on-change word :old :new
 	]
 	
 	;@@ field will need on-change handler & actor support for better user friendliness!
-	templates/field: make-template 'space [
+	declare-template 'field/space [
 		;; own facets:
 		weight:   1
-		origin:   0										;-- non-positive, offset(px) of text within the field
-		selected: none									;-- none or pair (offsets of selection start & end)
+		#type =? :invalidates   origin:   0				;-- non-positive, offset(px) of text within the field
+		#type =? :invalidates   selected: none			;-- none or pair (offsets of selection start & end)
 		history:  make block! 100						;-- saved states
 		map:      []
 
@@ -2812,11 +2644,11 @@ field-ctx: context [
 		selection: spaces/selection
 		
 		;; these mirror spaces/text facets:
-		margin: 0x0										;-- default = no margin
-		; color:  none									;-- placeholder for user to control
-		flags:  []										;-- [bold italic underline] supported ;@@ TODO: check for absence of `wrap`
-		text:   spaces/text/text
-		font:   spaces/text/font
+		#type =? :on-change   margin: 0x0				;-- default = no margin
+		#type    :on-change   flags:  []				;-- [bold italic underline] supported ;@@ TODO: check for absence of `wrap`
+		#type    :on-change   text:   spaces/text/text
+		#type =? :on-change   font:   spaces/text/font
+		#type =? :on-change   color:  none				;-- placeholder for user to control
 		
 		offset-to-caret: func [offset [pair!]] [~/offset-to-caret self offset]
 		
@@ -2828,9 +2660,6 @@ field-ctx: context [
 		]
 		
 		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
-		
-		space-on-change: :on-change*
-		#on-change-redirect
 	]
 	
 ]
@@ -2867,7 +2696,7 @@ field-ctx: context [
 	; ]
 	
 	; ;@@ TODO: only area should be scrollable
-	; templates/area: make-template 'scrollable [
+	; declare-template 'area/scrollable [
 		; text: ""
 		; selected: none		;@@ TODO
 		; caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
@@ -2893,7 +2722,7 @@ field-ctx: context [
 	
 ; ]
 
-templates/fps-meter: make-template 'text [
+declare-template 'fps-meter/text [
 	cache?:    off
 	rate:      100
 	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host

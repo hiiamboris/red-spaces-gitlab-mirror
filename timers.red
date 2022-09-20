@@ -7,42 +7,39 @@ Red [
 ;-- requires events.red (extends them on load), uses traversal.red & rendering.red (paths-from-space)
 
 
-context [
+timers: context [
 	;; to lighten the timer-inflicted CPU load (from 100% really), a registry of /rate-enabled spaces has to be kept
 	;; it is achieved by injecting /rate-tracking code into space/on-change
 	rated-spaces: make hash! 32
-	
-	#assert [object? :space-object!]
-	#assert [empty? body-of :space-object!/on-change*]		;-- must be safe to override
+
 	rate-types!: make typeset! [integer! float! time!]
-	on-rate-change: function [space [object!] word [any-word!] old [any-type!] new [any-type!]][
-		if 'rate = word [
-			#debug events [#print "rate changes to (new) for (space/size) (skip mold/flat/part space 80 13)"]
-			pos: find/same rated-spaces space
-			either all [
-				find rate-types! type? :new
-				positive? rate: new
-			][											;-- enable timers
-				if number? rate [rate: 0:0:1 / rate]	;-- normalize rate in advance
-				unless pos [
-					#debug events [#print "adding rate=(new) to rated-spaces"]
-					repend rated-spaces [space rate]
-				]
-			][											;-- disable timers
-				if pos [
-					#debug events [#print "removing rate=(old) from rated-spaces"]
-					fast-remove pos 2
-				]
+	on-rate-change: function [space [object!] word [word!] value [any-type!]][
+		#debug events [#print "rate changes to (value) for (space/size) (skip mold/flat/part space 80 13)"]
+		pos: find/same rated-spaces space
+		either all [
+			find rate-types! type? :value
+			positive? rate: value
+		][												;-- enable timers
+			if number? rate [rate: 0:0:1 / rate]		;-- normalize rate in advance
+			unless pos [
+				#debug events [#print "adding rate=(value) to rated-spaces"]
+				repend rated-spaces [space rate]
 			]
-			rated-spaces
+		][												;-- disable timers
+			if pos [
+				#debug events [#print "removing rate=(old) from rated-spaces"]
+				fast-remove pos 2
+			]
 		]
 	]
 	
-	quietly space-object!/on-change*: function [word [any-word!] old [any-type!] new [any-type!]] with space-object! [
-		on-rate-change self word :old :new
-	]
+	;@@ find a way someday to make timers an optional module
+	; modify-class 'space-object! [
+		; #type =? [none! integer! float! time!] :on-rate-change
+		; (any [none? rate zero? rate positive? rate])
+		; rate: none
+	; ]	
 	
-
 	;-- static map of previous call times of each timer, but `map!` cannot hold objects as keys so using hash!
 	marks: make hash! []
 	timer-resolution: 0:0								;-- measured automatically

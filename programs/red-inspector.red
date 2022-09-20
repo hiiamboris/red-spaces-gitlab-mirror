@@ -40,7 +40,7 @@ context [
 	]
 	
 	;; override defaults, though can be set in style too
-	spaces/templates/grid: make-template 'grid [
+	declare-template 'grid/grid [
 		margin:  2x2
 		spacing: 1x1
 		autofit: none
@@ -200,7 +200,7 @@ context [
 			either error [do error][drawn]
 		]
 	
-		spaces/templates/data-view: make-template 'data-view [
+		declare-template 'data-view/data-view [
 			wrap?: on
 			old-draw: :draw
 			draw: function [/on canvas [pair! none!]] [~/draw self canvas]

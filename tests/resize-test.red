@@ -182,7 +182,6 @@ view/no-wait/flags compose/deep [
 		face/size: max 0x0 face/parent/size - 20		;-- adjust face size
 		scr/limits: face/size .. face/size				;-- adjust scrollable size
 		adjust-limits face/size/x - 16					;-- set triplet lower size limit; 16 for the scroller
-		invalidate r									;-- required because of shared rich-text object :(
 		face/draw: render face
 	]
 ] 'resize

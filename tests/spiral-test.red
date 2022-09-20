@@ -12,7 +12,7 @@ Red [
 #include %../everything.red
 
 ;; this code is a bit messy and I'm lazy to clean it up
-spaces/templates/spiral: make-template 'space [
+declare-template 'spiral/space [
 	size: 100x100
 	content: 'field			;-- reuse field to apply it's event handlers
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite

@@ -37,7 +37,7 @@ copy-deep-limit: function [b n] [
 ]
 
 ;@@ is this useful out of the box?
-spaces/templates/zoomer: make-template 'cell [
+declare-template 'zoomer/cell [
 	zoom: [x: 1.0 y: 1.0]
 	; pivot: ?
 	draw: function [] [

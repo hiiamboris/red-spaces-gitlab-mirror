@@ -1635,6 +1635,41 @@ I need to drop multiple parent model entirely as it causes too many complication
 	same-path lookup in that array is very slow so not an option, so when should a path be removed? nasty...
 	from now on, only spaces with single parent can have a /rate, and I should probably move to single-parent model
 	;@@ and document this once decided
+;@@ need to find a way to disable invalidate calls during space creation, otherwise it's just lost effort
+;@@ esp. if space is deeply inherited, like link/paragraph/space
+while migrating spaces to classy-object, found an interesting catch
+	list-view/list when it's axis changes, affects content-flow of it's parent list-view
+	this means it's on-change actor is per-object, and classy-object doesn't work like that
+	ideally I should just call `react` and tie /content-flow to /axis, but spaces are not reactive due to later's shitty scalability
+	I could maintain a registry of list-view/list pairs, but bad idea - see REP 129
+	I could add /parent to this list, simple, but then spaces become cyclic, don't like it
+	(mold forgive me for even considering this, although if I add it as a word...)
+	ok /owner for now, temporarily
+	well, another option would be to make content-flow a function.. probably not..
+another catch:
+	with `declare-class` each new inherited spec adds a call to `classify-object`
+	without it, all initial on-changes (during object creation) will be lost (as object will be classless until complete)
+	but it's an overhead I'd like to avoid
+	I could perhaps insert `classify-object` into the head of the spec
+	but then if descendant class restricts some parent's field, initialization will fail if parent assigns a forbidden value
+	plus overhead
+and.. a lot of invalidate calls will now happen during construction
+	pointless, since it's not valid in the first place
+	idea: use /size = none as "never drawn" check? maybe inside invalidate itself?
+found multiple inheritance in on-change:
+	/origin is present in scrollable, window, grid, container
+	inf-scrollable inherits it from scrollable
+	grid-view and list-view from inf-scrollable
+	but grid-view wants to push it into grid, so it overrides the original
+	;@@ maybe I should add optional override warnings into classes (maybe as #debug classes ... or #debug warnings ...)
+timer becomes more and more woven with the rest
+	after classes merge, now I can't "modify" base space-object! class and affect all the other created classes
+	I either add the rate check directly into space class upon it's declaration, or modify all classes created so far
+	if I modify all of them, how do I know they're all spaces? some other classes might have been declared
+	plus, render has to do special work for timers
+	plus, events have special on-time slot
+	okay maybe I could maintain a global list of on-change hooks? but then, just for timers? reactivity is per-object anyway
+	not worth it, integrating timers...
 
 	
 

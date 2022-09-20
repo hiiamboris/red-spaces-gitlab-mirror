@@ -9,7 +9,7 @@ Red [
 
 ;@@ TODO: beautify it and draw a spider at random location, or leave it to the others as a challenge
 ;@@ TODO: explore fractals this way :D
-spaces/templates/web: make-template 'inf-scrollable [
+declare-template 'web/inf-scrollable [
 	web: self
 	canvas: make-space 'space [
 		available?: function [axis dir from requested] [requested]

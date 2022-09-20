@@ -9,7 +9,7 @@ Red [needs: view]
 big-font: make font! [size: 15]
 
 ;; just for fun
-spaces/templates/wheel: make-template 'text [
+declare-template 'wheel/text [
 	font: make font! [size: 27]
 	angle: 0
 	text: "⚙"
@@ -22,7 +22,7 @@ spaces/templates/wheel: make-template 'text [
 	rate: 67
 ]
 
-spaces/templates/rocket: make-template 'wheel [
+declare-template 'rocket/wheel [
 	disp: 10x10
 	text: "🚀"
 	burn?: yes
