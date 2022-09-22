@@ -118,6 +118,7 @@ context [
 	
 	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
 	;@@ but maybe they won't be needed as I'm improving the design?
+	;@@ space/invalidate should be called on-invalidate for less confusion
 	set 'invalidate function [
 		"Invalidate SPACE content and cache, or use <everything> to affect all spaces' cache"
 		space [word! object! tag!] "If contains `invalidate` func, it is evaluated"

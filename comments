@@ -1629,12 +1629,46 @@ tube caused problem in grid autofit:
 	text should be sized to 120px wide, or returned size should be 50px, but not both
 	in this sense, weighted algorithms are more resilient to abuse
 I need to drop multiple parent model entirely as it causes too many complications in both rendering cache and timer cache
+	;@@ and document this once decided
 	memoized-paths used in timers was unreliable as there's no known moment when it will reliably find paths that will survive for long
 	and there is no moment when it's known that memoized-paths should be invalidated
 	then I tried to add it's buildup directly into render, but render would just append the same path over and over
 	same-path lookup in that array is very slow so not an option, so when should a path be removed? nasty...
 	from now on, only spaces with single parent can have a /rate, and I should probably move to single-parent model
-	;@@ and document this once decided
+	although, what about self-containing grid? it has itself as parent and a real parent too... shit
+	what if invalidation doesn't clear tree nodes? only marks as non-cached?
+	I need then to leverage some `forget-tree` function to recycle no longer needed spaces (too bad GC can't tell me)
+	or maybe I could scan the cache post-render and clean it up from unused spaces?
+	have no parent = go away? but what if it has a parent, just wasn't invalidated?
+	more sense in marking spaces as cached or not... then not cached = go away
+	or better: have a render generation (incremented number), save it along each cached slot, if less than latest = go away
+	same number will surely blow the hash :) hmm.. no, tested, it's fine, but it has other problems
+	perhaps I should ditch hash for now, use block.. see #5213 - append & change are fine for now, and shouldn't use same items
+	timings: `append` and `clear back tail` - 1us, `change` - 1.4us
+	also, hash vs block for pairs: up to 4 parents no difference, 8 parents - 20% slowdown, 32 parents - 100% slowdown
+	meaning, I could use block for most cases, and use words in place of objects for parents to save RAM at the cost of one `get`
+	generation number should be per-host-face, because they are rendered separately, and cleanup should affect single face only
+	more informed hash structure then:
+	single space can have different names in different places on the tree, so name should not be part of it, but what links it to it's parent
+	parents block: [generation (once) space-name parent-name ...] (parent-name for hosts is 'host')
+	cache data block: [canvas space-size map drawn ...]
+	cache itself: [latest-generation (once) space-object parents-block cache-data-block ...]
+	(generation could be a time! value perhaps?)
+	all rendered items will be cached, regardless of their /cache? value (for tree validity)
+	when fetching smth from the cache, need to visit all children and increase their generation,
+	but how? only by iterating the map.. besides it's a slowdown and possible cycles..
+partial cache cleanup:
+	iterate over render-cache, spaces with generation older by a given threshold should be removed completely
+	(marking as free is pointless, just move smth from the tail)	
+	trigger? could be done once a second maybe (every `rate` frames)
+also, maybe I could detect face destruction and free it's space cache?
+	inject smth into stop-reactor's body? but it's compiled, and face's code is compiled with it, I can only override whole reactivity
+	I could perhaps inspect system/reactivity/relations and see if my host is there?
+	cleanup task: just clear the cache belonging to particular host
+	trigger? it's not rendered anymore.. even timer can't help if all hosts are inactive.. so no possible trigger
+	then manual cache-cleanup func, and a list of known hosts,
+	should also be triggered after each host render, so while at least one host is alive, other ones will be freed
+	need to test that host is indeed reactive at the time of 1st render, if not - find a defense
 ;@@ need to find a way to disable invalidate calls during space creation, otherwise it's just lost effort
 ;@@ esp. if space is deeply inherited, like link/paragraph/space
 while migrating spaces to classy-object, found an interesting catch
@@ -1670,6 +1704,94 @@ timer becomes more and more woven with the rest
 	plus, events have special on-time slot
 	okay maybe I could maintain a global list of on-change hooks? but then, just for timers? reactivity is per-object anyway
 	not worth it, integrating timers...
+I'm all the more serious about single parent model
+	what do I lose?
+	self-containing grid? okay, but it has no practical value
+	shared stretch space? to hell with it, it's not costly
+	shared images? they could just share an image! value, but be different spaces
+	I lose the ability to mirror some space tree somewhere:
+	- debug-draw that renders existing spaces on it's own canvas
+	- possible magnifier tool (e.g. in some UI editor? I don't even see a real use case, but draw block works here)
+	- fancy fx like layout mirrors, minimaps, etc - draw block works as long as there's no need in interactivity there
+	  (it won't be possible to press mirrored button etc)
+	  although.. debatable.. I could make a space that mirrors it's content and makes it interactive with /into
+	- animations e.g. rotating away copy of the layout - would have to become bitmaps or fixed draw blocks
+	- some kind of task manager could have snapshots of it's "task" layouts - again, fixed draw block works fine
+	so, only debug-draw is lost, and I could make it copy it's spaces subtree to fix that
+	that seems to be all...
+	what do I gain?
+	no risk for cell space to belong to multiple grids or be at multiple places in the same grid
+	  otherwise how to answer the question "what's the coordinate for this cell?" needed by styling (is it header or not, odd/even etc)
+	  header would assign a bold font, which is not accounted for by render-cache, and it will flip between fonts depending on rendering order
+	  (this answer will still be hard, but at least it will have a definite answer)
+	no risk of shared timers (which would slow them down significantly due to need for a complex cache model)
+	I could add /path facet to each rendered space
+	so timers will know what to do with timer's parent without any special lookups or tricky caches
+	this will also keep spaces moldable as it's not an object list (until reduced)
+	I could using /path easily invalidate it up to the root without a render-cache (which is a beast)
+	how to avoid subsequent invalidation? just by checking /cache for valid/invalid
+	cache could be held within the space itself, but since it contains draw blocks, I should not do that, or mold will kill me
+	or cache could be a word e.g. `valid` that points to a block with cached values
+	`invalid` could point to the same block or not, it doesn't matter as that data won't be used
+		(it's best to save the link so the object with [valid invalid] words will not require recreation)
+	=off could disable caching for that space, but we'll still have a path, independent of invalidation
+	what about cache cleanup then? cache only has objects within map, but that's enough to lock them
+		if cache is a word, no cleanup needed - GC will take care of it as long as cache has no references to live parents
+		let's see.. map contains children and these contain path that links them to parents... but children are inaccessible, so GC works
+	no need for generations, as these were only needed as a kludge for cleanup
+	no need to use a hash!
+	spaces already cached - how do I find them? just fetch their valid/invalid word, easy, which holds the subtree (as map)
+	this opens a possibility (down the road) to specify which object fields are to be held in the cache (not just drawn/map/size)
+		for grids this may be quite useful as they have too many caches
+		for text I could put /layout there
+		and it may remove the need for space-local /invalidate func
+		instead of exposing a new /cached slot, /cache could be used:
+		a block containing a list of cached words (before it's head) and their values (after it's head) referred to by word
+		a select-cached-fields function or whatever the name to tune it post-construction
+	problem with paths: in cached subtree they might become invalid if parent got moved
+		will have to visit and renew all paths via map traveersal
+		if I'm visiting whole tree, perhaps no need in deep invalidation?
+		during visit I will find deep spaces that are invalid, and will pop up the invalid flag to the root
+		this will solve the problem of invalidate vs invalidate/only
+		but may be slow...
+		alternatively, I could in place of /path just use /parent (word), limiting the visit depth
+		need to benchmark.. list-spaces takes 7ms for 1000 spaces, which should be a good visitor time estimate
+		and that crosses out visiting idea, then /parent should indeed be a word, or words
+	will have to remove 'generic' spaces
+	will be no need in limit or cycle detection in traversal algorithms ;@@ remove them
+	consider disabling cache for timers, as there's really no need
+	how to check for possible parent override during render?
+		maybe I shouldn't? 99% cases won't override anything, and self-containing grid still will work (hacky but..)
+		perhaps just an assertion, maybe only in debug mode?
+		this looks like a costly check to do though.. and will require a hash building during each render..
+		postponed!
+		this also relates to whole /parent vs /parents dilemma: with /parents I need a tracking mechanism
+	can /parent be part of /cache ? no, because we still need the relation even if space is not cached
+		/parent is mandatory now for all spaces, while /cache may be absent? but that would make it `none` meaning not cached
+		so /cache is mandatory too
+	who creates the /cache block?
+		it should be just `on` initially, or make-space could create the block and make it 'invalid
+		but it has to make it invalid *before* all other fields are set, so as not to trigger invalidation..
+		perhaps it could be unbound 'invalid at first, and post-construction become a fully qualified 'invalid ?
+		then cache could not be tuned during construction until make-space exits
+		/cache could be the first word set, with a call to create-cache ? that solves it all
+	this revives the question: should /map and /size be in the space object, or in the cache?
+		I hold /drawn in the cache because it's mold output is huge noise
+		I hold /size in the object because it's often accessed
+		/map is in the middle, it's used for traversal, it's also needed to persist even if cache is disabled (as well as size)
+		/content is not used for traversal because it's *all* items, not visible items, so not UI-related and may be a func in the future
+	and another one: should I still be using words, or /type: name inside the object?
+		I could rewrite `probe` finally.. could even write per-class variant of it
+		such /type could reference the object itself, so it will be easier to construct paths using it
+		#4118 is a good test for such probe
+		what's stopping me is e.g. scrollable/thumb and field/caret are both of rectangle template
+		if I make /type: 'thumb and 'caret, that would mean possibility of writing `view [caret]` which makes zero sense
+		while `view [rectangle]` is somewhat adequate even if not useful
+		OTOH, I will have path access
+		and can solve that by `make-space [name: 'thumb]`
+		need more pros and cons to decide, for now seems different but not better
+should there be dump-rendered-tree + dump-tree? since /map is only valid after render..
+	
 
 	
 
