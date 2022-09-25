@@ -297,7 +297,9 @@ context [
 				set [words: node:] get-cache space canvas
 			][
 				drawn: node/2
+				;@@ use set or looped set-quiet here? probably won't matter
 				set words next next node				;-- size map etc..
+				; node: skip node 2  repeat i length? words [set-quiet words/:i :node/:i]
 				try [quietly space/last-frame: reduce [name current-generation 'cached]]
 				#debug cache [							;-- add a frame to cached spaces after committing
 					drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]

@@ -635,20 +635,11 @@ paragraph-ctx: context [
 		wrap?:      to logic! find space/flags 'wrap
 		layout:     space/layout
 		|canvas|: either any [wrap? ellipsize?][
-			default canvas: infxinf						;-- none canvas is treated as infinity (need numbers for the layouts cache)
 			constrain abs canvas space/limits			;-- could care less about fill flag for text
 		][
 			infxinf
 		]
-		
-		;; this relies that layout/size is a pair! - lay-out should not assign none to it
-		if any [										;-- redraw if:
-			none? layout												;-- facet changed?
-			if any [wrap? ellipsize?] [|canvas|/x <> layout/size/x]		;-- width changed and matters?
-			if all [wrap? ellipsize?] [|canvas|/y <> layout/size/y]		;-- height changed and matters?
-		][
-			layout: lay-out space |canvas| ellipsize? wrap?
-		]
+		layout: lay-out space |canvas| ellipsize? wrap?
 
 		;; size can be adjusted in various ways:
 		;;  - if rendered < canvas, we can report either canvas or rendered
@@ -659,7 +650,7 @@ paragraph-ctx: context [
 		;; and one has to wrap it into a data-view space to stretch
 		mrg2: space/margin * 2x2
 		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
-		maybe space/size: mrg2 + text-size		;-- full size, regardless if canvas height is smaller?
+		maybe space/size: mrg2 + text-size				;@@ full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
@@ -672,8 +663,6 @@ paragraph-ctx: context [
 	]
 	
  	declare-template 'paragraph/space [
-		size:   none									;-- only valid after `draw` because it applies styles
-		
 		#type    :invalidates   text:   ""				;-- every assignment counts as space doesn't know if string itself changed
 		#type    :invalidates   flags:  [wrap]			;-- [bold italic underline wrap] supported
 		#type =? :invalidates   margin: 0x0				;-- default = no margin
@@ -684,12 +673,10 @@ paragraph-ctx: context [
 		#type =? :invalidates   color:  none			;-- placeholder for user to control
 		#type =? :invalidates   weight: 1
 
-		;; this is required because rich-text object is shared and every change propagates onto the draw block 
-		; layouts: make map! 10							;-- map of width -> rich-text object ;@@ creates random glitches if rtd face is not new!
-		;@@ remove layout from it completely!!
-		layout:  none									;-- last chosen layout, text size is kept in layout/extra
+		layout: none									;-- last rendered layout, text size is kept in layout/extra
+		cache:  [size layout]
+		
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
-		invalidate: does [quietly layout: none]			;-- will be laid out on next `draw`
 	]
 
 	;; unlike paragraph, text is never wrapped
