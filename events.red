@@ -21,7 +21,7 @@ context [
 	;; sometimes this gets window as 'host', likely when no face is in focus
 	host-event-func: function [host event] [
 		all [
-			word? w: select host 'space					;-- a host face?
+			word? w: select host 'space					;-- a host face? ;@@ use classes to detect this, and maybe /content field?
 			space? get w
 			find supported-events event/type
 			events/dispatch host event
@@ -258,11 +258,6 @@ events: context [
 
 	;; stack-like wrappers for `commands` usage
 	;; have to be separate because `stop?` is valid until all finalizers are done (e.g. in simulated events)
-	;; but `update?` is valid until `dispatch` handles it
-	with-update: function [code [block!]] [
-		update?: no										;-- force logic type
-		do code
-	]
 	with-stop: function [code [block!]] [
 		stop?: no										;-- force logic type
 		do code
@@ -281,7 +276,7 @@ events: context [
 	;@@ any way to unify these 2 formats?
 	dispatch: function [face [object!] event [event!] /local result /extern resolution last-on-time] [
 		focused?: no
-		with-update [with-stop [
+		with-stop [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
 			buf: cache/get
 			path: switch/default event/type [
@@ -295,24 +290,24 @@ events: context [
 						make block! 12
 				]
 				key key-down key-up enter [
-					focused?: yes							;-- event should not be detected by parent spaces
-					if empty? f: keyboard/focus [			;-- when focused by `set-focus`, keyboard/focus is not set, also see #3808 numerous bugs
+					focused?: yes								;-- event should not be detected by parent spaces
+					if empty? f: keyboard/focus [				;-- when focused by `set-focus`, keyboard/focus is not set, also see #3808 numerous bugs
 						keyboard/focus: f: as f path-from-face face
 					]
 					f
 				]
 				; focus unfocus ;-- generated internally by focus.red
 				time [
-					on-time face event						;-- handled by timers.red
-					if any [commands/update? face/dirty?] [	;-- only timer updates the view because of #4881 ;@@ on Linux this won't work
+					on-time face event							;-- handled by timers.red
+					#assert [face/space]
+					cspace: get face/space
+					if dirty?: cspace/cache <> 'valid [			;-- only timer updates the view because of #4881
 						#debug profile [prof/manual/start 'drawing]
-						face/draw: render face				;@@ #5130 is the killer of animations
-						face/dirty?: no
+						face/draw: render face					;@@ #5130 is the killer of animations
 						unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
 					]
-					; none
-					exit									;-- timer does not need further processing
+					exit										;-- timer does not need further processing
 				]
 				;@@ TODO: simulated hover-in and hover-out events to highlight items when hovering
 				;@@ TODO: `enter` should be simulated because base face does not support it
@@ -321,17 +316,16 @@ events: context [
 				; drag-start drag drop move moving resize resizing close  -- no need
 				; zoom pan rotate two-tap press-tap   -- android-only?
 				; create created  -- simulate these? (they're still undocumented mostly in View)
-			] [exit]										;-- ignore unsupported events
+			] [exit]											;-- ignore unsupported events
 			#debug events [print ["dispatch path:" path]]
 			if path [
-				#assert [block? path]						;-- for event handler's convenience, e.g. `set [..] path`
+				#assert [block? path]							;-- for event handler's convenience, e.g. `set [..] path`
 				;-- empty when hovering out of the host or over empty area of it
 				;-- actually also empty when clicking outside of other spaces, so disabled
 				; #assert [any [not empty? path  event/type = 'over]]
 				process-event path event [] focused?
 			]
-			if commands/update? [face/dirty?: yes]			;-- mark it for further redraw on timer
-		]]
+		]
 	]
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
@@ -477,10 +471,7 @@ events: context [
 ;-- toolkit available to every event handler/previewer/finalizer
 ;-- designed following REP#80 - commands, not return values
 events/commands: context with events [
-	;-- update shouldn't throw immediately but set a flag
-	;-- but flag is local to each handler's call, so we have to use a hack here
-	update:  does [set bind 'update? :with-update yes]
-	update?: does [get bind 'update? :with-update]
+	;-- flag is local to each handler's call, so we have to use a hack here
 	;@@ question here is what is the default behavior: pass the event further or not?
 	;@@ let's try with 'stop' by default
 	stop:    does [set bind 'stop?   :with-stop yes]	;-- used by previewers/finalizers

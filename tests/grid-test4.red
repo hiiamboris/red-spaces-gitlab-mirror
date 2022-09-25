@@ -15,23 +15,25 @@ append spaces/keyboard/focusable 'grid-view
 
 view/no-wait/options [
 	below
-	host [fps-meter]
 	b: host [
-		grid-view 1000x500 with [
-			grid/pinned: 2x1
-			grid/bounds: [x: #[none] y: #[none]]
-			; grid/content/(1x2): make-space/name 'button [data: "button1"]
-			; grid/content/(2x2): make-space/name 'button  [size: 80x80]
-			; grid/content/(1x1): make-space/name 'button [data: "button2"]
-			data: func [/pick xy /size] [
-				either pick [xy][[x: #[none] y: #[none]]]
+		vlist [
+			fps-meter
+			grid-view 1000x500 with [
+				grid/pinned: 2x1
+				grid/bounds: [x: #[none] y: #[none]]
+				; grid/content/(1x2): make-space/name 'button [data: "button1"]
+				; grid/content/(2x2): make-space/name 'button  [size: 80x80]
+				; grid/content/(1x1): make-space/name 'button [data: "button2"]
+				data: func [/pick xy /size] [
+					either pick [xy][[x: #[none] y: #[none]]]
+				]
+				grid/set-span 1x1 2x1
+				grid/set-span/force 2x2 3x2
+				; set-span/force 1x1 1x3
+				grid/heights/2: 100
+				grid/widths/default: 100
+				grid/heights/default: 30
 			]
-			grid/set-span 1x1 2x1
-			grid/set-span/force 2x2 3x2
-			; set-span/force 1x1 1x3
-			grid/heights/2: 100
-			grid/widths/default: 100
-			grid/heights/default: 30
 		]
 	]
 	on-over [

@@ -60,9 +60,7 @@ make-popup: function [
 	level  [integer!]
 ][
 	stack: get-popups-for window
-	either face: pick stack level + 1 [
-		invalidate-face face
-	][
+	unless face: pick stack level + 1 [
 		change (enlarge stack level none) face: make-face 'host
 	]
 	face
@@ -93,12 +91,12 @@ hide-popups: function [
 	do-async [											;@@ workaround for #5132
 		either level = 0 [
 			if stack/1 [
-				invalidate-face stack/1
+				; invalidate-face stack/1
 				remove find/same window/pane stack/1	;-- only hide the hint
 			]
 		][
 			foreach face pos: skip stack level [		;-- hide all popups but the hint
-				invalidate-face face
+				; invalidate-face face
 				remove find/same window/pane face
 			]
 		]
@@ -106,14 +104,15 @@ hide-popups: function [
 	show window
 ]
 
-invalidate-face: function [
-	"Remove all spaces used by HOST face from cache"
-	host [object!]
-][
-	foreach path list-spaces host/space [
-		invalidate-cache/forget/only get last path
-	]
-]
+;@@ put this into museum
+; invalidate-face: function [
+	; "Remove all spaces used by HOST face from cache"
+	; host [object!]
+; ][
+	; foreach path list-spaces host/space [
+		; invalidate/forget/only get last path
+	; ]
+; ]
 
 hint-text?: function [
 	"Get text of the shown hint for WINDOW; none if not shown"
@@ -154,7 +153,7 @@ show-hint: function [
 		if fixed <> offset [
 			offset: fixed
 			space/origin: none							;-- disable arrow in this case
-			invalidate-cache space
+			invalidate space
 			hint/draw: render hint						;-- have to redraw content to remove the arrow
 		]
 		show-popup window 0 offset hint 

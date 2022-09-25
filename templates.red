@@ -5,23 +5,43 @@ Red [
 ]
 
 ;-- requires `for` loop from auxi.red, layouts.red, export, `timers/on-rate-change` to enable it
-
-
-;@@ TODO: also a `spaces` context to wrap everything, to save it from being overridden (or other name, or under system/)
-
-
-; #macro [#on-change-redirect] func [s e] [				;@@ see REP #115
-	; copy/deep [											;-- copy so it can be bound to various contexts
-		; on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
-			; ~/on-change self word :old :new
-		; ]
-	; ]
-; ]
-
-
 exports: [make-space declare-template space?]
 
+
 space-object!: copy classy-object!
+
+templates: #()											;-- map for extensibility
+
+;; default on-change function to avoid replicating it in every template
+invalidates: function [space [object!] word [word!] value [any-type!]] [
+	invalidate space
+]
+
+;@@ cache should be another module
+init-cache: function [space [object!]] [
+	if block? :space/cache [
+		space/cache: bind 'invalid object [valid: invalid: tail reduce [space/cache]]
+	]													;-- returns bound 'invalid word, so no invalidation is triggered until rendered
+]
+
+templates/space: declare-class 'space [					;-- minimum basis to build upon
+	draw:  []
+	size:  0x0
+	cache: [size]										;-- `drawn` is an exception and not held in the space, so just `size`
+	owner: none
+	#type =? :invalidates   limits: none
+	; rate: none
+	last-frame: make block! 3							;-- used internally to check if space is connected to the tree
+]
+
+modify-class 'space [									;-- a trick not to enforce `rate:` presence but still typecheck it
+	#type =? [none! integer! float! time!] :timers/on-rate-change
+	(any [rate =? none  rate >= 0])
+	rate: none
+]	
+
+;@@ TODO: use classes to replace this with a more reliable check
+space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
 
 make-space: function [
 	"Create a space from a template TYPE"
@@ -37,7 +57,10 @@ make-space: function [
 		#print "*** Template '(type)' is of type (type? base)"
 	]]
 	r: append copy/deep base spec
-	unless block [r: make space-object! r]
+	unless block [
+		r: make space-object! r
+		init-cache r
+	]
 	if name [r: anonymize type r]
 	r
 ]
@@ -87,45 +110,6 @@ compose-map: function [
 	r
 ]
 
-
-templates: #()											;-- map for extensibility
-
-;; On limits:
-;; to waste less RAM (each range is 468 bytes), a single range is used instead of two (X+Y)
-;; this limits us a little bit but not much:
-;;   no /limits defined in a space -- same as limits=none (any size is possible)
-;;   limits: 'fixed                                   -- size is locked and not to be touched
-;;   limits: none                                     -- size is unconstrained (no limits, default)
-;;   limits: make range! [min: none  max: none]       -- ditto
-;;   limits: make range! [min: 0x0   max: none]       -- ditto
-;;   limits: make range! [min: 0x100 max: 999999x100] -- Y axis is fixed, X is practically unconstrained
-;;   limits: make range! [min: 50    max: 200]        -- main axis is constrained, secondary is not
-;; this allows to set each limit to a pair/number/none, where `none` means "fixed"
-;; but it's impossible to have e.g. min-x = none, but min-y = 100
-;; in this case zero (e.g. 0x100) should be used
-;@@ doc this semantics once it's proven
-
-;; default on-change function to avoid replicating it in every template
-invalidates: function [space [object!] word [word!] value [any-type!]] [
-	invalidate space
-]
-
-templates/space: declare-class 'space [					;-- minimum basis to build upon
-	draw:   []
-	size:   0x0
-	cache?: on
-	#type =? :invalidates   limits: none
-	; rate: none
-]
-
-modify-class 'space [									;-- a trick not to enforce `rate:` presence but still typecheck it
-	#type =? [none! integer! float! time!] :timers/on-rate-change
-	(any [rate =? none  rate >= 0])
-	rate: none
-]	
-
-;@@ TODO: use classes to replace this with a more reliable check
-space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
 
 declare-template 'timer/space [rate: none]				;-- template space for timers
 
@@ -283,6 +267,7 @@ cell-ctx: context [
 		content: in generic 'empty						;@@ consider `content: none` optimization if it's worth it
 		
 		map:     reduce [content [offset 0x0 size 0x0]]
+		cache:   [size map]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
@@ -338,7 +323,7 @@ scrollbar: context [
 		quietly space/forth-arrow/size: w-arrow by h
 		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
 		
-		foreach name list [invalidate-cache/only get name]
+		foreach name list [invalidate/only get name]
 		compose/deep [
 			push [
 				matrix [(select [x [1 0 0 1] y [0 1 1 0]] space/axis) 0 0]
@@ -356,6 +341,7 @@ scrollbar: context [
 		#type =? :invalidates   arrow-size: 90%			;-- arrow length in percents of scroller's thickness 
 		
 		map:         []
+		cache:       [size map]
 		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] ;-- go back a step
 		back-page:   make-space 'rectangle [draw: []]           ;-- go back a page
 		thumb:       make-space 'rectangle [margin: 2x1]        ;-- draggable
@@ -387,7 +373,7 @@ scrollable-space: context [
 		default factor: 1
 		switch amnt [line [amnt: 10] page [amnt: spc/map/(spc/content)/size]]
 		spc/origin: spc/origin - (amnt * factor * unit * dir)
-		; invalidate-cache spc
+		; invalidate spc
 	]
 
 	move-to: function [
@@ -418,7 +404,7 @@ scrollable-space: context [
 			]
 		]
 		maybe spc/origin: spc/origin - dxy
-		; invalidate-cache spc
+		; invalidate spc
 	]
 
 	into: function [space [object!] xy [pair!] name [word! none!]] [
@@ -500,8 +486,8 @@ scrollable-space: context [
 		render in space 'scroll-timer					;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
-		invalidate-cache/only space/hscroll
-		invalidate-cache/only space/vscroll
+		invalidate/only space/hscroll
+		invalidate/only space/vscroll
 		
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
 		compose/deep/only [
@@ -526,13 +512,13 @@ scrollable-space: context [
 			value: clip [(visible-size - cspace/size) 0x0] value 
 			maybe space/origin: value					;-- can't set quietly - watched by grid-view to set grid/origin
 			#debug grid-view [#print "on-change clipped to: (space/origin)"]
-			invalidate-cache space
+			invalidate space
 		]
 	]
 	
 	;@@ TODO: maybe make triangles *shared* for more juice? they always have the same size.. but this may limit styling
 	declare-template 'scrollable/space [
-		; cache?: off
+		; cache: off
 		;@@ make limits a block to save some RAM?
 		limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		
@@ -547,7 +533,8 @@ scrollable-space: context [
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		scroll-timer: make-space 'timer [rate: 0]
 
-		map:  reduce [content [offset: 0x0 size: 0x0]]
+		map:   reduce [content [offset: 0x0 size: 0x0]]
+		cache: [size map]
 
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
@@ -660,9 +647,9 @@ paragraph-ctx: context [
 			if any [wrap? ellipsize?] [|canvas|/x <> layout/size/x]		;-- width changed and matters?
 			if all [wrap? ellipsize?] [|canvas|/y <> layout/size/y]		;-- height changed and matters?
 		][
-			lay-out space |canvas| ellipsize? wrap?
+			layout: lay-out space |canvas| ellipsize? wrap?
 		]
-		
+
 		;; size can be adjusted in various ways:
 		;;  - if rendered < canvas, we can report either canvas or rendered
 		;;  - if rendered > canvas, the same
@@ -671,7 +658,7 @@ paragraph-ctx: context [
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
 		mrg2: space/margin * 2x2
-		text-size: max 0x0 (constrain space/layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
+		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
 		maybe space/size: mrg2 + text-size		;-- full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
 		
@@ -681,7 +668,7 @@ paragraph-ctx: context [
 		;; (and we can't stop it from updating)
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
-		compose [text (1x1 * space/margin) (space/layout)]
+		compose [text (1x1 * space/margin) (layout)]
 	]
 	
  	declare-template 'paragraph/space [
@@ -699,6 +686,7 @@ paragraph-ctx: context [
 
 		;; this is required because rich-text object is shared and every change propagates onto the draw block 
 		; layouts: make map! 10							;-- map of width -> rich-text object ;@@ creates random glitches if rtd face is not new!
+		;@@ remove layout from it completely!!
 		layout:  none									;-- last chosen layout, text size is kept in layout/extra
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 		invalidate: does [quietly layout: none]			;-- will be laid out on next `draw`
@@ -775,7 +763,8 @@ container-ctx: context [
 		items: function [/pick i [integer!] /size] [
 			either pick [content/:i][length? content]
 		]
-		map: []
+		map:   []
+		cache: [size map]
 		into: func [xy [pair!] /force name [word! none!]] [
 			into-map map xy + origin name
 		]
@@ -802,7 +791,7 @@ list-ctx: context [
 		#type =? :invalidates   margin:  0x0
 		#type =? :invalidates   spacing: 0x0
 		;@@ TODO: alignment?
-		; cache?:    off
+		; cache:    off
 
 		container-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
@@ -1048,6 +1037,7 @@ window-ctx: context [
 		;; window does not require content's size, so content can be an infinite space!
 		#type =? :invalidates   content: generic/empty
 		map: []
+		cache: [size map]
 		
 		available?: func [
 			"Returns number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
@@ -2060,6 +2050,7 @@ grid-ctx: context [
 		;@@       and how? per-row or per-col? or per-cell? or custom func? or alignment should be provided by item wrapper?
 		;@@       maybe just in lay-out-grid? or as some hacky map that can map rows/columns/cells to alignment?
 		map: []
+		cache: [size map]
 
 		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
@@ -2170,7 +2161,7 @@ grid-ctx: context [
 
 		;; since there's absolutely no way grid can track changes in the data or spaces within itself
 		;; invalidate should be used to mark those changes
-		;@@ interface is messy though: global invalidate calls this and invalidate-cache
+		;@@ interface is messy though: global invalidate calls this and invalidate
 		;@@ but this doesn't call the latter... so tangled if one wants to inval only /cell
 		invalidate: func [
 			"Clear the internal cache of the grid to redraw it anew"
@@ -2252,7 +2243,7 @@ grid-view-ctx: context [
 		;; cacheability requires window to be fully rendered but
 		;; full window render is too slow (many seconds), can't afford it
 		;; so instead, grid redraws visible part every time
-		window/cache?: off
+		window/cache: off
 		
 		window/content: 'grid
 		grid: make-space 'grid [
@@ -2321,6 +2312,7 @@ declare-template 'rotor/space [
 	map: [							;-- unused, required only to tell space iterators there's inner faces
 		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
 	]
+	cache: [size map]
 	
 	into: function [xy [pair!] /force name [word! none!]] [
 		unless content [return none]
@@ -2566,7 +2558,7 @@ field-ctx: context [
 
 	draw: function [field [object!] canvas [none! pair!]] [
 		ctext: field/spaces/text						;-- text content
-		invalidate-cache/only ctext						;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
+		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
 		drawn: render/on in field/spaces 'text infxinf	;-- this sets the size
 		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
@@ -2582,7 +2574,7 @@ field-ctx: context [
 		csize: field/caret/width by (cxy2/y - cxy1/y)
 		unless field/caret/size = csize [
 			quietly field/caret/size: csize
-			invalidate-cache/only field/caret
+			invalidate/only field/caret
 		]
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		if sel: field/selected [
@@ -2634,6 +2626,7 @@ field-ctx: context [
 		#type =? :invalidates   selected: none			;-- none or pair (offsets of selection start & end)
 		history:  make block! 100						;-- saved states
 		map:      []
+		cache:    [size map]
 
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
@@ -2711,7 +2704,7 @@ field-ctx: context [
 		; ;@@ TODO: auto scrolling when caret is outside the viewport
 		; invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
 			; paragraph/layout: none
-			; invalidate-cache paragraph
+			; invalidate paragraph
 		; ]
 	
 		; draw: func [/on canvas [pair! none!]] [~/draw self canvas]
@@ -2723,9 +2716,9 @@ field-ctx: context [
 ; ]
 
 declare-template 'fps-meter/text [
-	cache?:    off
+	; cache:     off
 	rate:      100
-	text:      "FPS: 100.0"								;-- longest text used for initial sizing of it's host
+	#on-change :invalidates   text: "FPS: 100.0"		;-- longest text used for initial sizing of it's host
 	init-time: now/precise/utc
 	frames:    make [] 400
 	aggregate: 0:0:3

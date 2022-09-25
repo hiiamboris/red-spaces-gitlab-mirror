@@ -34,8 +34,7 @@ declare-template 'rocket/wheel [
 	]
 ]
 define-handlers [
-	wheel: [on-time [space path event] [invalidate space update]]
-	; wheel: [on-time [space path event] [invalidate <everything> update]]
+	wheel: [on-time [space path event] [invalidate space]]
 	rocket: extends 'wheel []
 ]
 

@@ -135,17 +135,17 @@ VID: context [
 	;-- basic event dispatching face
 	;@@ DOC it: user can use any face as long as 'space' is defined (serves as a marker for the host-event-func)
 	system/view/VID/styles/host: [
-		default-actor: worst-actor-ever						;-- worry not! this is useful
+		default-actor: worst-actor-ever					;-- worry not! this is useful
 		template: [
-			type:   'base
-			size:   0x0										;-- no size by default - used by init-spaces-tree
+			type:       'base
+			size:       0x0								;-- no size by default - used by init-spaces-tree
 			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
 			;; (except for some popups that must be almost transparent)
-			color:  system/view/metrics/colors/panel
-			space:  none
-			flags:  'all-over								;-- else 'over' events won't make sense over spaces
-			rate:   100										;-- for space timers to work
-			dirty?: no										;-- for events to mark the host for redraw
+			color:      system/view/metrics/colors/panel
+			space:      none
+			flags:      'all-over						;-- else 'over' events won't make sense over spaces
+			rate:       100								;-- for space timers to work
+			generation: 0.0								;-- render generation number, used to detect live spaces (0 = never rendered)
 		]
 		init: [init-spaces-tree face]
 	]

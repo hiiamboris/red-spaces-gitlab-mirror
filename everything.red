@@ -23,10 +23,10 @@ Red [
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	; #debug off
-	#debug on											;-- type checking and general (unspecialized) debug logs
+	#debug off
+	; #debug on											;-- type checking and general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
-	; #debug set profile								;-- turn on to see rendering and other times
+	#debug set profile								;-- turn on to see rendering and other times
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
 	; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus									;-- turn on to see focus changes and errors
@@ -36,7 +36,7 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	; #assert off
+	#assert off
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red

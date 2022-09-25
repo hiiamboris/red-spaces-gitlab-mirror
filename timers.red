@@ -17,7 +17,7 @@ timers: context [
 		#debug events [#print "rate changes to (value) for (space/size) (skip mold/flat/part space 80 13)"]
 		pos: find/same rated-spaces space
 		either all [
-			find rate-types! type? :value
+			find rate-types! type? :value				;@@ should be done using class system!
 			positive? rate: value
 		][												;-- enable timers
 			if number? rate [rate: 0:0:1 / rate]		;-- normalize rate in advance
@@ -87,7 +87,12 @@ timers: context [
 		handlers: events/handlers
 		hpath: as path! []
 		foreach [space rate] rated-spaces [
-			unless path: path-from-space space [continue]
+			unless path: get-full-path space [
+				;; remove unconnected spaces from rated list, otherwise they won't be GCed
+				;@@ on the bad side, to plug them in again one would need to reset the rate ... any solution?
+				space/rate: none
+				continue
+			]
 			#debug events [#print "timer rate (rate) has path (path)"]
 			pos: find/same/tail marks space
 			set [prev: bias:] any [pos [0:0 0:0]]

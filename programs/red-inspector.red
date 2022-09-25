@@ -377,7 +377,7 @@ context [
 				on-resize: on-resizing: function [window event] [
 					new-size: window/size - 20x20
 					host/size: new-size
-					host/dirty?: yes
+					if host/space [invalidate get host/space]
 				]
 			]
 		]
@@ -398,6 +398,7 @@ red-inspector: function [
 ][
 	if empty? script [
 		inspect system
+		prof/show
 		quit/return 0
 	]
 	do script/1

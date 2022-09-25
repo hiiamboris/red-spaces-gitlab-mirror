@@ -19,10 +19,10 @@ define-handlers [
 					move-by: :scrollable-space/move-by
 					axis: select get item 'axis
 					switch subitem [
-						forth-arrow [move-by space 'line 'forth axis  update]
-						back-arrow  [move-by space 'line 'back  axis  update]
-						forth-page  [move-by space 'page 'forth axis  update]
-						back-page   [move-by space 'page 'back  axis  update]
+						forth-arrow [move-by space 'line 'forth axis]
+						back-arrow  [move-by space 'line 'back  axis]
+						forth-page  [move-by space 'page 'forth axis]
+						back-page   [move-by space 'page 'back  axis]
 					]
 					start-drag/with path space/origin
 				]
@@ -49,7 +49,6 @@ define-handlers [
 				ofs: drag-offset path					;-- content is dragged directly
 			]
 			space/origin: drag-parameter + ofs
-			update
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -67,7 +66,6 @@ define-handlers [
 			]
 			either code [
 				do code
-				update
 			][
 				pass								;-- key was not handled (useful for tabbing)
 			]
@@ -82,17 +80,14 @@ define-handlers [
 				pick [forth back] amount <= 0
 				pick [x y] 'hscroll = path/3
 				absolute amount * 4
-			update		;@@ TODO: only update when move succeeded
 		]
 		on-focus [space path event] [
 			invalidate space/hscroll/thumb
 			invalidate space/vscroll/thumb
-			update
 		]
 		on-unfocus [space path event] [
 			invalidate space/hscroll/thumb
 			invalidate space/vscroll/thumb
-			update
 		]
 		scroll-timer: [
 			on-time [space path event delay [percent!]] [	;-- press & hold way of scrolling
@@ -105,7 +100,6 @@ define-handlers [
 					switch subitem [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
 					any [select [hscroll x vscroll y] item  exit]
 					delay + 100%
-				update
 			]
 		]
 	]
@@ -114,12 +108,12 @@ define-handlers [
 	;@@ TODO: when dragging and roll succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `roll` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-down     [space path event] [if update? [space/roll]]	;-- after button clicks
-		on-key-down [space path event] [if update? [space/roll]]	;-- during key holding
+		on-down     [space path event] [space/roll]		;-- after button clicks
+		on-key-down [space path event] [space/roll]		;-- during key holding
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				space: get path/-1
-				if space/roll [update]
+				space/roll
 			]
 		]
 	]
@@ -134,7 +128,6 @@ define-handlers [
 	switch: [
 		on-up [space path event] [
 			space/state: not space/state
-			update
 		]
 	]
 	
@@ -142,7 +135,6 @@ define-handlers [
 	link: [
 		on-click [space path event] [
 			do space/command
-			update
 		]
 	]
 	
@@ -150,7 +142,6 @@ define-handlers [
 	clickable: [
 		on-click [space path event] [
 			do space/command
-			update
 		]
 	]
 	
@@ -162,10 +153,9 @@ define-handlers [
 				; ]
 				on-over [space path event] [
 					unless :highlight =? space [		;@@ this mechanism should be generalized
-						if space? :highlight [invalidate-cache highlight]
+						if space? :highlight [invalidate highlight]
 						set 'highlight space
-						invalidate-cache space
-						update
+						invalidate space
 					]
 				]
 			]
@@ -176,7 +166,6 @@ define-handlers [
 				do item/command
 			]
 			hide-popups event/window 1					;-- click on a menu hides all visible menus
-			update
 		]
 	]
 
@@ -184,12 +173,10 @@ define-handlers [
 		on-down [space path event] [
 			space/pushed?: yes
 			start-drag path								;-- otherwise `up` event might not be caught, leaving button "pressed"
-			update
 		]
 		on-up [space path event] [
 			space/pushed?: no		;@@ TODO: avoid the command when pointer goes out of button box (also maybe ESC key)
 			stop-drag
-			update
 		]
 		on-key [space path event] [
 			either all [
@@ -197,7 +184,6 @@ define-handlers [
 				not space/pushed?
 			][
 				space/pushed?: yes
-				update
 			][pass]
 		]
 		on-key-up [space path event] [
@@ -206,16 +192,13 @@ define-handlers [
 				space/pushed?
 			][
 				space/pushed?: no
-				update
 			][pass]
 		]
 		on-focus [space path event] [					;-- paint focus decoration
-			invalidate-cache space
-			update
+			invalidate space
 		]
 		on-unfocus [space path event] [					;-- remove focus decoration
-			invalidate-cache space
-			update
+			invalidate space
 		]
 	]
 
@@ -237,7 +220,6 @@ define-handlers [
 				angle: arctangent2 ofs/y ofs/x
 				parm: drag-parameter
 				rotor/angle: (parm/1 + angle - parm/2) // 360
-				update
 			]
 		]
 	]
@@ -265,8 +247,7 @@ define-handlers [
 			]
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
-			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
-			update
+			invalidate/only space/caret					;@@ any way to properly invalidate both at once? -- need layout under cache
 		]
 		
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
@@ -325,7 +306,7 @@ define-handlers [
 			space/edit plan
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
-			invalidate-cache/only space/caret			;@@ any way to properly invalidate both at once?
+			invalidate/only space/caret					;@@ any way to properly invalidate both at once?
 		]
 
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
@@ -343,7 +324,6 @@ define-handlers [
 				new-ofs: space/offset-to-caret path/2
 				space/edit compose [select to (new-ofs)]
 				quietly space/origin: field-ctx/adjust-origin space
-				; update									;-- let styles update
 			]
 		]
 		
@@ -351,12 +331,10 @@ define-handlers [
 
 		on-focus [space path event] [
 			maybe space/caret/visible?: yes
-			update
 		]
 
 		on-unfocus [space path event] [
 			maybe space/caret/visible?: no
-			update
 		]
 	]
 
@@ -374,8 +352,6 @@ define-handlers [
 			elapsed: to float! difference time frames/1
 			fps: (length? frames) / (max 0.01 elapsed)	;-- max for overflow protection
 			space/text: rejoin ["FPS: " 0.1 * to integer! 10 * fps]
-			invalidate space							;-- invalidates parents (lists etc)
-			update
 		]
 	]
 ]

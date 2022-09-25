@@ -5,7 +5,7 @@ Red [
 ]
 
 
-render: invalidate: invalidate-cache: paths-from-space: none	;-- reserve names in the spaces/ctx context
+render: invalidate: paths-from-space: none				;-- reserve names in the spaces/ctx context
 exports: [render invalidate]
 
 current-path: as path! []								;-- used as a stack during draw composition
@@ -74,142 +74,112 @@ combine-style: function [
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
-	;; render cache format: [space-object [parent-object name  ...] name [canvas space-size map drawn ...] ...]
-	;;   it holds rendered draw block of all spaces that have /cache? = true
-	;;   space-size is required because `draw` usually changes space/size and if draw is avoided, /size still must be set
-	;;   same for the map: it changes with canvas, has to be fetched from the cache together with the draw block
-	;;   unused slots contain 'free word to distinguish committed canvas=none case from unused cache slot
-	;;   parent list is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
-	;;   it holds rendering tree of parent/child relationships on the last rendered frame
-	;;   name is the space's name in that particular parent, used by paths-from-space which is used by timers
-	
-	;; caching workflow:
-	;; - drawn spaces draw blocks are committed to the cache if they have /cache? enabled
-	;; - render checks cache first, and only performs draw if cache is not found
-	;;   each slot group corresponds to a particular canvas size
-	;;   (usually 3 slots: unlimited, half-unlimited and limited, but tube uses 3 other except none)
-	;; - spaces should detect changes in their data that require new rendering effort and call `invalidate`
-	;;   invalidate uses last rendered parents tree to locate upper nodes and invalidate them all
-	;;   (there can be multiple parents to the same space, but see comments on limitations)
-	;@@ TODO: document this in a proper place
-	
-	; hash!: :block!
-	;; after changing cache format multiple times, I'm using named constants now:
-	parents-index:  2									;-- where parents are located
-	slots-index:    3									;-- where slots are located
-	slot-size:      4									;-- size occupied by a single cached entry
-	;@@ TODO: render-cache requires cleanup on highly dynamic layouts, or they slow down
-	;@@ will need a flat registry of still valid spaces
-	render-cache:   make hash! slots-index * 1024
-	
-	#debug cache [space-names: make hash! 2048]			;-- used to get space objects names for debug output
-	
-	memoized-paths: make hash! 2 * 1024					;-- [space paths] - necessary to lighten the timers code!
-	
-	set 'path-from-space function [
-		"Get path for SPACE on the last rendered frame"	;@@ single parent model!!!
+	;@@ move this somewhere else
+	set 'get-full-path function [
+		"Get path for SPACE on the last rendered frame, or none if it's not there"
 		space  [object!]
-		; return: [path!]
+		; return: [path! none!]
 	][
 		; #assert [is-face? host]
-		select/same memoized-paths space
+		#assert [space/owner]
+		host: first parents: reverse list-parents space
+		; #assert [is-face? host]							;-- let there be a warning for now
+		unless is-face? host [return none]				;-- fails on self-containing grid ;@@ need a faster check
+		gen:  host/generation
+		path: clear []
+		append path parents/1/parent					;-- faster than anonymizing 'host
+		foreach obj next parents [
+			frame: obj/last-frame
+			unless all [name: frame/1  gen <= frame/2] [return none]
+			append path name
+			if frame/3 = 'cached [gen: 0.0]				;-- don't check generation numbers inside cached subtree
+		]
+		append path space/last-frame/1
+		#assert [not find path none]
+		as path! copy path
 	]
 		
+	
+	set 'invalidate-tree function [face [object!]] [	;@@ or accept space instead?
+		#assert [is-face? face]
+		foreach-space [path space] face/space [invalidate/only space]
+	]
 	
 	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
 	;@@ but maybe they won't be needed as I'm improving the design?
 	;@@ space/invalidate should be called on-invalidate for less confusion
-	set 'invalidate function [
-		"Invalidate SPACE content and cache, or use <everything> to affect all spaces' cache"
-		space [word! object! tag!] "If contains `invalidate` func, it is evaluated"
-		/local custom									;-- can be unset during construction
-	][
-		if word? space [
-			space: get space
-			#assert [object? space]
-		]
-		invalidate-cache space
-		all [
-			object? space
-			any-function? set/any 'custom select space 'invalidate
-			custom
-		]
+	
+	;@@ should have a global safe wrapper
+	parents-list: make hash! 32
+	list-parents: function [space [object!]] [			;-- order is immediate-parent first, host last
+		clear parents-list
+		while [
+			all [
+				; word? :space/owner
+				word? select space 'owner				;@@ workaround for #5216 - fixed already, remove me
+				space: get space/owner					;@@ REP #113
+				not find/same parents-list space
+			]
+		] [append parents-list space]
+		parents-list
 	]
 	
-	invalidation-stack: make hash! 32
-	
-	set 'invalidate-cache function [
-		"If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
-		space [object! tag!] "Use <everything> to affect all spaces"
+	;@@ move this out, it's no longer part of render
+	set 'invalidate function [
+		"Invalidate SPACE cache, to force next redraw"
+		space [object!]
 		/only "Do not invalidate parents (e.g. if they are invalid already)"
-		/forget "Forget also location on the tree (space won't receive timer events until redrawn)"
-		;; /forget should be used to clean up cache from destroyed spaces (e.g. hidden menu)
+		/local custom									;-- can be unset during construction
 	][
-		#debug profile [prof/manual/start 'invalidation]
-		either tag? space [
-			#assert [space = <everything>]
-			;@@ what method to prefer? parse or radical (clear)? clear is dangerous - breaks timers by destroying parents tree
-			clear render-cache
-			clear memoized-paths
-		][
-			unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
-				#debug cache [#print "Invalidating (any [select space-names space 'unknown]) of size=(space/size)"]
-				if pos: find/same memoized-paths space [fast-remove pos 2]
-				either node: find/same render-cache space [
-					;; currently rendered spaces should not be invalidated, or parents get lost:
-					unless find/same visited-spaces space [
-						unless only [
-							;; no matter if cache?=yes or no, parents still have to be invalidated
-							#assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
-							#debug cache [
-								;; this may still happen normally, e.g. as a result of a reaction on rendered space
-								#assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
-							]
-							append invalidation-stack space
-							either forget					;@@ use apply
-								[foreach [parent _] node/:parents-index [invalidate-cache/forget parent]]
-								[foreach [parent _] node/:parents-index [invalidate-cache parent]]
-							remove top invalidation-stack	;@@ not using take/last for #5066
-							; if in space 'dirty? [space/dirty?: yes]		;-- mark for redraw
-						]
-						clear node/:slots-index				;-- clear cached slots
-						if forget [
-							clear node/:parents-index		;-- clear parents now
-							change node 'free				;-- mark free for claiming (so blocks can be reused)
-						]
-					]
-				][
-					if in space 'dirty? [space/dirty?: yes]		;-- mark host for redraw
-				]
+		#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
+		unless block? space/cache [						;-- block means space is not created yet; early exit
+			#debug profile [prof/manual/start 'invalidation]
+			if space/cache = 'valid [
+				#debug cache [#print "Invalidating (any [space/last-frame/1 'unknown]) of size=(space/size)"]
+				clear get word: space/cache
+				quietly space/cache: bind 'invalid context? word
 			]
+			;@@ remove custom support once it's possible
+			if any-function? set/any 'custom select space 'invalidate [
+				custom
+			]
+			unless only [								;-- no matter if cache=yes/valid/invalid, parents have to be invalidated
+				clear top parents: list-parents space	;-- no need to invalidate the host, as it has no cache
+				foreach space parents [invalidate/only space]
+			]
+			#debug profile [prof/manual/end 'invalidation]
 		]
-		#debug profile [prof/manual/end 'invalidation]
 	]
 	
 	get-cache: function [
 		"If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
 		space [object!] canvas [pair! none!]
 	][
-		r: all [
-			cache: find/same render-cache space			;-- must have a cache
-			find/skip cache/:slots-index canvas slot-size
+		result: all [
+			'valid = space/cache
+			cache: get space/cache
+			node: find/same/skip cache canvas 2 + length? cache/-1
+			reduce [cache/-1 node]
 		]
-		; if cache [print rejoin ["cache=" map-each/eval [a b _] copy/part skip cache prefix slots [[a b]]]]
+		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
-			name: any [select space-names space 'unknown]
-			either r [
-				#print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 40)"
+			name: any [space/last-frame/1 'unknown]
+			if cache [period: 2 + length? cache/-1]
+			either node [
+				n: (length? cache) / period
+				#print "Found cache for (name) size=(space/size) on canvas=(canvas) out of (n): (mold/flat/only/part to [] node 40)"
 			][
 				reason: case [
-					cache [rejoin ["cache=" mold to [] extract cache/:slots-index slot-size]]
-					not space/size ["never drawn"]
-					not select space 'cache? ["cache disabled"]
-					'else ["not cached or invalidated"]
+					cache [rejoin ["cache=" mold to [] extract cache period]]
+					not space/size ["never drawn"]		;@@ use /parent=none
+					not word? space/cache ["cache disabled"]
+					space/cache = 'invalid ["invalidated"]
+					'else ["unknown reason"]
 				]
 				#print "Not found cache for (name) size=(space/size) on canvas=(canvas), reason: (reason)"
 			]
 		]
-		r
+		result
 	]
 	
 	commit-cache: function [
@@ -218,75 +188,27 @@ context [
 		canvas [pair! none!]
 		drawn  [block!]
 	][
-		unless select space 'cache? [exit]				;-- do nothing if caching is disabled
-		#assert [pair? space/size]
-		map: select space 'map							;-- doesn't have to exist
-		node: find/same render-cache space
-		#assert [node "Node has been invalidated during render"]
-		either slot: find/skip node/:slots-index canvas slot-size [
-			rechange next slot [space/size map drawn]
-		][
-			repend node/:slots-index [canvas space/size map drawn]
-		]
+		;@@ problem with this is that not cached spaces cannot have timers as they're not connected to the tree!
+		unless word? word: space/cache [exit]			;-- do nothing if caching is disabled
+		#assert [pair? space/size]						;@@ won't be needed once I remove size=none support
+		cache:  get word
+		period: 2 + length? cache/-1					;-- custom words + canvas + drawn
+		node:   any [find/same/skip cache canvas period  tail cache]
+		words:  [canvas drawn]							;-- [canvas drawn size map ...] bound names
+		clear change next next words cache/-1
+		#assert [period = length? words]
+		rechange node words
+		quietly space/cache: bind 'valid context? word
 		#debug cache [
-			name: any [select space-names space 'unknown]
+			name: any [space/last-frame/1 'unknown]
 			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 	]
 	
-	set-parent: function [
-		"Mark parent/child relationship in the parents cache"
-		child  [object!] "Space"
-		name   [word!]
-		parent [object! none!] "Space or host face"
-	][
-		;; `none` may happen during init phase, e.g. autofit calls render to estimate row sizes
-		;; in this case cache slot has still to be created
-		#assert [not child =? parent]
-		case [
-			parents: select/same render-cache child [
-				any [
-					not parent							;-- happens only when render is called without host
-					find/same/only parents parent		;-- do not duplicate parents
-					append append parents parent name	;@@ should name be updated if parent is found?
-				]
-			]
-			node: find render-cache 'free [
-				change node child
-				if parent [append append node/:parents-index parent name]
-			]
-			'else [
-				parents: make hash! 2
-				if parent [reduce/into [parent name] parents]
-				repend render-cache [child parents make hash! slot-size * 4]	;@@ doesn't seem to be any performance win from hash here
-			]
-		]
-	]
-	
-	visited-spaces: make block! 50						;-- used to track parent/child relations
-	enter-space: function [
-		space [object!] name [word!]
-	][
-		set-parent space name last visited-spaces
-		append visited-spaces space
-	]
-	leave-space: does [remove top visited-spaces]
-
-	cache-size?: function [] [							;-- for cache creep detection
-		size: length? render-cache
-		for-each [inner [block! hash!]] render-cache [
-			size: size + length? inner
-		]
-		size
-	]
-
 	#if true = get/any 'disable-space-cache? [
-		clear body-of :invalidate-cache
+		clear body-of :invalidate
 		append clear body-of :get-cache none
 		clear body-of :commit-cache
-		clear body-of :set-parent
-		clear body-of :enter-space
-		clear body-of :leave-space
 	]
 	
 	;-- draw code has to be evaluated after current-path changes, for inner calls to render to succeed
@@ -299,7 +221,7 @@ context [
 			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
 			#print "*** Failed to render (name)!^/(msg)^/"
 		]
-		take/last current-path
+		remove top current-path							;@@ workaround for #5066
 	]
 	
 	render-face: function [
@@ -307,33 +229,34 @@ context [
 	][
 		#debug styles [#print "render-face on (face/type) with current-path: (mold current-path)"]
 		#assert [
-			is-face? :face
+			is-face? :face								;@@ simplify this using classes!
 			face/type = 'base
 			in face 'space
 			empty? current-path
 		]
 
-		host: face										;-- required for `same-paths?` to have a value (used by cache)
-		append visited-spaces host
-		with-style 'host [
+		current-generation: face/generation + 1.0
+		with-style anonymize 'host face [				;-- required for `same-paths?` to have a value (used by cache)
 			style: apply-current-style face				;-- host style can only be a block
 			canvas: if face/size [encode-canvas face/size -1x-1]	;-- fill by default
 			drawn: render-space/on face/space canvas
 			#assert [block? :drawn]
-			unless face/size [									;-- initial render: define face/size
+			unless face/size [							;-- initial render: define face/size
 				space: get face/space
 				#assert [space/size]
 				face/size: space/size
 				style: apply-current-style face			;-- reapply the host style using new size
 			]
-			render: combine-style drawn style
+			drawn: combine-style drawn style
 		]
-		clear visited-spaces
-		; #debug cache [#print "cache size=(cache-size?)"]
-		; #print "cache size=(cache-size?)"
-		any [render copy []]
+		face/generation: current-generation
+		any [drawn copy []]								;-- drawn=none in case of error during render
 	]
 
+	;; this needs to be wrapped in a `try` since some renders can be out-of-tree (e.g. during available? call)
+	;; these should not affect the tree
+	current-generation: does with :render-face [current-generation]		;-- exported for use in render-space
+	
 	render-space: function [
 		name [word!] "Space name pointing to it's object"
 		/window xy1 [pair! none!] xy2 [pair! none!]
@@ -342,18 +265,15 @@ context [
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
 		space: get name
-		#debug cache [any [find/same space-names space repend space-names [space name]]]	
 		#debug cache [#print "Rendering (name)"]	
 		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
-		#assert [space? :space]
-		#assert [not is-face? :space]					;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 		#assert [
+			space? :space
+			not is-face? :space							;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 			any [
 				none = canvas (abs canvas) +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
 				also no #print "(name): canvas=(canvas)" 
 			] "Oversized canvas detected!"
-		]
-		#assert [
 			any [
 				none = canvas
 				all [
@@ -363,6 +283,7 @@ context [
 			] "Negative infinity canvas detected!"
 		]
 
+		unless tail? current-path [quietly space/owner: last current-path]
 		with-style name [
 			window?: all [
 				any [xy1 xy2]
@@ -373,76 +294,62 @@ context [
 			
 			either all [
 				not window?								;-- usage of region is not supported by current cache model
-				cache: get-cache space canvas
+				set [words: node:] get-cache space canvas
 			][
-				set [size: map: render:] next cache
-				#assert [pair? size]
-				maybe space/size: size
-				if in space 'map [quietly space/map: map]
-				set-parent space name last visited-spaces	;-- mark parent/child relations
+				drawn: node/2
+				set words next next node				;-- size map etc..
+				try [quietly space/last-frame: reduce [name current-generation 'cached]]
 				#debug cache [							;-- add a frame to cached spaces after committing
-					render: compose/only [(render) pen green fill-pen off box 0x0 (space/size)]
+					drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
 				]
 			][
 				; if name = 'list [print ["canvas:" canvas mold space/content]]
 				#debug profile [prof/manual/start name]
-				enter-space space name					;-- mark parent/child relations
 				style: apply-current-style space
 				
 				either object? :style [
 					draw: select space 'draw
-					
 					;@@ this basically cries for FAST `apply` func!!
 					if function? :draw [
-						spec: spec-of :draw
-						either find spec /window [window: any [xy1 xy2]][set [xy1: xy2: window:] none]
-						canvas': if find spec /on [canvas]		;-- must not affect `canvas` used by cache, thus new name
-						code: case [						;@@ workaround for #4854 - remove me!!
-							all [canvas' window] [[draw/window/on xy1 xy2 canvas']]
-							window               [[draw/window    xy1 xy2        ]]
-							canvas'              [[draw/on                canvas']]
+						spec:    spec-of :draw
+						on?:     find spec /on
+						window?: find spec /window
+						code: case [
+							all [on? window?] [[draw/window/on xy1 xy2 canvas]]
+							window?           [[draw/window    xy1 xy2       ]]
+							on?               [[draw/on                canvas]]
+							'else             [[draw                         ]]
 						]
+						draw: do copy/deep code			;@@ workaround for #4854 - remove me!!
 					]
-					draw: either code [do copy/deep code][draw]	;-- call the draw function if not called yet
 					#assert [block? :draw]
-					render: combine-style draw style
+					drawn: combine-style draw style
 				][
 					#assert [function? :style]
 					;@@ this basically cries for FAST `apply` func!!
-					spec: spec-of :style
-					either find spec /window [window: any [xy1 xy2]][set [xy1: xy2: window:] none]
-					canvas': if find spec /on [canvas]	;-- must not affect `canvas` used by cache, thus new name
+					spec:    spec-of :style
+					on?:     find spec /on
+					window?: find spec /window
 					code: case [					
-						all [canvas' window] [[style/window/on space xy1 xy2 canvas']]
-						window               [[style/window    space xy1 xy2        ]]
-						canvas'              [[style/on        space         canvas']]
+						all [on? window?] [[style/window/on space xy1 xy2 canvas]]
+						window?           [[style/window    space xy1 xy2       ]]
+						on?               [[style/on        space         canvas]]
+						'else             [[style           space               ]]
 					]
-					render: either code [do copy/deep code][style space]	;@@ workaround for #4854 - remove me!!
-					#assert [block? :render]
+					drawn: do copy/deep code			;@@ workaround for #4854 - remove me!!
+					#assert [block? :drawn]
 				]
 				
-				leave-space
-				unless any [xy1 xy2] [commit-cache space canvas render]
-				; commit-cache space canvas render
-				
-				if select space 'rate [					;-- remember paths for spaces with timers, unfortunate optimization
-					path: copy current-path
-					;@@ I need to drop multiple parents model, as it complicates everything too much
-					;@@ this code uses single parent per timer-enabled space; otherwise no idea how to track those
-					either pos: find/same memoized-paths space [
-						pos/2: path
-					][
-						repend memoized-paths [space path]
-					]
-				]
+				unless any [xy1 xy2] [commit-cache space canvas drawn]
+				try [quietly space/last-frame: reduce [name current-generation 'drawn]]
 				
 				#debug profile [prof/manual/end name]
 				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
 			]
 		]
 		#debug profile [prof/manual/end 'render]	
-		either render [
-			reduce ['push render]						;-- don't carry styles over to next spaces
+		either drawn [									;-- drawn=none in case of error during render
+			reduce ['push drawn]						;-- don't carry styles over to next spaces
 		][
 			[]											;-- never changed, so no need to copy it
 		]

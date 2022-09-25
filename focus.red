@@ -110,36 +110,32 @@ focus-space: function [
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
-		with-update [									;-- provide context to event handlers
-			;@@ with no face in the path, `update?` command is lost!
-			foreach name path [							;-- if faces are provided, find the innermost one
-				either is-face? f: get name [face: f][break]
-			]
-			
-			unless empty? old-path: keyboard/focus [
-				with-stop [								;-- init a separate stop flag for a separate event
-					unfocus-event!/face: face
-					process-event old-path unfocus-event! [] yes
-					unfocus-event!/face: none
-				]
-			]
-	
-			if face [									;-- ..and focus it
-				set-focus face
-				unless system/view/auto-sync? [
-					show window-of face					;-- otherwise keys won't be detected
-				]
-			]
-			keyboard/focus: copy path					;-- copy since the path is static
-	
-			with-stop [									;-- init a separate stop flag for a separate event
-				focus-event!/face: face
-				process-event path focus-event! [] yes
-				focus-event!/face: none
-			]
-			
-			all [commands/update? face face/dirty?: yes]
+		foreach name path [							;-- if faces are provided, find the innermost one
+			either is-face? f: get name [face: f][break]
 		]
+		
+		unless empty? old-path: keyboard/focus [
+			with-stop [								;-- init a separate stop flag for a separate event
+				unfocus-event!/face: face
+				process-event old-path unfocus-event! [] yes
+				unfocus-event!/face: none
+			]
+		]
+
+		if face [									;-- ..and focus it
+			set-focus face
+			unless system/view/auto-sync? [
+				show window-of face					;-- otherwise keys won't be detected
+			]
+		]
+		keyboard/focus: copy path					;-- copy since the path is static
+
+		with-stop [									;-- init a separate stop flag for a separate event
+			focus-event!/face: face
+			process-event path focus-event! [] yes
+			focus-event!/face: none
+		]
+		
 		return yes
 	]
 	no
@@ -157,7 +153,7 @@ register-previewer
 		]
 
 		#debug focus [#print "Attempting to focus (as path! path)"]
-		if focus-space path [update]
+		focus-space path
 	]
 
 

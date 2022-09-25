@@ -43,11 +43,13 @@ declare-template 'zoomer/cell [
 	draw: function [] [
 		drawn: render content
 		maybe self/size: select get content 'size
-		compose/only [
-			translate (size / 2)						;-- zoom in effect
-			scale (zoom/x) (zoom/y)
-			translate (size / -2)
-			(drawn)
+		compose/only/deep [
+			clip 0x0 (self/size) [
+				translate (size / 2)					;-- zoom in effect
+				scale (zoom/x) (zoom/y)
+				translate (size / -2)
+				(drawn)
+			]
 		]
 	]
 ]
@@ -57,51 +59,53 @@ spaces/ctx/traversal/depth-limit: 4
 t0: now/utc/precise
 view/no-wait/options [
 	below
-	host [fm: fps-meter]
 	b: host [
-		z: zoomer [
-			gv: grid-view 500x300 with [
-				grid/autofit: none
-				; grid/pinned: 2x1
-				; grid/bounds: [x: #[none] y: #[none]]
-				grid/set-span 6x1 1x5					;-- unify outside cells for more fps
-				grid/set-span 1x6 6x1
-				; grid/set-span 4x4 2x2
-				; grid/set-span/force 2x2 3x2
-				; set-span/force 1x1 1x3
-				ratio: 5
-				cell-size: limits/min - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
-				grid/widths/default:  cell-size/x
-				grid/heights/default: cell-size/y
-				grid-view: self
-				grid/cells: func [/pick xy /size] [
-					either pick ['grid-view][1x1 * ratio + 1]
-				]
-				set-style 'grid/grid-view function [gview] reshape [
-					drawn: gview/draw
-					compose/only [
-						fill-pen !(system/view/metrics/colors/panel) box 0x0 (cell-size)
-						scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)
+		vlist [
+			fm: fps-meter								;-- has to be on the same host to invalidate it
+			z: zoomer [
+				gv: grid-view 500x300 with [
+					grid/autofit: none
+					; grid/pinned: 2x1
+					; grid/bounds: [x: #[none] y: #[none]]
+					grid/set-span 6x1 1x5					;-- unify outside cells for more fps
+					grid/set-span 1x6 6x1
+					; grid/set-span 4x4 2x2
+					; grid/set-span/force 2x2 3x2
+					; set-span/force 1x1 1x3
+					ratio: 5
+					cell-size: limits/min - (grid/margin * 2) - (ratio - 1 * grid/spacing) / ratio
+					grid/widths/default:  cell-size/x
+					grid/heights/default: cell-size/y
+					grid-view: self
+					grid/cells: func [/pick xy /size] [
+						either pick ['grid-view][1x1 * ratio + 1]
 					]
-				]
-				old-draw: :draw
-				;; this calls draw recursively and creates a self-containing draw block
-				;; but at the top level it is clipped at certain depth level,
-				;; so face/draw receives a truncated draw tree which it is able to render without deadlocking
-				;; copying depth has to be adjusted manually to a reasonable amount
-				;; with 6x6=36 cells, at depth 2 it becomes 1296 (~40fps), at depth 3 - 46656 cells (~1fps)
-				depth: 0
-				draw: function [/on canvas /extern depth] [
-					r: []
-					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
-						append clear r old-draw/on canvas
-						prof/manual/start 'truncation
-						; r: copy-deep-limit r 33				;-- 3 levels - 15625 grids
-						r: copy-deep-limit r 22				;-- 2 levels - 625 grids
-						prof/manual/end 'truncation
+					set-style 'grid/grid-view function [gview] reshape [
+						drawn: gview/draw
+						compose/only [
+							fill-pen !(system/view/metrics/colors/panel) box 0x0 (cell-size)
+							scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)
+						]
 					]
-					depth: depth - 1
-					r
+					old-draw: :draw
+					;; this calls draw recursively and creates a self-containing draw block
+					;; but at the top level it is clipped at certain depth level,
+					;; so face/draw receives a truncated draw tree which it is able to render without deadlocking
+					;; copying depth has to be adjusted manually to a reasonable amount
+					;; with 6x6=36 cells, at depth 2 it becomes 1296 (~40fps), at depth 3 - 46656 cells (~1fps)
+					depth: 0
+					draw: function [/on canvas /extern depth] [
+						r: []
+						if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
+							append clear r old-draw/on canvas
+							prof/manual/start 'truncation
+							; r: copy-deep-limit r 33				;-- 3 levels - 15625 grids
+							r: copy-deep-limit r 22				;-- 2 levels - 625 grids
+							prof/manual/end 'truncation
+						]
+						depth: depth - 1
+						r
+					]
 				]
 			]
 		]
