@@ -133,6 +133,8 @@ eventually field/area should have a blinking caret, but it's problematic because
 	e.g. if it's inside a grid's cell, blinking every 100ms, that's 10fps grid redraw and quite some CPU load
 perhaps I could use base's panel to put popups/caret there instead of parent's pane?
 	that would further limit the clipping region for popups, but for caret it should work, but only if it won't steal focus	
+maybe a text-length? func that will measure size of any space's text as if it was not wrapped?
+	aesthetically optimal paragraph size estimation may use sqrt of that for it's width	
 
 
 key aspects: draggable columns, rearrange by styles
@@ -767,6 +769,20 @@ on ranges and constraints:
 	btw, on VID side, /min can be `'fit` for text, esp. buttons, radio buttons etc. - meaning never clip the text
 	because maybe we want to be able to clip button text? hmm that's unlikely - and possible using `cell`
 	then button&co should always render their text in full even on 1x1 canvas
+limits (ranges)
+	to waste less RAM (each range is 468 bytes), a single range is used instead of two (X+Y)
+	this limits us a little bit but not much:
+	  no /limits defined in a space -- same as limits=none (any size is possible)
+	  limits: 'fixed                                   -- size is locked and not to be touched ;@@ do I really support/use this??
+	  limits: none                                     -- size is unconstrained (no limits, default)
+	  limits: make range! [min: none  max: none]       -- ditto
+	  limits: make range! [min: 0x0   max: none]       -- ditto
+	  limits: make range! [min: 0x100 max: 999999x100] -- Y axis is fixed, X is practically unconstrained
+	  limits: make range! [min: 50    max: 200]        -- main axis is constrained, secondary is not
+	this allows to set each limit to a pair/number/none, where `none` means "fixed"
+	but it's impossible to have e.g. min-x = none, but min-y = 100
+	in this case zero (e.g. 0x100) should be used
+	;@@ maybe a block will do? should not be any slower
 on layout: with the introduction of spaces styles, it will blur the distinction between spaces and faces
 	so compatibility has value in this context
 	most likely I will need support of full set of VID commands and some superset will be spaces-only
@@ -1769,12 +1785,61 @@ I'm all the more serious about single parent model
 	can /parent be part of /cache ? no, because we still need the relation even if space is not cached
 		/parent is mandatory now for all spaces, while /cache may be absent? but that would make it `none` meaning not cached
 		so /cache is mandatory too
+	/parent may simplify /size checking as /parent=none can be tested for "already rendered" and /size may always be a pair!
+	I like /owner more than /parent though, 1 symbol less
+	/dirty? flag is not needed anymore for the host, although how to avoid redraw?
+		perhaps host should check for it's space's /cache='valid value?
+		update() is not needed either as it's all automatic
 	who creates the /cache block?
 		it should be just `on` initially, or make-space could create the block and make it 'invalid
 		but it has to make it invalid *before* all other fields are set, so as not to trigger invalidation..
 		perhaps it could be unbound 'invalid at first, and post-construction become a fully qualified 'invalid ?
 		then cache could not be tuned during construction until make-space exits
 		/cache could be the first word set, with a call to create-cache ? that solves it all
+		since it's unset until initialized this will be simpler than also test for unset...
+		but I could simply test for a word, then it doesn't matter when cache is initialized!
+		problem with create-cache: if I wanted to alter it, I would have to call it again for each space
+		this will also affect /text space which must be fast
+		maybe a better way to use a `cache: block` at first until `make-space` turns it into an object
+		tricky part: without /only I need to visit all parents even if cache is 'invalid or off, but not if it's a block!
+	name is still a problem! if I have /parent chain I still don't have the names
+		and don't want another global registry for them, so perhaps name should also be in the cache!
+		but if I decide to expose it, won't be needed
+	what about timers that were rendered (and armed), but are no longer on the frame? how to turn them off?
+		they still have a /parent, which may be live, and name
+		I could scan parent's map for the name, but it's a big overhead in case of lists/grids
+		a global registry (one per host) could have been better if I could clear it at every frame, but I can't (due to cached subtrees)
+		maps could become hashes, but that would only work if they contain objects, not names
+		looks like find/same on the map is the cheapest solution so far, long as timers are not put into grids
+		but they are.. in inspector grid-view within grid-view...
+		and such lookup will have to be done everywhere up to the root
+		will be a user's burden to turn off timers /rate when not used? what about grid-views in cells? shit, these will stack up
+		I could combine the notion of render generation with some flag for cached subtrees (mark whole subtree as valid without visiting it)
+		then if I scan the tree from the host down, I will stop at the mark
+		e.g. if generation is an integer, mark can be -1 or 0, at 100 fps it will take 462 days of uptime to reach the maxint
+		generation could be time (slower?) then mark could be none (or it can be none anyway, or it can be 'cached)
+		generation could be a float64, still fast, multiply by 1 + eps instead of incrementing, enough for 1e18 frames
+		simple +1 increments are enough for 1e15 frames too, so increments are enough as they coerce to floats
+		generation: int/float (rendered), 'cached (fetched from cache), none (never rendered)
+		in host face - only int/float and none
+	/cache format: [
+			name generation           <- used by timers mainly, to figure out if space is still connected to the tree
+			[size map <head>]         <- extra words to cache, separate block because it's much easier to work with (e.g. as argument to `set`)
+			canvas drawn values ...   <- values of those words, whole group repeats
+		]
+		how many times allow canvas to repeat? block is efficient up to 4-8 canvases, more should be converted to hash or controlled
+		for now perhaps just an assertion if it's longer, so I am warned and can decide
+	what if cache is off?
+		such spaces don't get generation number or name, so can't have timers
+		grid is an example - not cached, still can have timers as children? no, because it's not traceable anymore from the root
+		either I use a separate /cache? on/off flag, or /state to hold name & generation, /state makes more sense but occupied by switch
+		not so many synonyms for state, perhaps /info for internal data? or /internal ?
+		both are too good names to claim
+		/frame-info /frame-data /last-frame
+		actually, none of that works because if space is marked as 'cached I no longer know if it's live or not
+		I could look up 'cached spaces in their parent map though to double check
+		oh but for 'cached I will have both generation and fence! so no problem at all
+		/last-frame: [name generation 'cached/drawn]
 	this revives the question: should /map and /size be in the space object, or in the cache?
 		I hold /drawn in the cache because it's mold output is huge noise
 		I hold /size in the object because it's often accessed
@@ -1789,9 +1854,23 @@ I'm all the more serious about single parent model
 		while `view [rectangle]` is somewhat adequate even if not useful
 		OTOH, I will have path access
 		and can solve that by `make-space [name: 'thumb]`
+		a bit dumb having `thumb: make-space [name: 'thumb]` from DRY perspective though - it has two names now
 		need more pros and cons to decide, for now seems different but not better
-should there be dump-rendered-tree + dump-tree? since /map is only valid after render..
-	
+should there be dump-rendered-tree + dump-tree? since /map is only valid after render.. (dump-tree could walk across content)
+available? is still an issue
+	it's an out of the tree render, so it's broken styling is going to cause problems eventually
+	so far it works only because list/grid are not styled as part of some parent style,
+	and even then it's a coincidence that lack of host style doesn't create artifacts
+	such render can also cause space data to go out of sync with the rendered frame, breaking hittest or smth
+	somehow I must make it render only during tree render cycle
+	available is used by roll to check how far can it roll, a few times per second, or triggered by other events
+	I must make it async, so roll sets the target, and next render fulfills it to an extent possible
+	roll can't change the origin directly as it is used for offset calculation on the frame
+	but maybe it can "plan" a change to it, maybe even on-change can "plan" it, not allowing a direct change
+	will require adding an argument to it's call :( or checking it's return value for some flag, e.g. 'revert ?
+	either way will slow down everything just for this
+	and it may be quite surprising for the user to see a value not being set, but postponed..
+	/next-origin may be a better solution 
 
 	
 
@@ -5376,4 +5455,209 @@ failed attempt at timers optimization.. in vids-polygon no timers worked because
 		; remove path
 		; remove top invalidation-stack
 	; ]
+; ]
+
+on-change model is no longer that dumb, unused macro
+; #macro [#on-change-redirect] func [s e] [				;@@ see REP #115
+	; copy/deep [											;-- copy so it can be bound to various contexts
+		; on-change*: func [word [any-word!] old [any-type!] new [any-type!]] [
+			; ~/on-change self word :old :new
+		; ]
+	; ]
+; ]
+
+old slow invalidation code
+; set 'invalidate function [
+	; "Invalidate SPACE content and cache, or use <everything> to affect all spaces' cache"
+	; space [word! object! tag!] "If contains `invalidate` func, it is evaluated"
+	; /local custom									;-- can be unset during construction
+; ][
+	; if word? space [
+		; space: get space
+		; #assert [object? space]
+	; ]
+	; invalidate-cache space
+	; all [
+		; object? space
+		; any-function? set/any 'custom select space 'invalidate
+		; custom
+	; ]
+; ]
+; invalidation-stack: make hash! 32
+; set 'invalidate-cache function [
+	; "If SPACE's draw caching is enabled, enforce next redraw of it and all it's ancestors"
+	; space [object! tag!] "Use <everything> to affect all spaces"
+	; /only "Do not invalidate parents (e.g. if they are invalid already)"
+	; /forget "Forget also location on the tree (space won't receive timer events until redrawn)"
+	; ;; /forget should be used to clean up cache from destroyed spaces (e.g. hidden menu)
+; ][
+	; #debug profile [prof/manual/start 'invalidation]
+	; either tag? space [
+		; #assert [space = <everything>]
+		; ;@@ what method to prefer? parse or radical (clear)? clear is dangerous - breaks timers by destroying parents tree
+		; clear render-cache
+		; clear memoized-paths
+	; ][
+		; unless find/same invalidation-stack space [			;-- stack overflow protection for cyclic trees 
+			; #debug cache [#print "Invalidating (any [select space-names space 'unknown]) of size=(space/size)"]
+			; if pos: find/same memoized-paths space [fast-remove pos 2]
+			; either node: find/same render-cache space [
+				; ;; currently rendered spaces should not be invalidated, or parents get lost:
+				; unless find/same visited-spaces space [
+					; unless only [
+						; ;; no matter if cache?=yes or no, parents still have to be invalidated
+						; #assert [not find/same node/:parents-index space]	;-- normally space should not be it's own parent
+						; #debug cache [
+							; ;; this may still happen normally, e.g. as a result of a reaction on rendered space
+							; #assert [empty? visited-spaces "Tree invalidation during rendering cycle detected"]
+						; ]
+						; append invalidation-stack space
+						; either forget					;@@ use apply
+							; [foreach [parent _] node/:parents-index [invalidate-cache/forget parent]]
+							; [foreach [parent _] node/:parents-index [invalidate-cache parent]]
+						; remove top invalidation-stack	;@@ not using take/last for #5066
+						; if in space 'dirty? [space/dirty?: yes]		;-- mark for redraw
+					; ]
+					; clear node/:slots-index				;-- clear cached slots
+					; if forget [
+						; clear node/:parents-index		;-- clear parents now
+						; change node 'free				;-- mark free for claiming (so blocks can be reused)
+					; ]
+				; ]
+			; ][
+				; if in space 'dirty? [space/dirty?: yes]		;-- mark host for redraw
+			; ]
+		; ]
+	; ]
+	; #debug profile [prof/manual/end 'invalidation]
+; ]
+
+other old caching code
+; ;; render cache format: [space-object [parent-object name  ...] name [canvas space-size map drawn ...] ...]
+; ;;   it holds rendered draw block of all spaces that have /cache = true
+; ;;   space-size is required because `draw` usually changes space/size and if draw is avoided, /size still must be set
+; ;;   same for the map: it changes with canvas, has to be fetched from the cache together with the draw block
+; ;;   unused slots contain 'free word to distinguish committed canvas=none case from unused cache slot
+; ;;   parent list is used by `invalidate` to go up the tree and invalidate all parents so the target space gets re-rendered
+; ;;   it holds rendering tree of parent/child relationships on the last rendered frame
+; ;;   name is the space's name in that particular parent, used by paths-from-space which is used by timers
+
+; ;; caching workflow:
+; ;; - drawn spaces draw blocks are committed to the cache if they have /cache enabled
+; ;; - render checks cache first, and only performs draw if cache is not found
+; ;;   each slot group corresponds to a particular canvas size
+; ;;   (usually 3 slots: unlimited, half-unlimited and limited, but tube uses 3 other except none)
+; ;; - spaces should detect changes in their data that require new rendering effort and call `invalidate`
+; ;;   invalidate uses last rendered parents tree to locate upper nodes and invalidate them all
+; ;;   (there can be multiple parents to the same space, but see comments on limitations)
+; ;@@ TODO: document this in a proper place, remove from here
+
+; ;; after changing cache format multiple times, I'm using named constants now:
+; parents-index:  2									;-- where parents are located
+; slots-index:    3									;-- where slots are located
+; slot-size:      4									;-- size occupied by a single cached entry
+; ;@@ TODO: render-cache requires cleanup on highly dynamic layouts, or they slow down
+; ;@@ will need a flat registry of still valid spaces
+; render-cache:   make hash! slots-index * 1024
+
+; get-cache: function [
+	; "If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
+	; space [object!] canvas [pair! none!]
+; ][
+	; r: all [
+		; cache: find/same render-cache space			;-- must have a cache
+		; find/skip cache/:slots-index canvas slot-size
+	; ]
+	; #debug cache [
+		; name: any [select space-names space 'unknown]
+		; either r [
+			; #print "Found cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part to [] r 40)"
+		; ][
+			; reason: case [
+				; cache [rejoin ["cache=" mold to [] extract cache/:slots-index slot-size]]
+				; not space/size ["never drawn"]
+				; not select space 'cache ["cache disabled"]
+				; 'else ["not cached or invalidated"]
+			; ]
+			; #print "Not found cache for (name) size=(space/size) on canvas=(canvas), reason: (reason)"
+		; ]
+	; ]
+	; r
+; ]
+
+; commit-cache: function [
+	; "Save SPACE's Draw block on this CANVAS in the cache"
+	; space  [object!]
+	; canvas [pair! none!]
+	; drawn  [block!]
+; ][
+	; unless select space 'cache [exit]				;-- do nothing if caching is disabled
+	; #assert [pair? space/size]
+	; map: select space 'map							;-- doesn't have to exist
+	; node: find/same render-cache space
+	; #assert [node "Node has been invalidated during render"]
+	; either slot: find/skip node/:slots-index canvas slot-size [
+		; rechange next slot [space/size map drawn]
+	; ][
+		; repend node/:slots-index [canvas space/size map drawn]
+	; ]
+	; #debug cache [
+		; name: any [select space-names space 'unknown]
+		; #print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
+	; ]
+; ]
+
+; set-parent: function [
+	; "Mark parent/child relationship in the parents cache"
+	; child  [object!] "Space"
+	; name   [word!]
+	; parent [object! none!] "Space or host face"
+; ][
+	; ;; `none` may happen during init phase, e.g. autofit calls render to estimate row sizes
+	; ;; in this case cache slot has still to be created
+	; #assert [not child =? parent]
+	; case [
+		; parents: select/same render-cache child [
+			; any [
+				; not parent							;-- happens only when render is called without host
+				; find/same/only parents parent		;-- do not duplicate parents
+				; append append parents parent name	;@@ should name be updated if parent is found?
+			; ]
+		; ]
+		; node: find render-cache 'free [
+			; change node child
+			; if parent [append append node/:parents-index parent name]
+		; ]
+		; 'else [
+			; parents: make hash! 2
+			; if parent [reduce/into [parent name] parents]
+			; repend render-cache [child parents make hash! slot-size * 4]	;@@ doesn't seem to be any performance win from hash here
+		; ]
+	; ]
+; ]
+
+; visited-spaces: make block! 50						;-- used to track parent/child relations
+; enter-space: function [
+	; space [object!] name [word!]
+; ][
+	; set-parent space name last visited-spaces
+	; append visited-spaces space
+; ]
+; leave-space: does [remove top visited-spaces]
+
+; cache-size?: function [] [							;-- for cache creep detection
+	; size: length? render-cache
+	; for-each [inner [block! hash!]] render-cache [
+		; size: size + length? inner
+	; ]
+	; size
+; ]
+
+; #if true = get/any 'disable-space-cache? [
+	; clear body-of :invalidate
+	; append clear body-of :get-cache none
+	; clear body-of :commit-cache
+	; clear body-of :set-parent
+	; clear body-of :enter-space
+	; clear body-of :leave-space
 ; ]
