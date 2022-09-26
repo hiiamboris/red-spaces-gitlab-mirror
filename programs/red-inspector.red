@@ -391,12 +391,12 @@ red-inspector: function [
 	"Use `inspect` function in your scripts"
 	script [file! block!]
 ][
-	if empty? script [
+	either empty? script [
 		inspect system
 		; prof/show
-		quit/return 0
+	][
+		do script/1
 	]
-	do script/1
 ]
 ; img: make image! 1000x7000
 ; inspect system/words/img
