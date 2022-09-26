@@ -13,7 +13,7 @@ into-map: function [
 	/only names [block!] "Only try to enter selected space names"
 ][
 	either name [
-		#assert [find map name]
+		#assert [find/same map name]
 		geom: select/same map name
 		reduce [name  xy - geom/offset]
 	][

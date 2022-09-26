@@ -140,9 +140,9 @@ context [
 				quietly space/cache: bind 'invalid context? word
 			]
 			;@@ remove custom support once it's possible
-			if any-function? set/any 'custom select space 'invalidate [
-				custom
-			]
+			; if any-function? set/any 'custom select space 'invalidate [
+				; custom
+			; ]
 			unless only [								;-- no matter if cache=yes/valid/invalid, parents have to be invalidated
 				clear top parents: list-parents space	;-- no need to invalidate the host, as it has no cache
 				foreach space parents [invalidate/only space]

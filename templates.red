@@ -1758,8 +1758,12 @@ grid-ctx: context [
 		#assert [any [not grid/infinite?  all [canvas wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
 	
 		set [canvas: fill:] decode-canvas canvas
-		cache: grid/size-cache
-		set cache none
+		
+		;; reset caches so they can be stashed and restored by render
+		grid/hcache:     make map! 20
+		; grid/ccache:     make map! 20					-- cannot be reset here
+		grid/fitcache:   if grid/fitcache [make block! 4]
+		grid/size-cache: cache: context [bounds: size: none]
 
 		;; prepare column widths before any offset-to-cell mapping, and before hcache is filled
 		if all [grid/autofit not grid/infinite?] [autofit grid canvas/x grid/autofit]
@@ -1786,31 +1790,29 @@ grid-ctx: context [
 		#assert [any [grid/infinite? cache/size]]		;-- must be set by calc-size
 		maybe grid/size: cache/size
 
-		;@@ create a grid layout?
-		stash grid/map
-		new-map: obtain block! 2 * area? cell2 - cell1 + 1
-		if map [append new-map map  stash map]			;-- add previously drawn pinned corner
+		quietly grid/map: make block! 2 * area? cell2 - cell1 + 1
+		if map [append grid/map map  stash map]
 		
+		;@@ create a grid layout?
 		if pinned/x > 0 [
 			set [map: drawn-row-header:] draw-range grid
 				(1 by cell1/y) (pinned/x by cell2/y)
 				xy0/x by (xy1/y - offs1/y)
-			append new-map map  stash map
+			append grid/map map  stash map
 		]
 		if pinned/y > 0 [
 			set [map: drawn-col-header:] draw-range grid
 				(cell1/x by 1) (cell2/x by pinned/y)
 				(xy1/x - offs1/x) by xy0/y
-			append new-map map  stash map
+			append grid/map map  stash map
 		]
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
-		append new-map map  stash map
+		append grid/map map  stash map
 		;-- note: draw order (common -> headers -> normal) is important
 		;-- because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;-- as such, map doesn't need clipping, but draw code does
 
-		quietly grid/map: new-map
 		reshape [
 			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
 			clip  0x0         !(xy1)            !(drawn-common-header)	/if drawn-common-header
@@ -1991,18 +1993,13 @@ grid-ctx: context [
 		clear grid/hcache								;-- line height cache is no longer valid after widths have changed
 	]
 	
-	;; called by global invalidate
-	invalidate*: function [grid [object!] cell [pair! none!]] [
-		either cell [
-			remove/key grid/hcache cell/y
-			remove/key grid/ccache cell
-			grid/size-cache/size: none
-		][
-			clear grid/hcache							;-- clear should never be called on big datasets
-			set grid/size-cache none					;-- reset calculated bounds
-		]
-		clear grid/fitcache
-	]
+	;@@ put this to use somehow, maybe invalidate could pass an optional child who caused the invalidation?
+	; invalidate-cell: function [grid [object!] cell [pair! none!]] [
+		; remove/key grid/hcache cell/y
+		; remove/key grid/ccache cell
+		; grid/size-cache/size: none
+		; clear grid/fitcache
+	; ]
 		
 	declare-template 'grid/space [
 		size:    none				;-- only available after `draw` because it applies styles
@@ -2024,20 +2021,28 @@ grid-ctx: context [
 		#type    :invalidates   bounds:  [x: auto y: auto]		;-- max number of rows & cols, auto=bound `cells`, integer=fixed
 											;-- 'auto will have a problem inside infinite grid with a sliding window
 
-		hcache:  make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
+		hcache:   make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
 		;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
 		;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
-		ccache:  make map! 20				;-- filled by render and height estimator
+		ccache:   make map! 20				;-- filled by render and height estimator
 		;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
 		;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
-		fitcache: []						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
+		fitcache: make block! 4				;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
+		
+		;; used by draw & others to avoid extra recalculations
+		;; valid up to the next `draw` or `invalidate` call
+		;; care should be taken so that grid can contain itself (draw has to be reentrant)
+		size-cache: context [bounds: size: none]
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
 		;@@       and how? per-row or per-col? or per-cell? or custom func? or alignment should be provided by item wrapper?
 		;@@       maybe just in lay-out-grid? or as some hacky map that can map rows/columns/cells to alignment?
 		map: []
-		cache: [size map]
+		;; ccache cannot be stashed/replaced because otherwise it's possible to press a button in a cell,
+		;; and upon release there will be another cell, the old one will be lost, so hittest will be confused
+		;@@ so when and how to invalidate ccache? makes most sense on content change and when it gets out of the viewport
+		cache: [size map hcache fitcache size-cache]
 
 		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
@@ -2136,25 +2141,6 @@ grid-ctx: context [
 	
 		calc-size: function ["Estimate total size of the grid in pixels"] [
 			~/calc-size self
-		]
-
-		;; used by draw & others to avoid extra recalculations
-		;; valid up to the next `draw` or `invalidate` call
-		;; care should be taken so that grid can contain itself (draw has to be reentrant)
-		size-cache: context [
-			bounds: none
-			size:   none
-		]
-
-		;; since there's absolutely no way grid can track changes in the data or spaces within itself
-		;; invalidate should be used to mark those changes
-		;@@ interface is messy though: global invalidate calls this and invalidate
-		;@@ but this doesn't call the latter... so tangled if one wants to inval only /cell
-		invalidate: func [
-			"Clear the internal cache of the grid to redraw it anew"
-			/cell xy [pair!] "Only for a particular cell"
-		][
-			~/invalidate* self xy
 		]
 
 		;; does not use canvas, dictates it's own size
