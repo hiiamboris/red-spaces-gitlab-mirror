@@ -292,11 +292,8 @@ context [
 		reload: does [
 			set/any 'browser/data get-path history/1
 			set-details
-			;; partial invalidations don't get rid of the now invalid spaces, which burden the cache and make it slow
-			;@@ why hash! becomes so slow?? need a way to reproduce it
-			; invalidate browser
+			invalidate browser
 			; invalidate details
-			invalidate <everything>
 		]
 		jump: function [] [
 			attempt [path: transcode/one entry/text]
@@ -313,13 +310,12 @@ context [
 						(copy/part spaces/keyboard/focus 3)			;-- screen/window/base
 						(first spaces/ctx/paths-from-space entry)	;-- part after base
 					]
-					update
 				]
 				any [
 					event/key = #"^H"					;-- backspace
 					all [event/key = 'left  find event/flags 'alt]
-				] [history-back update]
-				all [event/key = 'right find event/flags 'alt] [history-forward update]
+				] [history-back]
+				all [event/key = 'right find event/flags 'alt] [history-forward]
 			]
 		]
 	
@@ -331,14 +327,14 @@ context [
 					row align= -1x0 [
 						label "Jump to:" 
 						entry: field focus weight= 1 on-key [
-							if event/key = #"^M" [jump stop update]
+							if event/key = #"^M" [jump stop]
 						] hint= "Enter a valid path and click 'Go'"
 						button "Go" [jump] hint= "Browse into entered path"
 					] 
 					row 200 .. none [
 						box [
 							details: paragraph bold on-key-down [
-								event/key = #"^-" [pass update]
+								event/key = #"^-" [pass]
 							]
 						]
 						button "<<" [history-back]    hint= "Go back in history"
@@ -362,7 +358,6 @@ context [
 									not scalar? :value
 								][
 									navigate new-path
-									update
 								]
 							]
 						]
@@ -398,7 +393,7 @@ red-inspector: function [
 ][
 	if empty? script [
 		inspect system
-		prof/show
+		; prof/show
 		quit/return 0
 	]
 	do script/1
