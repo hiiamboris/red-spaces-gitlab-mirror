@@ -27,6 +27,7 @@ do/expand [
 	; #debug on											;-- type checking and general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	#debug set profile								;-- turn on to see rendering and other times
+	; #debug set changes								;-- turn on to see value changes and invalidation
 	; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
 	; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus									;-- turn on to see focus changes and errors
