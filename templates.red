@@ -651,7 +651,11 @@ paragraph-ctx: context [
 		][
 			infxinf
 		]
-		layout: lay-out space |canvas| ellipsize? wrap?
+		reuse?: all [not wrap?  not ellipsize?  space/layout  space/layout/size =? canvas]	;@@ REP #113
+		layout: any [
+			if reuse? [space/layout]					;-- text can reuse it's layout on any canvas
+			lay-out space |canvas| ellipsize? wrap?
+		]
 
 		;; size can be adjusted in various ways:
 		;;  - if rendered < canvas, we can report either canvas or rendered
