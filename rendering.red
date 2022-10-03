@@ -74,6 +74,10 @@ combine-style: function [
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
+	get-space-name: function [space [object!]][
+		any [all [block? :space/last-frame space/last-frame/1] 'unknown]		;@@ REP #113
+	]
+
 	;@@ move this somewhere else
 	set 'get-full-path function [
 		"Get path for SPACE on the last rendered frame, or none if it's not there"
@@ -111,7 +115,7 @@ context [
 	
 	;@@ should have a global safe wrapper
 	parents-list: make hash! 32
-	list-parents: function [space [object!]] [			;-- order is immediate-parent first, host last
+	list-parents: function [space [object!]] [			;-- order is bubbling: immediate-parent first, host last
 		clear parents-list
 		while [
 			all [
@@ -124,28 +128,50 @@ context [
 		parents-list
 	]
 	
+	set 'invalidate-cache function [space [object!]][	;-- to be used by custom invalidators
+		if space/cache = 'valid [
+			#debug cache [#print "Invalidating (any [space/last-frame/1 'unknown]) of size=(space/size)"]
+			clear get word: space/cache
+			quietly space/cache: bind 'invalid context? word
+		]
+	]
+	
 	;@@ move this out, it's no longer part of render
 	set 'invalidate function [
 		"Invalidate SPACE cache, to force next redraw"
 		space [object!]
 		/only "Do not invalidate parents (e.g. if they are invalid already)"
+		/info "Provide info about invalidation"
+			cause [none! object!] "Invalidated child object or none"	;@@ support word that's changed? any use outside debugging?
+			scope [none! word!]   "Invalidation scope: 'size or 'look"
 		/local custom									;-- can be unset during construction
 	][
+		#assert [not is-face? space]
 		#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
 		unless block? space/cache [						;-- block means space is not created yet; early exit
 			#debug profile [prof/manual/start 'invalidation]
-			if space/cache = 'valid [
-				#debug cache [#print "Invalidating (any [space/last-frame/1 'unknown]) of size=(space/size)"]
-				clear get word: space/cache
-				quietly space/cache: bind 'invalid context? word
+			default scope: 'size
+			either function? custom: select space 'on-invalidate [
+				custom space cause scope				;-- custom invalidation procedure
+			][
+				invalidate-cache space					;-- generic (full) invalidation
 			]
-			;@@ remove custom support once it's possible
-			; if any-function? set/any 'custom select space 'invalidate [
-				; custom
-			; ]
 			unless only [								;-- no matter if cache=yes/valid/invalid, parents have to be invalidated
-				clear top parents: list-parents space	;-- no need to invalidate the host, as it has no cache
-				foreach space parents [invalidate/only space]
+				host: last parents: list-parents space	;-- no need to invalidate the host, as it has no cache
+				;; check if space is already connected to the tree (traceable to a host face):
+				if all [host  in host 'generation] [	;@@ more reliable host check needed to detect if space belongs to the tree
+					clear top parents					;-- no need to invalidate the host, as it has no cache
+					#debug changes [
+						path: as path! reverse map-each obj parents [get-space-name obj]
+						append path get-space-name space
+						cause-name: if cause [get-space-name cause]
+						#print "invalidating from (path), scope=(scope), cause=(cause-name)"
+					]			
+					foreach space parents [
+						invalidate/only/info space cause scope
+						cause: space					;-- parent becomes the new child
+					]
+				]
 			]
 			#debug profile [prof/manual/end 'invalidation]
 		]
@@ -155,6 +181,7 @@ context [
 		"If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
 		space [object!] canvas [pair! none!]
 	][
+		#debug profile [prof/manual/start 'cache]
 		result: all [
 			'valid = space/cache
 			cache: get space/cache
@@ -179,6 +206,7 @@ context [
 				#print "Not found cache for (name) size=(space/size) on canvas=(canvas), reason: (reason)"
 			]
 		]
+		#debug profile [prof/manual/end 'cache]
 		result
 	]
 	
@@ -190,6 +218,7 @@ context [
 	][
 		;@@ problem with this is that not cached spaces cannot have timers as they're not connected to the tree!
 		unless word? word: space/cache [exit]			;-- do nothing if caching is disabled
+		#debug profile [prof/manual/start 'cache]
 		#assert [pair? space/size]						;@@ won't be needed once I remove size=none support
 		cache:  get word
 		period: 2 + length? cache/-1					;-- custom words + canvas + drawn
@@ -203,6 +232,7 @@ context [
 			name: any [space/last-frame/1 'unknown]
 			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
+		#debug profile [prof/manual/end 'cache]
 	]
 	
 	#if true = get/any 'disable-space-cache? [
@@ -228,9 +258,10 @@ context [
 		face [object!] "Host face"
 	][
 		#debug styles [#print "render-face on (face/type) with current-path: (mold current-path)"]
+		; unless is-face? :face [??~ face]
 		#assert [
 			is-face? :face								;@@ simplify this using classes!
-			face/type = 'base
+			'base = select face 'type
 			in face 'space
 			empty? current-path
 		]
