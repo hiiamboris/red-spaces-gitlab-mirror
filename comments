@@ -1871,7 +1871,66 @@ available? is still an issue
 	either way will slow down everything just for this
 	and it may be quite surprising for the user to see a value not being set, but postponed..
 	/next-origin may be a better solution 
-
+shit! in grid-test8 almost 3k renders...
+	row x3, column x3, 4 grids by 12 cells, 3 renders for autosizing, cell+text makes two
+	totals to 2592 renders, just this.. need optimizations, invalidation is extremely impactful and needs all juice it can get
+	more precisely: row&column each x2 since no 3rd render, 4 grid x 12 cells (48 cells total), but why 5 renders for each text?
+	and 2 renders of each text for wrap to set min-size (plus parsing there)
+	paragraph: min-width depends on text, flags, font, but not on canvas, color, margin
+		layout depends on text, flags, font, canvas (if wrapped), not color or margin
+		also if width<=min-width, doesn't need a second render
+	grid fitcache: depends on content (each column on it's own or spanned cells), not on canvas
+	grid hcache: depends on content and widths (changed by autofit), but not canvas height
+	grid margin/spacing/origin do not affect any of that, even size-cache, just the result (drawn,size,map)
+	grid pinned affects size-cache but not the rest
+	grid cell size/span changes affect fitcache of that column and spanned, hcache of that row, size-cache
+	so 1st and foremost, space itself must be able to handle invalidation and track what needs updating during render
+	invalidation should pass the child (cause) to the parent, so it will know the scale of invalidation
+	grid may have to use hash to locate the cell that caused it
+	but how this will work with render and it's canvas-caused invalidation?
+	content changes affect all canvases, but canvas changes may carry over some parameters
+	so on content change I must ensure nothing is cached by render itself, or it may override grid caches with old data
+	effect:
+	content (incl. cell size, but not color) => drawn, map, size, size-cache/size invalidated, but not size-cache/bounds
+		hcache of affected row(s)
+		fitcache of affected columns (need recovery of it from partial invalidations)
+	cell replaced => same as content change, + ccache entry (should be done by wrap-space automatically) ;@@
+	(need a hook in wrap-space perhaps)
+	cell color => just the overall drawn invalidated, but not map or size or anything else
+	cell content changes, but not size => same as color
+	margin/spacing/origin of grid => only drawn & map & size & size-cache/size, nothing else (origin doesn't even affect size)
+	(how to handle? invalidate 'size without a child? then what if full invalidation is needed? another scope? or invalidate-tree?)
+	span => hcache of all affected cells, size-cache/size but not size-cache/bounds
+		new autofit result => new hcache (no need to invalidate, autofit will do it on it's own)
+		no autofit => no further changes
+	(let set-span invalidate affected cells)
+	canvas width =>
+		new autofit result => new hcache (no need to invalidate, autofit will do it on it's own), size-cache/size, map, drawn, size
+		no autofit => no changes
+	canvas height => does not affect grid, affects grid-view(scrollable)
+	(let draw handle canvas or dispatch accordingly)
+	so: need distinction between size and appearance changes in children
+	can this all become some global structured laziness with dependencies?
+	how will grid know if just canvas height is changed? it can parse it's own cache..
+	so invalidate/info space cause scope where cause is child and scope is 'look or 'size
+		(primary call may have child=none)
+		default invalidation is 'size
+		cause must be an immediate (not deep) child (so parent space can find it in the map)
+	'look invalidation means all parents will also have only look change, while 'size means all parents sizes are in question
+	on some level 'size can become 'look if space knows it's size won't change, though it's questionable if it can
+	should there be 'size/x and 'size/y ? is there a benefit in that? even for `list` I don't see any
+	I should not invalidate data asap, rather should make an invalidation sequence that will be executed by next draw
+		because e.g. absent hcache may call calc-row-height and that will cause an out-of-tree draw
+		and result will not be valid anyway because it's not what's currently rendered (visible) on the frame
+		affected: hcache, size-cache, map, size
+		won't be needed until next render: fitcache
+		OTOH, maybe I *should* let these funcs work on new data, while map preserves the frame? but out-of-tree is a problem then
+	should I bother caching drawn & map? not until proven to be required I guess ;@@ but this is the further optimization agenda
+	
+	
+;@@ I need ASAP move on-origin-change from scrollable into draw
+;@@ after removal of maybe from styles I need to check them all for careless assignments that may invalidate the tree
+	
 	
 
 
