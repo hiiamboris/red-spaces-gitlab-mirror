@@ -304,7 +304,7 @@ events: context [
 					if dirty?: cspace/cache <> 'valid [			;-- only timer updates the view because of #4881
 						#debug profile [prof/manual/start 'drawing]
 						face/draw: render face					;@@ #5130 is the killer of animations
-						unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
+						; unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
 					]
 					exit										;-- timer does not need further processing
