@@ -277,6 +277,29 @@ clone: function [
 ]
 
 
+include-into: function [
+	"Include flag into series if it's not there"
+	series [series!] flag [any-type!]
+][
+	unless find series flag [append series flag]
+	series
+]
+
+exclude-from: function [
+	"Exclude flag into series if it's there"
+	series [series!] flag [any-type!]
+][
+	remove find series flag
+	series
+]
+
+set-flag: function [
+	"Include or exclude flag from series depending on present? value"
+	series [series!] flag [any-type!] present? [logic!]
+][
+	either present? [include-into series flag][exclude-from series flag]
+]
+
 
 flush: function [
 	"Grab a copy of SERIES, clearing the original"
