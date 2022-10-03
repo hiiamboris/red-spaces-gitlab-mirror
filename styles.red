@@ -140,7 +140,7 @@ do with [
 		]
 
 		field: [
-			maybe margin: 3x3							;-- better default when having a frame (and frame comes from style, not template)
+			margin: 3x3									;-- better default when having a frame (and frame comes from style, not template)
 			below: [(make-box size 1 select self 'color none)]
 		]
 		field/caret: [
@@ -181,9 +181,9 @@ do with [
 		]
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
-			maybe flags: either grid-ctx/pinned?
-				[union   flags [bold]]
-				[exclude flags [bold]]
+			;; careless setting causes full tree invalidation on each render, though if style is applied it's already invalid
+			;@@ need to check other styles for this issue too!
+			set-flag flags 'bold grid-ctx/pinned?
 		]
 		
 		
@@ -198,8 +198,8 @@ do with [
 			reduce [frame cross?]
 		]
 		logic: [										;-- readonly
-			maybe/same data/font: fonts/text
-			maybe data/data: either state ["✓"]["✗"]
+			data/font: fonts/text
+			data/data: either state ["✓"]["✗"]
 		]
 		
 		label: using [big?] [
@@ -210,8 +210,8 @@ do with [
 			]
 			below: when select self 'color [pen (color)]
 		]
-		label/text-box/body/text:    [maybe/same font: fonts/label  ]
-		label/text-box/body/comment: [maybe/same font: fonts/comment]
+		label/text-box/body/text:    [font: fonts/label  ]
+		label/text-box/body/comment: [font: fonts/comment]
 
 		button: using [fill overlay focus? inner-radius] [
 			fill:    either pushed? [opaque 'text 50%]['off]

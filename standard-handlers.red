@@ -330,11 +330,11 @@ define-handlers [
 		on-up [space path event] [stop-drag]
 
 		on-focus [space path event] [
-			maybe space/caret/visible?: yes
+			space/caret/visible?: yes
 		]
 
 		on-unfocus [space path event] [
-			maybe space/caret/visible?: no
+			space/caret/visible?: no
 		]
 	]
 

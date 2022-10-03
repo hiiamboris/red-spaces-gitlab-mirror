@@ -14,7 +14,19 @@ templates: #()											;-- map for extensibility
 
 ;; default on-change function to avoid replicating it in every template
 invalidates: function [space [object!] word [word!] value [any-type!]] [
+	#debug changes [
+		name: any [attempt [space/last-frame/1] 'unknown]
+		#print "change/size of (name)/(word) to (mold/flat/part :value 40)"
+	]
 	invalidate space
+]
+
+invalidates-look: function [space [object!] word [word!] value [any-type!]] [
+	#debug changes [
+		name: any [attempt [space/last-frame/1] 'unknown]
+		#print "change/look of (name)/(word) to (mold/flat/part :value 40)"
+	]
+	invalidate/info space none 'look
 ]
 
 ;@@ cache should be another module
@@ -202,10 +214,10 @@ image-ctx: context [
 			default canvas-scale: 1.0
 			scale: clip [min-scale max-scale] canvas-scale
 			; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
-			maybe image/size: isize * scale + (2 * mrg)
+			image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
 		][
-			maybe image/size: 2x2 * image/margin				;@@ can't be constrained further; or call constrain again?
+			image/size: 2x2 * image/margin				;@@ can't be constrained further; or call constrain again?
 			[]
 		]
 	]
@@ -236,7 +248,7 @@ cell-ctx: context [
 		size:   mrg2 + cspace/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 		size:   max size (finite-canvas canvas) * fill	;-- only extends along fill-enabled axes
-		maybe space/size: constrain size space/limits
+		space/size: constrain size space/limits
 		; #print "size: (size) space/size: (space/size) fill: (fill)"
 		
 		free:   space/size - cspace/size - mrg2
@@ -260,7 +272,7 @@ cell-ctx: context [
 		#type =? :invalidates   margin:  0x0			;-- useful for drawing inner frame, which otherwise would be hidden by content
 		#type =? :invalidates   weight:  1				;@@ what default weight to use? what default alignment?
 		
-		#type =? :invalidates (find allowed-alignments align)
+		#type =? :invalidates-look (find allowed-alignments align)
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
 		
 		#type =? :invalidates [word!]
@@ -336,9 +348,9 @@ scrollbar: context [
 		;@@ maybe leverage canvas size?
 		#type =? :invalidates   size:       100x16		;-- opposite axis defines thickness
 		#type =  :invalidates   axis:       'x
-		#type =? :invalidates   offset:     0%
-		#type =? :invalidates   amount:     100%
-		#type =? :invalidates   arrow-size: 90%			;-- arrow length in percents of scroller's thickness 
+		#type =? :invalidates-look   offset:     0%
+		#type =? :invalidates-look   amount:     100%
+		#type =? :invalidates-look   arrow-size: 90%	;-- arrow length in percents of scroller's thickness 
 		
 		map:         []
 		cache:       [size map]
@@ -403,7 +415,7 @@ scrollable-space: context [
 				'else           [xy/:x]
 			]
 		]
-		maybe spc/origin: spc/origin - dxy
+		spc/origin: spc/origin - dxy
 		; invalidate spc
 	]
 
@@ -423,7 +435,7 @@ scrollable-space: context [
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		set [canvas: fill:] decode-canvas canvas
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
-		maybe space/size: box: constrain finite-canvas canvas space/limits
+		space/size: box: constrain finite-canvas canvas space/limits
 		if zero? area? box [
 			;@@ this complains if I override default 50x50 limit with e.g. `100` (no vertical limit)
 			;@@ I need to make it work on zero canvas too (which should also make it faster on pre-renders)
@@ -451,8 +463,8 @@ scrollable-space: context [
 		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
 		;@@ origin clipping in tube makes it impossible to scroll to the bottom because of window resizes!
 		;@@ I need a better idea, how to apply it without breaking things, until then - not clipped
-		; maybe space/origin: clip [origin 0x0] box - scrollers - csz
-		; maybe space/origin: origin
+		; space/origin: clip [origin 0x0] box - scrollers - csz
+		; space/origin: origin
 		; print [space/content csz space/origin]
 		
 		;; determine what scrollers to show
@@ -482,7 +494,7 @@ scrollable-space: context [
 			(in space 'vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
 			(in space 'scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
 		]
-		maybe space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
+		space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
 		render in space 'scroll-timer					;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
@@ -510,9 +522,9 @@ scrollable-space: context [
 			;; hardcoded /2 offset, because content may change and get out of sync with the frame but /2 stays
 			visible-size: either empty? space/map [0x0][space/map/2/size]
 			value: clip [(visible-size - cspace/size) 0x0] value 
-			maybe space/origin: value					;-- can't set quietly - watched by grid-view to set grid/origin
+			quietly space/origin: value							;-- can't set quietly - watched by grid-view to set grid/origin
 			#debug grid-view [#print "on-change clipped to: (space/origin)"]
-			invalidate space
+			invalidate/info space none 'look
 		]
 	]
 	
@@ -524,8 +536,8 @@ scrollable-space: context [
 		
 		#type =? :on-origin-change   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
 		#type =? :invalidates   weight: 1
-		#type =? :invalidates   content: in generic 'empty		;-- should be defined (overwritten) by the user
-		#type =  :invalidates   content-flow: 'planar	;-- one of: planar, vertical, horizontal
+		#type =? :invalidates-look   content: in generic 'empty	;-- should be defined (overwritten) by the user
+		#type =  :invalidates-look   content-flow: 'planar		;-- one of: planar, vertical, horizontal
 		
 		hscroll: make-space 'scrollbar [axis: 'x]
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
@@ -650,7 +662,7 @@ paragraph-ctx: context [
 		;; and one has to wrap it into a data-view space to stretch
 		mrg2: space/margin * 2x2
 		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
-		maybe space/size: mrg2 + text-size				;@@ full size, regardless if canvas height is smaller?
+		space/size: mrg2 + text-size					;@@ full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
 		
 		;; this is quite hacky: rich-text is embedded directly into draw block
@@ -670,8 +682,8 @@ paragraph-ctx: context [
 		;; styles may override `/font` with another font created in advance 
 		#type =? :invalidates   font:   none			;-- can be set in style, as well as margin
 		;@@ maybe put color change into space-object?
-		#type =? :invalidates   color:  none			;-- placeholder for user to control
-		#type =? :invalidates   weight: 1
+		#type =? :invalidates-look   color:  none			;-- placeholder for user to control
+		#type =? :invalidates   weight: 1				;-- used by tube, should trigger a re-render
 
 		layout: none									;-- last rendered layout, text size is kept in layout/extra
 		cache:  [size layout]
@@ -736,14 +748,14 @@ container-ctx: context [
 			; ]
 		]
 		quietly cont/map: map	;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		maybe cont/size: constrain size cont/limits		;@@ is this ok or layout needs to know the limits?
-		maybe cont/origin: origin
+		cont/size: constrain size cont/limits			;@@ is this ok or layout needs to know the limits?
+		cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
 
 	declare-template 'container/space [
 		size:    none									;-- only available after `draw` because it applies styles
-		#type =? :invalidates   origin:  0x0			;-- used by ring layout to center itself around the pointer
+		#type =? :invalidates-look   origin:  0x0		;-- used by ring layout to center itself around the pointer
 		#type    :invalidates   content: []
 		
 		#type =? :invalidates
@@ -793,7 +805,7 @@ ring-ctx: context [
 	
 	declare-template 'ring/container [
 		;; in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
-		#type =? :invalidates   angle:  0
+		#type =? :invalidates-look   angle:  0
 		;; minimum distance (pixels) from the center to the nearest point of arranged items
 		#type =? :invalidates   radius: 50
 		;; whether items should be considered round, not rectangular
@@ -838,7 +850,7 @@ tube-ctx: context [
 		#type =? :invalidates   margin:  0x0
 		#type =? :invalidates   spacing: 0x0
 		#type    :invalidates   axes:    [e s]
-		#type =? :invalidates   align:   -1x-1
+		#type =? :invalidates-look   align:   -1x-1
 		
 		container-draw: :draw
 		draw: function [/on canvas [pair! none!]] [
@@ -855,7 +867,7 @@ switch-ctx: context [
 	~: self
 	
 	declare-template 'switch/space [
-		#type =? :invalidates   state: off
+		#type =? :invalidates-look   state: off
 		; command: []
 		data: make-space 'data-view []					;-- general viewer to be able to use text/images
 		draw: func [/on canvas [none! pair!]] [
@@ -941,13 +953,12 @@ data-view-ctx: context [
 	push-font: function [space [object!]] [
 		cspace: get space/content
 		if all [in cspace 'font  not cspace/font =? space/font] [
-			cspace/font: space/font
-			invalidate space
+			cspace/font: space/font						;-- should trigger invalidation
 		]
 	]
 	
 	declare-template 'data-view/box [					;-- inherit margin, content, map from the box
-		align:   -1x-1									;-- left-top aligned by default
+		align:   -1x-1									;-- left-top aligned by default; on-change inherited from box
 		
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
@@ -1009,7 +1020,7 @@ window-ctx: context [
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
 			if cspace/size [size: min size cspace/size - org]	;-- size has to be finite
 		]
-		maybe window/size: size
+		window/size: size
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
 		quietly window/map: compose/deep [(content) [offset: (org) size: (size)]]
@@ -1019,7 +1030,7 @@ window-ctx: context [
 	declare-template 'window/space [
 		;; when drawn auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
 		#type =? :invalidates   pages:  10x10			;-- window size multiplier in canvas sizes (= size of inf-scrollable)
-		#type =? :invalidates   origin: 0x0				;-- content's offset (negative)
+		#type =? :invalidates-look   origin: 0x0				;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
 		#type =? :invalidates   content: generic/empty
@@ -1073,8 +1084,8 @@ inf-scrollable-ctx: context [
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
 			#debug sizing [#print "rolling (space/size) with (space/content) by (wofs' - wofs)"]
-			maybe space/origin: space/origin + (wofs' - wofs)
-			maybe window/origin: negate wofs'
+			space/origin: space/origin + (wofs' - wofs)
+			window/origin: negate wofs'
 		]
 		wofs' <> wofs									;-- should return true when updates origin - used by event handlers ;@@ or not?
 	]
@@ -1084,7 +1095,7 @@ inf-scrollable-ctx: context [
 		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
-		maybe space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
 		;; scrollable/draw removes roll-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
 		repend space/map [in space 'roll-timer [offset 0x0 size 0x0]]
@@ -1291,7 +1302,7 @@ list-view-ctx: context [
 		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
 		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			maybe list/size: list/margin * 2x2
+			list/size: list/margin * 2x2
 			return quietly list/map: []
 		]
 		#assert [i1 <= i2]
@@ -1311,7 +1322,7 @@ list-view-ctx: context [
 				compose/only/into [translate (geom/offset) (drw)] tail drawn
 			]
 		]
-		maybe list/size: new-size
+		list/size: new-size
 		quietly list/map: new-map
 		drawn
 	]
@@ -1358,7 +1369,7 @@ list-view-ctx: context [
 		]
 		
 		wrap-data: function [item-data [any-type!]][
-			spc: make-space 'data-view [wrap?: on]
+			spc: make-space 'data-view [quietly wrap?: on]
 			set/any 'spc/data :item-data
 			anonymize 'item spc
 		]
@@ -1412,11 +1423,11 @@ grid-ctx: context [
 	]
 	
 	calc-bounds: function [grid [object!]] [
-		if lim: grid/size-cache/bounds [return lim]		;-- already calculated
+		if lim: grid/frame/bounds [return lim]			;-- already calculated
 		bounds: grid/bounds								;-- call it in case it's a function
 		unless any ['auto = bounds/x  'auto = bounds/y] [	;-- no auto limit set (but can be none)
 			#debug grid-view [#print "grid/calc-bounds [no auto] -> (bounds)"]
-			return bounds
+			return grid/frame/bounds: bounds
 		]
 		lim: copy bounds
 		xymax: either empty? grid/content [
@@ -1429,6 +1440,7 @@ grid-ctx: context [
 		if 'auto = lim/x [lim/x: xymax/x]				;-- pass `none` as is
 		if 'auto = lim/y [lim/y: xymax/y]
 		#debug grid-view [#print "grid/calc-bounds [auto] -> (lim)"]
+		grid/frame/bounds: lim
 		lim
 	]
 
@@ -1612,7 +1624,7 @@ grid-ctx: context [
 
 	row-height?: function [grid [object!] y [integer!]][
 		if 'auto = r: any [grid/heights/:y grid/heights/default] [
-			r: any [grid/hcache/:y  grid/hcache/:y: calc-row-height grid y]
+			r: any [grid/frame/heights/:y  grid/frame/heights/:y: calc-row-height grid y]
 		]
 		r
 	]
@@ -1625,7 +1637,6 @@ grid-ctx: context [
 	][
 		#assert ['auto = any [grid/heights/:y grid/heights/default]]	;-- otherwise why call it?
 		bounds: grid/calc-bounds
-		; #assert [size-cache/bounds]
 		xlim: bounds/x
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
 		hmin: obtain block! xlim + 1					;-- can't be static because has to be reentrant!
@@ -1674,7 +1685,7 @@ grid-ctx: context [
 	cell-height?: function [grid [object!] xy [pair!]] [
 		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
 		#debug grid-view [						;-- assertion doesn't hold for self-containing grids
-			#assert [grid/ccache/:xy]			;-- cell should be rendered already (for row-heights to return immediately)
+			#assert [grid/frame/cells/:xy]		;-- cell should be rendered already (for row-heights to return immediately)
 		]
 		yspan: second grid/get-span xy
 		r: 0 repeat y yspan [r: r + grid/row-height? y - 1 + xy/y]
@@ -1686,7 +1697,7 @@ grid-ctx: context [
 	]
 		
 	calc-size: function [grid [object!]] [
-		if r: grid/size-cache/size [return r]			;-- already calculated
+		if r: grid/size [return r]						;-- already calculated
 		#debug grid-view [#print "grid/calc-size is called!"]
 		#assert [not grid/infinite?]
 		bounds: grid/calc-bounds
@@ -1696,7 +1707,7 @@ grid-ctx: context [
 		repeat x bounds/x [r/x: r/x + grid/col-width?  x]
 		repeat y bounds/y [r/y: r/y + grid/row-height? y]
 		#debug grid-view [#print "grid/calc-size -> (r)"]
-		grid/size-cache/size: r
+		grid/size: r
 	]
 		
 	;@@ TODO: at least for the chosen range, cell/drawn should be invalidated and cell/size recalculated
@@ -1757,19 +1768,18 @@ grid-ctx: context [
 		#debug grid-view [#print "grid/draw is called with window xy1=(wxy1) xy2=(wxy2)"]
 		#assert [any [not grid/infinite?  all [canvas wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
 	
-		set [canvas: fill:] decode-canvas canvas
-		
-		;; reset caches so they can be stashed and restored by render
-		grid/hcache:     make map! 20
-		; grid/ccache:     make map! 20					-- cannot be reset here
-		grid/fitcache:   if grid/fitcache [make block! 4]
-		grid/size-cache: cache: context [bounds: size: none]
+		set [canvas: fill:] decode-canvas new-canvas: canvas	;-- new-canvas should remember the fill flag too
+		do-invalidate grid
+		frame: grid/frame
+		frame/canvas: new-canvas
 
 		;; prepare column widths before any offset-to-cell mapping, and before hcache is filled
-		if all [grid/autofit not grid/infinite?] [autofit grid canvas/x grid/autofit]
+		if all [fill/x = 1  grid/autofit  not grid/infinite?] [
+			autofit grid canvas/x grid/autofit
+		]
  	
-		cache/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
-		#assert [cache/bounds]
+		frame/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
+		#assert [frame/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
 		default wxy1: 0x0
 		unless wxy2 [wxy2: wxy1 + grid/calc-size]
@@ -1786,9 +1796,8 @@ grid-ctx: context [
 
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
-		all [none? cache/size  not grid/infinite?  grid/calc-size]
-		#assert [any [grid/infinite? cache/size]]		;-- must be set by calc-size
-		maybe grid/size: cache/size
+		all [none? grid/size  not grid/infinite?  grid/calc-size]
+		#assert [any [grid/infinite? grid/size]]		;-- must be set by calc-size or carried over from the previous render
 
 		quietly grid/map: make block! 2 * area? cell2 - cell1 + 1
 		if map [append grid/map map  stash map]
@@ -1809,9 +1818,9 @@ grid-ctx: context [
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
 		append grid/map map  stash map
-		;-- note: draw order (common -> headers -> normal) is important
-		;-- because map will contain intersections and first listed spaces are those "on top" from hittest's POV
-		;-- as such, map doesn't need clipping, but draw code does
+		;; note: draw order (common -> headers -> normal) is important
+		;; because map will contain intersections and first listed spaces are those "on top" from hittest's POV
+		;; as such, map doesn't need clipping, but draw code does
 
 		reshape [
 			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
@@ -1837,7 +1846,7 @@ grid-ctx: context [
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
-			cspace: get name: any [grid/ccache/:cell  grid/wrap-space cell grid/cells/pick cell]
+			cspace: get name: grid/cells/pick cell
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
 				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
@@ -1876,18 +1885,18 @@ grid-ctx: context [
 		widths:    grid/widths							;-- modifies widths map in place
 		min-width: any [widths/min 5]					;@@ make an option to control this?
 				
-		set [W1 H1 W2 H2] grid/fitcache					;-- if W1/H1/W2/H2 are cached, use them
+		set [W1 H1 W2 H2] grid/frame/limits				;-- if W1/H1/W2/H2 are cached, use them
+		new-vector: [add -1.0 make vector! reduce ['float! 64 nx]]	;-- negative or it will be considered cached
 		
 		loop 1 [										;-- needed to use `break`
 			;; render all columns on zero, get their min widths W1i and heights H1i
-			unless all [W1 H1] [
-				W1: make vector! reduce ['float! 64 nx]
-				H1: copy W1
-				repeat i nx [
-					size: measure-column grid i 0 1 ny
-					W1/:i: 1.0 * max min-width size/x
-					H1/:i: 1.0 * size/y
-				]
+			W1: any [W1  do new-vector]
+			H1: any [H1  do new-vector]
+			repeat i nx [
+				if all [W1/:i >= 0 H1/:i >= 0] [continue]		;-- cached, still valid
+				size: measure-column grid i 0 1 ny
+				W1/:i: 1.0 * max min-width size/x
+				H1/:i: 1.0 * size/y
 			]
 			
 			;; estimate space left SL = TW - sum(W1i), TW is total-width requested
@@ -1898,14 +1907,13 @@ grid-ctx: context [
 			if SL <= 0 [W: W1  break]
 			
 			;; SL > 0 case: render all columns on infinite canvas, now I have min heights H2i and max widths W2i
-			unless all [W2 H2] [
-				W2: copy W1
-				H2: copy H1
-				repeat i nx [
-					size: measure-column grid i infxinf/x 1 ny
-					W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
-					H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
-				]
+			W2: any [W2  do new-vector]
+			H2: any [H2  do new-vector]
+			repeat i nx [
+				if all [W2/:i >= 0 H2/:i >= 0] [continue]		;-- cached, still valid
+				size: measure-column grid i infxinf/x 1 ny
+				W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
+				H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
 			]
 			TW2: sum W2
 			
@@ -1985,12 +1993,21 @@ grid-ctx: context [
 			#assert [TW ~= sum W  "widths should in total sum to TW"]
 		]
 		
-		if grid/fitcache [grid/fitcache: reduce [W1 H1 W2 H2]]	;-- save min/max sizes
+		if grid/frame/limits [grid/frame/limits: reduce [W1 H1 W2 H2]]	;-- save min/max sizes
 		
 		;; set widths map to found W vector
 		W: quantize W
-		repeat i nx [widths/:i: W/:i]
-		clear grid/hcache								;-- line height cache is no longer valid after widths have changed
+		changed?: no
+		repeat i nx [
+			if widths/:i <> W/:i [
+				changed?: yes
+				widths/:i: W/:i
+			]
+		]
+		if changed? [
+			quietly grid/size: none						;-- size is no longer valid
+			clear grid/frame/heights					;-- line height cache is no longer valid after widths have changed
+		]
 	]
 	
 	;@@ put this to use somehow, maybe invalidate could pass an optional child who caused the invalidation?
@@ -2000,12 +2017,40 @@ grid-ctx: context [
 		; grid/size-cache/size: none
 		; clear grid/fitcache
 	; ]
-		
+	
+	on-invalidate: function [
+		grid  [object!]
+		cell  [none! object!]
+		scope [none! word!]
+	][
+		repend grid/frame/invalid [cell scope]
+		invalidate-cache grid							;-- clears the cached canvas+sizes block so render will be called again
+	]
+	
+	do-invalidate: function [grid [object!]] [
+		frame: grid/frame
+		plan:  frame/invalid
+		foreach [cell scope] plan [
+			either cell [
+				if scope = 'size [
+					set-pair [x: y:] xy: pick find/same frame/cells cell -1
+					remove/key frame/heights y
+					foreach vector frame/limits [vector/:x: -1.0]
+					quietly grid/size: none
+				]
+			][
+				if scope = 'size [
+					quietly grid/size: none
+				]
+			]
+		]
+	]
+	
 	declare-template 'grid/space [
-		size:    none				;-- only available after `draw` because it applies styles
+		size:    none						;-- only available after `draw` because it applies styles
 		#type =? :invalidates   margin:  5x5
 		#type =? :invalidates   spacing: 5x5
-		#type =? :invalidates   origin:  0x0	;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
+		#type =? :invalidates-look   origin:  0x0	;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
 		content: make map! 8				;-- XY coordinate -> space-name (not cell, but cells content name)
 		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;@@ protect widths, spans, heights? - not for tampering
@@ -2015,24 +2060,27 @@ grid-ctx: context [
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
 		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
-		#type =? :invalidates   pinned:  0x0	;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
+		#type =? :invalidates-look   pinned:  0x0	;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
 		;@@ bounds/.. = none means unlimited, but it will render scrollers useless
 		;@@ and cannot be drawn without /only - will need a window over it anyway (used by grid-view)
 		#type    :invalidates   bounds:  [x: auto y: auto]		;-- max number of rows & cols, auto=bound `cells`, integer=fixed
-											;-- 'auto will have a problem inside infinite grid with a sliding window
-
-		hcache:   make map! 20				;-- cached heights of rows marked for autosizing ;@@ TODO: when to clear/update?
-		;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
-		;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
-		ccache:   make map! 20				;-- filled by render and height estimator
-		;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
-		;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
-		fitcache: make block! 4				;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
-		
-		;; used by draw & others to avoid extra recalculations
-		;; valid up to the next `draw` or `invalidate` call
-		;; care should be taken so that grid can contain itself (draw has to be reentrant)
-		size-cache: context [bounds: size: none]
+																;-- 'auto will have a problem inside infinite grid with a sliding window
+		;; data about the last rendered frame, may be used by /draw to avoid extra recalculations
+		frame: context [								;@@ hide it maybe from mold? unify with /last-frame ?
+			;@@ maybe cache size too here? just to avoid setting grid/size to none in case it's relied upon by some reactors
+			;@@ maybe width not canvas?
+			canvas:  none								;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
+			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
+			heights: make map!   20						;-- cached heights of rows marked for autosizing
+			;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
+			;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
+			;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
+			cells:   make hash!  40						;-- cells that wrap content, filled by render and height estimator
+			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
+			limits:  make block! 4						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
+			invalid: make block! 8						;-- invalidation list for the next frame
+		]
+		on-invalidate: :~/on-invalidate
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
@@ -2042,16 +2090,17 @@ grid-ctx: context [
 		;; ccache cannot be stashed/replaced because otherwise it's possible to press a button in a cell,
 		;; and upon release there will be another cell, the old one will be lost, so hittest will be confused
 		;@@ so when and how to invalidate ccache? makes most sense on content change and when it gets out of the viewport
-		cache: [size map hcache fitcache size-cache]
+		; cache: [size map hcache fitcache size-cache]
+		cache: []
 
 		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
-			name: any [ccache/:xy  ccache/:xy: make-space/name 'cell []]
+			name: any [frame/cells/:xy  put frame/cells xy make-space/name 'cell []]
 			cell: get name
-			maybe/same cell/content: any [space in generic 'empty]	;-- prevent unnecessary invalidation if cached
+			cell/content: any [space in generic 'empty]	;@@ ensure cell calls invalidate 'size on this ;@@ get rid of generics
 			name
 		]
 
-		#on-change :invalidates
+		#on-change :invalidates							;@@ should clear frame/cells too!
 		cells: func [/pick xy [pair!] /size] [					;-- up to user to override
 			either pick [content/:xy][calc-bounds]
 		]
@@ -2135,10 +2184,12 @@ grid-ctx: context [
 		]
 
 		;; returns a block [x: y:] with possibly `none` (unlimited) values ;@@ REP #116 could solve this
+		;@@ maybe obsolete (hide) this, since now there's valid /size
 		calc-bounds: function ["Estimate total size of the grid in cells (in case bounds set to 'auto)"] [
 			~/calc-bounds self
 		]
 	
+		;@@ maybe obsolete (hide) this, since now there's valid /size
 		calc-size: function ["Estimate total size of the grid in pixels"] [
 			~/calc-size self
 		]
@@ -2208,7 +2259,11 @@ grid-view-ctx: context [
 		;@@ this is super slow because setting data -> font reset -> full invalidation (same probably for other values)
 		;@@ need to somehow avoid invalidation while still ensuring state correctness
 		wrap-data: function [item-data [any-type!]] [
-			spc: make-space 'data-view [wrap?: on margin: 3x3 align: -1x0]
+			spc: make-space 'data-view [
+				quietly wrap?:  on
+				quietly margin: 3x3
+				quietly align: -1x0
+			]
 			set/any 'spc/data :item-data
 			anonymize 'cell spc
 		]
@@ -2224,7 +2279,10 @@ grid-view-ctx: context [
 			ccache: content
 			
 			;; no need to wrap data-view because it's already a box/cell
-			wrap-space: function [xy [pair!] space [word!]] [space]
+			wrap-space: function [xy [pair!] space [word!]] [
+				put frame/cells xy get space
+				space
+			]
 			
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 				~/available? self axis dir from requested
@@ -2235,7 +2293,7 @@ grid-view-ctx: context [
 			either pick [
 				any [
 					grid/content/:xy					;@@ need to think when to free this up, maybe when cells get hidden
-					grid/content/:xy: wrap-data data/pick xy
+					grid/content/:xy: grid/wrap-space xy wrap-data data/pick xy
 				]
 			][data/size]
 		]
@@ -2276,7 +2334,7 @@ button-ctx: context [
 ;@@ this should not be generally available, as it's for the tests only - remove it!
 declare-template 'rotor/space [
 	#on-change :invalidates   content: none
-	#on-change :invalidates   angle: 0
+	#on-change :invalidates-look   angle: 0
 
 	ring: make-space 'space [size: 360x10]
 	tight?: no
@@ -2322,7 +2380,7 @@ declare-template 'rotor/space [
 		][
 			distance? 0x0 spc/size / 2
 		]
-		maybe self/size: r1 + 10 * 2x2
+		self/size: r1 + 10 * 2x2
 		compose/deep/only [
 			push [
 				line-width 10
@@ -2351,7 +2409,7 @@ caret-ctx: context [
 		#on-change [space word value] [space/size: value by space/size/y]
 		#type =?   width:       1						;-- width in pixels
 		
-		#type =? :invalidates   visible?:    no			;-- controlled by focus
+		#type =? :invalidates-look   visible?:    no			;-- controlled by focus
 		
 		#on-change [space word value] [if space/visible? [invalidate space]]
 		#type =?   offset:      0				;-- [0..length] should be kept even when not focused, so tabbing in leaves us where we were
@@ -2394,7 +2452,7 @@ field-ctx: context [
 			field/history: skip field/history -2		;-- state *after* the previous change
 			set [text: offset:] skip field/history -2
 			append clear field/text text
-			maybe field/caret/offset: offset
+			field/caret/offset: offset
 		]
 	]
 	
@@ -2403,7 +2461,7 @@ field-ctx: context [
 			set [text: offset:] field/history
 			field/history: next next field/history
 			append clear field/text text
-			maybe field/caret/offset: offset
+			field/caret/offset: offset
 		]
 	]
 	
@@ -2440,8 +2498,8 @@ field-ctx: context [
 					co: clip [0 len] co + n
 					sel: (min co other) by (max co other)
 				]
-				maybe field/caret/offset: co
-				maybe field/selected: sel
+				field/caret/offset: co
+				field/selected: sel
 			)
 			
 		|	'copy [
@@ -2459,8 +2517,8 @@ field-ctx: context [
 			|	'to set co integer!
 			|	'by set n  integer! (co: co + n)
 			] (
-				pos: skip text maybe field/caret/offset: co: clip [0 len] co
-				maybe field/selected: sel: none			;-- `select` should be used to keep selection
+				pos: skip text field/caret/offset: co: clip [0 len] co
+				field/selected: sel: none				;-- `select` should be used to keep selection
 			)
 			
 		|	'insert [set s string!] (
@@ -2486,7 +2544,7 @@ field-ctx: context [
 				]
 				n: min n len - co						;-- don't let it go past the tail
 				if n <> 0 [
-					maybe field/caret/offset: co
+					field/caret/offset: co
 					remove/part pos: skip text co n
 					len: length? text
 					mark-history field
@@ -2539,7 +2597,7 @@ field-ctx: context [
 		cmargin: field/caret/look-around
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
 		width: first either fill/x = 1 [canvas][min ctext/size + cmargin canvas]	
-		maybe field/size: constrain width by ctext/size/y field/limits
+		field/size: constrain width by ctext/size/y field/limits
 		viewport: field/size - (2 * mrg: field/margin * 1x1)
 		co: field/caret/offset + 1
 		cxy1: caret-to-offset       ctext/layout co
@@ -2553,7 +2611,7 @@ field-ctx: context [
 		if sel: field/selected [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
 			sxy2: caret-to-offset/lower ctext/layout sel/2
-			maybe field/selection/size: ssize: sxy2 - sxy1
+			field/selection/size: ssize: sxy2 - sxy1
 			sdrawn: compose/only [(render in field 'selection)]
 		]
 		cdrawn: render in field 'caret
@@ -2595,8 +2653,8 @@ field-ctx: context [
 	declare-template 'field/space [
 		;; own facets:
 		weight:   1
-		#type =? :invalidates   origin:   0				;-- non-positive, offset(px) of text within the field
-		#type =? :invalidates   selected: none			;-- none or pair (offsets of selection start & end)
+		#type =? :invalidates-look   origin:   0				;-- non-positive, offset(px) of text within the field
+		#type =? :invalidates-look   selected: none			;-- none or pair (offsets of selection start & end)
 		history:  make block! 100						;-- saved states
 		map:      []
 		cache:    [size map]
@@ -2640,14 +2698,14 @@ field-ctx: context [
 		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
 		; quietly area/size: canvas
 		; size: finite-canvas canvas
-		; maybe area/paragraph/width: if area/wrap? [size/x]
-		; maybe area/paragraph/text:  area/text
+		; area/paragraph/width: if area/wrap? [size/x]
+		; area/paragraph/text:  area/text
 		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
 		; pdrawn: render/on in area 'paragraph size
-		; maybe area/size: constrain max size area/paragraph/size area/limits
+		; area/size: constrain max size area/paragraph/size area/limits
 		; xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
 		; xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
-		; maybe area/caret/size: as-pair area/caret-width xy2/y - xy1/y
+		; area/caret/size: as-pair area/caret-width xy2/y - xy1/y
 		; cdrawn: []
 		; if area/active? [
 			; cdrawn: compose/only [translate (xy1) (render in area 'caret)]

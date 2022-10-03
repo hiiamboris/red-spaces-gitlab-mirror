@@ -31,10 +31,10 @@ context [
 	
 	define-styles [
 		cell/text: grid/cell/text: grid/cell/paragraph: [
-			maybe flags: either attempt [spaces/ctx/grid-ctx/pinned?]
+			flags: either attempt [spaces/ctx/grid-ctx/pinned?]
 				[union   flags [bold]]
 				[exclude flags [bold]]
-			maybe/same font: code-font
+			font: code-font
 			below: when color: select self 'color [pen (color)]
 		]
 	]
@@ -238,7 +238,7 @@ context [
 				vsc: gview/vscroll/size
 				hsc: gview/hscroll/size
 				scrollers: (vsc/x * sign? vsc/y) by (hsc/y * sign? hsc/x)
-				maybe gview/size: min gview/size gview/window/size + scrollers
+				gview/size: min gview/size gview/window/size + scrollers
 			]
 			drawn
 		]
