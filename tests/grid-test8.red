@@ -8,11 +8,12 @@ Red [
 ; #do [disable-space-cache?: yes]
 #include %../everything.red
 
-append spaces/keyboard/focusable 'grid-view
-
 declare-template 'zoomer/box [
 	zoom: [x: 1.0 y: 1.0]
-	draw: function [/on canvas [pair! none!]] [
+	;; replaces host/size to exclude face resizing from workflow, which allows for better responsiveness
+	#type =? :spaces/ctx/invalidates canvas: 0x0 
+	; draw: function [/on canvas [pair! none!]] [
+	draw: function [] [
 		canvas': if canvas [
 			as-pair
 				clip [negate infxinf/x infxinf/x] canvas/x / zoom/x
@@ -73,17 +74,19 @@ compare: [width-difference width-total area-total area-difference]
 ; compare: [width-total area-total]
 ; compare: [area-total area-difference]
 
+system/view/auto-sync?: off
 view/no-wait/options/flags reshape [
+	origin 20x20
 	below
-	b: host 900x600 [
-		zoomer with [zoom: [x 0.5 y 0.5]] [
+	host: host with [size: system/view/screens/1/size - 54x120] [
+		zoo: zoomer with [zoom: [x 0.5 y 0.5] canvas: host/size - 40] [
 			column [
 				row !(
 					map-each method compare [
 						compose/deep [box [text (form method) with [font: make font! [size: 20]]]]
 					]
 				)
-				row weight= 1 !(
+				row weight= 1 /use (
 					map-each method compare [
 						compose/deep [
 							grid-view content-flow= 'vertical source= data-source
@@ -94,21 +97,15 @@ view/no-wait/options/flags reshape [
 			]
 		]
 	]
-	; on-over [
-		; status/text: form hittest face/space event/offset
-	; ]
-	; status: text 300x40
-][
-	offset: 10x10
-	actors: object [
-		on-resizing: func [window event] [
-			b/size: window/size - 20x60
-			; spaces/ctx/grid-ctx/autofit gv/grid b/size/x - 20
-			; gv/origin: 0x0
-			invalidate b
-			; b/dirty?: yes
-		]
+	block: base brick 20x20 loose react later [
+		zoo/canvas: face/offset - host/offset
+		;; render immediately, not waiting for the timer - to reduce the visible lag:
+		host/draw: render host
+		show select host 'parent
 	]
+	do [block/offset: host/size + 20]
+][
+	offset: 0x0
 ] 'resize
 
 ; spaces/ctx/grid-ctx/autofit gv/grid 200
@@ -116,4 +113,5 @@ view/no-wait/options/flags reshape [
 			
 ; dump-tree
 either system/build/config/gui-console? [print "---"][do-events]
+prof/show
 
