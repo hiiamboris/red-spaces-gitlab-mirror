@@ -2,10 +2,15 @@ Red [
 	title:   "Default styles for Draw-based widgets"
 	author:  @hiiamboris
 	license: BSD-3
+	notes: {
+		REMINDER: should be careful when assigning facets in styles
+		If facet has no equality test (sometimes by design) but invalidates, `maybe` should be used
+		otherwise on each space's render all upper tree will be invalidated and no caching will work
+		;@@ TODO: detect such cases automatically and report
+	}
 ]
 
 ;; needs: map-each, anonymize, reshape, export, contrast-with, apply
-
 
 exports: [set-style remove-style define-styles]
 
@@ -182,7 +187,6 @@ do with [
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
 			;; careless setting causes full tree invalidation on each render, though if style is applied it's already invalid
-			;@@ need to check other styles for this issue too!
 			set-flag flags 'bold grid-ctx/pinned?
 		]
 		
@@ -199,7 +203,7 @@ do with [
 		]
 		logic: [										;-- readonly
 			data/font: fonts/text
-			data/data: either state ["✓"]["✗"]
+			maybe data/data: either state ["✓"]["✗"]	;-- maybe still required here because /data: doesn't check for equality
 		]
 		
 		label: using [big?] [

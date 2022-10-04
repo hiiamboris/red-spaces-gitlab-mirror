@@ -686,7 +686,7 @@ paragraph-ctx: context [
 		;; styles may override `/font` with another font created in advance 
 		#type =? :invalidates   font:   none			;-- can be set in style, as well as margin
 		;@@ maybe put color change into space-object?
-		#type =? :invalidates-look   color:  none			;-- placeholder for user to control
+		#type =? :invalidates-look   color:  none		;-- placeholder for user to control
 		#type =? :invalidates   weight: 1				;-- used by tube, should trigger a re-render
 
 		layout: none									;-- last rendered layout, text size is kept in layout/extra
@@ -697,15 +697,15 @@ paragraph-ctx: context [
 
 	;; unlike paragraph, text is never wrapped
 	declare-template 'text/paragraph [
-		weight: 0
-		flags:  []
+		quietly weight: 0
+		quietly flags:  []
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
 	declare-template 'link/paragraph [
-		flags:   [wrap underline]
-		color:   50.80.255								;@@ color should be taken from the OS theme
-		command: [browse as url! text]
+		quietly flags:   [wrap underline]
+		quietly color:   50.80.255								;@@ color should be taken from the OS theme
+		quietly command: [browse as url! text]
 	]
 ]
 
@@ -967,14 +967,14 @@ data-view-ctx: context [
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
 		#on-change [space word value] [push-font space]
-		font:    none
+		#type =?  font:    none
 		
 		#type =? :invalidates   spacing: 5x5			;-- used only when data is a block
 		#type =? :invalidates   wrap?:   off			;-- controls choice between text (off) and paragraph (on)
 		
 		#on-change [space word value [any-type!]] [
 			space/content: VID/wrap-value :value space/wrap?	;@@ maybe reuse the old space if it's available?
-			push-font space
+			push-font space								;-- push current font into newly created content space
 		]
 		data:    none									;-- ANY red value
 	]
@@ -2013,14 +2013,6 @@ grid-ctx: context [
 			clear grid/frame/heights					;-- line height cache is no longer valid after widths have changed
 		]
 	]
-	
-	;@@ put this to use somehow, maybe invalidate could pass an optional child who caused the invalidation?
-	; invalidate-cell: function [grid [object!] cell [pair! none!]] [
-		; remove/key grid/hcache cell/y
-		; remove/key grid/ccache cell
-		; grid/size-cache/size: none
-		; clear grid/fitcache
-	; ]
 	
 	on-invalidate: function [
 		grid  [object!]

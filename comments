@@ -1929,7 +1929,6 @@ shit! in grid-test8 almost 3k renders...
 	
 	
 ;@@ I need ASAP move on-origin-change from scrollable into draw
-;@@ after removal of maybe from styles I need to check them all for careless assignments that may invalidate the tree
 	
 	
 
