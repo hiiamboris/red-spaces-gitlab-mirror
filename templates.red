@@ -1453,6 +1453,7 @@ grid-ctx: context [
 			#assert [1x1 +<= span]						;-- ensure it's a first cell of multicell
 			xyloop xy span [							;@@ should be for-each
 				remove/key grid/spans xy': cell1 + xy - 1x1
+				invalidate-xy grid xy' 
 			]
 		]
 	]
@@ -1465,8 +1466,10 @@ grid-ctx: context [
 			break-cell grid cell1
 		]
 		xyloop xy span [								;@@ should be for-each
-			#assert [1x1 = grid/get-span cell1 + xy - 1x1]
-			grid/spans/(cell1 + xy - 1x1): 1x1 - xy		;-- each span points to the first cell
+			xy': cell1 + xy - 1x1
+			#assert [1x1 = grid/get-span xy']
+			grid/spans/:xy': 1x1 - xy					;-- each span points to the first cell
+			invalidate-xy grid xy' 
 		]
 		grid/spans/:cell1: span
 	]
@@ -2023,16 +2026,18 @@ grid-ctx: context [
 		invalidate-cache grid							;-- clears the cached canvas+sizes block so render will be called again
 	]
 	
-	do-invalidate: function [grid [object!]] [
+	invalidate-xy: function [grid [object!] xy [pair!]] [
 		frame: grid/frame
-		plan:  frame/invalid
-		foreach [cell scope] plan [
+		remove/key frame/heights xy/y
+		foreach vector frame/limits [vector/(xy/x): -1.0]
+		quietly grid/size: none
+	]
+	
+	do-invalidate: function [grid [object!]] [
+		foreach [cell scope] grid/frame/invalid [
 			either cell [
 				if scope = 'size [
-					set-pair [x: y:] xy: pick find/same frame/cells cell -1
-					remove/key frame/heights y
-					foreach vector frame/limits [vector/:x: -1.0]
-					quietly grid/size: none
+					invalidate-xy grid pick find/same grid/frame/cells cell -1
 				]
 			][
 				if scope = 'size [
