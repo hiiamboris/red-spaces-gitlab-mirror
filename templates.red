@@ -961,21 +961,33 @@ data-view-ctx: context [
 		]
 	]
 	
+	reset-content: function [space [object!]] [
+		space/content: VID/wrap-value :space/data space/wrap?	;@@ maybe reuse the old space if it's available?
+		push-font space									;-- push current font into newly created content space
+	]
+	
 	declare-template 'data-view/box [					;-- inherit margin, content, map from the box
-		align:   -1x-1									;-- left-top aligned by default; on-change inherited from box
+		align:        -1x-1								;-- left-top aligned by default; on-change inherited from box
+		
+		;@@ not used currently, maybe it should be
+		; #on-change [space word value] [
+			; if all [block? :space/data] ...
+		; ]
+		; #type =?   spacing: 5x5			;-- used only when data is a block
 		
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
 		#on-change [space word value] [push-font space]
-		#type =?  font:    none
+		#type =?   font: none
 		
-		#type =? :invalidates   spacing: 5x5			;-- used only when data is a block
-		#type =? :invalidates   wrap?:   off			;-- controls choice between text (off) and paragraph (on)
+		#on-change [space word value] [
+			if :space/data = either value ['text]['paragraph] [	;-- switches from text to paragraph and back
+				reset-content space
+			] 
+		] 
+		#type =?   wrap?: off							;-- controls choice between text (off) and paragraph (on)
 		
-		#on-change [space word value [any-type!]] [
-			space/content: VID/wrap-value :value space/wrap?	;@@ maybe reuse the old space if it's available?
-			push-font space								;-- push current font into newly created content space
-		]
+		#on-change [space word value [any-type!]] [reset-content space]
 		data:    none									;-- ANY red value
 	]
 ]
@@ -2072,11 +2084,11 @@ grid-ctx: context [
 			;@@ maybe width not canvas?
 			canvas:  none								;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
 			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
-			heights: make map!   20						;-- cached heights of rows marked for autosizing
+			heights: make map!   4						;-- cached heights of rows marked for autosizing
 			;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
 			;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
 			;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
-			cells:   make hash!  40						;-- cells that wrap content, filled by render and height estimator
+			cells:   make hash!  8						;-- cells that wrap content, filled by render and height estimator
 			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
 			limits:  make block! 4						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
 			invalid: make block! 8						;-- invalidation list for the next frame
@@ -2095,9 +2107,16 @@ grid-ctx: context [
 		cache: []
 
 		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
-			name: any [frame/cells/:xy  put frame/cells xy make-space/name 'cell []]
-			cell: get name
-			cell/content: any [space in generic 'empty]	;@@ ensure cell calls invalidate 'size on this ;@@ get rid of generics
+			cell: get name: any [
+				frame/cells/:xy
+				put frame/cells xy make-space/name 'cell []
+			]
+			quietly cell/owner: none					;-- prevent grid invalidation in case new space is assigned
+			any [
+				if space [cell/content: space]
+				cell/content = 'empty					;-- do not recreate empty cells without a reason
+				cell/content: make-space/name 'empty []
+			]
 			name
 		]
 
@@ -2257,11 +2276,10 @@ grid-view-ctx: context [
 			]
 		]
 
-		;@@ this is super slow because setting data -> font reset -> full invalidation (same probably for other values)
-		;@@ need to somehow avoid invalidation while still ensuring state correctness
+		;; only called initially or after invalidate-range
 		wrap-data: function [item-data [any-type!]] [
 			spc: make-space 'data-view [
-				quietly wrap?:  on
+				quietly wrap?:  on						;-- will be considered upon /data change
 				quietly margin: 3x3
 				quietly align: -1x0
 			]
@@ -2276,17 +2294,26 @@ grid-view-ctx: context [
 		
 		window/content: 'grid
 		grid: make-space 'grid [
-			;; grid-view does not use ccache, but sets it for the grid
-			ccache: content
-			
+			;; while this should not pose a danger of extra invalidation, since cells are not under user's control,
+			;; currently cells is a hash (for reverse lookups), while content is a map
+			;; also content contains names, cells - objects
+			; frame/cells: content
+		
 			;; no need to wrap data-view because it's already a box/cell
 			wrap-space: function [xy [pair!] space [word!]] [
-				put frame/cells xy get space
-				space
+				put frame/cells xy space				;-- used by grid for reverse lookups (e.g. during styling)
 			]
 			
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
 				~/available? self axis dir from requested
+			]
+			
+			;; currently the only way to make grid forget it's rendered content, since we can't "watch" /data
+			invalidate-range: function [xy1 [pair!] xy2 [pair!]] [
+				xyloop xy xy2 - xy1 + 1 [				;@@ should be for-each
+					remove/key grid/content xy + xy1 - 1
+				]
+				invalidate self
 			]
 		]
 		
