@@ -123,26 +123,27 @@ compose-map: function [
 ]
 
 
-declare-template 'timer/space [rate: none]				;-- template space for timers
+declare-template 'timer/space []						;-- template space for timers (space has /rate anyway now)
 
-
-;; has to be an object so these words have binding and can be placed as words into content field
-;@@ map is used to work around #5137 when compiling with -e!
-generic: construct to [] make map! reduce [				;-- holds commonly used spaces ;@@ experimental
-	'empty make-space 'space []							;-- used when no content is given
-	'<-> none 'stretch none								;-- set after box definition
+;@@ move to auxi?
+constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] [
+	constrain  (finite-canvas canvas) * max 0x0 fill  limits
 ]
 
-;; empty stretching space used for alignment (static version and template)
+;; used internally for empty spaces size estimation
+set-empty-size: function [space [object!] canvas [pair! none!]] [
+	set [canvas: fill:] decode-canvas canvas
+	space/size: constrain-canvas canvas fill limits
+]
+
+;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
 put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 	weight: 1
 	draw: function [/on canvas [pair! none!]] [
-		set [canvas: fill:] decode-canvas canvas
-		self/size: constrain (finite-canvas canvas) * max 0x0 fill limits
+		set-empty-size self canvas
 		[]
 	]
 ]
-generic/stretch: set in generic '<-> make-space 'stretch []
 
 rectangle-ctx: context [
 	~: self
@@ -237,8 +238,11 @@ cell-ctx: context [
 	~: self
 
 	draw: function [space [object!] canvas [pair! none!]] [
-		#assert [space/content]
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
+		unless space/content [
+			set-empty-size space canvas
+			return []
+		]
 		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
 		canvas: constrain canvas space/limits
@@ -276,7 +280,7 @@ cell-ctx: context [
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
 		
 		#type =? :invalidates [word!]
-		content: in generic 'empty						;@@ consider `content: none` optimization if it's worth it
+		content: none
 		
 		map:     reduce [content [offset 0x0 size 0x0]]
 		cache:   [size map]
@@ -435,11 +439,11 @@ scrollable-space: context [
 		;; canvas takes priority (for auto sizing), but only along constrained axes
 		set [canvas: fill:] decode-canvas canvas
 		;; stretch to finite dimensions of the canvas, but minimize across the infinite
-		space/size: box: constrain finite-canvas canvas space/limits
-		if zero? area? box [
-			;@@ this complains if I override default 50x50 limit with e.g. `100` (no vertical limit)
-			;@@ I need to make it work on zero canvas too (which should also make it faster on pre-renders)
-			#assert [false "Somehow scrollable has no size!"]
+		space/size: box: constrain-canvas canvas fill space/limits
+		if any [
+			zero? area? box
+			none =? space/content
+		][
 			return quietly space/map: []
 		]
 		origin: space/origin
@@ -532,11 +536,11 @@ scrollable-space: context [
 	declare-template 'scrollable/space [
 		; cache: off
 		;@@ make limits a block to save some RAM?
-		limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
+		; limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		
 		#type =? :on-origin-change   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
 		#type =? :invalidates   weight: 1
-		#type =? :invalidates-look   content: in generic 'empty	;-- should be defined (overwritten) by the user
+		#type =? :invalidates-look   content: none		;-- should be defined (overwritten) by the user
 		#type =  :invalidates-look   content-flow: 'planar		;-- one of: planar, vertical, horizontal
 		
 		hscroll: make-space 'scrollbar [axis: 'x]
@@ -902,7 +906,7 @@ label-ctx: context [
 				spaces/sigil/text: form label/image
 				'sigil
 			]
-			'else [in generic 'empty]
+			'else [none]
 		] spaces
 	]
 
@@ -932,7 +936,7 @@ label-ctx: context [
 		spaces: object [								;-- all lower level spaces used by label
 			image:      make-space 'image []
 			sigil:      make-space 'text [limits: 20 .. none]	;-- 20 is for alignment of labels under each other ;@@ should be set in style?
-			image-box:  make-space 'box  [content: in generic 'empty]	;-- needed for centering the image/sigil
+			image-box:  make-space 'box  [content: none]		;-- needed for centering the image/sigil
 			text:       make-space 'text []						;-- 1st line of text
 			comment:    make-space 'text []						;-- lines after the 1st
 			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  content: [text comment]]
@@ -955,9 +959,11 @@ data-view-ctx: context [
 	~: self
 
 	push-font: function [space [object!]] [
-		cspace: get space/content
-		if all [in cspace 'font  not cspace/font =? space/font] [
-			cspace/font: space/font						;-- should trigger invalidation
+		if space/content [
+			cspace: get space/content
+			if all [in cspace 'font  not cspace/font =? space/font] [
+				cspace/font: space/font					;-- should trigger invalidation
+			]
 		]
 	]
 	
@@ -1023,14 +1029,18 @@ window-ctx: context [
 	;; area outside of canvas and within xy1-xy2 may stay not rendered as long as it's size is guaranteed
 	draw: function [window [object!] canvas [pair! none!]] [
 		#debug grid-view [#print "window/draw is called on canvas=(canvas)"]
-		#assert [word? window/content]
+		unless content: window/content [
+			set-empty-size window canvas
+			return quietly window/map: []
+		]
+		#assert [word? content]
 		-org: negate org: window/origin
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
 		set [canvas': fill:] decode-canvas canvas
 		size: window/pages * finite-canvas canvas'
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
-			cspace: get content: window/content
+			cspace: get content
 			cdraw: render/window/on content -org -org + size canvas
 			;; once content is rendered, it's size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
@@ -1049,7 +1059,8 @@ window-ctx: context [
 		#type =? :invalidates-look   origin: 0x0				;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
-		#type =? :invalidates   content: generic/empty
+		#type =? :invalidates   content: none
+		
 		map: []
 		cache: [size map]
 		
