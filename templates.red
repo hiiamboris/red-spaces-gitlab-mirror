@@ -1081,6 +1081,7 @@ window-ctx: context [
 inf-scrollable-ctx: context [
 	~: self
 	
+	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
 	roll: function [space [object!]] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
@@ -1119,10 +1120,12 @@ inf-scrollable-ctx: context [
 	
 	draw: function [space [object!] canvas [none! pair!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
+		timer: space/roll-timer
+		if timer/ready? [roll space  timer/ready?: no]	;-- execute a pending roll, thus keeping renders in-tree
 		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
-		space/roll-timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
 		;; scrollable/draw removes roll-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
 		repend space/map [in space 'roll-timer [offset 0x0 size 0x0]]
@@ -1140,9 +1143,8 @@ inf-scrollable-ctx: context [
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [rate: 0]
-
-		roll: does [~/roll self]
+		roll-timer: make-space 'timer [rate: 0 ready?: no]
+		roll: does [roll-timer/ready?: yes]
 
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
