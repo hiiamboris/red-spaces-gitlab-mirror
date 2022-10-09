@@ -70,7 +70,11 @@ make-space: function [
 	]]
 	r: append copy/deep base spec
 	unless block [
-		r: make space-object! r
+		;; without trapping it's impossible to tell where the error happens during creation if it's caused e.g. by on-change
+		trap/catch [r: make space-object! r] [
+			#print "*** Unable to make space of type (type):"
+			do thrown
+		]
 		init-cache r
 	]
 	if name [r: anonymize type r]
@@ -133,7 +137,7 @@ constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] 
 ;; used internally for empty spaces size estimation
 set-empty-size: function [space [object!] canvas [pair! none!]] [
 	set [canvas: fill:] decode-canvas canvas
-	space/size: constrain-canvas canvas fill limits
+	space/size: constrain-canvas canvas fill space/limits
 ]
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
@@ -898,7 +902,7 @@ label-ctx: context [
 	
 	on-image-change: function [label [object!] word [word!] value [any-type!]] [
 		spaces: label/spaces
-		spaces/image-box/content: bind case [			;-- invalidated by cell
+		name: case [
 			image? label/image [
 				spaces/image/data: label/image
 				'image
@@ -912,7 +916,8 @@ label-ctx: context [
 				'sigil
 			]
 			'else [none]
-		] spaces
+		]
+		spaces/image-box/content: if name [bind name spaces]	;-- invalidated by cell
 	]
 
 	on-text-change: function [label [object!] word [word!] value [any-type!]] [
