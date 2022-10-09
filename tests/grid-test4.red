@@ -18,7 +18,7 @@ view/no-wait/options [
 	b: host [
 		vlist [
 			fps-meter
-			grid-view 1000x500 with [
+			grid-view 1000x500 focus with [
 				grid/pinned: 2x1
 				grid/bounds: [x: #[none] y: #[none]]
 				; grid/content/(1x2): make-space/name 'button [data: "button1"]
@@ -40,7 +40,7 @@ view/no-wait/options [
 		status/text: form hittest face/space event/offset
 	]
 	status: text 300x40
-] [offset: 10x10]
+] [offset: 250x10]
 
 prof/show
 prof/reset
