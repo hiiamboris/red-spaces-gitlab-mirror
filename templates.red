@@ -247,7 +247,6 @@ cell-ctx: context [
 			set-empty-size space canvas
 			return quietly space/map: []
 		]
-		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
 		canvas: constrain canvas space/limits
 		mrg2:   2x2 * space/margin
@@ -440,22 +439,19 @@ scrollable-space: context [
 	]
 
 	draw: function [space [object!] canvas [none! pair!]] [
-		;; find area of 'size' unobstructed by scrollbars - to limit content rendering
-		;; canvas takes priority (for auto sizing), but only along constrained axes
-		set [canvas: fill:] decode-canvas canvas
-		;; stretch to finite dimensions of the canvas, but minimize across the infinite
-		space/size: box: constrain-canvas canvas fill space/limits
+		;; sizing policy (for cell, scrollable, window):
+		;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
+		;; - use canvas/size if it's less than content/size or if fill flag is set
 		if any [
-			zero? area? box
-			none =? space/content
+			space/content =? none 
+			all [canvas  zero? area? canvas]
 		][
+			set-empty-size space canvas
 			return quietly space/map: []
 		]
-		origin: space/origin
+		set [canvas: fill:] decode-canvas canvas
+		box: canvas: constrain canvas space/limits		;-- 'box' is viewport - area not occupied by scrollbars
 		cspace: get space/content
-		#debug grid-view [
-			#print "scrollable/draw: renders content from (max 0x0 0x0 - origin) to (box - origin); box=(box)"
-		]
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
 		cdraw: render/on space/content encode-canvas box fill
@@ -464,33 +460,40 @@ scrollable-space: context [
 			cspace/size/:axis > box/:axis
 		][												;-- have to add the scroller and subtract it from canvas width
 			scrollers: space/vscroll/size/x by space/hscroll/size/y
-			ccanvas: max 0x0 box - (scrollers * axis2pair ortho axis)		;-- valid since box is finite
-			cdraw: render/on space/content encode-canvas ccanvas fill
+			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
+			cdraw: render/on space/content encode-canvas box fill
 		]
 		csz: cspace/size		
+		origin: space/origin							;-- must be read after render (& possible roll)
 		;; no origin clipping can be done here, otherwise it's changed during intermediate renders
 		;; and makes it impossible to scroll to the bottom because of window resizes!
 		;; clipping is done by /clip-origin, usually in event handlers where size & viewport are valid
 		
 		;; determine what scrollers to show
-		p2: csz + p1: origin
-		clip-p1: max 0x0 p1
 		loop 2 [										;-- each scrollbar affects another's visibility
-			clip-p2: min box p2
-			shown: min 100x100 (clip-p2 - clip-p1) * 100 / max 1x1 csz
-			if hdraw?: shown/x < 100 [box/y: space/size/y - space/hscroll/size/y]
-			if vdraw?: shown/y < 100 [box/x: space/size/x - space/vscroll/size/x]
+			if hdraw?: box/x < csz/x [box/y: max 0 canvas/y - space/hscroll/size/y]
+			if vdraw?: box/y < csz/y [box/x: max 0 canvas/x - space/vscroll/size/x]
 		]
-		space/hscroll/size/x: hx: either hdraw? [box/x][0]
-		space/vscroll/size/y: vy: either vdraw? [box/y][0]
-		full: max 1x1 max box - origin - (hx by vy) csz + (max 0x0 origin)
+		space/hscroll/size/x: either hdraw? [box/x][0]
+		space/vscroll/size/y: either vdraw? [box/y][0]
+		
+		;; size is canvas along fill=1 dimensions and min(canvas,csz+scrollers) along fill=0
+		scrollers: space/vscroll/size/x by space/hscroll/size/y
+		sz1: min canvas csz + scrollers  sz2: max canvas csz + scrollers
+		space/size: (sz2 - sz1) * (max 0x0 fill) + sz1
+		; echo [sz1 sz2 canvas csz space/size]
+		box: min box (space/size - scrollers)			;-- reduce viewport
+		
+		;; 'full' is viewport(box) + hidden (in all directions) part of content
+		end:  max box csz + bgn: min 0x0 origin
+		full: max 1x1 end - bgn
 		
 		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
 		;; (else may stack up to 99% of all rendering time)
-		quietly space/hscroll/offset: ofs: 100% * (clip-p1/x - p1/x) / max 1 full/x
-		quietly space/hscroll/amount: min 100% - ofs 100% * box/x / full/x
-		quietly space/vscroll/offset: ofs: 100% * (clip-p1/y - p1/y) / max 1 full/y
-		quietly space/vscroll/amount: min 100% - ofs 100% * box/y / full/y
+		quietly space/hscroll/amount: 100% * box/x / full/x
+		quietly space/hscroll/offset: 100% * (negate bgn/x) / full/x
+		quietly space/vscroll/amount: 100% * box/y / full/y
+		quietly space/vscroll/offset: 100% * (negate bgn/y) / full/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		quietly space/map: compose/deep [				;@@ should be reshape (to remove scrollers) but it's too slow

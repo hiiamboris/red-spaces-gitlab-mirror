@@ -10,6 +10,8 @@ Red [
 ]
 
 #include %../../cli/cli.red
+; #include %../../common/assert.red
+;@@ stupid include bugs turn off assertions in some crooked way, can't use them to debug inspector
 #include %../../common/setters.red
 #include %../../common/forparse.red
 ; #do [disable-space-cache?: yes]
@@ -48,6 +50,9 @@ context [
 		widths:  copy #(default 80)
 	]
 	
+	; declare-template 'grid-view/grid-view [
+		; limits:  50x50 .. none
+	; ]
 	
 	;; limits the displayed size of big blocks/objects
 	MAX_VALUES: 100
@@ -158,7 +163,7 @@ context [
 				pages: 5
 				grid/pinned: 0x1
 				extend grid/widths [1 80 2 80]
-				limits: 30x30 .. none
+				limits: 30x100 .. none
 			]
 			space/source: source
 		]
@@ -222,7 +227,7 @@ context [
 				new-width: max 50 canvas/x - widths/1 - (any [widths/2 0]) - (gview/grid/margin/x * 2) - (gview/grid/spacing/x * ncol) - gview/vscroll/size/x
 				if widths/default <> new-width [
 					widths/default: new-width
-					clear gview/grid/hcache
+					clear gview/grid/frame/heights
 				]
 			]
 			length? gview/grid/content
