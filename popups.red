@@ -193,7 +193,7 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 			empty? pos: find/tail row* 'text		
 			find row* '<->
 			find row* 'stretch
-			insert pos make-space/name '<->
+			insert pos make-space/name '<-> []
 		]
 		tube/content: flush row*
 	]
