@@ -251,8 +251,8 @@ context with spaces/ctx [
 			drawn: self/draw/on encode-canvas inner fill
 			shift: pad * 1x1
 			foreach [name geom] self/map [geom/offset: geom/offset + shift]
-			step/by 'self/map/hscroll/offset 0x4
-			step/by 'self/map/vscroll/offset 4x0
+			if find self/map 'hscroll [step/by 'self/map/hscroll/offset 0x4]
+			if find self/map 'vscroll [step/by 'self/map/vscroll/offset 4x0]
 			quietly self/size: self/size + (pad * 2)
 			reduce [
 				draw-frame self/size pad * 2 opaque black 50%
