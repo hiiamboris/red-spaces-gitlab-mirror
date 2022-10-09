@@ -49,6 +49,7 @@ traversal: context [
 		][
 			root: next root
 			foreach [name _] map [
+				assert [name]								;-- no junk in the maps please
 				change root name
 				target: list-spaces* root target
 			]

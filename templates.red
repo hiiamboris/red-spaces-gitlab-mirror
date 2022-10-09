@@ -245,7 +245,7 @@ cell-ctx: context [
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
 		unless space/content [
 			set-empty-size space canvas
-			return []
+			return quietly space/map: []
 		]
 		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
@@ -265,7 +265,7 @@ cell-ctx: context [
 			; drawn: compose/only [translate (offset) (drawn)]
 			drawn: compose/deep/only [clip 0x0 (space/size) [translate (offset) (drawn)]]
 		]
-		space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
+		quietly space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
 		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
 		drawn
 	]
@@ -286,7 +286,7 @@ cell-ctx: context [
 		#type =? :invalidates [word! none!]
 		content: none
 		
-		map:     reduce [content [offset 0x0 size 0x0]]
+		map:     []
 		cache:   [size map]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
