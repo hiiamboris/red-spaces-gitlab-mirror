@@ -49,7 +49,7 @@ view/flags [
 		]
 	] react [
 		face/size: face/parent/size - 20
-		face/dirty?: yes
+		invalidate get face/space
 	]
 ] 'resize
 
