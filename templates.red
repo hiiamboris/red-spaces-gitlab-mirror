@@ -279,7 +279,7 @@ cell-ctx: context [
 		#type =? :invalidates-look (find allowed-alignments align)
 		align:   0x0									;@@ consider more high level VID-like specification of alignment
 		
-		#type =? :invalidates [word!]
+		#type =? :invalidates [word! none!]
 		content: none
 		
 		map:     reduce [content [offset 0x0 size 0x0]]
@@ -374,53 +374,54 @@ scrollbar: context [
 scrollable-space: context [
 	~: self
 
-	;@@ or /line /page /forth /back /x /y ?
-	;@@ TODO: less awkward spec
-	move-by: function [
-		spc
-		amnt "'line or 'page or offset in px"
-		dir "forth or back"
-		axis "x or y"
-		/scale factor "1 by default"
+	set-origin: function [
+		space  [object!]
+		origin [pair! word!]
 	][
-		if word? spc [spc: get spc]
+		csize: select get space/content 'size
+		box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
+		space/origin: clip [box - csize 0x0] origin
+	]
+	
+	;@@ or /line /page /forth /back /x /y ? not without apply :(
+	;@@ TODO: less awkward spec possible?
+	move-by: function [
+		space  [object!]
+		amount [word! integer!]
+		dir    [word!]
+		axis   [word!]
+		scale  [number! none!]
+	][
 		dir:  select [forth 1 back -1] dir
-		unit: select [x 1x0 y 0x1] axis
-		default factor: 1
-		switch amnt [line [amnt: 10] page [amnt: spc/map/(spc/content)/size]]
-		spc/origin: spc/origin - (amnt * factor * unit * dir)
-		; invalidate spc
+		unit: axis2pair axis
+		default scale: either amount = 'page [0.8][1]
+		switch amount [line [amount: 16] page [amount: space/size]]
+		set-origin space space/origin - (amount * scale * unit * dir)
 	]
 
 	move-to: function [
-		"ensure point XY of content is visible, scroll only if required"
-		spc [object!]
-		xy [pair! word!] "offset or: head, tail"
-		/margin "how much space to reserve around XY"
-			mrg [integer! pair!] "default: 0"
+		space  [object!]
+		xy     [pair! word!]
+		margin [integer! pair! none!]					;-- space to reserve around XY
 	][
-		if word? spc [spc: get spc]
-		mrg: 1x1 * any [mrg 0]
-		cspace: get cname: spc/content
-		csize: cspace/size
+		mrg: 1x1 * any [margin 0]
+		csize: select get space/content 'size
 		switch xy [
 			head [xy: 0x0]
-			tail [xy: csize * 0x1]				;-- no right answer here, csize or csize*0x1
+			tail [xy: csize * 0x1]						;-- no right answer here, csize or csize*0x1
 		]
-		box: spc/map/:cname/size
-		mrg: min mrg box - 1 / 2				;-- at least 1 pixel should be between margins or this fails
-		xy1: mrg - spc/origin
-		xy2: xy1 + box - mrg
+		box: space/viewport
+		mrg: clip [0x0 mrg] box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
+		xy1: mrg - space/origin							;-- left top margin point in content's coordinates
+		xy2: xy1 + box - mrg							;-- right bottom margin point
 		dxy: 0x0
 		foreach x [x y] [
-			dxy/:x: xy/:x - case [
-				xy1/:x <  xy/:x [xy1/:x]
-				xy2/:x >= xy/:x [xy2/:x]
-				'else           [xy/:x]
+			case [
+				xy/:x < xy1/:x [dxy/:x: xy/:x - xy1/:x]
+				xy/:x > xy2/:x [dxy/:x: xy/:x - xy2/:x]
 			]
 		]
-		spc/origin: spc/origin - dxy
-		; invalidate spc
+		set-origin space space/origin - dxy
 	]
 
 	into: function [space [object!] xy [pair!] name [word! none!]] [
@@ -463,13 +464,9 @@ scrollable-space: context [
 			cdraw: render/on space/content encode-canvas ccanvas fill
 		]
 		csz: cspace/size		
-		; #assert [0x0 +< (origin + csz)  "scrollable/origin made content invisible!"]
-		;; ensure that origin doesn't go beyond content/size (happens when content changes e.g. on resizing)
-		;@@ origin clipping in tube makes it impossible to scroll to the bottom because of window resizes!
-		;@@ I need a better idea, how to apply it without breaking things, until then - not clipped
-		; space/origin: clip [origin 0x0] box - scrollers - csz
-		; space/origin: origin
-		; print [space/content csz space/origin]
+		;; no origin clipping can be done here, otherwise it's changed during intermediate renders
+		;; and makes it impossible to scroll to the bottom because of window resizes!
+		;; clipping is done by /clip-origin, usually in event handlers where size & viewport are valid
 		
 		;; determine what scrollers to show
 		p2: csz + p1: origin
@@ -515,31 +512,13 @@ scrollable-space: context [
 		]
 	]
 		
-	on-origin-change: function [space [object!] word [word!] value [any-type!]] [
-		;@@ problem: changing origin requires up to date content (no sync guarantee)
-		;@@ maybe we shouldn't clip it right here?
-		;@@ clip origin here or clip inside event handler? box isn't valid until draw is called..
-		;@@ or maybe clip it only inside draw and only for rendering purposes? let it otherwise roam free?
-		#debug grid-view [#print "on-change origin: (mold :old) -> (mold :value)"]
-		if all [pair? :value  word? :space/content] [
-			cspace: get space/content
-			;; hardcoded /2 offset, because content may change and get out of sync with the frame but /2 stays
-			visible-size: either empty? space/map [0x0][space/map/2/size]
-			value: clip [(visible-size - cspace/size) 0x0] value 
-			quietly space/origin: value							;-- can't set quietly - watched by grid-view to set grid/origin
-			#debug grid-view [#print "on-change clipped to: (space/origin)"]
-			invalidate/info space none 'look
-		]
-	]
-	
-	;@@ TODO: maybe make triangles *shared* for more juice? they always have the same size.. but this may limit styling
 	declare-template 'scrollable/space [
 		; cache: off
 		;@@ make limits a block to save some RAM?
 		; limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		
-		#type =? :on-origin-change   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
-		#type =? :invalidates   weight: 1
+		#type =? :invalidates-look   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
+		#type =? :invalidates        weight: 1
 		#type =? :invalidates-look   content: none		;-- should be defined (overwritten) by the user
 		#type =  :invalidates-look   content-flow: 'planar		;-- one of: planar, vertical, horizontal
 		
@@ -555,7 +534,33 @@ scrollable-space: context [
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
 		]
+		viewport: does [map/2/size]						;-- much better than subtracting scrollers; avoids exposing internal details
 
+		move-by: func [
+			"Offset viewport by a fixed amount"
+			amount [word! integer!] "'line or 'page or offset in pixels"
+			dir    [word!]          "'forth or 'back"
+			axis   [word!]          "'x or 'y"
+			/scale factor [number!] "Default: 0.8 for page, 1 for the rest"
+		][
+			~/move-by self amount dir axis factor
+		]
+
+		move-to: function [
+			"Ensure point XY of content is visible, scroll only if required"
+			xy          [pair! word!]    "'head or 'tail or an offset pair"
+			/margin mrg [integer! pair!] "How much space to reserve around XY (default: 0)"
+		][
+			~/move-to self xy mrg
+		]
+		
+		clip-origin: function [
+			"Change the /origin facet, ensuring no empty area is shown"
+			origin [pair!] "Clipped between (viewport - scrollable/size) and 0x0"
+		][
+			~/set-origin self origin
+		]
+	
 		draw: function [/on canvas [none! pair!]] [~/draw self canvas]
 	]
 ]
@@ -1112,10 +1117,9 @@ inf-scrollable-ctx: context [
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
 			#debug sizing [#print "rolling (space/size) with (space/content) by (wofs' - wofs)"]
-			space/origin: space/origin + (wofs' - wofs)
-			window/origin: negate wofs'
+			space/origin: space/origin + (wofs' - wofs)	;-- may be watched (e.g. by grid-view)
+			window/origin: negate wofs'					;-- invalidates both scrollable and window
 		]
-		wofs' <> wofs									;-- should return true when updates origin - used by event handlers ;@@ or not?
 	]
 	
 	draw: function [space [object!] canvas [none! pair!]] [
@@ -1125,12 +1129,12 @@ inf-scrollable-ctx: context [
 		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
-		timer/rate: either any-scrollers? [4][0]	;-- timer is turned off when unused
+		timer/rate: either any-scrollers? [4][0]		;-- timer is turned off when unused
 		;; scrollable/draw removes roll-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
 		repend space/map [in space 'roll-timer [offset 0x0 size 0x0]]
 		#debug sizing [#print "inf-scrollable with (space/content) on (canvas) -> (space/size) window: (space/window/size)"]
-		#assert [space/window/size]
+		#assert [any [not find space/map 'window  space/window/size]  "window should have a finite size if it's exposed"]
 		drawn
 	]
 	
@@ -1144,7 +1148,10 @@ inf-scrollable-ctx: context [
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		roll-timer: make-space 'timer [rate: 0 ready?: no]
-		roll: does [roll-timer/ready?: yes]
+		roll: does [
+			roll-timer/ready?: yes
+			invalidate self
+		]
 
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
@@ -1445,9 +1452,8 @@ grid-ctx: context [
 			offset: offset + grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 		]
 		all [
-			name: grid/cells/pick mcell
-			name: grid/wrap-space mcell name
-			reduce [name offset]
+			mcname: grid/frame/cells/:mcell
+			reduce [mcname offset]
 		]
 	]
 	
@@ -1815,8 +1821,8 @@ grid-ctx: context [
 		;-- locate-point calls row-height which may render cells when needed to determine the height
 		default wxy1: 0x0
 		unless wxy2 [wxy2: wxy1 + grid/calc-size]
-		xy1: wxy1 - grid/origin
-		xy2: min xy1 + canvas wxy2
+		xy1: max 0x0 wxy1 - grid/origin
+		xy2: max 0x0 min xy1 + canvas wxy2
 
 		;; affects xy1 so should come before locate-point
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
@@ -1826,6 +1832,7 @@ grid-ctx: context [
 		]
 		#debug grid-view [#print "drawing grid from (xy1) to (xy2)"]
 
+		xy2: max xy1 xy2
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
 		all [none? grid/size  not grid/infinite?  grid/calc-size]
@@ -2052,9 +2059,8 @@ grid-ctx: context [
 	]
 	
 	invalidate-xy: function [grid [object!] xy [pair!]] [
-		frame: grid/frame
-		remove/key frame/heights xy/y
-		foreach vector frame/limits [vector/(xy/x): -1.0]
+		remove/key grid/frame/heights xy/y
+		foreach vector grid/frame/limits [vector/(xy/x): -1.0]
 		quietly grid/size: none
 	]
 	
@@ -2062,7 +2068,7 @@ grid-ctx: context [
 		foreach [cell scope] grid/frame/invalid [
 			either cell [
 				if scope = 'size [
-					invalidate-xy grid pick find/same grid/frame/cells cell -1
+					invalidate-xy grid pick find/same grid/frame/cells cell -2
 				]
 			][
 				if scope = 'size [
@@ -2120,16 +2126,14 @@ grid-ctx: context [
 		cache: []
 
 		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
-			cell: get name: any [
-				frame/cells/:xy
-				put frame/cells xy make-space/name 'cell []
+			either name: frame/cells/:xy [
+				cell: get name
+			][
+				cell: get name: make-space/name 'cell []
+				repend frame/cells [xy name cell] 
 			]
 			quietly cell/owner: none					;-- prevent grid invalidation in case new space is assigned
-			any [
-				if space [cell/content: space]
-				cell/content = 'empty					;-- do not recreate empty cells without a reason
-				cell/content: make-space/name 'empty []
-			]
+			cell/content: space
 			name
 		]
 
@@ -2264,12 +2268,14 @@ grid-view-ctx: context [
 	declare-template 'grid-view/inf-scrollable [
 		;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
+		;@@ TODO: maybe a % of viewport instead of fixed jump size?
 		#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
 		size: 0x0
 		
+		;; reminder: window/roll may change this (together with window/origin) when rolling
 		#type =? #on-change [space word value] [
-			space/grid/origin: value
-			scrollable-space/on-origin-change space word value	;@@ keep this in sync with scrollable/origin on-change which I override
+			;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
+			space/grid/origin: value					;-- grid triggers invalidation
 		]
 		origin: 0x0
 		
@@ -2314,7 +2320,10 @@ grid-view-ctx: context [
 		
 			;; no need to wrap data-view because it's already a box/cell
 			wrap-space: function [xy [pair!] space [word!]] [
-				put frame/cells xy space				;-- used by grid for reverse lookups (e.g. during styling)
+				; put frame/cells xy get space
+				pos: any [find frame/cells xy  tail frame/cells]
+				rechange pos [xy space get space]		;-- used by grid for reverse lookups (e.g. during styling)
+				space
 			]
 			
 			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
@@ -2339,11 +2348,6 @@ grid-view-ctx: context [
 			][data/size]
 		]
 		grid/calc-bounds: grid/bounds: does [grid/cells/size]
-		
-		inf-scrollable-draw: :draw
-		draw: function [/on canvas [pair! none!]] [
-			inf-scrollable-draw/on canvas
-		]
 	]
 ]
 
@@ -2351,16 +2355,16 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
-	on-pushed-change: function [space [object!] word [word!] value [any-type!]] [
-		invalidate space
-		unless value [do space/command]					;-- trigger when released
-	]
-	
 	declare-template 'clickable/data-view [
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
-		#type =? :on-pushed-change   pushed?:  no		;-- becomes true when user pushes it; triggers `command`
+		
+		#on-change [space word value] [
+			invalidate space
+			unless value [do space/command]				;-- trigger when released
+		]
+		#type =?   pushed?: no							;-- becomes true when user pushes it; triggers `command`
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 	]
 	

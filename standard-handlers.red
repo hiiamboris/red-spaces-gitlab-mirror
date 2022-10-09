@@ -16,18 +16,19 @@ define-handlers [
 			set [_: _: item: _: subitem:] path
 			case [
 				find [hscroll vscroll] item [					;-- move or start dragging
-					move-by: :scrollable-space/move-by
 					axis: select get item 'axis
 					switch subitem [
-						forth-arrow [move-by space 'line 'forth axis]
-						back-arrow  [move-by space 'line 'back  axis]
-						forth-page  [move-by space 'page 'forth axis]
-						back-page   [move-by space 'page 'back  axis]
+						forth-arrow [space/move-by 'line 'forth axis]
+						back-arrow  [space/move-by 'line 'back  axis]
+						forth-page  [space/move-by 'page 'forth axis]
+						back-page   [space/move-by 'page 'back  axis]
 					]
-					start-drag/with path space/origin
 				]
-				item = space/content [pass]				;-- let content handle it
+				; item = space/content [pass]				;-- let content handle it, but still start dragging
+				; item = none []							;-- dragging by the empty area of scrollable
 			]
+			;; start dragging anyway, e.g. for dragging by content or by empty area:
+			start-drag path
 		]
 		on-up [space path event] [stop-drag pass]
 		on-over [space path event] [
@@ -38,44 +39,43 @@ define-handlers [
 				scroll: get item
 				map:    scroll/map
 				x:      scroll/axis
-				size1:  scroll/size/:x - map/back-arrow/size/x - map/forth-arrow/size/x - map/thumb/size/x
+				band:   scroll/size/:x - map/forth-arrow/size/:x - map/back-arrow/size/:x
 				cspace: get space/content
-				scs:    cspace/size
-				size2:  scs/:x - space/map/2/size/:x
+				csize:  cspace/size
+				vport:  space/viewport
+				hidden: csize/:x - vport/:x
 				ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
-				ofs: ofs * select [x 1x0 y 0x1] x		;-- project offset onto the axis
-				ofs: ofs * -1 * size2 / (max 1 size1)	;-- scale scrollbar inner part to the whole content
+				ofs: ofs/:x / max 1 band				;-- scale it down by scrollbar's size 
+				ofs: ofs * (csize * axis2pair x)		;-- now scale up by content size
 			][
-				ofs: drag-offset path					;-- content is dragged directly
+				ofs: negate drag-offset path			;-- dragged by an empty area
 			]
-			space/origin: drag-parameter + ofs
+			space/clip-origin space/origin - ofs		;-- clipping in the event handler guarantees validity of size
+			start-drag path								;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
-			move-by: :scrollable-space/move-by
-			move-to: :scrollable-space/move-to
 			code: switch event/key [
-				down       [[move-by space 'line 'forth 'y]]
-				up         [[move-by space 'line 'back  'y]]
-				right      [[move-by space 'line 'forth 'x]]
-				left       [[move-by space 'line 'back  'x]]
-				page-down  [[move-by space 'page 'forth 'y]]
-				page-up    [[move-by space 'page 'back  'y]]
-				home       [[move-to space 'head]]
-				end        [[move-to space 'tail]]
+				down       [[space/move-by 'line 'forth 'y]]
+				up         [[space/move-by 'line 'back  'y]]
+				right      [[space/move-by 'line 'forth 'x]]
+				left       [[space/move-by 'line 'back  'x]]
+				page-down  [[space/move-by 'page 'forth 'y]]
+				page-up    [[space/move-by 'page 'back  'y]]
+				home       [[space/move-to 'head]]
+				end        [[space/move-to 'tail]]
 			]
 			either code [
 				do code
 			][
-				pass								;-- key was not handled (useful for tabbing)
+				pass									;-- key was not handled (useful for tabbing)
 			]
 		]
 		on-wheel [space path event] [
 			if 100 < absolute amount: event/picked [	;@@ workaround for #5110
 				amount: -256 * sign? amount + amount
 			]
-			scrollable-space/move-by/scale
-				space
+			space/move-by/scale
 				'line
 				pick [forth back] amount <= 0
 				pick [x y] 'hscroll = path/3
@@ -94,8 +94,8 @@ define-handlers [
 				unless dragging? [exit]
 				set [spc: _: item: _: subitem:] drag-path
 				unless spc =? path/-1 [exit]				;-- dragging started inside another space - ignore it
-				scrollable-space/move-by/scale
-					get path/-1
+				scrollable: get path/-1
+				scrollable/move-by/scale
 					switch/default subitem [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
 					switch subitem [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
 					any [select [hscroll x vscroll y] item  exit]
