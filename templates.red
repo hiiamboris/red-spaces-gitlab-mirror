@@ -474,11 +474,13 @@ scrollable-space: context [
 			if hdraw?: box/x < csz/x [box/y: max 0 canvas/y - space/hscroll/size/y]
 			if vdraw?: box/y < csz/y [box/x: max 0 canvas/x - space/vscroll/size/x]
 		]
-		space/hscroll/size/x: either hdraw? [box/x][0]
-		space/vscroll/size/y: either vdraw? [box/y][0]
+		space/hscroll/size/x: box/x * hmask: pick [1 0] hdraw?
+		space/vscroll/size/y: box/y * vmask: pick [1 0] vdraw?
 		
 		;; size is canvas along fill=1 dimensions and min(canvas,csz+scrollers) along fill=0
-		scrollers: space/vscroll/size/x by space/hscroll/size/y
+		scrollers: as-pair
+			space/vscroll/size/x * vmask
+			space/hscroll/size/y * hmask
 		sz1: min canvas csz + scrollers  sz2: canvas
 		space/size: (max 0x0 sz2 - sz1) * (max 0x0 fill) + sz1
 		; echo [sz1 sz2 canvas csz space/size]
