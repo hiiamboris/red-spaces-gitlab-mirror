@@ -463,7 +463,7 @@ scrollable-space: context [
 			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
 			cdraw: render/on space/content encode-canvas box fill
 		]
-		csz: cspace/size		
+		csz: cspace/size
 		origin: space/origin							;-- must be read after render (& possible roll)
 		;; no origin clipping can be done here, otherwise it's changed during intermediate renders
 		;; and makes it impossible to scroll to the bottom because of window resizes!

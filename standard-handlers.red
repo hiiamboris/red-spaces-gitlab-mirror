@@ -27,6 +27,8 @@ define-handlers [
 				; item = space/content [pass]				;-- let content handle it, but still start dragging
 				; item = none []							;-- dragging by the empty area of scrollable
 			]
+			;; remove cells or other content from the path, as they do not have to persist during window moves:
+			unless find [hscroll vscroll] item [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
 			start-drag path
 		]
