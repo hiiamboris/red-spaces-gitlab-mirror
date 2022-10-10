@@ -442,14 +442,14 @@ scrollable-space: context [
 		;; sizing policy (for cell, scrollable, window):
 		;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
 		;; - use canvas/size if it's less than content/size or if fill flag is set
+		set [canvas: fill:] decode-canvas canvas
 		if any [
 			space/content =? none 
-			all [canvas  zero? area? canvas]
+			any [canvas/x = 0 canvas/y = 0]				;-- `area?` overflows here
 		][
 			set-empty-size space canvas
 			return quietly space/map: []
 		]
-		set [canvas: fill:] decode-canvas canvas
 		box: canvas: constrain canvas space/limits		;-- 'box' is viewport - area not occupied by scrollbars
 		cspace: get space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
@@ -1098,6 +1098,7 @@ inf-scrollable-ctx: context [
 	roll: function [space [object!]] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
+		unless find space/map 'window [exit]			;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
 		#assert [window/size "window must be rendered before it's rolled"]
 		wsize:  window/size
@@ -1140,7 +1141,11 @@ inf-scrollable-ctx: context [
 		timer/rate: either any-scrollers? [4][0]		;-- timer is turned off when unused
 		;; scrollable/draw removes roll-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
-		repend space/map [in space 'roll-timer [offset 0x0 size 0x0]]
+		;; (can't use repend, as map may be a static block)
+		quietly space/map: compose [
+			(space/map)
+			(in space 'roll-timer) [offset 0x0 size 0x0]
+		]
 		#debug sizing [#print "inf-scrollable with (space/content) on (canvas) -> (space/size) window: (space/window/size)"]
 		#assert [any [not find space/map 'window  space/window/size]  "window should have a finite size if it's exposed"]
 		drawn
