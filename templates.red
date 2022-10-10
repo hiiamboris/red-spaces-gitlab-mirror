@@ -479,8 +479,8 @@ scrollable-space: context [
 		
 		;; size is canvas along fill=1 dimensions and min(canvas,csz+scrollers) along fill=0
 		scrollers: space/vscroll/size/x by space/hscroll/size/y
-		sz1: min canvas csz + scrollers  sz2: max canvas csz + scrollers
-		space/size: (sz2 - sz1) * (max 0x0 fill) + sz1
+		sz1: min canvas csz + scrollers  sz2: canvas
+		space/size: (max 0x0 sz2 - sz1) * (max 0x0 fill) + sz1
 		; echo [sz1 sz2 canvas csz space/size]
 		box: min box (space/size - scrollers)			;-- reduce viewport
 		
