@@ -24,7 +24,7 @@ define-handlers [
 						back-page   [space/move-by 'page 'back  axis]
 					]
 				]
-				; item = space/content [pass]				;-- let content handle it, but still start dragging
+				item = space/content [pass]				;-- let content handle it, but still start dragging (e.g. grid-view within grid-view)
 				; item = none []							;-- dragging by the empty area of scrollable
 			]
 			;; remove cells or other content from the path, as they do not have to persist during window moves:
