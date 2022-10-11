@@ -1904,7 +1904,8 @@ grid-ctx: context [
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
-			cspace: get name: grid/cells/pick cell
+			unless name: grid/cells/pick cell [continue]
+			cspace: get name
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
 				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
