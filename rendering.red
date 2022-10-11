@@ -84,7 +84,10 @@ context [
 			next-gen: attempt [current-generation]
 			last-gen = next-gen
 			word? :space/owner
-			assert [(get space/owner) =? (get new-owner) "Owner sharing detected!"]
+			unless (get space/owner) =? (get new-owner) [
+				print `"*** Warning on rendering of (get-space-name space):"`
+				assert [(get space/owner) =? (get new-owner) "Owner sharing detected!"]
+			]
 		]
 	]
 
