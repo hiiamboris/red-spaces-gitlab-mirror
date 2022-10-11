@@ -64,7 +64,7 @@ view/no-wait/options [
 				;; trick: this cell style uses the same canvas size to ensure cache hits
 				set-style 'grid/grid-view function [gview] reshape [
 					drawn: gview/draw
-					compose/only [scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)]
+					compose/only [scale (cell-size/x / max 1 gview/size/x) (cell-size/y / max 1 gview/size/y) (drawn)]
 				]
 				;; this calls draw recursively and creates a self-containing draw block
 				;; but at the top level it is clipped at certain depth level,

@@ -84,7 +84,7 @@ view/no-wait/options [
 						drawn: gview/draw
 						compose/only [
 							fill-pen !(system/view/metrics/colors/panel) box 0x0 (cell-size)
-							scale (cell-size/x / gview/size/x) (cell-size/y / gview/size/y) (drawn)
+							scale (cell-size/x / max 1 gview/size/x) (cell-size/y / max 1 gview/size/y) (drawn)
 						]
 					]
 					old-draw: :draw
