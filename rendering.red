@@ -74,8 +74,20 @@ combine-style: function [
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
-	get-space-name: function [space [object!]][
+	get-space-name: function [space [object!]] [
 		any [all [block? :space/last-frame space/last-frame/1] 'unknown]		;@@ REP #113
+	]
+	check-owner-override: function [space [object!] new-owner [word!]] [	;-- only used before changing the /owner
+		if all [
+			block? space/last-frame
+			last-gen: space/last-frame/2
+			next-gen: attempt [current-generation]
+			last-gen = next-gen
+			word? :space/owner
+		][
+			assert [space/owner = new-owner]			;-- this check is only for better looking error report (with the names)
+			assert [(get space/owner) =? (get new-owner)]
+		]
 	]
 
 	;@@ move this somewhere else
@@ -130,7 +142,7 @@ context [
 	
 	set 'invalidate-cache function [space [object!]][	;-- to be used by custom invalidators
 		if space/cache = 'valid [
-			#debug cache [#print "Invalidating (any [space/last-frame/1 'unknown]) of size=(space/size)"]
+			#debug cache [#print "Invalidating (get-space-name space) of size=(space/size)"]
 			clear get word: space/cache
 			quietly space/cache: bind 'invalid context? word
 		]
@@ -190,7 +202,7 @@ context [
 		]
 		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
-			name: any [space/last-frame/1 'unknown]
+			name: get-space-name space
 			if cache [period: 2 + length? cache/-1]
 			either node [
 				n: (length? cache) / period
@@ -229,7 +241,7 @@ context [
 		rechange node words
 		quietly space/cache: bind 'valid context? word
 		#debug cache [
-			name: any [space/last-frame/1 'unknown]
+			name: get-space-name space
 			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 		#debug profile [prof/manual/end 'cache]
@@ -314,7 +326,10 @@ context [
 			] "Negative infinity canvas detected!"
 		]
 
-		unless tail? current-path [quietly space/owner: last current-path]
+		unless tail? current-path [
+			#debug cache [check-owner-override space last current-path]
+			quietly space/owner: last current-path
+		]
 		with-style name [
 			window?: all [
 				any [xy1 xy2]
