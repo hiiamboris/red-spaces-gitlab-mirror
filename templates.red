@@ -127,7 +127,7 @@ compose-map: function [
 ]
 
 
-declare-template 'timer/space []						;-- template space for timers (space has /rate anyway now)
+declare-template 'timer/space [cache: off]				;-- template space for timers (space has /rate anyway now)
 
 ;@@ move to auxi?
 constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] [
