@@ -1905,11 +1905,11 @@ grid-ctx: context [
 		for irow row1 row2 [
 			cell: index by irow
 			unless name: grid/cells/pick cell [continue]
-			cspace: get name
+			cspace: get cname: grid/wrap-space cell name		;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
-				render/on name encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
+				render/on cname encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
-				render/on name canvas
+				render/on cname canvas
 				h: cspace/size/y
 			]
 			span: grid/get-span cell1: grid/get-first-cell cell
