@@ -78,15 +78,13 @@ context [
 		any [all [block? :space/last-frame space/last-frame/1] 'unknown]		;@@ REP #113
 	]
 	check-owner-override: function [space [object!] new-owner [word!]] [	;-- only used before changing the /owner
-		if all [
+		all [
 			block? space/last-frame
 			last-gen: space/last-frame/2
 			next-gen: attempt [current-generation]
 			last-gen = next-gen
 			word? :space/owner
-		][
-			assert [space/owner = new-owner]			;-- this check is only for better looking error report (with the names)
-			assert [(get space/owner) =? (get new-owner)]
+			assert [(get space/owner) =? (get new-owner) "Owner sharing detected!"]
 		]
 	]
 
@@ -327,7 +325,7 @@ context [
 		]
 
 		unless tail? current-path [
-			#debug cache [check-owner-override space last current-path]
+			#debug [check-owner-override space last current-path]
 			quietly space/owner: last current-path
 		]
 		with-style name [
