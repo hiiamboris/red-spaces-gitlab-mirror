@@ -49,7 +49,7 @@ declare-template 'web/inf-scrollable [
 					rotate (a + (sec / 2)) (levels)
 				]
 			]
-			self/size: none
+			set-quiet in self 'size none				;-- circumvent pair type check without declaring a new class
 			compose/only [translate (center) (sec-draw)]
 		]
 	]

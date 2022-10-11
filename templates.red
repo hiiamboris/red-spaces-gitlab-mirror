@@ -38,7 +38,7 @@ init-cache: function [space [object!]] [
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
 	draw:  []
-	size:  0x0
+	#type =? [pair!]   size:  0x0						;-- none (infinite) must be allowed explicitly by templates supporting it
 	cache: [size]										;-- `drawn` is an exception and not held in the space, so just `size`
 	owner: none
 	#type =? :invalidates   limits: none
@@ -232,7 +232,6 @@ image-ctx: context [
 		#type =? :invalidates   weight: 0
 		#type =? :invalidates   data:   none			;-- images are not recyclable, so `none` by default
 		
-		size: none
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 	]
 ]
@@ -432,7 +431,7 @@ scrollable-space: context [
 			if r/1 =? space/content [
 				cspace: get space/content
 				r/2: r/2 - space/origin
-				unless any [name  within? r/2 0x0 cspace/size] [r: none]
+				unless any [name  0x0 +<= r/2 +< cspace/size] [r: none]
 			]
 		]
 		r
@@ -537,13 +536,15 @@ scrollable-space: context [
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		scroll-timer: make-space 'timer [rate: 0]
 
-		map:   reduce [content [offset: 0x0 size: 0x0]]
+		map:   []
 		cache: [size map]
 
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
 		]
-		viewport: does [map/2/size]						;-- much better than subtracting scrollers; avoids exposing internal details
+		viewport: does [								;-- much better than subtracting scrollers; avoids exposing internal details
+			any [all [map/2 map/2/size] 0x0]			;@@ REP #113
+		]
 
 		move-by: func [
 			"Offset viewport by a fixed amount"
@@ -776,7 +777,6 @@ container-ctx: context [
 	]
 
 	declare-template 'container/space [
-		size:    none									;-- only available after `draw` because it applies styles
 		#type =? :invalidates-look   origin:  0x0		;-- used by ring layout to center itself around the pointer
 		#type    :invalidates   content: []
 		
@@ -806,6 +806,7 @@ list-ctx: context [
 	~: self
 		
 	declare-template 'list/container [
+		#type [pair! none!]     size:    0x0			;-- allow infinite lists
 		#type =  :invalidates   axis:    'x
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
 		;@@ VID layout styles may include nonzero spacing as defaults, unless tight option is used
@@ -1032,7 +1033,7 @@ window-ctx: context [
 		either function? cavail?: select cspace 'available? [	;-- use content/available? when defined
 			cavail? axis dir from requested
 		][														;-- otherwise deduce from content/size
-			csize: any [cspace/size 0x0]						;@@ or assume infinity if no /size in content?
+			csize: any [cspace/size infxinf]
 			clip [0 requested] either dir < 0 [from][csize/:axis - from]
 		]
 	]
@@ -1102,11 +1103,11 @@ inf-scrollable-ctx: context [
 		window: space/window
 		unless find space/map 'window [exit]			;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
-		#assert [window/size "window must be rendered before it's rolled"]
+		#assert [window/size]
 		wsize:  window/size
 		before: negate space/origin						;-- area before the current viewport offset
 		#assert [space/map/window]						;-- roll attempt on an empty viewport, or map is invalid?
-		viewport: space/map/window/size
+		viewport: space/viewport
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
@@ -1157,7 +1158,7 @@ inf-scrollable-ctx: context [
 		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
 
-		window: make-space 'window [size: none]			;-- size is set by window/draw
+		window: make-space 'window []
 		content: 'window
 
 		;; timer that calls `roll` when dragging
@@ -1835,7 +1836,7 @@ grid-ctx: context [
 		#assert [frame/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
 		default wxy1: 0x0
-		unless wxy2 [wxy2: wxy1 + grid/calc-size]
+		unless wxy2 [wxy2: wxy1 + calc-size grid]
 		xy1: max 0x0 wxy1 - grid/origin
 		xy2: max 0x0 min xy1 + canvas wxy2
 
@@ -1850,7 +1851,7 @@ grid-ctx: context [
 		xy2: max xy1 xy2
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
-		all [none? grid/size  not grid/infinite?  grid/calc-size]
+		all [none? grid/size  not grid/infinite?  calc-size grid]
 		#assert [any [grid/infinite? grid/size]]		;-- must be set by calc-size or carried over from the previous render
 
 		quietly grid/map: make block! 2 * area? cell2 - cell1 + 1
@@ -2081,12 +2082,10 @@ grid-ctx: context [
 	
 	do-invalidate: function [grid [object!]] [
 		foreach [cell scope] grid/frame/invalid [
-			either cell [
-				if scope = 'size [
+			if scope = 'size [
+				either cell [
 					invalidate-xy grid pick find/same grid/frame/cells cell -2
-				]
-			][
-				if scope = 'size [
+				][
 					quietly grid/size: none
 				]
 			]
@@ -2094,7 +2093,9 @@ grid-ctx: context [
 	]
 	
 	declare-template 'grid/space [
-		size:    none						;-- only available after `draw` because it applies styles
+		;; grid's /size can be 'none' in two cases: either it's infinite, or it's size was invalidated and needs a calc-size() call
+		#type [pair! none!]   size: none
+		
 		#type =? :invalidates   margin:  5x5
 		#type =? :invalidates   spacing: 5x5
 		#type =? :invalidates-look   origin:  0x0	;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
@@ -2236,17 +2237,15 @@ grid-ctx: context [
 		]
 
 		;; returns a block [x: y:] with possibly `none` (unlimited) values ;@@ REP #116 could solve this
-		;@@ maybe obsolete (hide) this, since now there's valid /size
+		;@@ maybe obsolete (hide) this, since now there's valid /size? although /size can't account for half-infinite bounds
+		;@@ I also don't like the name, 'bounds' is too confusing (how is it different from /size?)
 		calc-bounds: function ["Estimate total size of the grid in cells (in case bounds set to 'auto)"] [
 			~/calc-bounds self
 		]
 	
-		;@@ maybe obsolete (hide) this, since now there's valid /size
-		calc-size: function ["Estimate total size of the grid in pixels"] [
-			~/calc-size self
-		]
+		;; hidden because /size should be valid now, and this function triggered out of tree rendering
+		; calc-size: function ["Estimate total size of the grid in pixels"] [~/calc-size self]
 
-		;; does not use canvas, dictates it's own size
 		draw: function [/on canvas [pair! none!] /window xy1 [none! pair!] xy2 [none! pair!]] [
 			~/draw self canvas xy1 xy2
 		]
@@ -2269,7 +2268,7 @@ grid-view-ctx: context [
 		r: case [
 			dir < 0 [from]
 			bounds/:axis [
-				size: grid/calc-size					;@@ optimize calc-size?
+				size: grid-ctx/calc-size grid			;@@ maybe /size will be enough?
 				max 0 size/:axis - from
 			]
 			'infinite [requested]
@@ -2620,7 +2619,6 @@ field-ctx: context [
 		field [object!]
 	][
 		cmargin: field/caret/look-around
-		#assert [field/size]							;-- must be rendered first!
 		;; layout may be invalidated by a series of keys, second key will call `adjust` with no layout
 		;; also changes to text in the event handler effectively make current layout obsolete for caret-to-offset estimation
 		;; field can just rebuild it since canvas is always known (infinite) ;@@ area will require different canvas..
@@ -2713,8 +2711,8 @@ field-ctx: context [
 	declare-template 'field/space [
 		;; own facets:
 		weight:   1
-		#type =? :invalidates-look   origin:   0				;-- non-positive, offset(px) of text within the field
-		#type =? :invalidates-look   selected: none			;-- none or pair (offsets of selection start & end)
+		#type =? :invalidates-look   origin:   0		;-- non-positive, offset(px) of text within the field
+		#type =? :invalidates-look   selected: none		;-- none or pair (offsets of selection start & end)
 		history:  make block! 100						;-- saved states
 		map:      []
 		cache:    [size map]
