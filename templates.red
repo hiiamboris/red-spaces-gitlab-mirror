@@ -1111,20 +1111,22 @@ inf-scrollable-ctx: context [
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
-		foreach x [x y] [
-			any [										;-- prioritizes left/up jump over right/down
-				all [
-					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wofs'/:x space/jump-length
-					wofs'/:x: wofs'/:x - avail
-				]
-				all [
-					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
-					wofs'/:x: wofs'/:x + avail
+		with-style in space 'window [with-style window/content [	;-- add window/content to the styling path
+			foreach x [x y] [
+				any [									;-- prioritizes left/up jump over right/down
+					all [
+						before/:x <= space/look-around
+						0 < avail: window/available? x -1 wofs'/:x space/jump-length
+						wofs'/:x: wofs'/:x - avail
+					]
+					all [
+						after/:x  <= space/look-around
+						0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
+						wofs'/:x: wofs'/:x + avail
+					]
 				]
 			]
-		]
+		]]
 		;; transfer offset from scrollable into window, in a way detectable by on-change
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
@@ -1209,6 +1211,7 @@ list-view-ctx: context [
 		canvas [pair!]    "Canvas on which it is rendered; positive!"
 		level  [integer!] "Offset in pixels from the 0 of main axis"
 	][
+		#assert ['list = last current-path  "Out of tree rendering detected!"]
 		#assert [0x0 +<= canvas]						;-- shouldn't happen - other funcs must pass positive canvas here
 		x: list/axis
 		if level < list/margin/:x [return compose [margin 1 (level)]]

@@ -254,8 +254,8 @@ context [
 		clear body-of :commit-cache
 	]
 	
-	;-- draw code has to be evaluated after current-path changes, for inner calls to render to succeed
-	with-style: function [
+	;; draw code has to be evaluated after current-path changes, for inner calls to render to succeed
+	set 'with-style function [							;-- exported for an ability to spoof the tree (for roll, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
 		name [word!] code [block!]
 	][
