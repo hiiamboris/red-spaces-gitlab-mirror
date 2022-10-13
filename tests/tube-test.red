@@ -1,8 +1,6 @@
 Red [needs: view]
 
-;; fun: this demo contains 7840 spaces!
-;; (as shown by dump-tree output, most of it comes from `field` usage, which has hidden scrollers)
-;; as a result, just physically drawing it takes 15-20ms! and it's a bit laggy
+;; fun: this demo contains 1787 spaces! and no lag except for the initial tree construction delay!
 
 ; recycle/off					
 #include %../../common/include-once.red
@@ -45,7 +43,7 @@ set-style 'tube function [tube /on canvas [pair! none!]] [
 
 declare-template 'heading/data-view []
 
-boxes: lay-out-vids [
+boxes: [
 	field 60x30 "A"
 	field 50x40 "B"
 	field 40x50 "C"
@@ -63,7 +61,7 @@ tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [
 	keep compose [
 		style vlist: vlist margin= 5x5 spacing= 5x5
-		style tube:  tube  margin= 5x5 spacing= 5x5 content= boxes
+		style tube:  tube  margin= 5x5 spacing= 5x5
 	]
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
 	; for-each [/i axes] [ [↓ →] ][
@@ -80,7 +78,7 @@ tubes: collect [
 				compose/deep/only [
 					vlist [
 						text text=(#composite "align: (mold align)")
-						tube axes=(axes) align=(align) limits=(lim1 .. lim2) 
+						tube axes=(axes) align=(align) limits=(lim1 .. lim2) content= lay-out-vids boxes 
 					]
 				]
 			]
