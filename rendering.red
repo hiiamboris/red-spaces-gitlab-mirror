@@ -279,18 +279,20 @@ context [
 		]
 
 		current-generation: face/generation + 1.0
-		with-style anonymize 'host face [				;-- required for `same-paths?` to have a value (used by cache)
-			style: apply-current-style face				;-- host style can only be a block
-			canvas: if face/size [encode-canvas face/size -1x-1]	;-- fill by default
-			drawn: render-space/on face/space canvas
-			#assert [block? :drawn]
-			unless face/size [							;-- initial render: define face/size
-				space: get face/space
-				#assert [space/size]
-				face/size: space/size
-				style: apply-current-style face			;-- reapply the host style using new size
+		without-GC [									;-- speeds up render by 60%
+			with-style anonymize 'host face [			;-- required for `same-paths?` to have a value (used by cache)
+				style: apply-current-style face			;-- host style can only be a block
+				canvas: if face/size [encode-canvas face/size -1x-1]	;-- fill by default
+				drawn: render-space/on face/space canvas
+				#assert [block? :drawn]
+				unless face/size [						;-- initial render: define face/size
+					space: get face/space
+					#assert [space/size]
+					face/size: space/size
+					style: apply-current-style face		;-- reapply the host style using new size
+				]
+				drawn: combine-style drawn style
 			]
-			drawn: combine-style drawn style
 		]
 		face/generation: current-generation
 		any [drawn copy []]								;-- drawn=none in case of error during render

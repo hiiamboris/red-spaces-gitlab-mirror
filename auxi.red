@@ -44,6 +44,13 @@ using: function [
 	with words code
 ]
 
+without-GC: func [
+	"Evaluate CODE with GC temporarily turned off"
+	code [block!]
+][
+	sort/compare [1 1] func [a b] code
+]
+
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
 ;; since it's for layout usage only, I don't care about a few allocated objects, no need to optimize it
 ;; ranges are used by spaces to constrain their size, but those are read-only
