@@ -11,7 +11,7 @@ Red [
 declare-template 'zoomer/box [
 	zoom: [x: 1.0 y: 1.0]
 	;; replaces host/size to exclude face resizing from workflow, which allows for better responsiveness
-	#type =? :spaces/ctx/invalidates canvas: 0x0 
+	canvas: 0x0		#type =? :spaces/ctx/invalidates  
 	; draw: function [/on canvas [pair! none!]] [
 	draw: function [] [
 		canvas': if canvas [

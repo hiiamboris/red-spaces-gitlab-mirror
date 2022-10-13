@@ -75,11 +75,10 @@ combine-style: function [
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
 	get-space-name: function [space [object!]] [
-		any [all [block? :space/last-frame space/last-frame/1] 'unknown]		;@@ REP #113
+		any [space/last-frame/1 'unknown]				;@@ REP #113
 	]
 	check-owner-override: function [space [object!] new-owner [word!]] [	;-- only used before changing the /owner
 		all [
-			block? space/last-frame
 			last-gen: space/last-frame/2
 			next-gen: attempt [current-generation]
 			last-gen = next-gen

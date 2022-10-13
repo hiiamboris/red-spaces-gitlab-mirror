@@ -107,7 +107,7 @@ context with spaces/ctx [
 		layout: space/layout							;-- set by draw
 		if override: select space 'color [color: override]
 		compose/deep [
-			translate (space/margin) [
+			translate (1x1 * space/margin) [
 				pen (shade)								;-- outline to make text more legible on gray bgnd
 				text  1x0 (layout) text 0x1  (layout)
 				text -1x0 (layout) text 0x-1 (layout)

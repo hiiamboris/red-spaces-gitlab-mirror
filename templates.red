@@ -37,19 +37,32 @@ init-cache: function [space [object!]] [
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
-	draw:  []
-	#type =? [pair!]   size:  0x0						;-- none (infinite) must be allowed explicitly by templates supporting it
-	cache: [size]										;-- `drawn` is an exception and not held in the space, so just `size`
-	owner: none
-	#type =? :invalidates   limits: none
+	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
+	owner:  none	#type [word! none!]
+	draw:   []   	#type [block! function!]
+	;-- `drawn` is an exception and not held in the space, so just `size`
+	cache:  [size]	#type [block!  word! (find [valid invalid] cache)  logic! (cache = off)]
+	limits: none	#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
-	last-frame: make block! 3							;-- used internally to check if space is connected to the tree
+	last-frame: make block! 3	#type [block!]			;-- used internally to check if space is connected to the tree
 ]
 
-modify-class 'space [									;-- a trick not to enforce `rate:` presence but still typecheck it
-	#type =? [none! integer! float! time!] :timers/on-rate-change
-	(any [rate =? none  rate >= 0])
-	rate: none
+;; a trick not to enforce some facets (saves RAM) but still provide default typechecks for them:
+;; (specific values are only for readability here and they have no effect)
+modify-class 'space [
+	map:     []		#type [block!]
+	into:    none	#type [function!]
+	rate:    none	#type =? :timers/on-rate-change
+					[none! integer! float! time!]
+					(any [rate =? none  rate >= 0])
+	color:   none	#type =? :invalidates-look [tuple! none!]
+	margin:  0		#type =? :invalidates [integer! pair!] (0x0 +<= (margin * 1x1))
+	spacing: 0		#type =? :invalidates [integer! pair!] (0x0 +<= (spacing * 1x1))
+	weight:  0		#type =? :invalidates [number!] (weight >= 0)
+	origin:  0x0	#type =? :invalidates-look [pair!]
+	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
+	command: []		#type [block! paren!]
+	on-invalidate: 	#type [function! none!]
 ]	
 
 ;@@ TODO: use classes to replace this with a more reliable check
@@ -142,7 +155,7 @@ set-empty-size: function [space [object!] canvas [pair! none!]] [
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
 put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
-	weight: 1
+	weight: 0
 	draw: function [/on canvas [pair! none!]] [
 		set-empty-size self canvas
 		[]
@@ -153,8 +166,8 @@ rectangle-ctx: context [
 	~: self
 	
 	declare-template 'rectangle/space [
-		#type =? :invalidates   size:   20x10
-		#type =? :invalidates   margin: 0
+		size:   20x10	#on-change :invalidates
+		margin: 0
 		draw:   does [compose [box (margin * 1x1) (size - margin)]]
 	]
 ]
@@ -178,9 +191,9 @@ triangle-ctx: context [
 	]
 		
 	declare-template 'triangle/space [
-		#type =? :invalidates   size:    16x10
-		#type =  :invalidates   dir:     'n
-		#type =? :invalidates   margin:  0
+		size:    16x10	#on-change :invalidates
+		dir:     'n		#type =    :invalidates [word!] (find [n s w e] dir)
+		margin:  0
 		
 		;@@ need `into` here? or triangle will be a box from the clicking perspective?
 		draw: does [~/draw self]
@@ -228,9 +241,9 @@ image-ctx: context [
 	]
 
 	declare-template 'image/space [
-		#type =? :invalidates   margin: 0
-		#type =? :invalidates   weight: 0
-		#type =? :invalidates   data:   none			;-- images are not recyclable, so `none` by default
+		margin: 0
+		weight: 0
+		data:   none	#type =? :invalidates			;-- images are not recyclable, so `none` by default
 		
 		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 	]
@@ -275,14 +288,12 @@ cell-ctx: context [
 	]
 	
 	declare-template 'box/space [
-		#type =? :invalidates   margin:  0x0			;-- useful for drawing inner frame, which otherwise would be hidden by content
-		#type =? :invalidates   weight:  1				;@@ what default weight to use? what default alignment?
-		
-		#type =? :invalidates-look (find allowed-alignments align)
-		align:   0x0									;@@ consider more high level VID-like specification of alignment
-		
-		#type =? :invalidates [word! none!]
-		content: none
+		;; margin is useful for drawing inner frame, which otherwise would be hidden by content
+		margin:  0
+		weight:  0										;@@ what default weight to use? what default alignment?
+		;@@ consider more high level VID-like specification of alignment
+		align:   0x0	#type =? :invalidates-look (find allowed-alignments align)
+		content: none	#type =? :invalidates [word! none!]
 		
 		map:     []
 		cache:   [size map]
@@ -352,19 +363,20 @@ scrollbar: context [
 	
 	declare-template 'scrollbar/space [
 		;@@ maybe leverage canvas size?
-		#type =? :invalidates   size:       100x16		;-- opposite axis defines thickness
-		#type =  :invalidates   axis:       'x
-		#type =? :invalidates-look   offset:     0%
-		#type =? :invalidates-look   amount:     100%
-		#type =? :invalidates-look   arrow-size: 90%	;-- arrow length in percents of scroller's thickness 
+		size:       100x16	#type =? :invalidates		;-- opposite axis defines thickness
+		axis:       'x		#type =  :invalidates [word!] (find [x y] axis)
+		offset:     0%		#type =? :invalidates-look [number!] (all [0 <= offset offset <= 1])
+		amount:     100%	#type =? :invalidates-look [number!] (all [0 <= amount amount <= 1])
+		;; arrow length in percents of scroller's thickness:
+		arrow-size: 90%		#type =? :invalidates-look [number!] (0 <= arrow-size) 
 		
 		map:         []
 		cache:       [size map]
-		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] ;-- go back a step
-		back-page:   make-space 'rectangle [draw: []]           ;-- go back a page
-		thumb:       make-space 'rectangle [margin: 2x1]        ;-- draggable
-		forth-page:  make-space 'rectangle [draw: []]           ;-- go forth a page
-		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] ;-- go forth a step
+		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] #type (space? back-arrow)		;-- go back a step
+		back-page:   make-space 'rectangle [draw: []]           #type (space? back-page)		;-- go back a page
+		thumb:       make-space 'rectangle [margin: 2x1]        #type (space? thumb)			;-- draggable
+		forth-page:  make-space 'rectangle [draw: []]           #type (space? forth-page)		;-- go forth a page
+		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		draw: does [~/draw self]
@@ -521,20 +533,20 @@ scrollable-space: context [
 	]
 		
 	declare-template 'scrollable/space [
-		; cache: off
 		;@@ make limits a block to save some RAM?
 		; limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		
-		#type =? :invalidates-look   origin: 0x0		;-- at which point `content` to place: >0 to right below, <0 to left above
-		#type =? :invalidates        weight: 1
-		#type =? :invalidates-look   content: none		;-- should be defined (overwritten) by the user
-		#type =  :invalidates-look   content-flow: 'planar		;-- one of: planar, vertical, horizontal
+		;; at which point `content` to place: >0 to right below, <0 to left above:
+		origin:       0x0
+		weight:       1
+		content:      none		#type =? :invalidates [word! none!]	;-- should be defined (overwritten) by the user
+		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
 		
-		hscroll: make-space 'scrollbar [axis: 'x]
-		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]
+		hscroll: make-space 'scrollbar [axis: 'x]						#type (space? hscroll)
+		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]	#type (space? vscroll)
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		scroll-timer: make-space 'timer [rate: 0]
+		scroll-timer: make-space 'timer [rate: 0]						#type (space? scroll-timer)
 
 		map:   []
 		cache: [size map]
@@ -542,9 +554,10 @@ scrollable-space: context [
 		into: func [xy [pair!] /force name [word! none!]] [
 			~/into self xy name
 		]
+		
 		viewport: does [								;-- much better than subtracting scrollers; avoids exposing internal details
 			any [all [map/2 map/2/size] 0x0]			;@@ REP #113
-		]
+		] #type [function!]
 
 		move-by: func [
 			"Offset viewport by a fixed amount"
@@ -554,7 +567,7 @@ scrollable-space: context [
 			/scale factor [number!] "Default: 0.8 for page, 1 for the rest"
 		][
 			~/move-by self amount dir axis factor
-		]
+		] #type [function!]
 
 		move-to: function [
 			"Ensure point XY of content is visible, scroll only if required"
@@ -562,14 +575,14 @@ scrollable-space: context [
 			/margin mrg [integer! pair!] "How much space to reserve around XY (default: 0)"
 		][
 			~/move-to self xy mrg
-		]
+		] #type [function!]
 		
 		clip-origin: function [
 			"Change the /origin facet, ensuring no empty area is shown"
 			origin [pair!] "Clipped between (viewport - scrollable/size) and 0x0"
 		][
 			~/set-origin self origin
-		]
+		] #type [function!]
 	
 		draw: function [/on canvas [none! pair!]] [~/draw self canvas]
 	]
@@ -697,34 +710,32 @@ paragraph-ctx: context [
 		compose [text (1x1 * space/margin) (layout)]
 	]
 	
- 	declare-template 'paragraph/space [
-		#type    :invalidates   text:   ""				;-- every assignment counts as space doesn't know if string itself changed
-		#type    :invalidates   flags:  [wrap]			;-- [bold italic underline wrap] supported
-		#type =? :invalidates   margin: 0x0				;-- default = no margin
+ 	declare-template 'text/space [
+		text:   ""		#type    :invalidates [any-string!]	;-- every assignment counts as space doesn't know if string itself changed
+		flags:  []		#type    :invalidates [block!]	;-- [bold italic underline wrap] supported ;@@ typecheck that all flags are words
 		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
 		;; styles may override `/font` with another font created in advance 
-		#type =? :invalidates   font:   none			;-- can be set in style, as well as margin
-		;@@ maybe put color change into space-object?
-		#type =? :invalidates-look   color:  none		;-- placeholder for user to control
-		#type =? :invalidates   weight: 1				;-- used by tube, should trigger a re-render
+		font:   none									;-- can be set in style, as well as margin
+		color:  none									;-- placeholder for user to control
+		margin: 0
+		weight: 0										;-- no point in stretching single-line text as it won't change
 
-		layout: none									;-- last rendered layout, text size is kept in layout/extra
-		cache:  [size layout]
-		
-		draw: func [/on canvas [pair! none!]] [~/draw self canvas]
+		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
+		quietly cache:  [size layout]
+		quietly draw: func [/on canvas [pair! none!]] [~/draw self canvas]
 	]
 
 	;; unlike paragraph, text is never wrapped
-	declare-template 'text/paragraph [
-		quietly weight: 0
-		quietly flags:  []
+	declare-template 'paragraph/text [
+		quietly weight: 0								;-- used by tube, should trigger a re-render
+		quietly flags:  [wrap]
 	]
 
 	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
 	declare-template 'link/paragraph [
-		quietly flags:   [wrap underline]
-		quietly color:   50.80.255								;@@ color should be taken from the OS theme
-		quietly command: [browse as url! text]
+		quietly flags: [wrap underline]
+		quietly color: 50.80.255						;@@ color should be taken from the OS theme
+		command: [browse as url! text]					;-- can't use 'quietly' or no set-word = no facet
 	]
 ]
 
@@ -777,13 +788,13 @@ container-ctx: context [
 	]
 
 	declare-template 'container/space [
-		#type =? :invalidates-look   origin:  0x0		;-- used by ring layout to center itself around the pointer
-		#type    :invalidates   content: []
+		origin:  0x0									;-- used by ring layout to center itself around the pointer
+		content: []		#type :invalidates				;-- no type check as user may redefine it and /items freely
 		
-		#type =? :invalidates
 		items: function [/pick i [integer!] /size] [
 			either pick [content/:i][length? content]
-		]
+		] #type :invalidates [function!]
+		
 		map:   []
 		cache: [size map]
 		into: func [xy [pair!] /force name [word! none!]] [
@@ -806,19 +817,17 @@ list-ctx: context [
 	~: self
 		
 	declare-template 'list/container [
-		#type [pair! none!]     size:    0x0			;-- allow infinite lists
-		#type =  :invalidates   axis:    'x
+		size:    0x0	#type [pair! none!]				;-- 'none' to allow infinite lists
+		axis:    'x		#type =  :invalidates [word!] (find [x y] axis)
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
-		;@@ VID layout styles may include nonzero spacing as defaults, unless tight option is used
-		#type =? :invalidates   margin:  0x0
-		#type =? :invalidates   spacing: 0x0
+		margin:  0
+		spacing: 0
 		;@@ TODO: alignment?
-		; cache:    off
 
-		container-draw: :draw
+		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair! none!]] [
 			settings: [axis margin spacing canvas limits]
-			container-draw/layout 'list settings; xy1 xy2
+			container-draw/layout 'list settings
 		]
 	]
 ]
@@ -828,13 +837,13 @@ ring-ctx: context [
 	
 	declare-template 'ring/container [
 		;; in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
-		#type =? :invalidates-look   angle:  0
+		angle:  0	#type =? :invalidates-look [integer! float!]
 		;; minimum distance (pixels) from the center to the nearest point of arranged items
-		#type =? :invalidates   radius: 50
+		radius: 50	#type =? :invalidates [integer! float!]
 		;; whether items should be considered round, not rectangular
-		#type =? :invalidates   round?: no
+		round?: no	#type =? :invalidates [logic!]
 
-		container-draw: :draw
+		container-draw: :draw	#type [function!]
 		draw: does [container-draw/layout 'ring [angle radius round?]]
 	]
 ]
@@ -845,7 +854,7 @@ icon-ctx: context [
 		
 	declare-template 'icon/list [
 		axis:   'y
-		margin: 0x0
+		margin: 0
 		
 		;@@ TODO: image should be also aligned by a box, when icon fills the canvas
 		;@@ or set icon weight to 0 and don't let list stretch zero-weight spaces
@@ -854,13 +863,11 @@ icon-ctx: context [
 			text:  make-space 'paragraph []
 			box:   make-space 'box [content: 'text]		;-- used to align paragraph
 			set 'content [image box]
-		]
-
-		#on-change [space word value] [space/spaces/image/data: value]
-		image:  none
+		] #type [object!]
 		
-		#on-change [space word value] [space/spaces/text/text: value]
-		text:   ""
+		;; exposed inner facets for easier access
+		image:  none	#on-change [space word value] [space/spaces/image/data: value]
+		text:   ""		#on-change [space word value] [space/spaces/text/text:  value]
 	]
 ]
 
@@ -870,12 +877,17 @@ tube-ctx: context [
 	~: self
 
 	declare-template 'tube/container [
-		#type =? :invalidates   margin:  0x0
-		#type =? :invalidates   spacing: 0x0
-		#type    :invalidates   axes:    [e s]
-		#type =? :invalidates-look   align:   -1x-1
+		margin:  0
+		spacing: 0
+		align:   -1x-1	#type =? :invalidates-look
+		axes:    [e s]	#type :invalidates [block!]
+						(find/only [
+							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
+							[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
+						] axes)
 		
-		container-draw: :draw
+		
+		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair! none!]] [
 			settings: [margin spacing align axes canvas limits]
 			drawn: container-draw/layout 'tube settings
@@ -890,9 +902,9 @@ switch-ctx: context [
 	~: self
 	
 	declare-template 'switch/space [
-		#type =? :invalidates-look   state: off
+		state: off		#type =? :invalidates-look [logic!]
 		; command: []
-		data: make-space 'data-view []					;-- general viewer to be able to use text/images
+		data: make-space 'data-view []	#type (space? data)		;-- general viewer to be able to use text/images
 		draw: func [/on canvas [none! pair!]] [
 			also data/draw/on canvas					;-- draw avoids extra 'data-view' style in the tree
 			size: data/size
@@ -961,9 +973,9 @@ label-ctx: context [
 			set 'content [image-box text-box]
 		]
 
-		#on-change :on-image-change   image:   none		;-- can be a string! as well
-		#on-change :on-text-change    text:    ""
-		#on-change :on-flags-change   flags:   []		;-- transferred to text and comment
+		image: none		#type :on-image-change [image! string! char! none!]
+		text:  ""		#type :on-text-change  [any-string!]
+		flags: []		#type :on-flags-change [block!]			;-- transferred to text and comment
 	]
 ]
 
@@ -999,18 +1011,16 @@ data-view-ctx: context [
 		
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
-		#on-change [space word value] [push-font space]
-		#type =?   font: none
+		font: none	#on-change [space word value] [push-font space]
 		
+		wrap?: off	#type =? [logic!]							;-- controls choice between text (off) and paragraph (on)
 		#on-change [space word value] [
 			if :space/data = either value ['text]['paragraph] [	;-- switches from text to paragraph and back
 				reset-content space
 			] 
 		] 
-		#type =?   wrap?: off							;-- controls choice between text (off) and paragraph (on)
 		
-		#on-change [space word value [any-type!]] [reset-content space]
-		data:    none									;-- ANY red value
+		data: none	#on-change [space word value [any-type!]] [reset-content space]		;-- ANY red value
 	]
 ]
 
@@ -1070,15 +1080,16 @@ window-ctx: context [
 	]
 	
 	declare-template 'window/space [
-		;; when drawn auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
-		#type =? :invalidates   pages:  10x10			;-- window size multiplier in canvas sizes (= size of inf-scrollable)
-		#type =? :invalidates-look   origin: 0x0				;-- content's offset (negative)
+		;; window size multiplier in canvas sizes (= size of inf-scrollable)
+		;; when drawn, auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
+		pages:   10x10	#type =? :invalidates [pair! integer! float!]
+		origin:  0x0									;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
-		#type =? :invalidates   content: none
+		content: none	#type =? :invalidates [word! none!]
 		
-		map: []
-		cache: [size map]
+		map:     []
+		cache:   [size map]
 		
 		available?: func [
 			"Returns number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
@@ -1088,7 +1099,7 @@ window-ctx: context [
 			requested [integer!] "max look-ahead required"
 		][
 			~/available? self axis dir from requested
-		]
+		] #type [function!]
 	
 		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
 	]
@@ -1157,21 +1168,21 @@ inf-scrollable-ctx: context [
 	]
 	
 	declare-template 'inf-scrollable/scrollable [		;-- `infinite-scrollable` is too long for a name
-		jump-length: 200						;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
-		look-around: 50							;-- zone after head and before tail that triggers roll-edge (px)
+		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
+		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers roll-edge (px)
 
-		window: make-space 'window []
+		window: make-space 'window []	#type (space? window)
 		content: 'window
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [rate: 0 ready?: no]
+		roll-timer: make-space 'timer [rate: 0 ready?: no]	#type (space? roll-timer)
 		roll: does [
 			roll-timer/ready?: yes
 			invalidate self
-		]
+		] #type [function!]
 
-		scrollable-draw: :draw
+		scrollable-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair! none!]] [~/draw self canvas]
 	]
 ]
@@ -1214,13 +1225,13 @@ list-view-ctx: context [
 		#assert ['list = last current-path  "Out of tree rendering detected!"]
 		#assert [0x0 +<= canvas]						;-- shouldn't happen - other funcs must pass positive canvas here
 		x: list/axis
-		if level < list/margin/:x [return compose [margin 1 (level)]]
+		if level < mrgx: list/margin along 'x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
 		canvas: encode-canvas canvas make-pair [1x1 x -1]	;-- list items will be filled along secondary axis
 		
 		; either empty? list/map [
 			i: 1
-			level: level - list/margin/:x
+			level: level - mrgx
 		; ][
 			;@@ this needs reconsideration, because canvas is not guaranteed to have persisted! plus it has a bug now
 			;@@ ideally I'll have to have a map of item (object) -> list of it's offsets on variuos canvases
@@ -1291,8 +1302,8 @@ list-view-ctx: context [
 	][
 		set [l-item: l-idx: l-ofs:] locate-line list canvas  low-level
 		set [h-item: h-idx: h-ofs:] locate-line list canvas high-level
-		sp: list/spacing/(list/axis)
-		mg: list/margin/( list/axis)
+		sp: list/spacing along list/axis
+		mg: list/margin  along list/axis
 		;; intent of this is to return item indexes that fully cover the requested range
 		;; so, space and margin before first item is still considered belonging to that item
 		;; (as it doesn't require rendering of the previous item)
@@ -1337,7 +1348,7 @@ list-view-ctx: context [
 		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
 		r: max 0 requested - switch item [
 			space item [0]
-			margin [either idx = 1 [0 - ofs][ofs - list/margin/:axis]]
+			margin [either idx = 1 [0 - ofs][ofs - (list/margin along axis)]]
 		]
 		#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
 		r
@@ -1388,51 +1399,52 @@ list-view-ctx: context [
 	]
 	
 	on-axis-change: function [list [object!] word [word!] value [word!]] [
-		lview: get list/owner
-		lview/content-flow: switch value [x ['horizontal] y ['vertical]]
-		if lview/size [invalidate list]	;@@ invalidate should check /size itself?
+		if lview: list/list-view [
+			lview/content-flow: switch value [x ['horizontal] y ['vertical]]
+			invalidate/only list						;-- list-view is already invalidated by content-flow
+		]
 	]
 		
+	;; externalized, otherwise will recreate the class on every new list-view
 	list-template: declare-class/manual 'list-in-list-view/list [		;-- new class needed for custom on-change
-		owner: none								;@@ remove me and use `react` to tie content-flow & axis when it's scalable!
-		
-		#type = :on-axis-change (find/case [x y] axis)
-		axis: none								;@@ must be set by list-view after /owner
+		list-view: none		#type [object! none!]
+		axis:      'y		#type = :on-axis-change		;@@ must be set after /list-view! maybe add list-view/axis instead?
 		
 		;; cache of last rendered item spaces (as words)
 		;; this persistency is required by the focus model: items must retain sameness
 		;; an int->word map! - for flexibility in caching strategies (which items to free and when)
 		;@@ when to forget these? and why not keep only focused item?
-		icache: make map! []	
-		items: none
+		icache: make map! []	#type [map!]
+		items:  does []									;-- placeholder, set by list-view to a func
 		
 		available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 			;; must pass positive canvas (uses last rendered list-view size)
 			~/available? self size axis dir from requested
-		]
+		] #type [function!]
 
-		classify-object 'list-in-list-view self			;-- on-change is not primed until /owner is set
+		classify-object 'list-in-list-view self			;-- on-change is not primed until /list-view is set
 	]
 
 	declare-template 'list-view/inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
-		source: []
+		source: []	#on-change :invalidates				;-- no type check for it can be freely overridden
 		data: function [/pick i [integer!] /size] [		;-- can be overridden
 			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
-		]
+		] #type [function!]
 		
-		wrap-data: function [item-data [any-type!]][
+		wrap-data: function [item-data [any-type!]][	;-- can be overridden (but with care)
 			spc: make-space 'data-view [quietly wrap?: on]
 			set/any 'spc/data :item-data
 			anonymize 'item spc
-		]
+		] #type [function!]
 
 		window/content: 'list
-		list: make-space 'list list-template
-		quietly list/owner: anonymize 'list-view self	;@@ find a better solution!
-		list/axis: 'y									;-- will trigger content-flow update
+		list: make-space 'list list-template	#type (space? list)
+		list/list-view: self							;@@ find a better solution to sync content-flow with list/axis!
+		list/axis: 'y									;-- will trigger content-flow update when changed from 'y
+		content-flow: 'vertical
 		
 		list/items: function [/pick i [integer!] /size] with list [
 			either pick [
@@ -1550,7 +1562,7 @@ grid-ctx: context [
 			if x1 = x2 [continue]
 			wh?: get/any wh?							;@@ workaround for #4988
 			for xi: x1 x2 - 1 [r/:x: r/:x + wh? xi]		;@@ should be sum map
-			r/:x: r/:x + (x2 - x1 * grid/spacing/:x)
+			r/:x: r/:x + (x2 - x1 * (grid/spacing along x))
 			if x1 > x2 [r/:x: negate r/:x]
 		]
 		r
@@ -1575,12 +1587,12 @@ grid-ctx: context [
 		array [map!]     "widths or heights"
 		axis  [word!]    "x or y"
 	][
-		mg: grid/margin/:axis
+		mg: grid/margin along axis
 		if level < mg [return reduce ['margin 1 level]]		;-- within the first margin case
 		level: level - mg
 
 		bounds: grid/calc-bounds
-		sp:     grid/spacing/:axis
+		sp:     grid/spacing along axis
 		lim:    bounds/:axis
 		def:    array/default
 		#assert [def]									;-- must always be defined
@@ -1662,10 +1674,10 @@ grid-ctx: context [
 			set [item: idx: ofs:] locate-line grid xy/:x array x
 			#debug grid-view [#print "locate-line/(x)=(xy/:x) -> [(item) (idx) (ofs)]"]
 			switch item [
-				space [ofs: ofs - grid/spacing/:x  idx: idx + 1]
+				space [ofs: ofs - (grid/spacing along x)  idx: idx + 1]
 				margin [
 					either idx = 1 [
-						ofs: ofs - grid/margin/:x
+						ofs: ofs - (grid/margin along x)
 					][
 						idx: bounds/:x
 						ofs: ofs + wh? idx
@@ -1718,7 +1730,7 @@ grid-ctx: context [
 				]
 				span/y + y = cell1/y [					;-- multi-cell vertically ends after this row
 					for y2: cell1/y y - 1 [
-						height1: height1 - grid/spacing/y - grid/row-height? y2
+						height1: height1 - (grid/spacing along 'y) - grid/row-height? y2
 					]
 					append hmin height1
 				]
@@ -1736,7 +1748,7 @@ grid-ctx: context [
 		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
 		xspan: first grid/get-span xy
 		r: 0 repeat x xspan [r: r + grid/col-width? x - 1 + xy/x]
-		r + (xspan - 1 * grid/spacing/x)
+		r + (xspan - 1 * (grid/spacing along 'x))
 	]
 		
 	cell-height?: function [grid [object!] xy [pair!]] [
@@ -1746,7 +1758,7 @@ grid-ctx: context [
 		]
 		yspan: second grid/get-span xy
 		r: 0 repeat y yspan [r: r + grid/row-height? y - 1 + xy/y]
-		r + (yspan - 1 * grid/spacing/y)
+		r + (yspan - 1 * (grid/spacing along 'y))
 	]
 		
 	cell-size?: function [grid [object!] xy [pair!]] [
@@ -1900,7 +1912,7 @@ grid-ctx: context [
 	][
 		canvas: encode-canvas width by infxinf/y -1x-1	;-- no fill flag is set
 		size: grid/margin * 0x2
-		spc:  grid/spacing/y
+		spc:  grid/spacing along 'y
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
@@ -2096,27 +2108,36 @@ grid-ctx: context [
 		]
 	]
 	
+	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
+	
 	declare-template 'grid/space [
 		;; grid's /size can be 'none' in two cases: either it's infinite, or it's size was invalidated and needs a calc-size() call
-		#type [pair! none!]   size: none
+		size: none	#type [pair! none!]
 		
-		#type =? :invalidates   margin:  5x5
-		#type =? :invalidates   spacing: 5x5
-		#type =? :invalidates-look   origin:  0x0	;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
-		content: make map! 8				;-- XY coordinate -> space-name (not cell, but cells content name)
-		spans:   make map! 4				;-- XY coordinate -> it's XY span (not user-modifiable!!)
-		;@@ protect widths, spans, heights? - not for tampering
+		margin:  5
+		spacing: 5
+		origin:  0x0			;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
+		content: make map! 8	#on-change :invalidates			;-- XY coordinate -> space-name (not cell, but cells content name)
+		spans:   make map! 4	#type [map!]					;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
-		widths:  make map! [default 100 min 10]	;-- map of column -> it's width
-		autofit: 'area-total					;-- automatically adjust column widths? method name or none
+		widths:  make map! [default 100 min 10]					;-- map of column -> it's width
+			#type [map!] :invalidates
 		;; heights/min used when heights/default = auto, in case no other constraints apply
 		;; set to >0 to prevent rows of 0 size (e.g. if they have no content)
-		heights: make map! [default auto min 0]	;-- height can be 'auto (row is auto sized) or integer (px)
-		#type =? :invalidates-look   pinned:  0x0	;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
-		;@@ bounds/.. = none means unlimited, but it will render scrollers useless
-		;@@ and cannot be drawn without /only - will need a window over it anyway (used by grid-view)
-		#type    :invalidates   bounds:  [x: auto y: auto]		;-- max number of rows & cols, auto=bound `cells`, integer=fixed
-																;-- 'auto will have a problem inside infinite grid with a sliding window
+		heights: make map! [default auto min 0]					;-- height can be 'auto (row is auto sized) or integer (px)
+			#type [map!] :invalidates
+		autofit: 'area-total									;-- automatically adjust column widths? method name or none
+			#type = :invalidates [none! word! (find ~/fit-types autofit)]
+		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
+			#type =? :invalidates-look (0x0 +<= pinned)
+		bounds:  [x: auto y: auto]								;-- max number of rows & cols
+			#type :invalidates [block! function! pair!]
+			(all [										;-- 'auto=bound /cells, integer=fixed, none=infinite (only within a window!)
+				bounds: bounds							;-- call it if it's a function
+				any [none =? bounds/x  'auto = bounds/x  all [integer? bounds/x  bounds/x >= 0]]
+				any [none =? bounds/y  'auto = bounds/y  all [integer? bounds/y  bounds/y >= 0]]
+			])
+			
 		;; data about the last rendered frame, may be used by /draw to avoid extra recalculations
 		frame: context [								;@@ hide it maybe from mold? unify with /last-frame ?
 			;@@ maybe cache size too here? just to avoid setting grid/size to none in case it's relied upon by some reactors
@@ -2131,14 +2152,16 @@ grid-ctx: context [
 			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
 			limits:  make block! 4						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
 			invalid: make block! 8						;-- invalidation list for the next frame
-		]
-		on-invalidate: :~/on-invalidate
+		] #type [object!]
+		
+		on-invalidate: :~/on-invalidate					;-- grid uses custom invalidation or it's too slow
 		
 		;@@ TODO: margin & spacing - in style??
 		;@@ TODO: alignment within cells? when cell/size <> content/size..
 		;@@       and how? per-row or per-col? or per-cell? or custom func? or alignment should be provided by item wrapper?
 		;@@       maybe just in lay-out-grid? or as some hacky map that can map rows/columns/cells to alignment?
 		map: []
+		
 		;; ccache cannot be stashed/replaced because otherwise it's possible to press a button in a cell,
 		;; and upon release there will be another cell, the old one will be lost, so hittest will be confused
 		;@@ so when and how to invalidate ccache? makes most sense on content change and when it gets out of the viewport
@@ -2155,13 +2178,12 @@ grid-ctx: context [
 			quietly cell/owner: none					;-- prevent grid invalidation in case new space is assigned
 			cell/content: space
 			name
-		]
+		] #type [function!] :invalidates
 
-		#on-change :invalidates							;@@ should clear frame/cells too!
-		cells: func [/pick xy [pair!] /size] [					;-- up to user to override
+		cells: func [/pick xy [pair!] /size] [			;-- up to user to override
 			either pick [content/:xy][calc-bounds]
-		]
-
+		] #type [function!] :invalidates				;@@ should clear frame/cells too!
+		
 		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
 		
 		;-- userspace functions for `spans` reading & modification
@@ -2171,7 +2193,7 @@ grid-ctx: context [
 			xy [pair!] "Column (x) and row (y)"
 		][
 			any [spans/:xy  1x1]
-		]
+		] #type [function!]
 
 		get-first-cell: function [
 			"Get the starting row & column of a multicell that occupies cell at XY"
@@ -2180,7 +2202,7 @@ grid-ctx: context [
 			span: get-span xy
 			if span +< 1x1 [xy: xy + span]
 			xy
-		]
+		] #type [function!]
 
 		set-span: function [
 			"Set the SPAN of a FIRST cell, breaking it if needed"
@@ -2189,14 +2211,14 @@ grid-ctx: context [
 			/force "Also break all multicells that intersect with the given area"
 		][
 			~/set-span self cell1 span force
-		]
+		] #type [function!]
 		
 		get-offset-from: function [
 			"Get pixel offset of left top corner of cell C2 from that of C1"
 			c1 [pair!] c2 [pair!]
 		][
 			~/get-offset-from self c1 c2
-		]
+		] #type [function!]
 		
 		locate-point: function [
 			"Map XY point on a grid into a cell it lands on, return [cell-xy offset]"
@@ -2205,47 +2227,47 @@ grid-ctx: context [
 			; return: [block!] "offset can be negative for leftmost and topmost cells"
 		][
 			~/locate-point self xy screen
-		]
+		] #type [function!]
 
 		row-height?: function [
 			"Get height of row Y (only calculate if necessary)"
 			y [integer!]
 		][
 			~/row-height? self y
-		]
+		] #type [function!]
 
 		col-width?: function [
 			"Get width of column X"
 			x [integer!]
 		][
 			any [widths/:x widths/default]
-		]
+		] #type [function!]
 
 		cell-size?: function [
 			"Get the size of a cell XY or a multi-cell starting at XY (with the spaces)"
 			xy [pair!]
 		][
 			~/cell-size? self xy
-		]
+		] #type [function!]
 
 		is-cell-pinned?: func [
 			"Check if XY is within pinned row or column"
 			xy [pair!]
 		][
 			not pinned +< xy
-		]
+		] #type [function!]
 
 		infinite?: function ["True if not all grid dimensions are finite"] [
 			bounds: self/bounds							;-- call it in case it's a function
 			not all [bounds/x bounds/y]
-		]
+		] #type [function!]
 
 		;; returns a block [x: y:] with possibly `none` (unlimited) values ;@@ REP #116 could solve this
 		;@@ maybe obsolete (hide) this, since now there's valid /size? although /size can't account for half-infinite bounds
 		;@@ I also don't like the name, 'bounds' is too confusing (how is it different from /size?)
 		calc-bounds: function ["Estimate total size of the grid in cells (in case bounds set to 'auto)"] [
 			~/calc-bounds self
-		]
+		] #type [function!]
 	
 		;; hidden because /size should be valid now, and this function triggered out of tree rendering
 		; calc-size: function ["Estimate total size of the grid in pixels"] [~/calc-size self]
@@ -2287,18 +2309,14 @@ grid-view-ctx: context [
 		;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
 		;@@ TODO: maybe a % of viewport instead of fixed jump size?
-		#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
-		size: 0x0
+		size: 0x0	#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
 		
 		;; reminder: window/roll may change this (together with window/origin) when rolling
-		#type =? #on-change [space word value] [
-			;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
-			space/grid/origin: value					;-- grid triggers invalidation
-		]
-		origin: 0x0
+		;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
+		origin: 0x0	#type =? #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
 		
 		content-flow: 'planar
-		source: make map! [size: 0x0]					;-- map is more suitable for spreadsheets than block of blocks
+		source: make map! [size: 0x0]	#on-change :invalidates	;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
 				block! [
@@ -2309,9 +2327,9 @@ grid-view-ctx: context [
 					]
 				]
 				map! [either pick [source/:xy][source/size]]
-				'else [#assert [no "Unsupported data format"]]
+				'else [ERROR "Unsupported data source type: (mold type? :source)"]
 			]
-		]
+		] #type [function!] :invalidates
 
 		;; only called initially or after invalidate-range
 		wrap-data: function [item-data [any-type!]] [
@@ -2322,7 +2340,7 @@ grid-view-ctx: context [
 			]
 			set/any 'spc/data :item-data
 			anonymize 'cell spc
-		]
+		] #type [function!] :invalidates
 
 		;; cacheability requires window to be fully rendered but
 		;; full window render is too slow (many seconds), can't afford it
@@ -2355,7 +2373,7 @@ grid-view-ctx: context [
 				]
 				invalidate self
 			]
-		]
+		] #type (space? grid)
 		
 		grid/cells: func [/pick xy [pair!] /size] [
 			either pick [
@@ -2378,26 +2396,26 @@ button-ctx: context [
 		align:    0x0									;-- center by default
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
 		
+		pushed?:  no	#type =? [logic!]				;-- becomes true when user pushes it; triggers `command`
 		#on-change [space word value] [
 			invalidate space
 			unless value [do space/command]				;-- trigger when released
 		]
-		#type =?   pushed?: no							;-- becomes true when user pushes it; triggers `command`
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 	]
 	
 	declare-template 'button/clickable [				;-- styled with decor
-		weight:   0
+		weight:   0										;-- button should not be stretched by tubes
 		margin:   10x5
-		rounding: 5										;-- box rounding radius in px
+		rounding: 5	#type [integer!] (rounding >= 0)	;-- box rounding radius in px
 	]
 ]
 
 
 ;@@ this should not be generally available, as it's for the tests only - remove it!
 declare-template 'rotor/space [
-	#on-change :invalidates   content: none
-	#on-change :invalidates-look   angle: 0
+	content: none	#type =? :invalidates [word! none!]
+	angle:   0		#type =  :invalidates-look [integer! float!]
 
 	ring: make-space 'space [size: 360x10]
 	tight?: no
@@ -2469,18 +2487,17 @@ caret-ctx: context [
 	~: self
 	
 	declare-template 'caret/rectangle [					;-- caret has to be a separate space so it can be styled
-		#on-change [space word value] [space/size: value by space/size/y]
-		#type =?   width:       1						;-- width in pixels
+		visible?:    no		#type =? :invalidates-look [logic!]	;-- controlled by focus
+		look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
 		
-		#type =? :invalidates-look   visible?:    no			;-- controlled by focus
+		width:       1		#type =? [integer!] (width > 0)		;-- width in pixels
+			#on-change [space word value] [space/size: value by space/size/y]
+			
+		;; [0..length] should be kept even when not focused, so tabbing in leaves us where we were
+		offset:      0		#type =? [integer!] (offset >= 0)
+			#on-change [space word value] [if space/visible? [invalidate space]]
 		
-		#on-change [space word value] [if space/visible? [invalidate space]]
-		#type =?   offset:      0				;-- [0..length] should be kept even when not focused, so tabbing in leaves us where we were
-		
-		look-around: 10									;-- how close caret is allowed to come to field borders
-		anchor:      0.0								;-- [0..1] viewport-relative location of caret within field
-		
-		rectangle-draw: :draw
+		rectangle-draw: :draw	#type [function!]
 		draw: does [when visible? (rectangle-draw)]
 	]
 ]
@@ -2700,24 +2717,20 @@ field-ctx: context [
 	]
 		
 	on-change: function [field [object!] word [word!] value [any-type!]] [
-		switch word [
-			margin text font flags color [
-				set/any 'field/spaces/text/:word :value	;-- sync these to text space; invalidated by text
-				if word = 'text [
-					field/caret/offset: length? value	;-- auto position at the tail
-					mark-history field
-				]
-			]
+		set/any 'field/spaces/text/:word :value			;-- sync these to text space; invalidated by text
+		if word = 'text [
+			field/caret/offset: length? value			;-- auto position at the tail
+			mark-history field
 		]
 	]
 	
 	;@@ field will need on-change handler & actor support for better user friendliness!
 	declare-template 'field/space [
 		;; own facets:
-		weight:   1
-		#type =? :invalidates-look   origin:   0		;-- non-positive, offset(px) of text within the field
-		#type =? :invalidates-look   selected: none		;-- none or pair (offsets of selection start & end)
-		history:  make block! 100						;-- saved states
+		weight:   1		#type =? :invalidates [number!] (weight >= 0)
+		origin:   0		#type =? :invalidates-look [integer!] (origin <= 0)		;-- offset(px) of text within the field
+		selected: none	#type =? :invalidates-look [pair! none!]	;-- none or pair (offsets of selection start & end)
+		history:  make block! 100	#type [block!]		;-- saved states
 		map:      []
 		cache:    [size map]
 
@@ -2725,25 +2738,28 @@ field-ctx: context [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
 			caret:     make-space 'caret     []
 			selection: make-space 'rectangle []			;-- can be styled
-		]
-		caret:     spaces/caret							;-- shortcuts
-		selection: spaces/selection
+		] #type [object!]
+		
+		;; shortcuts
+		caret:     spaces/caret		#type (space? caret)
+		selection: spaces/selection	#type (space? selection)
 		
 		;; these mirror spaces/text facets:
-		#type =? :on-change   margin: 0x0				;-- default = no margin
-		#type    :on-change   flags:  []				;-- [bold italic underline] supported ;@@ TODO: check for absence of `wrap`
-		#type    :on-change   text:   spaces/text/text
-		#type =? :on-change   font:   spaces/text/font
-		#type =? :on-change   color:  none				;-- placeholder for user to control
+		margin: 0					#type =? :on-change	;-- default = no margin
+		flags:  []					#type    :on-change	;-- [bold italic underline] supported ;@@ TODO: check for absence of `wrap`
+		text:   spaces/text/text	#type    :on-change
+		font:   spaces/text/font	#type =? :on-change
+		color:  none				#type =? :on-change	;-- placeholder for user to control
 		
 		offset-to-caret: func [offset [pair!]] [~/offset-to-caret self offset]
+		#type [function!]
 		
 		edit: func [
 			"Apply a sequence of edits to the text"
 			plan [block!]
 		][
 			~/edit self plan
-		]
+		] #type [function!]
 		
 		draw: func [/on canvas [none! pair!]] [~/draw self canvas]
 	]
@@ -2811,10 +2827,10 @@ field-ctx: context [
 declare-template 'fps-meter/text [
 	; cache:     off
 	rate:      100
-	#on-change :invalidates   text: "FPS: 100.0"		;-- longest text used for initial sizing of it's host
-	init-time: now/precise/utc
-	frames:    make [] 400
-	aggregate: 0:0:3
+	text:      "FPS: 100.0"		#on-change :invalidates	;-- longest text used for initial sizing of it's host
+	init-time: now/precise/utc	#type [date!]
+	frames:    make [] 400		#type [block!]
+	aggregate: 0:0:3			#type [time!]
 ]
 
 export exports
