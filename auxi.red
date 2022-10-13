@@ -28,6 +28,13 @@ exports: [by abs range! range? .. using when only mix clip ortho dump-event boxe
 by: make op! :as-pair
 abs: :absolute
 
+along: make op! func [
+	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
+	pair [pair! integer!] axis [word!]
+][
+	pick 1x1 * pair axis
+]
+
 using: function [
 	"Return CODE bound to a context with WORDS local to it"
 	words [block!] "List of words"
