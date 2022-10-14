@@ -881,11 +881,10 @@ tube-ctx: context [
 		spacing: 0
 		align:   -1x-1	#type =? :invalidates-look
 		axes:    [e s]	#type :invalidates [block!]
-						(find/only [
+						(find/only [					;-- literal listing allows it to appear in the error output
 							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
 							[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
 						] axes)
-		
 		
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair! none!]] [
