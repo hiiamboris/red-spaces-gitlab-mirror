@@ -610,7 +610,7 @@ infxinf: 2000000000x2000000000							;-- used too often to always type it numeri
 constrain: function [
 	"Clip SIZE within LIMITS (allows none for both)"
 	size    [none! pair!]   "none if unlimited (same as infxinf)"
-	limits  [none! object! (range? limits)] "none if no limits"
+	limits  [object! (range? limits) none!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
 	either size [										;-- pair size
@@ -636,13 +636,12 @@ constrain: function [
 
 #assert [infxinf = constrain infxinf none]
 
-for: func ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] code [block!]] [
-	either all [integer? i1 integer? i2] [
+for: function ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] (same? type? i1 type? i2) code [block!]] [
+	either integer? i1 [
 		if i2 < i1 [exit]			;@@ return none or unset? `while` return value is buggy anyway
 		set word i1 - 1
 		while [i2 >= set word 1 + get word] code
 	][
-		#assert [all [pair? i1 pair? i2]]
 		range: i2 - i1 + 1
 		unless 1x1 +<= range [exit]	;-- empty range
 		xyloop i: range [

@@ -40,19 +40,17 @@ into-map: function [
 ;-- has to be fast, for on-over events
 hittest: function [
 	"Map a certain point deeply into the tree of spaces"
-	space [word!] "Top space in the tree (host/space usually)"
+	space [word!] "Top space in the tree (host/space usually)" (space? get space)
 	xy [pair!] "Point in that top space"
 	/into "Append into a given buffer"
 		path [block! path!]
 	;-- this is required for dragging, as we need to follow the same path as at the time of click
 	/as "Force coordinate translation to follow a given path"
-		template [block! path! none!]
+		template [block! (name = template/1) path! (name = template/1) none!]
 ][
 	space: get name: space
-	#assert [space? space]
 	path: any [path  make [] 16]
 	either template [
-		#assert [name = template/1]
 		forall template [
 			set [name: _: name2:] template
 			repend path [name xy]

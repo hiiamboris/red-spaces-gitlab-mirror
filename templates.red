@@ -41,7 +41,7 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 	owner:  none	#type [word! none!]
 	draw:   []   	#type [block! function!]
 	;-- `drawn` is an exception and not held in the space, so just `size`
-	cache:  [size]	#type [block!  word! (find [valid invalid] cache)  logic! (cache = off)]
+	cache:  [size]	#type [word! (find [valid invalid] cache)  logic! (cache = off)  block!]
 	limits: none	#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
 	last-frame: make block! 3	#type [block!]			;-- used internally to check if space is connected to the tree
@@ -2123,7 +2123,7 @@ grid-ctx: context [
 		heights: make map! [default auto min 0]					;-- height can be 'auto (row is auto sized) or integer (px)
 			#type [map!] :invalidates
 		autofit: 'area-total									;-- automatically adjust column widths? method name or none
-			#type = :invalidates [none! word! (find ~/fit-types autofit)]
+			#type = :invalidates [word! (find ~/fit-types autofit) none!]
 		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
 			#type =? :invalidates-look (0x0 +<= pinned)
 		bounds:  [x: auto y: auto]								;-- max number of rows & cols
