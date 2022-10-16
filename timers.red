@@ -52,9 +52,8 @@ timers: context [
 		#debug profile [prof/manual/end 'timers]
 	]
 
-	update-timer-host: function [face [object!]] [		;-- automatically choose the host with maximum rate
-		#assert [not face =? timer-host]
-		#assert [face/rate]
+	;; automatically chooses the host with maximum rate
+	update-timer-host: function [face [object!] (all [face/rate  not face =? timer-host])] [
 		unless number? rate: face/rate [rate: 0:0:1 / rate]
 		if all [
 			timer-host

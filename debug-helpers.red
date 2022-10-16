@@ -115,8 +115,7 @@ add-indent: function [text [string!] size [integer!]] [
 ]
 
 mold~stack: make hash! 100								;-- used to avoid cycles
-mold~: function [value [any-type!] /indent indent-size [integer! none!]] [
-	default indent-size: 4
+mold~: function [value [any-type!] /indent indent-size: 4 [integer! none!]] [
 	decor: select [
 		block!  ["[" "]"]
 		hash!   ["make hash! [" "]"] 

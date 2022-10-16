@@ -33,9 +33,8 @@ is-popup?: function [									;-- must be blazing-fast, used in global event fun
 ]
 
 get-popups-for: function [
-	window [object!] "Each window has it's own popups stack"
+	window [object!] "Each window has it's own popups stack" (window/type = 'window)
 ][
-	#assert [window/type = 'window]
 	any [
 		stack: select/same popup-registry window
 		repend popup-registry [window stack: make hash! 4]
@@ -45,10 +44,9 @@ get-popups-for: function [
 
 save-popup: function [
 	window [object!] "Each window has it's own popups stack"
-	level  [integer!] ">= 0"
+	level  [integer!] ">= 0" (level >= 0)
 	face   [object!] "Popup face"
 ][
-	#assert [level >= 0]
 	stack: get-popups-for window
 	change enlarge stack level none face
 ]
@@ -213,12 +211,11 @@ lay-out-menu: function [spec [block!] /local code name tube list flags radial? r
 show-menu: function [
 	"Immediately show a menu LAYOUT at OFFSET and LEVEL in WINDOW"
 	window  [object!]
-	level   [integer!]
+	level   [integer!] (level > 0)
 	offset  [pair!]
 	menu    [block!] "Written using Menu DSL"
 	;@@ maybe also a flag to make it appear above the offset?
 ][
-	#assert [level > 0]
 	face: make-popup window level
 	face/rate:  10										;-- reduced timer pressure
 	face/space: lay-out-menu menu

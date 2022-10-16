@@ -67,6 +67,7 @@ do/expand [
 	#include %../common/show-trace.red
 	#include %../common/do-atomic.red
 	#include %../common/classy-object.red
+	#include %../common/advanced-function.red
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code

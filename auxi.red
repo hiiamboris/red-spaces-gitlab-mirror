@@ -8,36 +8,44 @@ Red [
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
 exports: [by abs range! range? .. using when only mix clip ortho dump-event boxes-overlap? infxinf opaque]
 
-;; readability helper instead of reduce/into [] clear [] ugliness
-#macro [#reduce-in-place block!] func [[manual] s e] [
-	change/only s 'reduce/into
-	insert/only insert e 'clear copy []
-	s
-]
+; ;; readability helper instead of reduce/into [] clear [] ugliness
+; #macro [#reduce-in-place block!] func [[manual] s e] [
+	; change/only s 'reduce/into
+	; insert/only insert e 'clear copy []
+	; s
+; ]
 
-;@@ watch out for #5009 for a better way to specify refinements
-#macro [#compose-in-place any refinement! block!] func [[manual] s e /local path] [
-	path: copy 'compose/into
-	e: next s
-	while [refinement? :e/1] [append path to word! take e]
-	change/only s path
-	insert/only insert e 'clear copy []
-	s
-]
+; ;@@ watch out for #5009 for a better way to specify refinements
+; #macro [#compose-in-place any refinement! block!] func [[manual] s e /local path] [
+	; path: copy 'compose/into
+	; e: next s
+	; while [refinement? :e/1] [append path to word! take e]
+	; change/only s path
+	; insert/only insert e 'clear copy []
+	; s
+; ]
 
 by: make op! :as-pair
 abs: :absolute
 
-along: make op! func [
+along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
-	pair [pair! integer!] axis [word!]
+	pair [pair! (0x0 +<= pair) integer! (0 <= pair)]
+	axis [word!] (find [x y] axis)
 ][
 	pick 1x1 * pair axis
 ]
 
+block-of?: make op! func [
+	"Test if all of BLOCK's values are of type TYPE"
+	block [block!] type [datatype!]
+][
+	parse block [any type]
+]
+
 using: function [
 	"Return CODE bound to a context with WORDS local to it"
-	words [block!] "List of words"
+	words [block!] "List of words" (words block-of? word!)
 	code  [block!]
 ][
 	words: construct map-each w words [to set-word! w]
@@ -115,9 +123,8 @@ vec-length?: function [v [pair!]] [						;-- this is still 2x faster than compil
 closest-box-point?: function [
 	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
 	B1 [pair!] "inclusive" B2 [pair!] "inclusive"
-	/to origin [pair!] "defaults to 0x0"
+	/to origin: 0x0 [pair!] "defaults to 0x0"
 ][
-	default origin: 0x0
 	as-pair
 		case [origin/x < B1/x [B1/x] B2/x < origin/x [B2/x] 'else [origin/x]]
 		case [origin/y < B1/y [B1/y] B2/y < origin/y [B2/y] 'else [origin/y]]
@@ -204,10 +211,9 @@ context [
 	;; `make` alternative that uses a free list of series when possible - to reduce GC load
 	set 'obtain function [
 		"Get a series of type TYPE with a buffer of at least SIZE length"
-		type [datatype!] "Any series type"
+		type [datatype!] "Any series type" (any [map! = type find series! type])
 		size [integer!]  "Minimal length before reallocation, >= 1"
 	][
-		#assert [any [map! = type find series! type]]
 		size:   max 1 size								;-- else log will be infinite
 		name:   to word! type							;-- datatype is not supported by maps
 		ladder: any [free-list/:name  free-list/:name: make hash! 256]
@@ -295,7 +301,7 @@ include-into: function [
 	"Include flag into series if it's not there"
 	series [series!] flag [any-type!]
 ][
-	unless find series flag [append series flag]
+	unless find series :flag [append series :flag]
 	series
 ]
 
@@ -303,7 +309,7 @@ exclude-from: function [
 	"Exclude flag into series if it's there"
 	series [series!] flag [any-type!]
 ][
-	remove find series flag
+	remove find series :flag
 	series
 ]
 
@@ -311,7 +317,7 @@ set-flag: function [
 	"Include or exclude flag from series depending on present? value"
 	series [series!] flag [any-type!] present? [logic!]
 ][
-	either present? [include-into series flag][exclude-from series flag]
+	either present? [include-into series :flag][exclude-from series :flag]
 ]
 
 
@@ -369,7 +375,7 @@ wrap: func [
 	reduce [:value]
 ]
 
-area?: func [xy [pair!]] [xy/x * xy/y]
+area?: func [xy [pair!]] [xy/x * xy/y]					;-- maybe support infxinf? or partialy infinity?
 
 skip?: func [series [series!]] [-1 + index? series]
 
@@ -511,7 +517,7 @@ enhance: function [
 	"Push COLOR further from BGND (alpha channels ignored)"
 	bgnd  [tuple! word!]
 	color [tuple! word!]
-	amnt  [number!] "Should be over 100%"
+	amnt  [number!] "Should be over 100%" (amnt >= 100%)
 ][
 	bg-hsl: RGB2HSL resolve-color bgnd
 	fg-hsl: RGB2HSL resolve-color color
@@ -524,7 +530,7 @@ enhance: function [
 opaque: function [
 	"Add alpha channel to the COLOR"
 	color [tuple! word! issue!] "If a word, looked up in system/view/metrics/colors"
-	alpha [percent! float!]
+	alpha [percent! float!] (all [0 <= alpha alpha <= 1])
 ][
 	color: 0.0.0.0 + resolve-color color
 	color/4: to integer! 255 - (255 - color/4 * alpha)
@@ -569,11 +575,9 @@ context [
 		error [number!] "Minimum acceptable error to stop search (along X or F)"
 		F     [block!]  "Function F(x)"
 		/with "Provide F(X1) and F(X2) if they are known"
-			F1    [number!] 
-			F2    [number!] 
+			F1: (call-f X1) [number!] 
+			F2: (call-f X2) [number!] 
 	][
-		f1: any [f1 call-f x1] 
-		f2: any [f2 call-f x2]
 		#assert [fopt = clip [min f1 f2 max f1 f2] fopt  "Optimum value should be within [F1,F2]"]	;@@ rephrase when clip updates
 		sign: sign? (f2 - f1) * (x2 - x1)				;-- + if ascending
 		repeat n 1e3 [
@@ -606,10 +610,9 @@ infxinf: 2000000000x2000000000							;-- used too often to always type it numeri
 constrain: function [
 	"Clip SIZE within LIMITS (allows none for both)"
 	size    [none! pair!]   "none if unlimited (same as infxinf)"
-	limits  [none! object!] "none if no limits"
+	limits  [none! object! (range? limits)] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
-	#assert [range? limits]
 	either size [										;-- pair size
 		case [
 			none =? min: limits/min [min: 0x0]
@@ -795,7 +798,7 @@ finite-canvas: function [
 extend-canvas: function [
 	"Make one of CANVAS dimensions infinite"
 	canvas [pair!]
-	axis   [word!] "X or Y"
+	axis   [word!] "X or Y" (find [x y] axis)
 ][
 	canvas/:axis: infxinf/x
 	canvas
@@ -804,10 +807,9 @@ extend-canvas: function [
 ;; useful to subtract margins, but only from finite dimensions
 subtract-canvas: function [
 	"Subtract PAIR from CANVAS if it's finite, rounding negative results to 0x0"
-	canvas [pair!]
+	canvas [pair!] (0x0 +<= canvas)
 	pair   [pair!]
 ][
-	#assert [0x0 +<= canvas]
 	mask: 1x1 - (canvas / infxinf)						;-- 0x0 (infinite) to 1x1 (finite)
 	max 0x0 canvas - (pair * mask)
 ]
@@ -939,13 +941,10 @@ find-same-path: function [b [block!] p [path!]] [
 ;@@ maybe extract this into /common? maybe with /limits being an optional refinement?
 distribute: function [
 	"Distribute a numeric AMOUNT across items with given WEIGHTS"
-	amount  [number!] "Any nonnegative number"
-	weights [block!] "Zero for items that do not receive any part of AMOUNT"
-	limits  [block!] "Maximum part of AMOUNT each item is able to receive; NONE if unlimited"
+	amount  [number!] "Any nonnegative number" (amount >= 0)
+	weights [block!] "Zero for items that do not receive any part of AMOUNT" ((length? limits) = length? weights)
+	limits  [block!] "Maximum part of AMOUNT each item is able to receive; NONE if unlimited" (0 < length? limits)
 ][
-	#assert [amount > 0]
-	#assert [(length? limits) > 0]
-	#assert [(length? limits) = length? weights]
 	data: clear []
 	sum-weights: 0.0
 	repeat i count: length? weights [

@@ -203,9 +203,8 @@ triangle-ctx: context [
 image-ctx: context [
 	~: self
 	
-	draw: function [image [object!] canvas [pair! none!]] [
+	draw: function [image [object!] canvas: infxinf [pair! none!]] [
 		either image? image/data [
-			default canvas: infxinf
 			set [canvas: fill:] decode-canvas canvas
 			mrg2: 2 * mrg: image/margin * 1x1 
 			limits:        image/limits
@@ -636,8 +635,7 @@ paragraph-ctx: context [
 	;; wrap=off elli=on -> canvas=fixed, but wrapping should be off, i.e. layout/size=inf (don't use none! draw relies on this)
 	;; wrap=elli=on -> canvas=fixed
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
-	lay-out: function [space [object!] canvas [pair!] "positive!" ellipsize? [logic!] wrap? [logic!]] [
-		#assert [0x0 +<= canvas]
+	lay-out: function [space [object!] canvas [pair!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
 		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
@@ -1218,11 +1216,10 @@ list-view-ctx: context [
 	locate-line: function [
 		"Turn a coordinate along main axis into item index and area type (item/space/margin)"
 		list   [object!]  "List object with items"
-		canvas [pair!]    "Canvas on which it is rendered; positive!"
+		canvas [pair!]    "Canvas on which it is rendered; positive!" (0x0 +<= canvas)	;-- other funcs must pass positive canvas here
 		level  [integer!] "Offset in pixels from the 0 of main axis"
 	][
 		#assert ['list = last current-path  "Out of tree rendering detected!"]
-		#assert [0x0 +<= canvas]						;-- shouldn't happen - other funcs must pass positive canvas here
 		x: list/axis
 		if level < mrgx: list/margin along 'x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
@@ -1283,8 +1280,7 @@ list-view-ctx: context [
 		r
 	]
 
-	item-length?: function [list [object!] i [integer!]] [
-		#assert [0 < i]
+	item-length?: function [list [object!] i [integer!] (i > 0)] [
 		#assert [list/icache/:i]
 		item: get list/icache/:i						;-- must be cached by previous locate-line call
 		r: item/size/(list/axis)
@@ -1336,8 +1332,9 @@ list-view-ctx: context [
 		r
 	]
 	
-	available?: function [list [object!] canvas [pair!] "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]] [
-		#assert [0x0 +<= canvas]						;-- shouldn't happen
+	available?: function [
+		list [object!] canvas [pair!] (0x0 +<= canvas) "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]
+	][
 		if axis <> list/axis [
 			;; along secondary axis there is no absolute width: no way to know some distant unrendered item's width
 			;; so just previously rendered width is used (and will vary as list is rolled, if some items are bigger than canvas)
@@ -1375,7 +1372,7 @@ list-view-ctx: context [
 		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
 		guide:    axis2pair axis
 		origin:   guide * (xy1 - o1 - list/margin)
-		settings: with [list 'local] [axis margin spacing canvas origin]
+		settings: with [list 'local] [axis margin spacing canvas origin limits]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
@@ -2282,14 +2279,10 @@ grid-view-ctx: context [
 	~: self
 	
 	;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
-	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
+	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] (from >= 0) requested [integer!] (requested >= 0)] [	
 		#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
 		bounds: grid/bounds
-		#assert [
-			bounds "data/size is none!"
-			from >= 0
-			requested >= 0
-		]
+		#assert [bounds "data/size is none!"]
 		r: case [
 			dir < 0 [from]
 			bounds/:axis [
@@ -2665,11 +2658,10 @@ field-ctx: context [
 			offset - field/margin - (field/origin by 0)
 	]
 
-	draw: function [field [object!] canvas [none! pair!]] [
+	draw: function [field [object!] canvas: infxinf [none! pair!]] [
 		ctext: field/spaces/text						;-- text content
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
 		drawn: render/on in field/spaces 'text infxinf	;-- this sets the size
-		default canvas: infxinf
 		set [canvas: fill:] decode-canvas canvas
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		cmargin: field/caret/look-around
