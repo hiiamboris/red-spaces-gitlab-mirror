@@ -100,7 +100,7 @@ context [
 		#assert [space/owner]
 		host: first parents: reverse list-parents space
 		; #assert [is-face? host]							;-- let there be a warning for now
-		unless is-face? host [return none]				;-- fails on self-containing grid ;@@ need a faster check
+		unless host? host [return none]					;-- fails on self-containing grid
 		gen:  host/generation
 		path: clear []
 		append path parents/1/parent					;-- faster than anonymizing 'host
@@ -117,7 +117,7 @@ context [
 		
 	
 	set 'invalidate-tree function [face [object!]] [	;@@ or accept space instead?
-		#assert [is-face? face]
+		#assert [host? face]
 		foreach-space [path space] face/space [invalidate/only space]
 	]
 	
@@ -158,7 +158,7 @@ context [
 			scope [none! word!]   "Invalidation scope: 'size or 'look"
 		/local custom									;-- can be unset during construction
 	][
-		#assert [not is-face? space]
+		#assert [not host? space]
 		#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
 		unless block? space/cache [						;-- block means space is not created yet; early exit
 			#debug profile [prof/manual/start 'invalidation]
@@ -270,11 +270,8 @@ context [
 		face [object!] "Host face"
 	][
 		#debug styles [#print "render-face on (face/type) with current-path: (mold current-path)"]
-		; unless is-face? :face [??~ face]
 		#assert [
-			is-face? :face								;@@ simplify this using classes!
-			'base = select face 'type
-			in face 'space
+			host? :face
 			empty? current-path
 		]
 
@@ -314,7 +311,7 @@ context [
 		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [
 			space? :space
-			not is-face? :space							;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
+			not host? :space							;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 			any [
 				none = canvas (abs canvas) +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
 				also no #print "(name): canvas=(canvas)" 

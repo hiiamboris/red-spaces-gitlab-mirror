@@ -6,7 +6,7 @@ Red [
 
 
 ;-- provides focusing by clicking
-;-- requires: export is-face? and window-of
+;-- requires: export and window-of
 
 exports: [focused? focus-space]
 
@@ -31,7 +31,7 @@ keyboard: object [
 	valid-path?: function [path [path! block!]] [
 		foreach name path [
 			obj: get name
-			either is-face? obj [
+			either host? obj [
 				unless all [obj/state obj/visible?] [return no]
 			][
 				if all [map  not find map name] [return no]
@@ -110,27 +110,27 @@ focus-space: function [
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
-		foreach name path [							;-- if faces are provided, find the innermost one
-			either is-face? f: get name [face: f][break]
+		foreach name path [								;-- if faces are provided, find the innermost one
+			either host? f: get name [face: f][break]
 		]
 		
 		unless empty? old-path: keyboard/focus [
-			with-stop [								;-- init a separate stop flag for a separate event
+			with-stop [									;-- init a separate stop flag for a separate event
 				unfocus-event!/face: face
 				process-event old-path unfocus-event! [] yes
 				unfocus-event!/face: none
 			]
 		]
 
-		if face [									;-- ..and focus it
+		if face [										;-- ..and focus it
 			set-focus face
 			unless system/view/auto-sync? [
-				show window-of face					;-- otherwise keys won't be detected
+				show window-of face						;-- otherwise keys won't be detected
 			]
 		]
-		keyboard/focus: copy path					;-- copy since the path is static
+		keyboard/focus: copy path						;-- copy since the path is static
 
-		with-stop [									;-- init a separate stop flag for a separate event
+		with-stop [										;-- init a separate stop flag for a separate event
 			focus-event!/face: face
 			process-event path focus-event! [] yes
 			focus-event!/face: none

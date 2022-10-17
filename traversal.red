@@ -84,12 +84,12 @@ traversal: context [
 	]
 
 	set 'list-*aces function [
-		"Deeply list spaces and faces of a FACE"
+		"Deeply list spaces and faces of a host FACE"
 		face [object! word!]
 		/into target [block!] "Existing content is overwritten"
 	][
 		target: any [target  make [] 100]
-		#assert [is-face? any [all [word? face  get face] face] "face! object expected"]
+		#assert [host? any [all [word? face  get face] face] "host object expected"]	;@@ REP #113
 		if object? :face [face: anonymize face/type face]
 		clear list-*aces* to path! face target
 		new-line/all target yes

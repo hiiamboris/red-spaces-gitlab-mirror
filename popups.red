@@ -242,7 +242,8 @@ context [
 	popup-event-func: function [host event] [
 		all [
 			event/type = 'time
-			word? select host 'space					;-- a host face?
+			host? host									;-- a host face?
+			word? host/space							;-- has a space assigned?
 			on-time host event
 			none   										;-- the event can be processed by other handlers
 		]

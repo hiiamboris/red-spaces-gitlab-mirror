@@ -21,8 +21,8 @@ context [
 	;; sometimes this gets window as 'host', likely when no face is in focus
 	host-event-func: function [host event] [
 		all [
-			word? w: select host 'space					;-- a host face? ;@@ use classes to detect this, and maybe /content field?
-			space? get w
+			host? host									;@@ maybe /content field not /space?
+			host/space									;-- /space is assigned?
 			find supported-events event/type
 			events/dispatch host event
 			none										;-- the event can be processed by other handlers

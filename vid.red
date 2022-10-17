@@ -132,22 +132,33 @@ VID: context [
 	;@@ grid-view
 	
 	
-	;-- basic event dispatching face
-	;@@ DOC it: user can use any face as long as 'space' is defined (serves as a marker for the host-event-func)
-	system/view/VID/styles/host: [
+	host?: func ["Check if OBJ is a HOST face" obj [object!]]['host = class? obj]
+	
+	host-on-change: function [host word value] [if word? :host/space [invalidate get host/space]]
+	
+	;; basic event dispatching face
+	system/view/VID/styles/host: reshape [
 		default-actor: worst-actor-ever					;-- worry not! this is useful
-		template: [
-			type:       'base
-			size:       0x0								;-- no size by default - used by init-spaces-tree
+		init: [init-spaces-tree face]
+		template: /use (declare-class/manual 'host [
+			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
+			on-change*: function spec-of :classy-object!/on-change*
+				with self append copy body-of :classy-object!/on-change* body-of :face!/on-change*
+			classify-object 'host self
+			#assert [host? self]
+			
+			type:       'base		#type =  [word!]
+			;; no size by default - used by init-spaces-tree as a hint to resize the host itself:
+			size:       0x0			#type =? [pair! none!]  :host-on-change
 			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
 			;; (except for some popups that must be almost transparent)
 			color:      system/view/metrics/colors/panel
-			space:      none
-			flags:      'all-over						;-- else 'over' events won't make sense over spaces
-			rate:       100								;-- for space timers to work
-			generation: 0.0								;-- render generation number, used to detect live spaces (0 = never rendered)
-		]
-		init: [init-spaces-tree face]
+									#type =  [tuple! none!] :host-on-change
+			space:      none		#type =? [word! (space? get/any space) none!] :host-on-change
+			flags:      'all-over	#type =  [block! word! none!]	;-- else 'over' events won't make sense over spaces
+			rate:       100			#type =  [integer! time! none!]	;-- for space timers to work
+			generation: 0.0			#type =  [float!]				;-- render generation number, used to detect live spaces (0 = never rendered)
+		])
 	]
 	
 	
@@ -375,7 +386,7 @@ VID: context [
 				
 				append pane name
 			]
-		]
+		];; commit-style: []
 		
 		reset: [
 			set def none
@@ -494,8 +505,8 @@ VID: context [
 		
 		parse spec =vids=
 		pane
-	]
+	];; lay-out-vids: function
 	
-	export [lay-out-vids]
+	export [lay-out-vids host?]
 ]
 

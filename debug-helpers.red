@@ -61,7 +61,7 @@ expand-space-path: function [path [any-word! any-path!] /local coll] [
 			;; substitute global word in the path with a word that refers to a space
 			any [
 				all [object? :coll  in coll 'map  found: find coll/map item  found/1]
-				all [object? :coll  is-face? coll  any [item = 'space  item = select coll 'space]  coll/space]
+				all [object? :coll  host? coll  any [item = 'space  item = select coll 'space]  coll/space]
 				all [block?  :coll  found: find coll item  found/1]
 			]
 		]
