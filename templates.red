@@ -1398,6 +1398,7 @@ list-view-ctx: context [
 		if lview: list/list-view [
 			lview/content-flow: switch value [x ['horizontal] y ['vertical]]
 			invalidate/only list						;-- list-view is already invalidated by content-flow
+			invalidate/only lview/window
 		]
 	]
 		
