@@ -1393,26 +1393,17 @@ list-view-ctx: context [
 	list-picker: func [/size /pick i] with :list-draw [
 		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
 	]
-	
-	on-axis-change: function [list [object!] word [word!] value [word!]] [
-		if lview: list/list-view [
-			lview/content-flow: switch value [x ['horizontal] y ['vertical]]
-			invalidate/only list						;-- list-view is already invalidated by content-flow
-			invalidate/only lview/window
-		]
-	]
 		
+	;; new class needed to type icache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
-	list-template: declare-class/manual 'list-in-list-view/list [		;-- new class needed for custom on-change
-		list-view: none		#type [object! none!]
-		axis:      'y		#type = :on-axis-change		;@@ must be set after /list-view! maybe add list-view/axis instead?
+	list-template: declare-class/manual 'list-in-list-view/list [
+		axis: 'y
 		
 		;; cache of last rendered item spaces (as words)
 		;; this persistency is required by the focus model: items must retain sameness
 		;; an int->word map! - for flexibility in caching strategies (which items to free and when)
 		;@@ when to forget these? and why not keep only focused item?
-		icache: make map! []	#type [map!]
-		items:  does []									;-- placeholder, set by list-view to a func
+		icache: make map! 16	#type [map!]
 		
 		available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 			;; must pass positive canvas (uses last rendered list-view size)
@@ -1439,9 +1430,9 @@ list-view-ctx: context [
 
 		window/content: 'list
 		list: make-space 'list list-template	#type (space? list)
-		list/list-view: self							;@@ find a better solution to sync content-flow with list/axis!
-		list/axis: 'y									;-- will trigger content-flow update when changed from 'y
-		content-flow: 'vertical
+		content-flow: does [
+			select [x horizontal y vertical] list/axis
+		] #type [function!]
 		
 		list/items: function [/pick i [integer!] /size] with list [
 			either pick [
