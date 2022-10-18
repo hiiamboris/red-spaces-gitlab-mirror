@@ -1410,7 +1410,7 @@ list-view-ctx: context [
 			~/available? self size axis dir from requested
 		] #type [function!]
 
-		classify-object 'list-in-list-view self			;-- on-change is not primed until /list-view is set
+		classify-object self 'list-in-list-view			;-- on-change is not primed until /list-view is set
 	]
 
 	declare-template 'list-view/inf-scrollable [

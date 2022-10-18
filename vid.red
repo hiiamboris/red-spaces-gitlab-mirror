@@ -144,7 +144,7 @@ VID: context [
 			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
 			on-change*: function spec-of :classy-object!/on-change*
 				with self append copy body-of :classy-object!/on-change* body-of :face!/on-change*
-			classify-object 'host self
+			classify-object self 'host
 			#assert [host? self]
 			
 			type:       'base		#type =  [word!]
