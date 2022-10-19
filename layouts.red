@@ -51,7 +51,7 @@ layouts: context [
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
-				limits   [none! object! (all [in limits 'min in limits 'max])]
+				limits   [object! (all [in limits 'min in limits 'max]) none!]
 				origin   [none! pair!]
 			]]
 			default origin: 0x0
@@ -133,23 +133,30 @@ layouts: context [
 				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
 			]
 			#debug [typecheck [
-				axes     [none! block! (
-					find/only [
-						[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
-						[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
-					] axes
-				)]
-				align    [none! pair! (-1x-1 +<= align +<= 1x1) block! [(
-					all [
-						2 >= length? align
-						find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/1
-						find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/2
-					]
-				)]]
+				axes     [
+					block! (
+						find/only [
+							[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]
+							[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
+						] axes
+					)
+					none!
+				]
+				align    [
+					pair! (-1x-1 +<= align +<= 1x1)
+					block! [(
+						all [
+							2 >= length? align
+							find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/1
+							find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/2
+						]
+					)]
+					none!
+				]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
-				limits   [none! object! (all [in limits 'min in limits 'max])]
+				limits   [object! (all [in limits 'min in limits 'max]) none!]
 			]]
 			default axes:   [e s]
 			default align:  -1x-1
