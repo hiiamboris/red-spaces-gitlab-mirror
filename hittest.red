@@ -46,7 +46,7 @@ hittest: function [
 		path [block! path!]
 	;-- this is required for dragging, as we need to follow the same path as at the time of click
 	/as "Force coordinate translation to follow a given path"
-		template [block! (name = template/1) path! (name = template/1) none!]
+		template [block! path! (space = template/1) none!]
 ][
 	space: get name: space
 	path: any [path  make [] 16]
