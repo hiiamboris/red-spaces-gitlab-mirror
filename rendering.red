@@ -189,6 +189,17 @@ context [
 		]
 	]
 	
+	#debug changes [
+		verify-validity: function [host [object!] (host? host)] [
+			paths: list-spaces anonymize host/type host
+			remove-each path paths ['invalid <> select get last path 'cache]
+			unless empty? paths [
+				print "*** Unwanted invalidation of the following spaces detected during render: ***"
+				print mold/only paths
+			]
+		]
+	]
+	
 	get-cache: function [
 		"If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
 		space [object!] canvas [pair! none!]
@@ -292,6 +303,7 @@ context [
 			]
 		]
 		face/generation: current-generation
+		#debug changes [verify-validity face]			;-- check for unwanted invalidations during render, which may loop it
 		any [drawn copy []]								;-- drawn=none in case of error during render
 	]
 
