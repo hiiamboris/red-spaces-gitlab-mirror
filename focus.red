@@ -111,7 +111,7 @@ focus-space: function [
 		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
 
 		foreach name path [								;-- if faces are provided, find the innermost one
-			either host? f: get name [face: f][break]
+			if host? f: get name [face: f break]
 		]
 		
 		unless empty? old-path: keyboard/focus [
