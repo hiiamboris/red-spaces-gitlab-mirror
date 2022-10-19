@@ -89,7 +89,7 @@ traversal: context [
 		/into target [block!] "Existing content is overwritten"
 	][
 		target: any [target  make [] 100]
-		#assert [host? any [all [word? face  get face] face] "host object expected"]	;@@ REP #113
+		#assert [is-face? any [all [word? face  get face] face] "face object expected"]	;@@ REP #113
 		if object? :face [face: anonymize face/type face]
 		clear list-*aces* to path! face target
 		new-line/all target yes
