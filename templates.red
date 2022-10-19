@@ -65,8 +65,21 @@ modify-class 'space [
 	on-invalidate: 	#type [function! none!]
 ]	
 
-;@@ TODO: use classes to replace this with a more reliable check
-space?: func [obj [any-type!]] [all [object? :obj  in obj 'draw  in obj 'size]]
+space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
+	all [
+		object? :obj
+		any [
+			templates/(class? obj)						;-- fast check, but will fail for e.g. list-in-list-view
+			all [										;-- duck check ;@@ what words are strictly required to qualify?
+				in obj 'last-frame
+				in obj 'limits
+				in obj 'owner
+				in obj 'size
+				in obj 'draw
+			]
+		]
+	]
+]
 
 make-space: function [
 	"Create a space from a template TYPE"
