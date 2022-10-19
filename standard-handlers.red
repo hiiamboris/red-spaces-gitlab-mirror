@@ -196,12 +196,6 @@ define-handlers [
 				space/pushed?: no
 			][pass]
 		]
-		on-focus [space path event] [					;-- paint focus decoration
-			invalidate space
-		]
-		on-unfocus [space path event] [					;-- remove focus decoration
-			invalidate space
-		]
 	]
 
 
