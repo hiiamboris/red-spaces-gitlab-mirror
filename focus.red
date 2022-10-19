@@ -115,7 +115,7 @@ focus-space: function [
 		]
 		
 		unless empty? old-path: keyboard/focus [
-			invalidate get last old-path				;-- let space remove it's focus decoration
+			if space? obj: get last old-path [invalidate obj]	;-- let space remove it's focus decoration
 			with-stop [									;-- init a separate stop flag for a separate event
 				unfocus-event!/face: face
 				process-event old-path unfocus-event! [] yes
@@ -130,7 +130,7 @@ focus-space: function [
 			]
 		]
 		keyboard/focus: copy path						;-- copy since the path is static
-		invalidate get last path						;-- let space paint it's focus decoration
+		if space? obj: get last path [invalidate obj]	;-- let space paint it's focus decoration
 
 		with-stop [										;-- init a separate stop flag for a separate event
 			focus-event!/face: face
