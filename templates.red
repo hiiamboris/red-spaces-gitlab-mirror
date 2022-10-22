@@ -302,7 +302,7 @@ cell-ctx: context [
 	declare-template 'box/space [
 		;; margin is useful for drawing inner frame, which otherwise would be hidden by content
 		margin:  0
-		weight:  0										;@@ what default weight to use? what default alignment?
+		weight:  1										;@@ what default weight to use? what default alignment?
 		;@@ consider more high level VID-like specification of alignment
 		align:   0x0	#type =? :invalidates-look (find allowed-alignments align)
 		content: none	#type =? :invalidates [word! none!]

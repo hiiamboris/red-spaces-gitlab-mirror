@@ -290,7 +290,7 @@ context [
 		without-GC [									;-- speeds up render by 60%
 			with-style anonymize 'host face [			;-- required for `same-paths?` to have a value (used by cache)
 				style: apply-current-style face			;-- host style can only be a block
-				canvas: if face/size [encode-canvas face/size -1x-1]	;-- fill by default
+				canvas: if face/size [encode-canvas face/size 1x1]	;-- fill by default
 				drawn: render-space/on face/space canvas
 				#assert [block? :drawn]
 				unless face/size [						;-- initial render: define face/size
