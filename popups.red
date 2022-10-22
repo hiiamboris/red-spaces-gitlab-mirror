@@ -9,7 +9,10 @@ Red [
 
 ;@@ menu command should be able to access the space that opened the menu! - bind it!
 
-templates/hint: make-template 'box [margin: 20x10 origin: 0x0]
+declare-template 'hint/box [
+	margin: 20x10
+	origin: 0x0		#type =? [pair! none!]				;-- `none` disables the arrow display (when it's not precise)
+]
 
 ;@@ use a single stack for all windows maybe? not sure if View will handle cross-window face transfer though
 popup-registry: make hash! 2
