@@ -2692,21 +2692,21 @@ field-ctx: context [
 		cdrawn: render in field 'caret
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
 		ofs: field/origin by 0
-		quietly field/map: compose/deep [
-			(in field/spaces 'text)          [offset: (ofs) size: (ctext/size)]
-			(when sel (compose/deep [					;@@ use reshape when it gets fast enough, what a mess
-				(in field/spaces 'selection) [offset: (ofs + mrg + sxy1) size: (ssize)]
-			]))
-			(in field/spaces 'caret)         [offset: (ofs + mrg + cxy1) size: (csize)]
+		quietly field/map: reshape-light [
+			@[in field/spaces 'text]      [offset: @(ofs) size: @(ctext/size)]
+		/?	@[in field/spaces 'selection] [offset: @(ofs + mrg + sxy1) size: @(ssize)]		/if sel
+			@[in field/spaces 'caret]     [offset: @(ofs + mrg + cxy1) size: @(csize)]
 		]
-		compose/only/deep [								;@@ can compose-map be used without re-rendering?
-			clip (mrg) (field/size - mrg) [
-				translate (ofs) [
-					(when sel (compose [translate (mrg + sxy1) (sdrawn)]))
-					translate 0x0 (drawn)
-					translate (mrg + cxy1) (cdrawn)
+		reshape-light [									;@@ can compose-map be used without re-rendering?
+			clip @(mrg) @(field/size - mrg) [
+				translate @(ofs) [
+				/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
+					translate 0x0 @[drawn]
+				/?	translate @(mrg + cxy1) @[cdrawn]	/if sel
 					;@@ workaround for #4901 which draws white background under text over the selection:
-					#if linux? [(when sel (compose [translate (mrg + sxy1) (sdrawn)]))]
+					#if linux? [
+					/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
+					]
 				]
 			]
 		]

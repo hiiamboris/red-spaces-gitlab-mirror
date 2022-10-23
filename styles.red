@@ -102,16 +102,14 @@ do with [
 		pen [word! tuple! block! none!]
 		fill-pen [word! tuple! none!]
 		/round radius [integer!]
-		/margin mrg [pair!]
+		/margin mrg: ((system/words/round/ceiling/to 1x1 * line 2) / 2) [pair!]
 	][
-		mrg:    any [mrg (system/words/round/ceiling/to 1x1 * line 2) / 2]
-		pen?:   when pen      (compose [pen      (pen)     ])
-		fill?:  when fill-pen (compose [fill-pen (fill-pen)])
-		compose/deep [
+		reshape-light [
 			push [
-				(pen?) (fill?)
-				line-width (line)
-				box (mrg) (size - mrg) (only radius)
+			/?	pen      @(pen)				/if pen
+			/?	fill-pen @(fill-pen)		/if fill-pen
+				line-width @(line)
+				box @(mrg) @(size - mrg) @(radius)
 			]
 		]
 	]
@@ -254,19 +252,17 @@ do with [
 			below: [(make-box/round size 1 none none 50)]
 		]
 		
-		hint: function [box] [
+		hint: function [box] /skip [
 			drawn: box/draw								;-- draw to obtain the size
 			m: box/margin / 2
-			matrix: arrow: []							;-- no arrow if hint was adjusted by window borders
-			if o: box/origin [
+			reshape [
+				@(make-box/round/margin box/size 1 none none 3 1x1 + m)
 				;@@ TODO: arrow can be placed anywhere really, just more math needed
-				if o <> 0x0 [matrix: compose/deep [matrix [1 0 0 -1 0 (box/size/y)]]]
-				arrow: compose/deep [shape [move (m + 4x1) line 0x0 (m + 1x4)]] 
-			]
-			compose/only/deep [
-				(make-box/round/margin box/size 1 none none 3 1x1 + m)
-				push [(matrix) (arrow)]
-				(wrap drawn)
+				push [
+					matrix [1 0 0 -1 0 @(box/size/y)]	/if o <> 0x0
+					shape [move @(m + 4x1) line 0x0 @(m + 1x4)]
+				]							/if o: box/origin	;-- no arrow if hint was adjusted by window borders
+				!(drawn)
 			]
 		]
 		
