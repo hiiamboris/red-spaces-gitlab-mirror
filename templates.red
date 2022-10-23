@@ -2702,7 +2702,7 @@ field-ctx: context [
 				translate @(ofs) [
 				/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
 					translate 0x0 @[drawn]
-				/?	translate @(mrg + cxy1) @[cdrawn]	/if sel
+					translate @(mrg + cxy1) @[cdrawn]
 					;@@ workaround for #4901 which draws white background under text over the selection:
 					#if linux? [
 					/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
