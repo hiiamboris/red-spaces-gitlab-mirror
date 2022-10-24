@@ -14,18 +14,12 @@ templates: #()											;-- map for extensibility
 
 ;; default on-change function to avoid replicating it in every template
 invalidates: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [
-		name: any [attempt [space/last-frame/1] 'unknown]
-		#print "change/size of (name)/(word) to (mold/flat/part :value 40)"
-	]
+	#debug changes [#print "change/size of (space/type)/(word) to (mold/flat/part :value 40)"]
 	invalidate space
 ]
 
 invalidates-look: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [
-		name: any [attempt [space/last-frame/1] 'unknown]
-		#print "change/look of (name)/(word) to (mold/flat/part :value 40)"
-	]
+	#debug changes [#print "change/look of (space/type)/(word) to (mold/flat/part :value 40)"]
 	invalidate/info space none 'look
 ]
 
@@ -37,8 +31,9 @@ init-cache: function [space [object!]] [
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
+	type:	'space	#type [word!] =						;-- used for styling, may be different from template name!
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
-	owner:  none	#type [word! none!]
+	owner:  none	#type [object! none!]
 	draw:   []   	#type [block! function!]
 	;-- `drawn` is an exception and not held in the space, so just `size`
 	cache:  [size]	#type [word! (find [valid invalid] cache)  logic! (cache = off)  block!]
@@ -74,6 +69,7 @@ space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
 				in obj 'last-frame
 				in obj 'limits
 				in obj 'owner
+				in obj 'type
 				in obj 'size
 				in obj 'draw
 			]
@@ -86,7 +82,6 @@ make-space: function [
 	type [word!]  "Looked up in templates"
 	spec [block!] "Extension code"
 	/block "Do not instantiate the object"
-	/name "Return a word referring to the space, rather than space object"
 ][
 	base: templates/:type
 	#assert [any [
@@ -101,9 +96,9 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
+		quietly r/type: type
 		init-cache r
 	]
-	if name [r: anonymize type r]
 	r
 ]
 
@@ -129,18 +124,18 @@ declare-template: function [
 ;-- helps having less boilerplate when `map` is straightforward
 compose-map: function [
 	"Build a Draw block from MAP"
-	map "List of [space-name [offset XxY size XxY] ...]"
+	map "List of [space [offset XxY size XxY] ...]"
 	/only list [block!] "Select which spaces to include"
 	/window xy1 [pair!] xy2 [pair!] "Specify viewport"	;@@ it's unused; remove it?
 ][
 	r: make [] round/ceiling/to (1.5 * length? map) 1	;-- 3 draw tokens per 2 map items
-	foreach [name box] map [
-		all [list  not find list name  continue]		;-- skip names not in the list if it's provided
+	foreach [space box] map [
+		all [list  not find/same list space  continue]	;-- skip names not in the list if it's provided
 		; all [limits  not boxes-overlap? xy1 xy2 o: box/offset o + box/size  continue]	;-- skip invisibles ;@@ buggy - requires origin
 		if zero? area? box/size [continue]				;-- don't render empty elements (also works around #4859)
 		cmds: either window [
-			render/window name xy1 xy2
-		][	render        name
+			render/window space xy1 xy2
+		][	render        space
 		]
 		unless empty? cmds [							;-- don't spawn empty translate/clip structures
 			compose/only/into [
@@ -278,7 +273,7 @@ cell-ctx: context [
 		canvas: constrain canvas space/limits
 		mrg2:   2x2 * space/margin
 		drawn:  render/on space/content encode-canvas (subtract-canvas canvas mrg2) fill
-		cspace: get space/content
+		cspace: space/content
 		size:   mrg2 + cspace/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 		size:   max size (finite-canvas canvas) * fill	;-- only extends along fill-enabled axes
@@ -308,7 +303,7 @@ cell-ctx: context [
 		weight:  1										;@@ what default weight to use? what default alignment?
 		;@@ consider more high level VID-like specification of alignment
 		align:   0x0	#type =? :invalidates-look (find allowed-alignments align)
-		content: none	#type =? :invalidates [word! none!]
+		content: none	#type =? :invalidates [object! none!]
 		
 		map:     []
 		cache:   [size map]
@@ -328,20 +323,19 @@ cell-ctx: context [
 scrollbar: context [
 	~: self
 	
-	into: func [space [object!] xy [pair!] name [word! none!]] [
+	into: func [space [object!] xy [pair!] child [object! none!]] [
 		any [space/axis = 'x  xy: reverse xy]
-		into-map space/map xy name
+		into-map space/map xy child
 	]
 	
 	arrange: function [content [block!]] [				;-- like list layout but simpler/faster
 		map: make block! 2 * length? content
 		pos: 0x0
-		foreach name content [	;@@ should be map-each
-			size: select get name 'size
+		foreach space content [	;@@ should be map-each
 			append map compose/deep [
-				(name) [offset: (pos) size: (size)]
+				(name) [offset: (pos) size: (space/size)]
 			]
-			pos: size * 1x0 + pos
+			pos: space/size * 1x0 + pos
 		]
 		map
 	]
@@ -367,7 +361,7 @@ scrollbar: context [
 		quietly space/forth-arrow/size: w-arrow by h
 		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
 		
-		foreach name list [invalidate/only get name]
+		foreach item list [invalidate/only item]
 		compose/deep [
 			push [
 				matrix [(select [x [1 0 0 1] y [0 1 1 0]] space/axis) 0 0]
@@ -393,7 +387,7 @@ scrollbar: context [
 		forth-page:  make-space 'rectangle [draw: []]           #type (space? forth-page)		;-- go forth a page
 		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
-		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
+		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
 		draw: does [~/draw self]
 	]
 ]
@@ -407,7 +401,7 @@ scrollable-space: context [
 		space  [object!]
 		origin [pair! word!]
 	][
-		csize: select get space/content 'size
+		csize: select space/content 'size
 		box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
 		space/origin: clip [box - csize 0x0] origin
 	]
@@ -434,7 +428,7 @@ scrollable-space: context [
 		margin [integer! pair! none!]					;-- space to reserve around XY
 	][
 		mrg: 1x1 * any [margin 0]
-		csize: select get space/content 'size
+		csize: select space/content 'size
 		switch xy [
 			head [xy: 0x0]
 			tail [xy: csize * 0x1]						;-- no right answer here, csize or csize*0x1
@@ -453,12 +447,11 @@ scrollable-space: context [
 		set-origin space space/origin - dxy
 	]
 
-	into: function [space [object!] xy [pair!] name [word! none!]] [
-		if r: into-map space/map xy name [
+	into: function [space [object!] xy [pair!] child [object! none!]] [
+		if r: into-map space/map xy child [
 			if r/1 =? space/content [
-				cspace: get space/content
 				r/2: r/2 - space/origin
-				unless any [name  0x0 +<= r/2 +< cspace/size] [r: none]
+				unless any [child  0x0 +<= r/2 +< space/content/size] [r: none]
 			]
 		]
 		r
@@ -477,7 +470,7 @@ scrollable-space: context [
 			return quietly space/map: []
 		]
 		box: canvas: constrain canvas space/limits		;-- 'box' is viewport - area not occupied by scrollbars
-		cspace: get space/content
+		cspace: space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
 		cdraw: render/on space/content encode-canvas box fill
@@ -554,7 +547,7 @@ scrollable-space: context [
 		;; at which point `content` to place: >0 to right below, <0 to left above:
 		origin:       0x0
 		weight:       1
-		content:      none		#type =? :invalidates [word! none!]	;-- should be defined (overwritten) by the user
+		content:      none		#type =? :invalidates [object! none!]	;-- should be defined (overwritten) by the user
 		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
 		
 		hscroll: make-space 'scrollbar [axis: 'x]						#type (space? hscroll)
@@ -566,8 +559,8 @@ scrollable-space: context [
 		map:   []
 		cache: [size map]
 
-		into: func [xy [pair!] /force name [word! none!]] [
-			~/into self xy name
+		into: func [xy [pair!] /force child [object! none!]] [
+			~/into self xy child
 		]
 		
 		viewport: does [								;-- much better than subtracting scrollers; avoids exposing internal details
@@ -774,11 +767,10 @@ container-ctx: context [
 		
 		drawn: make [] len * 6
 		items: make [] len
-		repeat i len [append items name: cont/items/pick i]		;@@ use map-each
+		repeat i len [append items cont/items/pick i]	;@@ use map-each
 		set [size: map: origin:] make-layout type items settings
 		default origin: 0x0
-		i: 0 foreach [name geom] map [					;@@ should be for-each [/i name geom]
-			i: i + 1
+		foreach [_ geom] map [
 			pos: geom/offset
 			siz: geom/size
 			drw: geom/drawn
@@ -811,8 +803,8 @@ container-ctx: context [
 		
 		map:   []
 		cache: [size map]
-		into: func [xy [pair!] /force name [word! none!]] [
-			into-map map xy + origin name
+		into: func [xy [pair!] /force child [object! none!]] [
+			into-map map xy + origin child
 		]
 
 		draw: function [
@@ -875,7 +867,7 @@ icon-ctx: context [
 		spaces: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
-			box:   make-space 'box [content: 'text]		;-- used to align paragraph
+			box:   make-space 'box [content: text]		;-- used to align paragraph
 			set 'content [image box]
 		] #type [object!]
 		
@@ -933,22 +925,21 @@ label-ctx: context [
 	
 	on-image-change: function [label [object!] word [word!] value [any-type!]] [
 		spaces: label/spaces
-		name: case [
+		spaces/image-box/content: case [				;-- invalidated by cell
 			image? label/image [
 				spaces/image/data: label/image
-				'image
+				spaces/image
 			]
 			string? label/image [
 				spaces/sigil/text: label/image
-				'sigil
+				spaces/sigil
 			]
 			char? label/image [
 				spaces/sigil/text: form label/image
-				'sigil
+				spaces/sigil
 			]
 			'else [none]
 		]
-		spaces/image-box/content: if name [bind name spaces]	;-- invalidated by cell
 	]
 
 	on-text-change: function [label [object!] word [word!] value [any-type!]] [
@@ -961,7 +952,7 @@ label-ctx: context [
 			spaces/text/text: label/text
 			'text
 		]
-		spaces/body/content: spaces/lists/:type			;-- invalidated by container
+		spaces/body/content: reduce spaces/lists/:type			;-- invalidated by container
 	]
 	
 	on-flags-change: function [label [object!] word [word!] value [any-type!]] [
@@ -980,8 +971,8 @@ label-ctx: context [
 			image-box:  make-space 'box  [content: none]		;-- needed for centering the image/sigil
 			text:       make-space 'text []						;-- 1st line of text
 			comment:    make-space 'text []						;-- lines after the 1st
-			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  content: [text comment]]
-			text-box:   make-space 'box  [content: 'body]		;-- needed for text centering
+			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  content: reduce [text comment]]
+			text-box:   make-space 'box  [content: body]		;-- needed for text centering
 			lists: [text: [text] comment: [text comment]]		;-- used to avoid extra bind in on-change
 			set 'content [image-box text-box]
 		]
@@ -1001,9 +992,8 @@ data-view-ctx: context [
 
 	push-font: function [space [object!]] [
 		if space/content [
-			cspace: get space/content
-			if all [in cspace 'font  not cspace/font =? space/font] [
-				cspace/font: space/font					;-- should trigger invalidation
+			if all [in space/content 'font  not space/content/font =? space/font] [
+				space/content/font: space/font					;-- should trigger invalidation
 			]
 		]
 	]
@@ -1052,7 +1042,7 @@ window-ctx: context [
 		from      [integer!]
 		requested [integer!]
 	][
-		cspace: get space/content
+		cspace: space/content
 		either function? cavail?: select cspace 'available? [	;-- use content/available? when defined
 			cavail? axis dir from requested
 		][														;-- otherwise deduce from content/size
@@ -1079,11 +1069,10 @@ window-ctx: context [
 		set [canvas': fill:] decode-canvas canvas
 		size: window/pages * finite-canvas canvas'
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
-			cspace: get content
 			cdraw: render/window/on content -org -org + size canvas
 			;; once content is rendered, it's size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
-			if cspace/size [size: min size cspace/size - org]	;-- size has to be finite
+			if content/size [size: min size content/size - org]	;-- size has to be finite
 		]
 		window/size: size
 		#debug sizing [#print "window resized to (window/size)"]
@@ -1099,7 +1088,7 @@ window-ctx: context [
 		origin:  0x0									;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
-		content: none	#type =? :invalidates [word! none!]
+		content: none	#type =? :invalidates [object! none!]
 		
 		map:     []
 		cache:   [size map]
@@ -1184,8 +1173,7 @@ inf-scrollable-ctx: context [
 		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers roll-edge (px)
 
-		window: make-space 'window []	#type (space? window)
-		content: 'window
+		content: window: make-space 'window []	#type (space? window)
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
@@ -1257,14 +1245,14 @@ list-view-ctx: context [
 		imax: list/items/size
 		space: list/spacing								;-- return value is named "space"
 		fetch-ith-item: [								;-- sets `item` to size
-			obj: get name: list/items/pick i
+			obj: list/items/pick i
 			;; presence of call to `render` here is a tough call
 			;; existing previous size is always preferred here, esp. useful for non-cached items
 			;; but `locate-line` is used by `available?` which is in turn called:
 			;; - when determining initial window extent (from content size)
 			;; - every time window gets scrolled closer to it's borders (where we have to render out-of-window items)
 			;; so there's no easy way around requiring render here, but for canvas previous window size can be used
-			render/on name canvas
+			render/on obj canvas
 			item: obj/size
 		]
 		;@@ should this func use layout or it will only complicate things?
@@ -1297,7 +1285,7 @@ list-view-ctx: context [
 
 	item-length?: function [list [object!] i [integer!] (i > 0)] [
 		#assert [list/icache/:i]
-		item: get list/icache/:i						;-- must be cached by previous locate-line call
+		item: list/icache/:i							;-- must be cached by previous locate-line call
 		r: item/size/(list/axis)
 		#debug list-view [#print "item-length? (i) -> (r)"]
 		r
@@ -1392,7 +1380,7 @@ list-view-ctx: context [
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn: make [] 3 * (length? new-map) / 2
-		foreach [name geom] new-map [
+		foreach [_ geom] new-map [
 			#assert [geom/drawn]						;@@ should never happen?
 			if drw: geom/drawn [						;-- invisible items don't get re-rendered
 				remove/part find geom 'drawn 2			;-- no reason to hold `drawn` in the map anymore
@@ -1438,13 +1426,15 @@ list-view-ctx: context [
 		] #type [function!]
 		
 		wrap-data: function [item-data [any-type!]][	;-- can be overridden (but with care)
-			spc: make-space 'data-view [quietly wrap?: on]
+			spc: make-space 'data-view [
+				quietly type: 'item
+				quietly wrap?: on
+			]
 			set/any 'spc/data :item-data
-			anonymize 'item spc
+			spc
 		] #type [function!]
 
-		window/content: 'list
-		list: make-space 'list list-template	#type (space? list)
+		window/content: list: make-space 'list list-template	#type (space? list)
 		content-flow: does [
 			select [x horizontal y vertical] list/axis
 		] #type [function!]
@@ -1478,16 +1468,16 @@ list-view-ctx: context [
 grid-ctx: context [
 	~: self
 	
-	into: func [grid [object!] xy [pair!] name [word! none!]] [	;-- faster than generic map-based into
-		if name [return into-map grid/map xy name]		;-- let into-map handle it ;@@ slow! need a better solution!
+	into: func [grid [object!] xy [pair!] cell [object! none!]] [	;-- faster than generic map-based into
+		if cell [return into-map grid/map xy cell]		;-- let into-map handle it ;@@ slow! need a better solution!
 		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
 		if cell <> mcell [
 			offset: offset + grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 		]
 		all [
-			mcname: grid/frame/cells/:mcell
-			reduce [mcname offset]
+			mcspace: grid/frame/cells/:mcell
+			reduce [mcspace offset]
 		]
 	]
 	
@@ -1723,8 +1713,7 @@ grid-ctx: context [
 			if content: grid/cells/pick cell1 [
 				set-quiet 'rendered-xy cell1			;@@ temporary kludge until apply!
 				render/on grid/wrap-space cell1 content canvas	;-- render to get the size
-				cspace: get content
-				height1: cspace/size/y
+				height1: content/size/y
 			]
 			case [
 				span/y = 1 [
@@ -1803,7 +1792,7 @@ grid-ctx: context [
 			mcell: grid/get-first-cell cell				;-- row/col of multicell this cell belongs to
 			if any [
 				done/:mcell								;-- skip mcells that were drawn for this group
-				not content-name: grid/cells/pick mcell		;-- cell is not defined? skip the draw
+				not content: grid/cells/pick mcell		;-- cell is not defined? skip the draw
 			] [continue]
 			done/:mcell: true							;-- mark it as drawn
 			
@@ -1812,15 +1801,15 @@ grid-ctx: context [
 			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
 			
-			mcspace: get mcname: grid/wrap-space mcell content-name
+			mcspace: grid/wrap-space mcell content
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
-			render/on mcname encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
+			render/on mcspace encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply! (could have been reset by inner grids)
-			mcdraw: render/on mcname encode-canvas mcsize 1x1	;-- re-render to draw the full background
+			mcdraw: render/on mcspace encode-canvas mcsize 1x1	;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
-			repend map [mcname geom]					;-- map may contain the same space if it's both pinned & normal
+			repend map [mcspace geom]					;-- map may contain the same space if it's both pinned & normal
 			compose/only/into [							;-- compose-map calls extra render, so let's not use it here
 				translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
 			] tail drawn
@@ -1919,12 +1908,12 @@ grid-ctx: context [
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
-			unless name: grid/cells/pick cell [continue]
-			cspace: get cname: grid/wrap-space cell name		;-- apply cell style too (may influence min. size by margin, etc)
+			unless spc: grid/cells/pick cell [continue]
+			cspace: grid/wrap-space cell spc			;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
-				render/on cname encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
+				render/on cspace encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
-				render/on cname canvas
+				render/on cspace canvas
 				h: cspace/size/y
 			]
 			span: grid/get-span cell1: grid/get-first-cell cell
@@ -2120,7 +2109,7 @@ grid-ctx: context [
 		margin:  5
 		spacing: 5
 		origin:  0x0			;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
-		content: make map! 8	#on-change :invalidates			;-- XY coordinate -> space-name (not cell, but cells content name)
+		content: make map! 8	#on-change :invalidates			;-- XY coordinate -> space (not cell, but cells content)
 		spans:   make map! 4	#type [map!]					;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
 		widths:  make map! [default 100 min 10]					;-- map of column -> it's width
@@ -2148,8 +2137,8 @@ grid-ctx: context [
 			canvas:  none								;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
 			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
 			heights: make map!   4						;-- cached heights of rows marked for autosizing
-			;; "cell cache" - cached `cell` spaces: [XY name ...] and [space XY geometry ...]
-			;; persistency required by the focus model: cells must retain sameness, i.e. XY -> name
+			;; "cell cache" - cached `cell` spaces: [XY cell ...] and [space XY geometry ...]
+			;; persistency required by the focus model: cells must retain sameness, i.e. XY -> cell
 			;@@ TODO: changes to content must invalidate ccache! but no way to detect those changes, so only manually possible
 			cells:   make hash!  8						;-- cells that wrap content, filled by render and height estimator
 			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
@@ -2171,23 +2160,21 @@ grid-ctx: context [
 		; cache: [size map hcache fitcache size-cache]
 		cache: []
 
-		wrap-space: function [xy [pair!] space [word! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
-			either name: frame/cells/:xy [
-				cell: get name
-			][
-				cell: get name: make-space/name 'cell []
-				repend frame/cells [xy name cell] 
+		wrap-space: function [xy [pair!] space [object! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
+			unless cell: frame/cells/:xy [
+				cell: make-space 'cell []
+				repend frame/cells [xy cell] 
 			]
 			quietly cell/owner: none					;-- prevent grid invalidation in case new space is assigned
 			cell/content: space
-			name
+			cell
 		] #type [function!] :invalidates
 
 		cells: func [/pick xy [pair!] /size] [			;-- up to user to override
 			either pick [content/:xy][calc-bounds]
 		] #type [function!] :invalidates				;@@ should clear frame/cells too!
 		
-		into: func [xy [pair!] /force name [word! none!]] [~/into self xy name]
+		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		
 		;-- userspace functions for `spans` reading & modification
 		;-- they are required to be able to get any particular cell's multi-cell without full `spans` traversal
@@ -2333,12 +2320,13 @@ grid-view-ctx: context [
 		;; only called initially or after invalidate-range
 		wrap-data: function [item-data [any-type!]] [
 			spc: make-space 'data-view [
+				quietly type:  'cell
 				quietly wrap?:  on						;-- will be considered upon /data change
 				quietly margin: 3x3
 				quietly align: -1x0
 			]
 			set/any 'spc/data :item-data
-			anonymize 'cell spc
+			spc
 		] #type [function!] :invalidates
 
 		;; cacheability requires window to be fully rendered but
@@ -2346,18 +2334,16 @@ grid-view-ctx: context [
 		;; so instead, grid redraws visible part every time
 		window/cache: off
 		
-		window/content: 'grid
-		grid: make-space 'grid [
+		window/content: grid: make-space 'grid [
 			;; while this should not pose a danger of extra invalidation, since cells are not under user's control,
 			;; currently cells is a hash (for reverse lookups), while content is a map
-			;; also content contains names, cells - objects
 			; frame/cells: content
 		
 			;; no need to wrap data-view because it's already a box/cell
-			wrap-space: function [xy [pair!] space [word!]] [
+			wrap-space: function [xy [pair!] space [object!]] [
 				; put frame/cells xy get space
 				pos: any [find frame/cells xy  tail frame/cells]
-				rechange pos [xy space get space]		;-- used by grid for reverse lookups (e.g. during styling)
+				rechange pos [xy space]					;-- used by grid for reverse lookups (e.g. during styling)
 				space
 			]
 			
@@ -2413,21 +2399,20 @@ button-ctx: context [
 
 ;@@ this should not be generally available, as it's for the tests only - remove it!
 declare-template 'rotor/space [
-	content: none	#type =? :invalidates [word! none!]
+	content: none	#type =? :invalidates [object! none!]
 	angle:   0		#type =  :invalidates-look [integer! float!]
 
 	ring: make-space 'space [size: 360x10]
 	tight?: no
 	;@@ TODO: zoom for round spaces like spiral
 
-	map: [							;-- unused, required only to tell space iterators there's inner faces
+	map: reduce [							;-- unused, required only to tell space iterators there's inner faces
 		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
 	]
 	cache: [size map]
 	
-	into: function [xy [pair!] /force name [word! none!]] [
-		unless content [return none]
-		spc: get content
+	into: function [xy [pair!] /force child [object! none!]] [
+		unless spc: content [return none]
 		r1: to 1 either tight? [
 			(min spc/size/x spc/size/y) + 50 / 2
 		][
@@ -2439,22 +2424,21 @@ declare-template 'rotor/space [
 		p: as-pair  p/x * c - (p/y * s)  p/x * s + (p/y * c)	;-- rotate the coordinates
 		xy: p + (size / 2)
 		xy1: size - spc/size / 2
-		if any [name = content  within? xy xy1 spc/size] [
+		if any [child =? content  within? xy xy1 spc/size] [
 			return reduce [content xy - xy1]
 		]
 		r: p/x ** 2 + (p/y ** 2) ** 0.5
 		a: (arctangent2 0 - p0/y p0/x) // 360					;-- ring itself does not rotate
-		if any [name = 'ring  all [r1 <= r r <= r2]] [
-			return reduce ['ring  as-pair a r2 - r]
+		if any [child =? ring  all [r1 <= r r <= r2]] [
+			return reduce [ring  as-pair a r2 - r]
 		]
 		none
 	]
 
 	draw: function [] [
 		unless content [return []]
-		map/1: content				;-- expose actual name of inner face to iterators
-		spc: get content
-		drawn: render content		;-- render before reading the size
+		map/1: spc: content				;-- expose actual name of inner face to iterators
+		drawn: render content			;-- render before reading the size
 		r1: to 1 either tight? [
 			(min spc/size/x spc/size/y) + 50 / 2
 		][

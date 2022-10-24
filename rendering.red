@@ -33,7 +33,9 @@ get-style: function [
 get-current-style: function [
 	"Fetch styling code object for the current space being drawn"
 ][
-	get-style as path! current-path
+	path: copy current-path
+	forall path [path/1: path/1/type]
+	get-style as path! path
 ]
 
 
@@ -74,18 +76,14 @@ combine-style: function [
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
-	get-space-name: function [space [object!]] [
-		any [space/last-frame/1 'unknown]				;@@ REP #113
-	]
-	check-owner-override: function [space [object!] new-owner [word!]] [	;-- only used before changing the /owner
+	check-owner-override: function [space [object!] new-owner [object!]] [	;-- only used before changing the /owner
 		all [
-			last-gen: space/last-frame/2
+			last-gen: space/last-frame/1
 			next-gen: attempt [current-generation]
 			last-gen = next-gen
-			word? :space/owner
-			unless (get space/owner) =? (get new-owner) [
-				print `"*** Warning on rendering of (get-space-name space):"`
-				assert [(get space/owner) =? (get new-owner) "Owner sharing detected!"]
+			unless :space/owner =? :new-owner [
+				print `"*** Warning on rendering of (space/type):"`
+				assert [:space/owner =? :new-owner "Owner sharing detected!"]
 			]
 		]
 	]
@@ -106,11 +104,11 @@ context [
 		append path parents/1/parent					;-- faster than anonymizing 'host
 		foreach obj next parents [
 			frame: obj/last-frame
-			unless all [name: frame/1  gen <= frame/2] [return none]
-			append path name
-			if frame/3 = 'cached [gen: 0.0]				;-- don't check generation numbers inside cached subtree
+			unless gen <= frame/1 [return none]
+			append path obj/type
+			if frame/2 = 'cached [gen: 0.0]				;-- don't check generation numbers inside cached subtree
 		]
-		append path space/last-frame/1
+		append path space/type
 		#assert [not find path none]
 		as path! copy path
 	]
@@ -132,8 +130,7 @@ context [
 		while [
 			all [
 				; word? :space/owner
-				word? select space 'owner				;@@ workaround for #5216 - fixed already, remove me
-				space: get space/owner					;@@ REP #113
+				space: select space 'owner				;@@ workaround for #5216 - fixed already, remove me
 				not find/same parents-list space
 			]
 		] [append parents-list space]
@@ -142,7 +139,7 @@ context [
 	
 	set 'invalidate-cache function [space [object!]][	;-- to be used by custom invalidators
 		if space/cache = 'valid [
-			#debug cache [#print "Invalidating (get-space-name space) of size=(space/size)"]
+			#debug cache [#print "Invalidating (space/type) of size=(space/size)"]
 			clear get word: space/cache
 			quietly space/cache: bind 'invalid context? word
 		]
@@ -174,10 +171,9 @@ context [
 				if all [host  in host 'generation] [	;@@ more reliable host check needed to detect if space belongs to the tree
 					clear top parents					;-- no need to invalidate the host, as it has no cache
 					#debug changes [
-						path: as path! reverse map-each obj parents [get-space-name obj]
-						append path get-space-name space
-						cause-name: if cause [get-space-name cause]
-						#print "invalidating from (path), scope=(scope), cause=(cause-name)"
+						path: as path! reverse map-each obj parents [obj/type]
+						append path space/type
+						#print "invalidating from (path), scope=(scope), cause=(if cause [cause/type])"
 					]			
 					foreach space parents [
 						invalidate/only/info space cause scope
@@ -192,7 +188,7 @@ context [
 	#debug changes [
 		verify-validity: function [host [object!] (host? host)] [
 			paths: list-spaces anonymize host/type host
-			remove-each path paths ['invalid <> select get last path 'cache]
+			remove-each path paths ['invalid <> select last path 'cache]
 			unless empty? paths [
 				print "*** Unwanted invalidation of the following spaces detected during render: ***"
 				print mold/only paths
@@ -213,7 +209,7 @@ context [
 		]
 		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
-			name: get-space-name space
+			name: space/type
 			if cache [period: 2 + length? cache/-1]
 			either node [
 				n: (length? cache) / period
@@ -252,8 +248,7 @@ context [
 		rechange node words
 		quietly space/cache: bind 'valid context? word
 		#debug cache [
-			name: get-space-name space
-			#print "Saved cache for (name) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
+			#print "Saved cache for (space/type) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 		#debug profile [prof/manual/end 'cache]
 	]
@@ -267,14 +262,14 @@ context [
 	;; draw code has to be evaluated after current-path changes, for inner calls to render to succeed
 	set 'with-style function [							;-- exported for an ability to spoof the tree (for roll, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
-		name [word! path!]								;-- path support is useful for out of tree renders (like roll)
+		space [object! path!]							;-- path support is useful for out of tree renders (like roll)
 		code [block!]
 	][
 		top: tail current-path
-		append current-path name
+		append current-path space
 		trap/all/catch code [
 			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
-			#print "*** Failed to render (name)!^/(msg)^/"
+			#print "*** Failed to render (space/type)!^/(msg)^/"
 		]
 		clear top
 	]
@@ -290,15 +285,14 @@ context [
 
 		current-generation: face/generation + 1.0
 		without-GC [									;-- speeds up render by 60%
-			with-style anonymize 'host face [			;-- required for `same-paths?` to have a value (used by cache)
+			with-style face [
 				style: apply-current-style face			;-- host style can only be a block
 				canvas: if face/size [encode-canvas face/size 1x1]	;-- fill by default
 				drawn: render-space/on face/space canvas
 				#assert [block? :drawn]
 				unless face/size [						;-- initial render: define face/size
-					space: get face/space
-					#assert [space/size]
-					face/size: space/size
+					#assert [face/space/size]
+					face/size: face/space/size
 					style: apply-current-style face		;-- reapply the host style using new size
 				]
 				drawn: combine-style drawn style
@@ -314,13 +308,13 @@ context [
 	current-generation: does with :render-face [current-generation]		;-- exported for use in render-space
 	
 	render-space: function [
-		name [word!] "Space name pointing to it's object"
+		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas [pair! none!]
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
-		space: get name
+		name: space/type
 		#debug cache [#print "Rendering (name)"]	
 		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [
@@ -343,7 +337,7 @@ context [
 			#debug [check-owner-override space last current-path]
 			quietly space/owner: last current-path
 		]
-		with-style name [
+		with-style space [
 			window?: all [
 				any [xy1 xy2]
 				function? draw: select space 'draw
@@ -359,7 +353,7 @@ context [
 				;@@ use set or looped set-quiet here? probably won't matter
 				set words next next node				;-- size map etc..
 				; node: skip node 2  repeat i length? words [set-quiet words/:i :node/:i]
-				try [quietly space/last-frame: reduce [name current-generation 'cached]]
+				try [quietly space/last-frame: reduce [current-generation 'cached]]
 				#debug cache [							;-- add a frame to cached spaces after committing
 					drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
 				]
@@ -402,7 +396,7 @@ context [
 				]
 				
 				unless any [xy1 xy2] [commit-cache space canvas drawn]
-				try [quietly space/last-frame: reduce [name current-generation 'drawn]]
+				try [quietly space/last-frame: reduce [current-generation 'drawn]]
 				
 				#debug profile [prof/manual/end name]
 				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
@@ -418,15 +412,15 @@ context [
 
 	set 'render function [
 		"Return Draw code to draw a space or host face, after applying styles"
-		space [word! object!] "Space name, or host face as object"
+		space [object!] "Space or host face as object"
 		/window "Limit rendering area to [XY1,XY2] if space supports it"
 			xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas [pair! none!] "Specify canvas size as sizing hint"
 	][
-		drawn: either word? space [
-			render-space/window/on space xy1 xy2 canvas
-		][
+		drawn: either host? space [
 			render-face space
+		][
+			render-space/window/on space xy1 xy2 canvas
 		]
 		#debug draw [									;-- test the output to figure out which style has a "Draw error"
 			if error? error: try/keep [draw 1x1 drawn] [

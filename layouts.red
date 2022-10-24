@@ -73,10 +73,10 @@ layouts: context [
 			map: make [] 2 * count
 			size: 0x0
 			repeat i count [							;-- first render cycle
-				space: get name: either func? [spaces/pick i][spaces/:i]
-				drawn: render/on name canvas1
+				space: either func? [spaces/pick i][spaces/:i]
+				drawn: render/on space canvas1
 				#assert [space/size +< (1e7 by 1e7)]
-				compose/only/deep/into [(name) [offset (pos) size (space/size) drawn (drawn)]] tail map
+				compose/only/deep/into [(space) [offset (pos) size (space/size) drawn (drawn)]] tail map
 				pos:   pos + (space/size + spacing * guide)
 				size:  max size space/size
 			]
@@ -91,8 +91,8 @@ layouts: context [
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
-					space: get name: either func? [spaces/pick i][spaces/:i]
-					drawn: render/on name canvas2
+					space: either func? [spaces/pick i][spaces/:i]
+					drawn: render/on space canvas2
 					#assert [space/size +< (1e7 by 1e7)]
 					geom:  pick map 2 * i
 					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
@@ -193,7 +193,7 @@ layouts: context [
 			;; obtain constraints info
 			;; `info` can't be static since render may call another build-map; same for other arrays here
 			;; info format: [space-name space-object draw-block available-extension weight]
-			info: obtain block! count * 5
+			info: obtain block! count * 4
 			#leaving [stash info]
 			
 			;; clipped canvas - used for allowed width / height fitting
@@ -212,9 +212,9 @@ layouts: context [
 			#debug sizing [print ["tube canvas=" canvas "ccanvas=" ccanvas "stripe=" stripe]]
 			
 			repeat i count [
-				space: get name: either func? [spaces/pick i][spaces/:i]
+				space: either func? [spaces/pick i][spaces/:i]
 				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
-				drawn: render/on name stripe
+				drawn: render/on space stripe
 				weight: any [select space 'weight 0]
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
@@ -231,19 +231,19 @@ layouts: context [
 				]
 				;; if width is infinite, this 1st `drawn` block and `space/size` will be used as there's no meaningful width to fill
 				;; otherwise they're just drafts and will be replaced by proper size & block
-				repend info [name space drawn available weight]
+				repend info [space drawn available weight]
 			]
 			
 			;; split info into rows according to found min widths
 			;; rows coordinate system is always [x=e y=s] for simplicity; results are later normalized
 			rows: obtain block! 30
-			row:  obtain block! count * 5
+			row:  obtain block! count * 4
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
 			allowed-row-width: ccanvas/:x				;-- how wide rows to allow (splitting margin)
 			peak-row-width: 0							;-- used to determine full layout size when canvas is not limited
 			total-length:   0							;-- used to extend row heights to fill finite canvas
 			row-weight:     0							;-- later used to expand rows with >0 peak weight
-			foreach [name space drawn available weight] info [
+			foreach [space drawn available weight] info [
 				new-row-size: as-pair					;-- add item-size and check if it hangs over
 					row-size/x + space/size/:x + spacing/:x
 					max row-size/y space/size/:y		;-- height will only be needed in infinite width case (no 2nd render)
@@ -262,7 +262,7 @@ layouts: context [
 					row-weight: weight
 				]
 				peak-row-width: max peak-row-width row-size/x
-				repend row [name space drawn available weight]
+				repend row [space drawn available weight]
 			]
 			repend rows [row-size row-weight row]
 			total-length: total-length + row-size/y
@@ -295,11 +295,11 @@ layouts: context [
 						
 						row-size: -1x0 * spacing
 						repeat i length? extensions [	;@@ use for-each
-							set [name: space:] item: skip row i - 1 * 5
+							set [space:] item: skip row i - 1 * 4
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
 								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
-								item/3: render/on name encode-canvas desired-size reverse? 1x-1
+								item/3: render/on space encode-canvas desired-size reverse? 1x-1
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -336,12 +336,12 @@ layouts: context [
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
 			;@@ maybe it should affect (contract) row widths?
 			foreach [row-size row-weight row] rows [
-				repeat i (length? row) / 5 [			;@@ use for-each
-					set [name: space:] item: skip row i - 1 * 5
+				repeat i (length? row) / 4 [			;@@ use for-each
+					set [space:] item: skip row i - 1 * 4
 					;; always re-renders items, because they were painted on an infinite canvas
 					;; finite canvas will most likely bring about different outcome
 					desired-size: reverse? space/size/:x by row-size/y
-					item/3: render/on name encode-canvas desired-size 1x1
+					item/3: render/on space encode-canvas desired-size 1x1
 				]
 			]
 			
@@ -354,10 +354,10 @@ layouts: context [
 			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
 			foreach [row-size _ row] rows [
 				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
-				foreach [name space drawn _ _] row [
+				foreach [space drawn _ _] row [
 					ofs/:y: to integer! row-size/y - space/size/:y * in-row-shift + row-y
 					geom: reduce ['offset ofs * oxy + (space/size * shift) 'size space/size 'drawn drawn]
-					repend map [name geom]
+					repend map [space geom]
 					ofs/:x: ofs/:x + spacing/:x + space/size/:x
 				]
 				row-y: row-y + spacing/:y + row-size/y
@@ -366,7 +366,7 @@ layouts: context [
 			size: 2 * margin + reverse? total-width by total-length
 			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive
 				shift: size * abs shift
-				foreach [name geom] map [geom/offset: geom/offset + shift]
+				foreach [space geom] map [geom/offset: geom/offset + shift]
 			]
 			#debug sizing [print ["tube c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
@@ -410,13 +410,13 @@ layouts: context [
 			either round? [
 				;; round items are also considered almost equal in size, so it's easy math
 				repeat i count [
-					space:  get name: either func? [spaces/pick i][spaces/:i]
-					drawn:  render name
+					space:  either func? [spaces/pick i][spaces/:i]
+					drawn:  render space
 					center: space/size / 2
 					rad:    radius + max center/x center/y
 					point:  (polar2cartesian rad angle) - center
 					compose/only/deep/into [
-						(name) [offset (pos) size (space/size) drawn (drawn)]
+						(space) [offset (pos) size (space/size) drawn (drawn)]
 					] tail map
 					origin: min origin pos				;-- find leftmost topmost point
 					total:  max total pos + space/size	;-- find total dimensions
@@ -437,12 +437,12 @@ layouts: context [
 				#leaving [stash items]
 				
 				repeat i count [
-					space: get name: either func? [spaces/pick i][spaces/:i]
-					drawn: render name
+					space: either func? [spaces/pick i][spaces/:i]
+					drawn: render space
 					size:  space/size
 					rad:   radius
 					do adjust-radius
-					repend items [i name angle rad pos space/size drawn]
+					repend items [i space angle rad pos space/size drawn]
 					angle: angle + step
 				]
 				
@@ -467,9 +467,9 @@ layouts: context [
 				]
 				
 				;; lay out boxes into a map and estimate boundaries
-				foreach [_ name _ _ pos size drawn] items [
+				foreach [_ space _ _ pos size drawn] items [
 					compose/only/deep/into [
-						(name) [offset (pos) size (size) drawn (drawn)]
+						(space) [offset (pos) size (size) drawn (drawn)]
 					] tail map
 					origin: min origin pos				;-- find leftmost topmost point
 					total:  max total pos + size		;-- find total dimensions

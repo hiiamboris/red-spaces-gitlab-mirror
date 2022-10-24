@@ -48,9 +48,9 @@ traversal: context [
 			depth-limit > length? head root
 		][
 			root: next root
-			foreach [name _] map [
-				assert [name]								;-- no junk in the maps please
-				change root name
+			foreach [space _] map [
+				assert [space]								;-- no junk in the maps please
+				change root anonymize space/type space
 				target: list-spaces* root target
 			]
 			clear root
@@ -74,9 +74,9 @@ traversal: context [
 			]
 			clear root
 		]
-		if name: select root-face 'space [					;-- insert spaces if any
-			#assert [word? name]
-			change root name
+		if space: select root-face 'space [					;-- insert spaces if any
+			#assert [space? space]
+			change root anonymize space/type space
 			target: list-spaces* root target
 			clear root
 		]

@@ -154,7 +154,7 @@ VID: context [
 			;; (except for some popups that must be almost transparent)
 			color:      system/view/metrics/colors/panel
 									#type =  [tuple! none!] :host-on-change
-			space:      none		#type =? [word! (space? get/any space) none!] :host-on-change
+			space:      none		#type =? [object! (space? space) none!] :host-on-change
 			flags:      'all-over	#type =  [block! word! none!]	;-- else 'over' events won't make sense over spaces
 			rate:       100			#type =  [integer! time! none!]	;-- for space timers to work
 			generation: 0.0			#type =  [float!]				;-- render generation number, used to detect live spaces (0 = never rendered)
@@ -192,7 +192,7 @@ VID: context [
 			;; this is the only viable way to set focus,
 			;; as multiple `wrap-space` funcs create spaces that cannot be accounted for in VID code
 			foreach path list-*aces anonymize face/type face [
-				if focused =? get last path [
+				if focused =? last path [
 					#assert [face? face/parent]
 					focus-space path: compose [
 						(anonymize 'screen system/view/screens/1)	;-- not linked to the screen yet, has no /parent
@@ -212,12 +212,12 @@ VID: context [
 		wrap? [logic!] "How to lay text out: as a line (false) or paragraph (true)"
 	][ 
 		switch/default type?/word :value [
-			string! [make-space/name pick [paragraph text] wrap? [text: value]]
-			logic!  [make-space/name 'logic [state: value]]
-			image!  [make-space/name 'image [data:  value]]
-			url!    [make-space/name 'link  [data:  value]]
-			block!  [anonymize 'tube either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
-		] [make-space/name 'text [text: mold :value]]
+			string! [make-space pick [paragraph text] wrap? [text: value]]
+			logic!  [make-space 'logic [state: value]]
+			image!  [make-space 'image [data:  value]]
+			url!    [make-space 'link  [data:  value]]
+			block!  [either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
+		] [make-space 'text [text: mold :value]]
 	]
 	
 	
@@ -332,7 +332,7 @@ VID: context [
 				]
 				put sheet def/link new-style
 			][
-				space: get name: make-space/name def/style/template space-spec
+				space: make-space def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
 				
 				if def/pane [
@@ -384,7 +384,7 @@ VID: context [
 					either late? [react/later reaction][react reaction] 
 				]
 				
-				append pane name
+				append pane space
 			]
 		];; commit-style: []
 		

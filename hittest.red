@@ -9,27 +9,25 @@ Red [
 exports: [hittest]
 
 into-map: function [
-	map [block!] xy [pair!] name [none! word!]
-	/only names [block!] "Only try to enter selected space names"
+	map [block!] xy [pair!] child [none! object!]
+	/only list [block!] "Only try to enter selected spaces"
 ][
-	either name [
-		#assert [find/same map name]
-		geom: select/same map name
-		reduce [name  xy - geom/offset]
+	either child [
+		#assert [find/same map child]
+		geom: select/same map child
+		reduce [child  xy - geom/offset]
 	][
-		either names [
-			foreach name names [
-				box: select map name
+		either list [
+			foreach child list [
+				box: select/same map child
 				if within? xy o: box/offset box/size [
-					space: get name
-					return reduce [name  xy - o]
+					return reduce [child  xy - o]
 				]
 			]
 		][
-			foreach [name box] map [
+			foreach [child box] map [
 				if within? xy o: box/offset box/size [
-					space: get name
-					return reduce [name  xy - o]
+					return reduce [child  xy - o]
 				]
 			]
 		]
@@ -40,30 +38,27 @@ into-map: function [
 ;-- has to be fast, for on-over events
 hittest: function [
 	"Map a certain point deeply into the tree of spaces"
-	space [word!] "Top space in the tree (host/space usually)" (space? get space)
+	space [object!] "Top space in the tree (host/space usually)" (space? get space)
 	xy [pair!] "Point in that top space"
 	/into "Append into a given buffer"
-		path [block! path!]
+		path: (make [] 16) [block! path!]
 	;-- this is required for dragging, as we need to follow the same path as at the time of click
 	/as "Force coordinate translation to follow a given path"
-		template [block! path! (space = template/1) none!]
+		template [block! path! (space =? template/1) none!]
 ][
-	space: get name: space
-	path: any [path  make [] 16]
 	either template [
 		forall template [
-			set [name: _: name2:] template
-			repend path [name xy]
-			space: get name
+			set [space: _: child:] template
+			repend path [space xy]
 			#assert [xy]
 			; #assert [name2]							;-- can be none!
 			case [
 				into: select space 'into [
-					set [_ xy] do copy/deep [into/force xy name2]	;@@ workaround for #4854 - remove me
+					set [_ xy] do copy/deep [into/force xy child]	;@@ workaround for #4854 - remove me
 					; set [_ xy] into/force xy name2
 				]
 				map: select space 'map [
-					set [_ xy] into-map map xy name2
+					set [_ xy] into-map map xy child
 				]
 			]
 			template: next template
@@ -71,22 +66,21 @@ hittest: function [
 	][
 		while [
 			all [
-				name
-				space: get name
+				space
 				any [
 					none? space/size			;-- infinite spaces include any point ;@@ but should none mean infinite?
 					within? xy 0x0 space/size
 				]
 			]
 		][
-			repend path [name xy]
+			repend path [space xy]
 			#assert [xy]
 			case [
 				into: select space 'into [
-					set [name xy] into xy
+					set [space xy] into xy
 				]
 				map: select space 'map [
-					set [name xy] into-map map xy none
+					set [space xy] into-map map xy none
 				]
 				'else [break]
 			]
