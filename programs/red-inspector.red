@@ -33,9 +33,8 @@ context [
 	
 	define-styles [
 		cell/text: grid/cell/text: grid/cell/paragraph: [
-			flags: either attempt [spaces/ctx/grid-ctx/pinned?]
-				[union   flags [bold]]
-				[exclude flags [bold]]
+			spaces/ctx/set-flag flags 'bold spaces/ctx/grid-ctx/pinned?
+			; default font: code-font
 			font: code-font
 			below: when color: select self 'color [pen (color)]
 		]
@@ -49,10 +48,6 @@ context [
 		heights: copy #(min 10 default auto)
 		widths:  copy #(default 80)
 	]
-	
-	; declare-template 'grid-view/grid-view [
-		; limits:  50x50 .. none
-	; ]
 	
 	;; limits the displayed size of big blocks/objects
 	MAX_VALUES: 100
@@ -90,7 +85,7 @@ context [
 					grid/widths/1: 50
 					grid/pinned:  1x0
 					; pages: 2
-					; limits: 30x30 .. 200x200
+					limits: 30x50 .. none
 					old-wrap-data: :wrap-data
 					wrap-data: func [data] [
 						either all [word? :data space? get/any data] [
@@ -185,8 +180,8 @@ context [
 		too-deep: function [space [object!] canvas [none! pair!]] [
 			default canvas: 0x0
 			make-space/name 'text [
-				text: mold/flat/part :space/data 1000
-				flags: [ellipsize]
+				quietly text: mold/flat/part :space/data 1000
+				quietly flags: [ellipsize]
 			]
 		]
 		
@@ -227,7 +222,7 @@ context [
 				new-width: max 50 canvas/x - widths/1 - (any [widths/2 0]) - (gview/grid/margin/x * 2) - (gview/grid/spacing/x * ncol) - gview/vscroll/size/x
 				if widths/default <> new-width [
 					widths/default: new-width
-					clear gview/grid/frame/heights
+					; clear gview/grid/frame/heights
 				]
 			]
 			length? gview/grid/content
@@ -348,7 +343,7 @@ context [
 					do [set-details]
 					;@@ 9999 is a hack that needs a better solution
 					;@@ currently scrollable doesn't know how to render itself on inf canvas, becomes zero and complains
-					browser: data-view 100x100 .. 9999x9999 data=(get/any target) on-dbl-click [
+					browser: data-view data=(get/any target) on-dbl-click [
 						if all [ 
 							pos: find path 'grid
 							grid: get pos/1
@@ -398,10 +393,10 @@ red-inspector: function [
 ][
 	either empty? script [
 		inspect system
-		; prof/show
 	][
 		do script/1
 	]
+	prof/show
 ]
 ; img: make image! 1000x7000
 ; inspect system/words/img
