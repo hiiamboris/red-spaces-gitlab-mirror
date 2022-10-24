@@ -57,7 +57,7 @@ declare-template 'zoomer/cell [
 ; system/view/auto-sync?: no
 spaces/ctx/traversal/depth-limit: 4
 t0: now/utc/precise
-view/no-wait/options [
+view/no-wait/options expand-directives [
 	below
 	b: host [
 		vlist [
@@ -98,10 +98,10 @@ view/no-wait/options [
 						r: []
 						if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 							append clear r old-draw/on canvas
-							prof/manual/start 'truncation
+							#debug profile [prof/manual/start 'truncation]
 							; r: copy-deep-limit r 33				;-- 3 levels - 15625 grids
 							r: copy-deep-limit r 22				;-- 2 levels - 625 grids
-							prof/manual/end 'truncation
+							#debug profile [prof/manual/end 'truncation]
 						]
 						depth: depth - 1
 						r
@@ -119,7 +119,8 @@ view/no-wait/options [
 		elapsed: to float! difference now/utc/precise t0
 		z/zoom/x: exp (1 * elapsed) // log-e (gv/size/x / gv/cell-size/x)
 		z/zoom/y: z/zoom/x * (gv/size/y / gv/cell-size/y) / (gv/size/x / gv/cell-size/x)
-		invalidate z
+		invalidate/only gv	;-- may not see 'z' as parent because of overrides
+		invalidate/only z
 	]
 ] [offset: 10x10]
 prof/show
