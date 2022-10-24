@@ -153,7 +153,10 @@ compose-map: function [
 ]
 
 
-declare-template 'timer/space [cache: off]				;-- template space for timers (space has /rate anyway now)
+declare-template 'timer/space [							;-- template space for timers
+	rate:  0											;-- unlike space, must always have a /rate facet
+	cache: off
+]		
 
 ;@@ move to auxi?
 constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] [
@@ -558,7 +561,7 @@ scrollable-space: context [
 		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]	#type (space? vscroll)
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		scroll-timer: make-space 'timer [rate: 0]						#type (space? scroll-timer)
+		scroll-timer: make-space 'timer []								#type (space? scroll-timer)
 
 		map:   []
 		cache: [size map]
@@ -1119,7 +1122,7 @@ inf-scrollable-ctx: context [
 	~: self
 	
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
-	roll: function [space [object!]] [
+	roll: function [space [object!] path [path!] "inf-scrollable should be the last item"] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
 		unless find space/map 'window [exit]			;-- likely window was optimized out due to empty canvas 
@@ -1132,7 +1135,8 @@ inf-scrollable-ctx: context [
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
-		with-style in space 'window [with-style window/content [	;-- add window/content to the styling path
+		path: rejoin [path in space 'window window/content] 
+		with-style path [								;-- spoof rendered path, needed for /available?'s inner renders
 			foreach x [x y] [
 				any [									;-- prioritizes left/up jump over right/down
 					all [
@@ -1147,7 +1151,7 @@ inf-scrollable-ctx: context [
 					]
 				]
 			]
-		]]
+		]
 		;; transfer offset from scrollable into window, in a way detectable by on-change
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
@@ -1160,7 +1164,6 @@ inf-scrollable-ctx: context [
 	draw: function [space [object!] canvas [none! pair!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
 		timer: space/roll-timer
-		if timer/ready? [roll space  timer/ready?: no]	;-- execute a pending roll, thus keeping renders in-tree
 		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
@@ -1186,10 +1189,9 @@ inf-scrollable-ctx: context [
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [rate: 0 ready?: no]	#type (space? roll-timer)
-		roll: does [
-			roll-timer/ready?: yes
-			invalidate self
+		roll-timer: make-space 'timer []	#type (space? roll-timer)
+		roll: function [/in path: (as path! []) [path!] "Inject subpath into current styling path"] [
+			~/roll self path
 		] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
@@ -1837,7 +1839,7 @@ grid-ctx: context [
 	draw: function [grid [object!] canvas [none! pair!] wxy1 [none! pair!] wxy2 [none! pair!]] [
 		#debug grid-view [#print "grid/draw is called with window xy1=(wxy1) xy2=(wxy2)"]
 		#assert [any [not grid/infinite?  all [canvas wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
-	
+		
 		set [canvas: fill:] decode-canvas new-canvas: canvas	;-- new-canvas should remember the fill flag too
 		do-invalidate grid
 		frame: grid/frame

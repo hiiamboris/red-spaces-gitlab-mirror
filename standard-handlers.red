@@ -115,7 +115,7 @@ define-handlers [
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				space: get path/-1
-				space/roll
+				space/roll/in as path! copy/part head path path
 			]
 		]
 	]
