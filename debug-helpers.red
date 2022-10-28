@@ -6,7 +6,7 @@ Red [
 
 ;-- requires export, prettify
 
-exports: [dump-tree expand-space-path fix-paths dorc probe~ ??~ debug-draw]
+exports: [dump-tree expand-space-path fix-paths dorc mold probe save ?? ? help debug-draw]
 
 
 ;-- debug func
@@ -27,82 +27,15 @@ dump-tree: function [] [
 
 dump-host-tree: function [
 	"List hierarchical tree of currently rendered spaces"
-	host-face [object!] "Root face to list from"
+	host [object!] "Root face to list from" (host? host)
 ][
-	unless in host-face 'space [ERROR "Host space expected"]
-	foreach-*ace path: anonymize 'host host-face [
+	foreach-*ace path: host [
 		spc: get last path
 		print [pad spc/size 10 path]
 	]
 	()
 ]
 
-fix-paths: function [
-	"Replaces convenient but invalid space-referring paths with valid ones"
-	code [block!] "Block where to replace paths"
-	/local path
-][
-	parse r: copy/deep code [any [
-		change only set path any-path! (to path expand-space-path path)
-	|	skip
-	]]
-	r
-]
-				
-;; helper to work with words as objects in paths
-;@@ can there be a -> operator for select+get+maplookup?
-expand-space-path: function [path [any-word! any-path!] /local coll] [
-	if word? path [path: to path! path]
-	set/any 'coll get/any path/1
-	out: head clear next copy path 
-	for-each [pos: item] as [] next path [				;@@ as [] = workaround for #4421
-		if any-function? :coll [append out pos  break]
-		space: if word? :item [
-			;; substitute global word in the path with a word that refers to a space
-			any [
-				all [object? :coll  in coll 'map  found: find coll/map item  found/1]
-				all [object? :coll  host? coll  any [item = 'space  item = select coll 'space]  coll/space]
-				all [block?  :coll  found: find coll item  found/1]
-			]
-		]
-		set/any 'coll either space [
-			append clear out space
-			get/any space
-		][
-			unless any [series? :coll  any-object? :coll  map? :coll] [
-				#print "Error getting path (path) after (out) which is (type?/word :coll)"
-			]
-			append out :item
-			:coll/:item
-		]
-	]
-	if single? out [out: out/1]
-	case [
-		any [get-word? path get-path? path] [out: either word? out [to get-word! out][as get-path! out]]
-		any [set-word? path set-path? path] [out: either word? out [to set-word! out][as set-path! out]]
-	]
-	out
-]
-
-; get-space: function ['path [word! path!]] [
-	; get expand-space-path (path)
-; ]
-
-; ;-- debug helper
-; ?s: function ['path [word! path!]] [
-	; val: get-space (path)
-	; print replace help-string val "VAL" uppercase mold path
-; ]
-
-; ??s: function ['path [word! path!]] [
-	; probe get-space (path)
-	; ()
-; ]
-
-; sdo: function [code [block!]] [
-	; map-each/self/only [p [path!]] code [get-space (p)]
-	; do code
-; ]
 
 dorc: does [do read-clipboard]
 
@@ -114,179 +47,259 @@ add-indent: function [text [string!] size [integer!]] [
 	text
 ]
 
-mold~stack: make hash! 100								;-- used to avoid cycles
-mold~: function [value [any-type!] /indent indent-size: 4 [integer! none!]] [
-	decor: select [
-		block!  ["[" "]"]
-		hash!   ["make hash! [" "]"] 
-		map!    ["#(" ")"] 
-		object! ["make object! [" "]"] 
-	] type?/word :value
-	if decor [
-		if find/same/only mold~stack :value [return "..."]
-		append/only mold~stack value
-	]
-	result: switch/default type?/word :value [
-		map! object! [
-			block: to [] value
-			longest: any [last sort map-each [k v] block [length? form k]  0]
-			strings: copy []
-			foreach [k v] block [
-				if find [on-change* on-deep-change*] k [continue]	;-- skip hidden fields
-				v: case [
-					object? :v ["object [...]^/"]
-					image?  :v ["make image! [...]^/"]
-					'else [append mold~/indent :v indent-size #"^/"]
-				]
-				k: rejoin [k ": "]
-				if tail? find/tail v #"^/" [k: pad k longest + 2]
-				append strings rejoin [k v]
-			]
-			inside: add-indent rejoin ["" strings] indent-size
-			rejoin [decor/1 #"^/" inside decor/2]
+mold: :system/words/mold								;-- let it always be available in Spaces context
+if action? :mold [
+	;; this monstrosity is adjusted to make more user-friendly output
+	;; without /all it will not expand inner objects/maps, and will output spaces in compact form type:size
+	;; and generally will be closer to `help` output
+	;; mold/all will output loadable info in format acceptable by %load-anything.red
+	context [
+		;@@ there's some heisenbug: empty blocks sometimes get a new-line between brackets! no idea how to pinpoint it
+		native-mold: :mold
+		
+		decor*: [[
+			block!    ["[" "]"]
+			paren!    ["(" ")"]
+			hash!     ["##[make hash! [" "]]"] 
+			map!      ["##[make map! [" "]]"] 
+			event!    ["##[make event! [" "]]"] 
+			object!   ["##[construct/only [" "]]"]
+			function! ["##[func" "]"] 
+			action!   ["##[make action!" "]"]			;-- can't use native mold since it will use it's own indentation 
+			native!   ["##[make native!" "]"] 
+			routine!  ["##[routine" "]"] 
+		][
+			block!    ["[" "]"]
+			paren!    ["(" ")"]
+			hash!     ["hash [" "]"] 
+			map!      ["#(" ")"] 
+			event!    ["event [" "]"] 
+			object!   ["object [" "]"] 
+			function! ["func" ""] 
+			action!   ["action" ""] 
+			native!   ["native" ""] 
+			routine!  ["routine" ""] 
+		]]
+		
+		set 'mold function [
+			{Returns a source format string representation of a value}
+			value [any-type!]
+			/only "Exclude outer brackets if value is a block" 
+			/all  "Return value in loadable format" 
+			/flat "Exclude all indentation"
+			/compact "Do not expand nested structures" 
+			/part "Limit the length of the result" 
+				limit: (pick [100'000'000  10'000] all) [integer!] (limit >= 0)
+		][
+			indent: make string! 32
+			depth:  0
+			mold* :value limit
 		]
-		block! hash! image! [
-			strings: copy []
-			p: value
-			forall p [
-				x: case [
-					object? :p/1 [copy "object [...]"]
-					image?  :p/1 [copy "make image! [...]"]
-					'else [mold~/indent :p/1 indent-size]
+		
+		~: system/words
+		sp: " "
+			
+		font-words: words-of font!
+		mold-stack: make hash! 100						;-- used to avoid cycles
+		mold*: function [value [any-type!] limit] with :mold [
+			output: make string! 16
+			decor: select pick decor* all type: type?/word :value
+			all [decor  find/same/only mold-stack :value  return emit ["..."]]
+			if compact [
+				if :value =? (2e9 by 2e9) [return emit ["INFxINF"]]		;@@ not sure about this since it's too tightly tied to spaces...
+				if 0 < depth [
+					if 'block! = type [
+						try [							;-- fails on system/words
+							parse value: copy value [any [	;-- simple grouping ;@@ TODO: also find periodic patterns
+								s: ahead [set x skip (xtype: type? :x) xtype] [
+									skip change [some x e:] (to word! rejoin ['x offset? s e])
+								|	change xtype (to word! xtype)
+									change [some xtype e:]  (to word! rejoin ['x offset? s e])
+								]
+							|	skip
+							]]
+						]
+					]
+					if 'object! = type [
+						string: case [
+							face? value [
+								either 'rich-text = :value/type [ 
+									native-mold value/text
+								][
+									rejoin [:value/type ":" mold* :value/size limit]
+								]
+							]
+							space? value [
+								rejoin [:value/type ":" mold* :value/size limit]
+							]
+							(class-of value) = class-of font! [native-mold value/name]
+							'else [
+								size: any [attempt [system/console/size/x] 80]
+								rejoin [
+									decor/1
+									native-mold/only/part words-of value size - length? indent	;@@ ellipsize it
+									decor/2
+								]
+							]
+						]
+						return emit [string] 
+					]
 				]
-				if new-line? p [insert x #"^/"]
-				append strings x
 			]
-			inside: rejoin ["" strings]
-			if new-line? value [append add-indent inside indent-size "^/"]
-			rejoin [decor/1 inside decor/2]
+			
+			if decor [append/only mold-stack :value]
+			switch/default type [
+				event! object! map! hash! block! paren! [
+					step 'depth
+					;; output events too ;@@ won't be loadable since can't make events
+					if 'event! = type [
+						value: construct/only map-each/eval word system/catalog/accessors/event! [
+							[to set-word! word  :value/:word]
+						]
+					]
+					;; emit skip for blocks in /all mode
+					if ~/all [
+						all
+						find [block! hash! paren!] type
+						skip?: unless head? value [-1 + index? value]
+					][
+						skip-decor: reduce ["##[skip " rejoin [" " skip? "]"]]
+						emit [skip-decor/1]
+						value: head value
+					]
+					pos: block: to block! value
+					if find [object! event!] type [				;@@ workaround for #5140 - restore words
+						values: values-of value
+						repeat i length? values [
+							poke block i * 2 :values/:i
+						]
+					]
+					;; emit opening
+					if new-line? block [append/dup indent #" " 4]
+					lf: unless flat [rejoin ["^/" indent]]
+					emit [decor/1]
+					;; emit contents
+					~/all [								;-- exclude on-change in normal mold
+						compact
+						object? value
+						remove/part find/skip pos [on-change*] 2 2
+						remove/part find/skip pos [on-deep-change*] 2 2
+					]
+					if find [object! map!] type [		;-- find max word length (excluding on-change possibly) 
+						align: 1 + any [
+							maximum-of map-each [word _] block [length? form word]
+							0
+						]
+					]
+					forall pos [						;-- emit items
+						if new-line? pos [emit [lf]]
+						string: mold* :pos/1 limit
+						emit [string]
+						unless tail? next pos [
+							if align [
+								string: append/dup clear "" " " align - length? string
+								emit [string]
+							]
+							emit [sp]
+						]
+						if limit <= 0 [break]
+					]
+					if new-line? block [
+						clear skip tail indent -4
+						lf: unless flat [rejoin ["^/" indent]]
+						emit [lf]
+					]
+					;; emit closing & skip closing
+					emit [decor/2]
+					if skip-decor [emit [skip-decor/2]]
+					step/down 'depth
+				]
+				function! action! native! routine! [
+					spec: spec-of :value
+					body: body-of :value
+					if all [compact depth > 1] [
+						new-line/all spec: copy spec no
+						parse spec [
+							any [/local remove to end | not 'return all-word! | remove skip]
+						]
+						body: [...]
+					]
+					if find [action! native!] type [body: [...]]	;-- body is unknown to runtime
+					saved: compact  compact: no
+					emit [decor/1 sp (mold* spec limit) sp (mold* body limit) decor/2]
+					compact: saved
+				]
+				handle! [										;-- make handles loadable by converting to integers
+					value: second transcode/one next native-mold/all value	;-- extract the integer
+					string: rejoin [form to-hex value "h"]		;-- convert to hex
+					emit [string]
+				]
+			][
+				string: case [
+					flat and all [native-mold/all/flat :value]
+					all          [native-mold/all      :value]
+					flat         [native-mold/flat     :value]
+					'else        [native-mold          :value]
+				]
+				emit [string]
+			]
+			if decor [clear find/same/only mold-stack :value]
+			
+			output
 		]
-		image!
-	][
-		mold :value
+		
+		emit: function [strings [block!]] with [:mold :mold*] [
+			foreach string reduce strings [
+				if paren? string [string: do string]
+				unless string [continue]
+				append/part output string limit
+				set 'limit max 0 limit - length? string
+			]
+			output
+		]
+			
 	]
-	if decor [remove top mold~stack]
-	result
-] 
+]
 
-probe~: function [
-	"Returns a value after printing its molded form, excluding inner objects"
+probe: function [
+	"Returns a value after printing its molded form"
 	value [any-type!]
 ][
-	print mold~ any [
-		attempt [prettify/data :value]
-		:value
-	]
+	print mold/compact :value
 	:value
 ]
 
-??~: function ['value [any-type!]] [
-	probe~ either any [any-word? :value any-path? :value] [
-		prin value prin ": "
-		get/any value
+??: function [
+	"Prints a word and the value it refers to (molded)"
+	'value [any-type!] "Word, path, multiple words/paths in a block, or any value"
+][
+	case [
+		any [any-word? :value any-path? :value] [
+			prin value prin ": "
+			print mold/compact get/any value
+		]
+		block? :value [									;-- multiple named values on a single line
+			print form map-each word value [
+				`"(word): (mold/part/flat/compact get/any word 20) "`
+			]
+		]
+		'else [print mold/compact :value]
+	]
+]
+
+help: ?: none
+if function? :system/words/help [						;-- if console present, remove the annoying trailing new-line
+	set 'help set '? function [
+		{Displays information about functions, values, objects, and datatypes}
+		'word [any-type!]
 	][
-		:value
+		if #"^/" = last msg: help-string :word [take/last msg]
+		print msg
 	]
 ]
 
-echo: function [values [block!]] [
-	print form map-each/eval word values [
-		[append mold word ":" mold/part/flat get/any word 20 ""]
-	]
-]
+save: func spec-of :system/words/save body-of :system/words/save	;-- replace compiled mold with interpreted mold
 
-
-;-- experimental probe with depth control
-context [
-	containers: make typeset! [block! object! map! hash! paren! function!]
-	openings: reduce [block! "[" object! "object [" map! "#(" hash! "make hash! [" paren! "(" function! "function"]
-	closings: reduce [block! "]" object! "]"        map! ")"  hash! "]"            paren! ")" function! ""]
-
-	indent-text: function [text [string!] isize [integer!] /after] [
-		if isize <= 0 [return text]
-		text: copy text
-		indent: append/dup clear "" #" " isize
-		append append clear line: "" "^/" indent
-		unless after [insert text indent]
-		replace/all text #"^/" line
-	]
-	
-	set '?p function [depth [integer!] value [any-type!] /indent isize [integer!]] [
-		isize: any [isize 0]
-		either find containers type: type? :value [
-			either depth = 0 [
-				prin mold/flat/part :value 40
-			][
-				either any [object? :value map? :value function? :value] [
-					either function? :value [
-						prin [select openings type  mold/flat spec-of :value  ""]
-						?p/indent depth - 1 body-of :value isize
-					][
-						print indent-text select openings type isize
-						foreach [k v] to [] :value [
-							prin [indent-text pad mold k 10 isize + 4 ""]
-							?p/indent depth - 1 :v isize + 4
-							print ""
-						]
-						print indent-text select closings type isize
-					]
-				][
-					prin select openings type
-					if nl?: new-line? value [prin ["^/" indent-text "" isize + 4]]
-					repeat i length? value [
-						?p/indent depth - 1 :value/:i isize + 4
-						unless i = length? value [prin " "]
-						if new-line? skip value i [prin ["^/" indent-text "" isize + 4]]
-					]
-					if nl? [prin ["^/" indent-text "" isize]]
-					prin select closings type
-				]
-			]
-		][
-			prin indent-text/after mold/part :value 40 isize
-		]
-	]
-]
-
-find-deep: none
-context [
-	path: make path! 10
-	
-	find-deep*: function [list [any-block!] value [any-type!]] [
-		;; find should be faster on hashes than parse
-		either pos: find/only/same list :value [
-			throw copy append path index? pos
-		][
-			append path 1
-			forall list [								;@@ for-each can't be used with throw yet!
-				inner: list/1
-				;@@ [hash! block!] value filter seems buggy in for-each! can't locate the bug!
-				unless any [hash? inner block? inner] [continue]	
-				change top path index? list
-				find-deep* inner :value
-			]
-			remove top path
-		]
-		none
-	]
-	
-	set 'find-deep function [list [any-block!] value [any-type!]] [
-		clear path
-		catch [find-deep* list :value]
-	]
-]
-	
-dump-parents-list: function [list [hash! block!] cache [hash! block!]] [			;-- used for cache debugging only
-	#print "parents-list: (\size = ((length? list) / 2)) ["
-	foreach [space parents] list [
-		prin ["   " mold/part/flat space 40 "(" pad find-deep cache space 12 ")" "-> "]
-		foreach [node parent] parents [
-			prin [find-deep cache node find-deep cache parent "| "]
-		]
-		print ""
-	]
-	print "]"
-]
 
 ;@@ TODO: at least 3 canvases: none (and maybe 0x0), half-infinite, and finite; configurable size
 debug-draw: function ["Show GUI to inspect spaces Draw block"] [
