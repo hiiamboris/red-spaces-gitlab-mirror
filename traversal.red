@@ -18,39 +18,38 @@ exports: [list-spaces list-*aces foreach-space foreach-*ace path-from-face]		;--
 traversal: context [
 	depth-limit: 100									;-- used to prevent stack from overflowing in recursive layouts
 
-	reuse-path: function ['target [word!]][
-		blk: get target
-		set target either path? :blk/1 [				;-- reuse existing paths to minimize allocations
-			path: clear head blk/1
-			next blk
+	reuse-path: in-out-func ['target [word!]] [
+		block: target
+		target: either path? :block/1 [					;-- reuse existing paths to minimize allocations
+			path: clear head block/1
+			next block
 		][
 			path: make path! 10
-			change/only blk path
+			change/only block path
 		]
 		path
 	]
 
 	set 'list-spaces function [
 		"Deeply list spaces of a ROOT space"
-		root [word!]
-		/into target [block!] "Existing content is overwritten"
+		root [object!] (space? root)
+		/into target: (make [] 50) [block!] "Existing content is overwritten"
 	][
-		target: any [target  make [] 50]
-		clear list-spaces* to path! root target				;-- copy root, will modify
+		clear list-spaces* to path! root target
 		new-line/all target yes
 	]
 
 	list-spaces*: function [root [path!] "will be modified" target [block!]] [
 		path: reuse-path target
-		append path head root								;-- insert current path
+		append path head root							;-- insert current path
 		if all [
-			map: select get root/1 'map						;-- insert child paths
+			map: select root/1 'map						;-- insert child paths
 			depth-limit > length? head root
 		][
 			root: next root
 			foreach [space _] map [
-				assert [space]								;-- no junk in the maps please
-				change root anonymize space/type space
+				#assert [space? space]					;-- no junk in the maps please
+				change root space
 				target: list-spaces* root target
 			]
 			clear root
@@ -63,20 +62,18 @@ traversal: context [
 		target [block!]
 	][
 		path: reuse-path target	
-		append path head root								;-- insert current path
-		root-face: get root/1
+		append path head root							;-- insert current path
+		root-face: root/1
 		root: next root
-		unless empty? pane: select root-face 'pane [		;-- insert child paths
+		unless empty? pane: select root-face 'pane [	;-- insert child paths
 			foreach face pane [
-				name: anonymize face/type face
-				change root name
+				change root face
 				target: list-*aces* root target
 			]
 			clear root
 		]
-		if space: select root-face 'space [					;-- insert spaces if any
-			#assert [space? space]
-			change root anonymize space/type space
+		if space? space: select root-face 'space [		;-- insert spaces if any
+			change root space
 			target: list-spaces* root target
 			clear root
 		]
@@ -84,27 +81,24 @@ traversal: context [
 	]
 
 	set 'list-*aces function [
-		"Deeply list spaces and faces of a host FACE"
-		face [object! word!]
-		/into target [block!] "Existing content is overwritten"
+		"Deeply list spaces and faces of a FACE"
+		face [object!] (is-face? face)
+		/into target: (make [] 100) [block!] "Existing content is overwritten"
 	][
-		target: any [target  make [] 100]
-		#assert [is-face? any [all [word? face  get face] face] "face object expected"]	;@@ REP #113
-		if object? :face [face: anonymize face/type face]
 		clear list-*aces* to path! face target
 		new-line/all target yes
 	]
 
 	set 'path-from-face function [
 		"Return FACE's path from the screen"
-		face [object!]		;@@ no need in spaces support here?
+		face [object!] (is-face? face)					;@@ no need in spaces support here?
 	][
-		r: make path! 10
+		buf: as path! clear []
 		until [
-			insert r anonymize face/type face
+			insert buf face
 			none? face: face/parent
 		]
-		r
+		copy buf
 	]
 ]
 
@@ -115,7 +109,7 @@ context [
 	;-- break & continue will work!
 	foreach*: function [					;-- tree iterator
 		spec     [word! set-word! block!]
-		path     [word! path! block!]
+		path     [path! block! (not empty? path) object!]
 		code     [block!]
 		lister   [function!]
 		reverse? [logic!]
@@ -123,11 +117,9 @@ context [
 		;@@ any point in not making it cyclic?
 	][
 		if any-word? spec [spec: to [] to word! spec]
-		path: either word? path [to path! path][as path! path]
-		#assert [not empty? path "Tree iteration expects a face in the path"]
-		if empty? path [exit]								;-- no paths to iterate over
+		path: either object? path [reduce [path]][as path! path]
 
-		buf: cache/get										;-- so we can call foreach-*ace from itself
+		buf: cache/get											;-- so we can call foreach-*ace from itself
 		list: lister/into path/1 buf
 		if reverse? [reverse list]
 
@@ -139,7 +131,7 @@ context [
 			]
 			if next? [remove pos]
 			unless head? pos [
-				move/part  head pos  tail pos  skip? pos	;-- rearrange to cover the whole tree
+				move/part  head pos  tail pos  skip? pos		;-- rearrange to cover the whole tree
 			]
 		][
 			#debug focus [
@@ -147,16 +139,16 @@ context [
 					#print "NOT found (as path! path) in spaces tree"
 				]
 			]
-			pos: list										;-- if empty path or path is invalid: go from head
+			pos: list											;-- if empty path or path is invalid: go from head
 		]
 
 		foreach path head pos [
-			set spec head change change/only [] path get last path
+			set spec head change change/only [] path last path
 			do code
 		]
 
-		cache/put buf										;-- save the block for later use
-		()			;-- no return value
+		cache/put buf											;-- save the block for later use
+		exit													;-- no return value
 	]
 
 	set 'foreach-space function [
@@ -173,7 +165,7 @@ context [
 	set 'foreach-*ace function [
 		"Evaluate CODE for each face & space starting with PATH"
 		'spec [word! set-word! block!] "path or [path *ace]"
-		path  [path! block! object!] "Starting path (index determines tree root)"
+		path  [path! block! object! (is-face? path)] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
 		/next    "Skip the PATH itself (otherwise includes it)"

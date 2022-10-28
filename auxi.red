@@ -297,6 +297,31 @@ clone: function [
 ]
 
 
+;@@ move this into /common once debugged
+in-out-func: function [spec [block!] body [block!]] [
+	lit-words: keep-type spec lit-word!
+	block-rule: [any [
+		ahead set w get-word! if (find lit-words w)
+		change only skip (as paren! reduce ['get/any to word! w])
+	|	ahead set w word!     if (find lit-words w)
+		change only skip (as paren! reduce ['get to word! w])
+	|	ahead set w set-word! if (find lit-words w)
+		insert ('set) change skip (to word! w)
+	|	ahead any-list! into block-rule
+	|	ahead any-path! into path-rule
+	|	ahead word! 'quote skip
+	|	skip
+	]]
+	path-rule: [any [
+		ahead set w get-word! if (find lit-words w) change only skip (as paren! reduce ['get/any to word! w])
+	|	ahead any-list! into block-rule
+	|	skip
+	]]
+	parse body: copy/deep body block-rule
+	function spec body
+]
+
+
 include-into: function [
 	"Include flag into series if it's not there"
 	series [series!] flag [any-type!]
@@ -905,19 +930,17 @@ enlarge: function [
 ;-- see REP #104, but this is still different: we don't care what context word belongs to, only it's spelling and value
 same-paths?: function [p1 [block! path!] p2 [block! path!]] [
 	to logic! all [
-		p1 == as p1 p2									;-- spelling & length match
-		find/match/same									;-- values match
-			reduce/into as [] p1 clear []
-			reduce/into as [] p2 clear []
+		find/match/same as [] p1 as [] p2
+		(length? p1) = length? p2
 	]
 ]
 
-find-same-path: function [b [block!] p [path!]] [
-	forall b [
+find-same-path: function [block [block!] path [path!]] [
+	forall block [
 		all [
-			path? :b/1
-			same-paths? :b/1 p
-			return b
+			path? :block/1
+			same-paths? block/1 path
+			return block
 		]
 	]
 	none
@@ -925,9 +948,11 @@ find-same-path: function [b [block!] p [path!]] [
 
 #assert [
 	(a: object [] b: object [])
-	same-paths? 'a/b [a b]
-	2 = index? r: find-same-path [a/c a/b] 'a/b
-	2 = index? r: find-same-path reduce [as path! bind [a b] construct [a: b:] 'a/b] 'a/b
+	same-paths? as path! reduce [a b] reduce [a b]
+	2 = index? r: find-same-path reduce [
+		as path! reduce [copy a b]
+		as path! reduce [a b]
+	] as path! reduce [a b]
 ]
 
 
