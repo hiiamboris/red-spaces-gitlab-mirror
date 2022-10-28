@@ -38,7 +38,7 @@ into-map: function [
 ;-- has to be fast, for on-over events
 hittest: function [
 	"Map a certain point deeply into the tree of spaces"
-	space [object!] "Top space in the tree (host/space usually)" (space? get space)
+	space [object!] "Top space in the tree (host/space usually)" (space? space)
 	xy [pair!] "Point in that top space"
 	/into "Append into a given buffer"
 		path: (make [] 16) [block! path!]

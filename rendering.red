@@ -105,10 +105,10 @@ context [
 		foreach obj next parents [
 			frame: obj/last-frame
 			unless gen <= frame/1 [return none]
-			append path obj/type
+			append path obj
 			if frame/2 = 'cached [gen: 0.0]				;-- don't check generation numbers inside cached subtree
 		]
-		append path space/type
+		append path space
 		#assert [not find path none]
 		as path! copy path
 	]

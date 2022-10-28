@@ -162,7 +162,7 @@ context [
 	set 'foreach-space function [
 		"Evaluate CODE for each space starting with PATH"
 		'spec [word! set-word! block!] "path or [path space]"
-		path  [word! path! block!] "Starting path (index determines tree root)"
+		path  [path! block! object! (space? path)] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
 		/next    "Skip the PATH itself (otherwise includes it)"
@@ -173,12 +173,11 @@ context [
 	set 'foreach-*ace function [
 		"Evaluate CODE for each face & space starting with PATH"
 		'spec [word! set-word! block!] "path or [path *ace]"
-		path  [word! path! block! object!] "Starting path (index determines tree root)"
+		path  [path! block! object!] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
 		/next    "Skip the PATH itself (otherwise includes it)"
 	][
-		if object? path [path: anonymize path/type path]
 		foreach* spec path code :list-*aces reverse next
 	]
 ]

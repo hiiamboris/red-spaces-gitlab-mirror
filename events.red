@@ -127,7 +127,7 @@ events: context [
 
 	do-global: function [map [map!] path [block!] event [event! object!] args [block!]] [
 		unless list: map/(event/type) [exit]
-		space: all [path/1 get path/1]					;-- space can be none if event falls into space-less area of the host ;@@ REP #113
+		space: path/1									;-- space can be none if event falls into space-less area of the host
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
 		code: compose/into [handler space pcopy event (args) none] clear []
 		foreach handler list [
@@ -300,7 +300,7 @@ events: context [
 				time [
 					on-time face event							;-- handled by timers.red
 					#assert [face/space]
-					cspace: get face/space
+					cspace: face/space
 					if dirty?: cspace/cache <> 'valid [			;-- only timer updates the view because of #4881
 						#debug profile [prof/manual/start 'drawing]
 						face/draw: render face					;@@ #5130 is the killer of animations
@@ -330,7 +330,7 @@ events: context [
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
 	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object!] args [block!]] [
-		space: get first path: clone path cache/get			;-- copy in case user modifies/reduces it, preserve index
+		space: first path: clone path cache/get			;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
 			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
@@ -350,6 +350,7 @@ events: context [
 			hodl: obtain block! (length? path) / unit: 2			;-- need reentrancy because some events generate others
 			wpath: extract/into path unit hodl						;-- remove pairs ;@@ should be `map` - extract is slow
 		]
+		forall wpath [wpath/1: wpath/1/type]						;@@ use map-each
 		#leaving [if hodl [stash hodl]]
 		#assert [not find wpath pair!]
 		len: length? wpath

@@ -47,7 +47,7 @@ do/expand [
 	#include %../common/prettify.red
 	#include %../common/clock.red
 	#include %../common/profiling.red
-	#include %../common/extremi.red
+	#include %../common/extrema.red
 	; #include %../common/map-each.red
 	#include %../common/new-apply.red
 	#include %../common/new-each.red
@@ -58,7 +58,8 @@ do/expand [
 	#include %../common/is-face.red
 	#include %../common/contrast-with.red
 	#include %../common/keep-type.red
-	#include %../common/typecheck.red
+	#include %../common/step.red
+	; #include %../common/typecheck.red
 	; #include %../common/selective-catch.red
 	#include %../common/mapparse.red
 	#include %../common/reshape.red

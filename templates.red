@@ -96,7 +96,7 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
-		quietly r/type: type
+		if r/type = 'space [quietly r/type: type]		;-- only set type if it's not already set by template
 		init-cache r
 	]
 	r
@@ -331,9 +331,10 @@ scrollbar: context [
 	arrange: function [content [block!]] [				;-- like list layout but simpler/faster
 		map: make block! 2 * length? content
 		pos: 0x0
-		foreach space content [	;@@ should be map-each
+		foreach name content [	;@@ should be map-each
+			space: get name
 			append map compose/deep [
-				(name) [offset: (pos) size: (space/size)]
+				(space) [offset: (pos) size: (space/size)]
 			]
 			pos: space/size * 1x0 + pos
 		]
@@ -361,7 +362,7 @@ scrollbar: context [
 		quietly space/forth-arrow/size: w-arrow by h
 		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
 		
-		foreach item list [invalidate/only item]
+		foreach item list [invalidate/only get item]
 		compose/deep [
 			push [
 				matrix [(select [x [1 0 0 1] y [0 1 1 0]] space/axis) 0 0]
@@ -381,11 +382,11 @@ scrollbar: context [
 		
 		map:         []
 		cache:       [size map]
-		back-arrow:  make-space 'triangle  [margin: 2  dir: 'w] #type (space? back-arrow)		;-- go back a step
-		back-page:   make-space 'rectangle [draw: []]           #type (space? back-page)		;-- go back a page
-		thumb:       make-space 'rectangle [margin: 2x1]        #type (space? thumb)			;-- draggable
-		forth-page:  make-space 'rectangle [draw: []]           #type (space? forth-page)		;-- go forth a page
-		forth-arrow: make-space 'triangle  [margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
+		back-arrow:  make-space 'triangle  [type: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
+		back-page:   make-space 'rectangle [type: 'back-page   draw: []]           #type (space? back-page)		;-- go back a page
+		thumb:       make-space 'rectangle [type: 'thumb       margin: 2x1]        #type (space? thumb)			;-- draggable
+		forth-page:  make-space 'rectangle [type: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
+		forth-arrow: make-space 'triangle  [type: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
 		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
 		draw: does [~/draw self]
@@ -519,12 +520,12 @@ scrollable-space: context [
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		quietly space/map: compose/deep [				;@@ should be reshape (to remove scrollers) but it's too slow
 			(space/content) [offset: 0x0 size: (box)]
-			(in space 'hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
-			(in space 'vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
-			(in space 'scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
+			(space/hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
+			(space/vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
+			(space/scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
 		]
 		space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
-		render in space 'scroll-timer					;-- scroll-timer has to appear in the tree for timers
+		render space/scroll-timer						;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
 		invalidate/only space/hscroll
@@ -536,7 +537,7 @@ scrollable-space: context [
 				clip (0x0 - origin) (box - origin)
 				(cdraw)
 			]
-			(compose-map/only space/map [hscroll vscroll])
+			(compose-map/only space/map reduce [space/hscroll space/vscroll])
 		]
 	]
 		
@@ -550,11 +551,11 @@ scrollable-space: context [
 		content:      none		#type =? :invalidates [object! none!]	;-- should be defined (overwritten) by the user
 		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
 		
-		hscroll: make-space 'scrollbar [axis: 'x]						#type (space? hscroll)
-		vscroll: make-space 'scrollbar [axis: 'y size: reverse size]	#type (space? vscroll)
+		hscroll: make-space 'scrollbar [type: 'hscroll axis: 'x]					#type (space? hscroll)
+		vscroll: make-space 'scrollbar [type: 'vscroll axis: 'y size: reverse size]	#type (space? vscroll)
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		scroll-timer: make-space 'timer []								#type (space? scroll-timer)
+		scroll-timer: make-space 'timer [type: 'scroll-timer]					#type (space? scroll-timer)
 
 		map:   []
 		cache: [size map]
@@ -1062,7 +1063,7 @@ window-ctx: context [
 			set-empty-size window canvas
 			return quietly window/map: []
 		]
-		#assert [word? content]
+		#assert [space? content]
 		-org: negate org: window/origin
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
@@ -1124,7 +1125,7 @@ inf-scrollable-ctx: context [
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
-		path: rejoin [path in space 'window window/content] 
+		path: rejoin [path space/window window/content] 
 		with-style path [								;-- spoof rendered path, needed for /available?'s inner renders
 			foreach x [x y] [
 				any [									;-- prioritizes left/up jump over right/down
@@ -1153,7 +1154,7 @@ inf-scrollable-ctx: context [
 	draw: function [space [object!] canvas [none! pair!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
 		timer: space/roll-timer
-		render in space 'roll-timer						;-- timer has to appear in the tree for timers to work
+		render timer									;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
 		timer/rate: either any-scrollers? [4][0]		;-- timer is turned off when unused
@@ -1162,10 +1163,10 @@ inf-scrollable-ctx: context [
 		;; (can't use repend, as map may be a static block)
 		quietly space/map: compose [
 			(space/map)
-			(in space 'roll-timer) [offset 0x0 size 0x0]
+			(timer) [offset 0x0 size 0x0]
 		]
 		#debug sizing [#print "inf-scrollable with (space/content) on (canvas) -> (space/size) window: (space/window/size)"]
-		#assert [any [not find space/map 'window  space/window/size]  "window should have a finite size if it's exposed"]
+		#assert [any [not find/same space/map space/window  space/window/size]  "window should have a finite size if it's exposed"]
 		drawn
 	]
 	
@@ -1177,7 +1178,7 @@ inf-scrollable-ctx: context [
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer []	#type (space? roll-timer)
+		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
 		roll: function [/in path: (as path! []) [path!] "Inject subpath into current styling path"] [
 			~/roll self path
 		] #type [function!]
