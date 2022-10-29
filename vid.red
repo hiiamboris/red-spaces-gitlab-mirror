@@ -147,18 +147,18 @@ VID: context [
 			classify-object self 'host
 			#assert [host? self]
 			
-			type:       'base		#type =  [word!]
-			style:      'host		#type =  [word!]
+			type:       'base					#type =  [word!]
+			style:      anonymize 'host self	#type =  [word!]	;-- word will be used as a reference from paths
 			;; no size by default - used by init-spaces-tree as a hint to resize the host itself:
-			size:       0x0			#type =? [pair! none!]  :host-on-change
+			size:       0x0						#type =? [pair! none!]  :host-on-change
 			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
 			;; (except for some popups that must be almost transparent)
-			color:      system/view/metrics/colors/panel
-									#type =  [tuple! none!] :host-on-change
-			space:      none		#type =? [object! (space? space) none!] :host-on-change
-			flags:      'all-over	#type =  [block! word! none!]	;-- else 'over' events won't make sense over spaces
-			rate:       100			#type =  [integer! time! none!]	;-- for space timers to work
-			generation: 0.0			#type =  [float!]				;-- render generation number, used to detect live spaces (0 = never rendered)
+			color:      svmc/panel				#type =  [tuple! none!] :host-on-change
+			space:      none					#type =? [object! (space? space) none!] :host-on-change
+			flags:      'all-over				#type =  [block! word! none!]		;-- else 'over' events won't make sense over spaces
+			rate:       100						#type =  [integer! time! none!]		;-- for space timers to work
+			;; render generation number, used to detect live spaces (0 = never rendered):
+			generation: 0.0						#type =  [float!]
 		])
 	]
 	

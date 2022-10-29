@@ -85,7 +85,7 @@ find-next-focal-space: function [dir "forth or back"] [
 			#debug focus [
 				space: get last path 
 				text: mold any [select space 'text  select space 'data] 
-				#print "find-next-focal-space @(path), text=(text)"
+				#print "find-next-focal-space @(mold path), text=(text)"
 			]
 			if find keyboard/focusable last path [next: path break]
 		]

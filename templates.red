@@ -1121,7 +1121,7 @@ inf-scrollable-ctx: context [
 		#assert [window/size]
 		wsize:  window/size
 		before: negate space/origin						;-- area before the current viewport offset
-		#assert [space/map/window]						;-- roll attempt on an empty viewport, or map is invalid?
+		#assert [find/same space/map window]			;-- roll attempt on an empty viewport, or map is invalid?
 		viewport: space/viewport
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]

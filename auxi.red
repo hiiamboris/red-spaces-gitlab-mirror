@@ -25,8 +25,11 @@ exports: [by abs range! range? .. using when only mix clip ortho dump-event boxe
 	; s
 ; ]
 
-by: make op! :as-pair
+by:   make op! :as-pair
 abs: :absolute
+svf:  system/view/fonts
+svm:  system/view/metrics
+svmc: system/view/metrics/colors
 
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
@@ -427,7 +430,7 @@ clip-vector: function [v1 [vector!] v2 [vector!] v3 [vector!]] [
 
 resolve-color: function [color [tuple! word! issue!]] [
 	case [
-		word?  color [system/view/metrics/colors/:color]
+		word?  color [svmc/:color]
 		issue? color [hex-to-rgb color]
 		'else [color]
 	]

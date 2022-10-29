@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires events.red (extends them on load), uses traversal.red & rendering.red (paths-from-space)
+;-- requires events.red (extends them on load), uses traversal.red & rendering.red (get-full-path)
 
 
 timers: context [
@@ -92,18 +92,19 @@ timers: context [
 				space/rate: none
 				continue
 			]
-			#debug events [#print "timer rate (rate) has path (path)"]
+			#debug events [#print "timer rate (rate) has path (mold path)"]
 			pos: find/same/tail marks space
 			set [prev: bias:] any [pos [0:0 0:0]]
 			delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer
 			if delay < negate timer-resolution / 2 + bias [continue]	;-- too early to call it?
 			
 			args: reduce/into [to 1% delay / rate] clear []
-			path: new-line/all as [] path no
+			wpath: copy path: new-line/all as [] path no				;@@ need new-line here?
+			forall wpath [wpath/1: wpath/1/style]						;@@ use map-each
 			;; even if no time handler, actors or previewers/finalizers may be defined
 			events/do-previewers top path event args
-			forall path [
-				compose/into [handlers (path) on-time] clear hpath		;-- not allocated
+			forall wpath [
+				compose/into [handlers (wpath) on-time] clear hpath		;-- not allocated
 				unless block? try [list: get hpath] [continue]			;-- no time handler ;@@ REP #113
 				foreach handler list [									;-- call the on-time stack
 					#assert [function? :handler]

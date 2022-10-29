@@ -67,14 +67,11 @@ define-styles: function [
 	parse styles [any [=names= =expr= =commit=]]
 ]
 
-do with [
+do with context [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
-	svm: system/view/metrics
 	unless svm/colors [svm/colors: copy #()]			;@@ MacOS fix for #4740
-	svmc: system/view/metrics/colors
 	unless svmc/text  [svmc/text: black]				;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
-	svf:  system/view/fonts
 	checkered-pen: reshape [							;-- used for focus indication
 		pattern 4x4 [
 			scale 0.5 0.5 pen off

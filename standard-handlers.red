@@ -15,20 +15,20 @@ define-handlers [
 		on-down [space path event] [
 			set [_: _: item: _: subitem:] path
 			case [
-				find [hscroll vscroll] item [					;-- move or start dragging
-					axis: select get item 'axis
-					switch subitem [
+				find [hscroll vscroll] item/style [		;-- move or start dragging
+					axis: item/axis
+					switch subitem/style [
 						forth-arrow [space/move-by 'line 'forth axis]
 						back-arrow  [space/move-by 'line 'back  axis]
 						forth-page  [space/move-by 'page 'forth axis]
 						back-page   [space/move-by 'page 'back  axis]
 					]
 				]
-				item = space/content [pass]				;-- let content handle it, but still start dragging (e.g. grid-view within grid-view)
+				item =? space/content [pass]			;-- let content handle it, but still start dragging (e.g. grid-view within grid-view)
 				; item = none []							;-- dragging by the empty area of scrollable
 			]
 			;; remove cells or other content from the path, as they do not have to persist during window moves:
-			unless find [hscroll vscroll] item [clear skip path 2]
+			unless find [hscroll vscroll] item/style [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
 			start-drag path
 		]
@@ -36,13 +36,13 @@ define-handlers [
 		on-over [space path event] [
 			unless dragging?/from space [pass exit]		;-- let inner spaces handle it
 			set [_: _: item: _: subitem:] path
-			either find [hscroll vscroll] item [
-				unless subitem = 'thumb [exit]			;-- do not react to drag of arrows (used by timer)
-				scroll: get item
+			either find [hscroll vscroll] item/style [
+				unless subitem/style = 'thumb [exit]	;-- do not react to drag of arrows (used by timer)
+				scroll: item
 				map:    scroll/map
 				x:      scroll/axis
 				band:   scroll/size/:x - map/forth-arrow/size/:x - map/back-arrow/size/:x
-				cspace: get space/content
+				cspace: space/content
 				csize:  cspace/size
 				vport:  space/viewport
 				hidden: csize/:x - vport/:x
@@ -81,7 +81,7 @@ define-handlers [
 				'line
 				pick [forth back] amount <= 0
 				pick [x y] 'hscroll = path/3
-				absolute amount * 4
+				abs amount * 4
 		]
 		on-focus [space path event] [
 			invalidate space/hscroll/thumb
@@ -96,7 +96,7 @@ define-handlers [
 				unless dragging? [exit]
 				set [spc: _: item: _: subitem:] drag-path
 				unless spc =? path/-1 [exit]				;-- dragging started inside another space - ignore it
-				scrollable: get path/-1
+				scrollable: path/-1
 				scrollable/move-by/scale
 					switch/default subitem [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
 					switch subitem [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
@@ -114,8 +114,8 @@ define-handlers [
 		on-key-down [space path event] [space/roll]		;-- during key holding
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
-				space: get path/-1
-				space/roll/in as path! copy/part head path path
+				scrollable: path/-1
+				scrollable/roll/in as path! copy/part head path path
 			]
 		]
 	]
@@ -163,8 +163,8 @@ define-handlers [
 			]
 		]
 		on-click [space path event] [
-			if find [round-clickable clickable] path/5 [
-				item: get path/5
+			item: path/5
+			if find [round-clickable clickable] item/style [
 				do item/command
 			]
 			hide-popups event/window 1					;-- click on a menu hides all visible menus
@@ -203,7 +203,7 @@ define-handlers [
 	rotor: [
 		ring: [
 			on-down [space path event] [
-				rotor: get path/-2
+				rotor: path/-2
 				ofs: path/-1 - (rotor/size / 2)
 				angle: arctangent2 ofs/y ofs/x
 				start-drag/with path reduce [rotor/angle angle]
@@ -211,7 +211,7 @@ define-handlers [
 			on-up [space path event] [stop-drag]
 			on-over [space path event] [
 				unless dragging? [exit]
-				rotor: get path/-2
+				rotor: path/-2
 				ofs: path/-1 - (rotor/size / 2)
 				angle: arctangent2 ofs/y ofs/x
 				parm: drag-parameter

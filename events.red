@@ -317,7 +317,7 @@ events: context [
 				; zoom pan rotate two-tap press-tap   -- android-only?
 				; create created  -- simulate these? (they're still undocumented mostly in View)
 			] [exit]											;-- ignore unsupported events
-			#debug events [print ["dispatch path:" path]]
+			#debug events [#print "dispatch path: (mold path)"]
 			if path [
 				#assert [block? path]							;-- for event handler's convenience, e.g. `set [..] path`
 				;-- empty when hovering out of the host or over empty area of it
@@ -431,8 +431,8 @@ events: context [
 		path [path! block!]
 		/with param [any-type!] "Attach any data to the dragging state"
 	][
-		#debug events [if dragging? [#print "WARNING: Dragging override detected: (drag-path)->(path)"]]
-		#debug events [#print "Starting drag on [(copy/part path -99) | (path)] with (:param)"]
+		#debug events [if dragging? [#print "WARNING: Dragging override detected: (mold drag-path)->(mold path)"]]
+		#debug events [#print "Starting drag on [(mold copy/part path -99) | (mold path)] with (:param)"]
 		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]
 		append clear drag-in/head head path				;-- make a copy in place, saving original offsets

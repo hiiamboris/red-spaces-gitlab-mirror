@@ -91,23 +91,25 @@ context [
 	;@@ move this somewhere else
 	set 'get-full-path function [
 		"Get path for SPACE on the last rendered frame, or none if it's not there"
-		space  [object!]
+		space  [object!] (space? space)
 		; return: [path! none!]
 	][
-		; #assert [is-face? host]
 		#assert [space/owner]
 		host: first parents: reverse list-parents space
-		; #assert [is-face? host]							;-- let there be a warning for now
+		; #assert [host? host]							;-- let there be a warning for now
 		unless host? host [return none]					;-- fails on self-containing grid
 		gen:  host/generation
 		path: clear []
-		append path parents/1/parent					;-- faster than anonymizing 'host
+		; append path host/style
+		append path host
 		foreach obj next parents [
-			frame: obj/last-frame
-			unless gen <= frame/1 [return none]
+			; append path obj/style
 			append path obj
+			frame: obj/last-frame
+			if frame/1 < gen [return none]				;-- space generation is older than the host: orphaned (unused) subtree
 			if frame/2 = 'cached [gen: 0.0]				;-- don't check generation numbers inside cached subtree
 		]
+		; append path space/style
 		append path space
 		#assert [not find path none]
 		as path! copy path
@@ -119,19 +121,14 @@ context [
 		foreach-space [path space] face/space [invalidate/only space]
 	]
 	
-	;@@ a bit of an issue here is that <everything> doesn't call /invalidate() funcs of all spaces
-	;@@ but maybe they won't be needed as I'm improving the design?
-	;@@ space/invalidate should be called on-invalidate for less confusion
-	
 	;@@ should have a global safe wrapper
 	parents-list: make hash! 32
 	list-parents: function [space [object!]] [			;-- order is bubbling: immediate-parent first, host last
 		clear parents-list
 		while [
 			all [
-				; word? :space/owner
-				space: select space 'owner				;@@ workaround for #5216 - fixed already, remove me
-				not find/same parents-list space
+				space: select space 'owner
+				not find/same parents-list space		;-- cycle prevention
 			]
 		] [append parents-list space]
 		parents-list
@@ -173,7 +170,7 @@ context [
 					#debug changes [
 						path: as path! reverse map-each obj parents [obj/style]
 						append path space/style
-						#print "invalidating from (path), scope=(scope), cause=(if cause [cause/style])"
+						#print "invalidating from (mold path), scope=(scope), cause=(if cause [cause/style])"
 					]			
 					foreach space parents [
 						invalidate/only/info space cause scope
