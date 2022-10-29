@@ -95,7 +95,7 @@ if action? :mold [
 			/only "Exclude outer brackets if value is a block" 
 			/all  "Return value in loadable format" 
 			/flat "Exclude all indentation"
-			/compact "Do not expand nested structures" 
+			/deep "Expand nested structures on all levels" 
 			/part "Limit the length of the result" 
 				limit: (pick [100'000'000  10'000] all) [integer!] (limit >= 0)
 		][
@@ -108,13 +108,13 @@ if action? :mold [
 			
 		font-words: words-of font!
 		mold-stack: make hash! 100						;-- used to avoid cycles
-		mold*: function [value [any-type!] limit /extern compact flat] with :mold [
+		mold*: function [value [any-type!] limit /extern deep flat] with :mold [
 			sp: " "
 			output: make string! 16
 			decor: select pick decor* all type: type?/word :value
 			all [decor  find/same/only mold-stack :value  return emit ["..."]]
-			if compact [
-				if :value =? (2e9 by 2e9) [return emit ["INFxINF"]]		;@@ not sure about this since it's too tightly tied to spaces...
+			unless deep [
+				if :value =? as-pair 2e9 2e9 [return emit ["INFxINF"]]		;@@ not sure about this since it's too tightly tied to spaces...
 				if 0 < depth [
 					if 'block! = type [
 						try [							;-- fails on system/words
@@ -189,7 +189,7 @@ if action? :mold [
 					emit [decor/1]
 					;; emit contents
 					~/all [								;-- exclude on-change in normal mold
-						compact
+						not deep
 						object? value
 						remove/part find/skip pos [on-change*] 2 2
 						remove/part find/skip pos [on-deep-change*] 2 2
@@ -227,7 +227,7 @@ if action? :mold [
 				function! action! native! routine! [
 					spec: spec-of :value
 					body: body-of :value
-					if all [compact depth > 1] [
+					if all [not deeep depth > 1] [
 						new-line/all spec: copy spec no
 						parse spec [
 							any [/local remove to end | not 'return all-word! | remove skip]
@@ -235,9 +235,9 @@ if action? :mold [
 						body: [...]
 					]
 					if find [action! native!] type [body: [...]]	;-- body is unknown to runtime
-					compact': compact  compact: no
+					deep': deep  deep: yes				;-- don't shorten function bodies
 					emit [decor/1 sp (mold* spec limit) sp (mold* body limit) decor/2]
-					compact: compact'
+					deep: deep'
 				]
 				handle! [										;-- make handles loadable by converting to integers
 					value: second transcode/one next native-mold/all value	;-- extract the integer
@@ -275,7 +275,7 @@ probe: function [
 	"Returns a value after printing its molded form"
 	value [any-type!]
 ][
-	print mold/compact :value
+	print mold :value
 	:value
 ]
 
@@ -286,14 +286,14 @@ probe: function [
 	case [
 		any [any-word? :value any-path? :value] [
 			prin value prin ": "
-			print mold/compact get/any value
+			print mold get/any value
 		]
 		block? :value [									;-- multiple named values on a single line
 			print form map-each word value [
-				`"(word): (mold/part/flat/compact get/any word 20) "`
+				`"(word): (mold/part/flat get/any word 20) "`
 			]
 		]
-		'else [print mold/compact :value]
+		'else [print mold :value]
 	]
 ]
 
@@ -308,7 +308,54 @@ if function? :system/words/help [						;-- if console present, remove the annoyi
 	]
 ]
 
-save: func spec-of :system/words/save body-of :system/words/save	;-- replace compiled mold with interpreted mold
+save: none
+context [												;-- replace compiled mold with interpreted mold, and add /deep
+	body: body-of :system/words/save
+	parse body rule: [any [
+		ahead any-list! into rule
+	|	ahead any-path! into [thru 'mold insert ('deep) to end]
+	|	change only 'mold ('mold/deep)
+	|	skip
+	]]
+	set 'save func spec-of :system/words/save body
+]
+
+
+; form: :system/words/form								;-- let it always be available in Spaces context
+; if action? :form [
+	; native-form: :form
+	
+	; set 'form function [
+		; "Returns a user-friendly string representation of a value"
+		; value [any-type!] 
+		; /part "Limit the length of the result" 
+			; limit [integer!] 		
+	; ][
+		; switch/default type?/word :value [
+			; object! [mold value]
+			; block! hash! paren! path! get-path! set-path! lit-path! [
+				; sp: either any-path? value ["/"][" "]
+				; left: limit
+				; r: rejoin next map-each/eval x value [
+					; either part [
+						; s: form/part :x limit
+						; left: left - 1 - length? s
+					; ][
+						; s: form :x
+					; ]
+					; [sp s]
+				; ]
+				; if part [clear skip r limit]
+				; r
+			; ]
+		; ][
+			; either part
+				; [native-form/part :value limit]
+				; [native-form      :value]
+		; ]
+	; ]
+; ]
+
 
 
 ;@@ TODO: at least 3 canvases: none (and maybe 0x0), half-infinite, and finite; configurable size
