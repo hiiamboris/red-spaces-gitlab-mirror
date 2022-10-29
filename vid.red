@@ -148,6 +148,7 @@ VID: context [
 			#assert [host? self]
 			
 			type:       'base		#type =  [word!]
+			style:      'host		#type =  [word!]
 			;; no size by default - used by init-spaces-tree as a hint to resize the host itself:
 			size:       0x0			#type =? [pair! none!]  :host-on-change
 			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:

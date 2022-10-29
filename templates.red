@@ -14,12 +14,12 @@ templates: #()											;-- map for extensibility
 
 ;; default on-change function to avoid replicating it in every template
 invalidates: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [#print "change/size of (space/type)/(word) to (mold/flat/part :value 40)"]
+	#debug changes [#print "change/size of (space/style)/(word) to (mold/flat/part :value 40)"]
 	invalidate space
 ]
 
 invalidates-look: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [#print "change/look of (space/type)/(word) to (mold/flat/part :value 40)"]
+	#debug changes [#print "change/look of (space/style)/(word) to (mold/flat/part :value 40)"]
 	invalidate/info space none 'look
 ]
 
@@ -31,7 +31,7 @@ init-cache: function [space [object!]] [
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
-	type:	'space	#type [word!] =						;-- used for styling, may be different from template name!
+	style:	'space	#type [word!] =						;-- used for styling, may be different from template name!
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
 	owner:  none	#type [object! none!]
 	draw:   []   	#type [block! function!]
@@ -69,7 +69,7 @@ space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
 				in obj 'last-frame
 				in obj 'limits
 				in obj 'owner
-				in obj 'type
+				in obj 'style
 				in obj 'size
 				in obj 'draw
 			]
@@ -96,7 +96,7 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
-		if r/type = 'space [quietly r/type: type]		;-- only set type if it's not already set by template
+		if r/style = 'space [quietly r/style: type]		;-- only set type if it's not already set by template
 		init-cache r
 	]
 	r
@@ -382,11 +382,11 @@ scrollbar: context [
 		
 		map:         []
 		cache:       [size map]
-		back-arrow:  make-space 'triangle  [type: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
-		back-page:   make-space 'rectangle [type: 'back-page   draw: []]           #type (space? back-page)		;-- go back a page
-		thumb:       make-space 'rectangle [type: 'thumb       margin: 2x1]        #type (space? thumb)			;-- draggable
-		forth-page:  make-space 'rectangle [type: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
-		forth-arrow: make-space 'triangle  [type: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
+		back-arrow:  make-space 'triangle  [style: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
+		back-page:   make-space 'rectangle [style: 'back-page   draw: []]           #type (space? back-page)	;-- go back a page
+		thumb:       make-space 'rectangle [style: 'thumb       margin: 2x1]        #type (space? thumb)		;-- draggable
+		forth-page:  make-space 'rectangle [style: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
+		forth-arrow: make-space 'triangle  [style: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
 		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
 		draw: does [~/draw self]
@@ -551,11 +551,11 @@ scrollable-space: context [
 		content:      none		#type =? :invalidates [object! none!]	;-- should be defined (overwritten) by the user
 		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
 		
-		hscroll: make-space 'scrollbar [type: 'hscroll axis: 'x]					#type (space? hscroll)
-		vscroll: make-space 'scrollbar [type: 'vscroll axis: 'y size: reverse size]	#type (space? vscroll)
+		hscroll:  make-space 'scrollbar [style: 'hscroll axis: 'x]						#type (space? hscroll)
+		vscroll:  make-space 'scrollbar [style: 'vscroll axis: 'y size: reverse size]	#type (space? vscroll)
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		scroll-timer: make-space 'timer [type: 'scroll-timer]					#type (space? scroll-timer)
+		scroll-timer: make-space 'timer [style: 'scroll-timer]							#type (space? scroll-timer)
 
 		map:   []
 		cache: [size map]
@@ -1178,7 +1178,7 @@ inf-scrollable-ctx: context [
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
+		roll-timer: make-space 'timer [style: 'roll-timer]	#type (space? roll-timer)
 		roll: function [/in path: (as path! []) [path!] "Inject subpath into current styling path"] [
 			~/roll self path
 		] #type [function!]
@@ -1428,8 +1428,8 @@ list-view-ctx: context [
 		
 		wrap-data: function [item-data [any-type!]][	;-- can be overridden (but with care)
 			spc: make-space 'data-view [
-				quietly type: 'item
-				quietly wrap?: on
+				quietly style: 'item
+				quietly wrap?:  on
 			]
 			set/any 'spc/data :item-data
 			spc
@@ -2320,8 +2320,8 @@ grid-view-ctx: context [
 
 		;; only called initially or after invalidate-range
 		wrap-data: function [item-data [any-type!]] [
-			spc: make-space 'data-view [
-				quietly type:  'cell
+			spc: make-space 'data-view [				;@@ 'quietly' used as optimization but must be in sync with data-view/on-change
+				quietly style: 'cell
 				quietly wrap?:  on						;-- will be considered upon /data change
 				quietly margin: 3x3
 				quietly align: -1x0

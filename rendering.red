@@ -34,7 +34,7 @@ get-current-style: function [
 	"Fetch styling code object for the current space being drawn"
 ][
 	path: copy current-path
-	forall path [path/1: path/1/type]
+	forall path [path/1: path/1/style]
 	get-style as path! path
 ]
 
@@ -82,7 +82,7 @@ context [
 			next-gen: attempt [current-generation]
 			last-gen = next-gen
 			unless :space/owner =? :new-owner [
-				print `"*** Warning on rendering of (space/type):"`
+				print `"*** Warning on rendering of (space/style):"`
 				assert [:space/owner =? :new-owner "Owner sharing detected!"]
 			]
 		]
@@ -139,7 +139,7 @@ context [
 	
 	set 'invalidate-cache function [space [object!]][	;-- to be used by custom invalidators
 		if space/cache = 'valid [
-			#debug cache [#print "Invalidating (space/type) of size=(space/size)"]
+			#debug cache [#print "Invalidating (space/style) of size=(space/size)"]
 			clear get word: space/cache
 			quietly space/cache: bind 'invalid context? word
 		]
@@ -171,9 +171,9 @@ context [
 				if all [host  in host 'generation] [	;@@ more reliable host check needed to detect if space belongs to the tree
 					clear top parents					;-- no need to invalidate the host, as it has no cache
 					#debug changes [
-						path: as path! reverse map-each obj parents [obj/type]
-						append path space/type
-						#print "invalidating from (path), scope=(scope), cause=(if cause [cause/type])"
+						path: as path! reverse map-each obj parents [obj/style]
+						append path space/style
+						#print "invalidating from (path), scope=(scope), cause=(if cause [cause/style])"
 					]			
 					foreach space parents [
 						invalidate/only/info space cause scope
@@ -187,7 +187,7 @@ context [
 	
 	#debug changes [
 		verify-validity: function [host [object!] (host? host)] [
-			paths: list-spaces anonymize host/type host
+			paths: list-spaces host
 			remove-each path paths ['invalid <> select last path 'cache]
 			unless empty? paths [
 				print "*** Unwanted invalidation of the following spaces detected during render: ***"
@@ -209,7 +209,7 @@ context [
 		]
 		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
-			name: space/type
+			name: space/style
 			if cache [period: 2 + length? cache/-1]
 			either node [
 				n: (length? cache) / period
@@ -248,7 +248,7 @@ context [
 		rechange node words
 		quietly space/cache: bind 'valid context? word
 		#debug cache [
-			#print "Saved cache for (space/type) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
+			#print "Saved cache for (space/style) size=(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 		#debug profile [prof/manual/end 'cache]
 	]
@@ -269,7 +269,7 @@ context [
 		append current-path space
 		trap/all/catch code [
 			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
-			#print "*** Failed to render (space/type)!^/(msg)^/"
+			#print "*** Failed to render (space/style)!^/(msg)^/"
 		]
 		clear top
 	]
@@ -314,7 +314,7 @@ context [
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
-		name: space/type
+		name: space/style
 		#debug cache [#print "Rendering (name)"]	
 		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [
