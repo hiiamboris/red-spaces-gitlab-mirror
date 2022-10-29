@@ -96,8 +96,9 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
-		unless r/style = 'space [type: r/style]			;-- type may have been enforced by the template, so pick it up
-		quietly r/style: anonymize type r				;-- pay anonymization price up front, to lighten path formation
+		; unless r/style = 'space [type: r/style]			;-- type may have been enforced by the template, so pick it up
+		; quietly r/style: anonymize type r				;-- pay anonymization price up front, to lighten path formation
+		if r/style = 'space [quietly r/style: type]		;-- replace the type if it was not enforced by the template
 		init-cache r
 	]
 	r
