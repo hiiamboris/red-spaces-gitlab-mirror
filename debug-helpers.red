@@ -185,7 +185,7 @@ if action? :mold [
 						remove/part find/skip pos [on-change*] 2 2
 						remove/part find/skip pos [on-deep-change*] 2 2
 					]
-					if find [object! map!] type [		;-- find max word length (excluding on-change possibly) 
+					if all [not flat  find [object! map!] type] [	;-- find max word length (excluding on-change possibly) 
 						align: 1 + any [
 							maximum-of map-each [word _] block [length? form word]
 							0
