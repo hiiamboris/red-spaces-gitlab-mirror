@@ -96,7 +96,8 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
-		if r/style = 'space [quietly r/style: type]		;-- only set type if it's not already set by template
+		unless r/style = 'space [type: r/style]			;-- type may have been enforced by the template, so pick it up
+		quietly r/style: anonymize type r				;-- pay anonymization price up front, to lighten path formation
 		init-cache r
 	]
 	r
@@ -1115,7 +1116,7 @@ inf-scrollable-ctx: context [
 	roll: function [space [object!] path [path!] "inf-scrollable should be the last item"] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		window: space/window
-		unless find space/map 'window [exit]			;-- likely window was optimized out due to empty canvas 
+		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
 		#assert [window/size]
 		wsize:  window/size
