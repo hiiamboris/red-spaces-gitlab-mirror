@@ -350,7 +350,7 @@ events: context [
 			hodl: obtain block! (length? path) / unit: 2			;-- need reentrancy because some events generate others
 			wpath: extract/into path unit hodl						;-- remove pairs ;@@ should be `map` - extract is slow
 		]
-		forall wpath [wpath/1: wpath/1/type]						;@@ use map-each
+		forall wpath [wpath/1: wpath/1/style]						;-- words needed to locate handler ;@@ use map-each
 		#leaving [if hodl [stash hodl]]
 		#assert [not find wpath pair!]
 		len: length? wpath
