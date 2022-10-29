@@ -60,6 +60,10 @@ if action? :mold [
 		decor*: [[
 			block!    ["[" "]"]
 			paren!    ["(" ")"]
+			path!     ["" ""]
+			lit-path! ["'" ""]
+			get-path! [":" ""]
+			set-path! ["" ":"]
 			hash!     ["##[make hash! [" "]]"] 
 			map!      ["##[make map! [" "]]"] 
 			event!    ["##[make event! [" "]]"] 
@@ -71,6 +75,10 @@ if action? :mold [
 		][
 			block!    ["[" "]"]
 			paren!    ["(" ")"]
+			path!     ["" ""]
+			lit-path! ["'" ""]
+			get-path! [":" ""]
+			set-path! ["" ":"]
 			hash!     ["hash [" "]"] 
 			map!      ["#(" ")"] 
 			event!    ["event [" "]"] 
@@ -97,11 +105,11 @@ if action? :mold [
 		]
 		
 		~: system/words
-		sp: " "
 			
 		font-words: words-of font!
 		mold-stack: make hash! 100						;-- used to avoid cycles
-		mold*: function [value [any-type!] limit] with :mold [
+		mold*: function [value [any-type!] limit /extern compact flat] with :mold [
+			sp: " "
 			output: make string! 16
 			decor: select pick decor* all type: type?/word :value
 			all [decor  find/same/only mold-stack :value  return emit ["..."]]
@@ -149,7 +157,8 @@ if action? :mold [
 			
 			if decor [append/only mold-stack :value]
 			switch/default type [
-				event! object! map! hash! block! paren! [
+				event! object! map! hash! block! paren! path! get-path! set-path! lit-path! [
+					if 'path! = type [sp: "/" flat': flat flat: yes]
 					step 'depth
 					;; output events too ;@@ won't be loadable since can't make events
 					if 'event! = type [
@@ -213,6 +222,7 @@ if action? :mold [
 					emit [decor/2]
 					if skip-decor [emit [skip-decor/2]]
 					step/down 'depth
+					if 'path! = type [flat: flat']
 				]
 				function! action! native! routine! [
 					spec: spec-of :value
@@ -225,9 +235,9 @@ if action? :mold [
 						body: [...]
 					]
 					if find [action! native!] type [body: [...]]	;-- body is unknown to runtime
-					saved: compact  compact: no
+					compact': compact  compact: no
 					emit [decor/1 sp (mold* spec limit) sp (mold* body limit) decor/2]
-					compact: saved
+					compact: compact'
 				]
 				handle! [										;-- make handles loadable by converting to integers
 					value: second transcode/one next native-mold/all value	;-- extract the integer
@@ -248,12 +258,12 @@ if action? :mold [
 			output
 		]
 		
-		emit: function [strings [block!]] with [:mold :mold*] [
+		emit: function [strings [block!] /extern limit] with [:mold :mold*] [
 			foreach string reduce strings [
 				if paren? string [string: do string]
 				unless string [continue]
 				append/part output string limit
-				set 'limit max 0 limit - length? string
+				limit: max 0 limit - length? string
 			]
 			output
 		]
