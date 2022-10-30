@@ -89,6 +89,8 @@ traversal: context [
 		new-line/all target yes
 	]
 
+	;@@ screen and window doesn't have a /style, so their addition complicates path to words conversion in events code
+	;@@ but if all paths become host-relative, global cross-window tabbing (even cross-host) is out of the question
 	set 'path-from-face function [
 		"Return FACE's path from the screen"
 		face [object!] (is-face? face)					;@@ no need in spaces support here?
@@ -117,7 +119,7 @@ context [
 		;@@ any point in not making it cyclic?
 	][
 		if any-word? spec [spec: to [] to word! spec]
-		path: either object? path [reduce [path]][as path! path]
+		path: as path! either object? path [reduce [path]][path]
 
 		buf: cache/get											;-- so we can call foreach-*ace from itself
 		list: lister/into path/1 buf
@@ -126,7 +128,7 @@ context [
 		either pos: find-same-path list path [
 			#debug focus [
 				if attempt [get bind 'dir :find-next-focal-space] [
-					#print "Found (as path! path) at index (index? pos)"
+					#print "Found (mold as path! path) at index (index? pos)"
 				]
 			]
 			if next? [remove pos]
@@ -136,7 +138,7 @@ context [
 		][
 			#debug focus [
 				if attempt [get bind 'dir :find-next-focal-space] [
-					#print "NOT found (as path! path) in spaces tree"
+					#print "NOT found (mold as path! path) in spaces tree"
 				]
 			]
 			pos: list											;-- if empty path or path is invalid: go from head
@@ -154,7 +156,7 @@ context [
 	set 'foreach-space function [
 		"Evaluate CODE for each space starting with PATH"
 		'spec [word! set-word! block!] "path or [path space]"
-		path  [path! block! object! (space? path)] "Starting path (index determines tree root)"
+		path  [object! (space? path) path! block!] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
 		/next    "Skip the PATH itself (otherwise includes it)"
@@ -165,7 +167,7 @@ context [
 	set 'foreach-*ace function [
 		"Evaluate CODE for each face & space starting with PATH"
 		'spec [word! set-word! block!] "path or [path *ace]"
-		path  [path! block! object! (is-face? path)] "Starting path (index determines tree root)"
+		path  [object! (is-face? path) path! block!] "Starting path (index determines tree root)"
 		code  [block!]
 		/reverse "Traverse in the opposite direction"
 		/next    "Skip the PATH itself (otherwise includes it)"

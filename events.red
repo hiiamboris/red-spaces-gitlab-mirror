@@ -345,12 +345,13 @@ events: context [
 	][
 		if commands/stop? [exit]
 		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
-		wpath: path  unit: 1										;-- word-only path
+		wpath: copy path  unit: 1										;-- word-only path
 		if pair? second path [
 			hodl: obtain block! (length? path) / unit: 2			;-- need reentrancy because some events generate others
 			wpath: extract/into path unit hodl						;-- remove pairs ;@@ should be `map` - extract is slow
 		]
-		forall wpath [wpath/1: wpath/1/style]						;-- words needed to locate handler ;@@ use map-each
+		;@@ /style and /type multiplicity becomes a nuisance now:
+		forall wpath [wpath/1: any [select wpath/1 'style wpath/1/type]]	;-- words needed to locate handler ;@@ use map-each
 		#leaving [if hodl [stash hodl]]
 		#assert [not find wpath pair!]
 		len: length? wpath
@@ -413,7 +414,7 @@ events: context [
 		case [
 			empty? drag-in/head [no]
 			not from [yes]
-			name: drag-in/path/1 [space =? get name]
+			space? source: drag-in/path/1 [space =? source]
 		]
 	]
 	
@@ -458,7 +459,7 @@ events: context [
 		set [spc:  ofs: ] path
 		#assert [
 			spc =? spc'									;-- only makes sense to track it within the same space
-			word? spc
+			space? spc
 			pair? ofs
 			pair? ofs'
 		]

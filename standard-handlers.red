@@ -15,7 +15,7 @@ define-handlers [
 		on-down [space path event] [
 			set [_: _: item: _: subitem:] path
 			case [
-				find [hscroll vscroll] item/style [		;-- move or start dragging
+				find [hscroll vscroll] select item 'style [		;-- move or start dragging
 					axis: item/axis
 					switch subitem/style [
 						forth-arrow [space/move-by 'line 'forth axis]
@@ -36,14 +36,16 @@ define-handlers [
 		on-over [space path event] [
 			unless dragging?/from space [pass exit]		;-- let inner spaces handle it
 			set [_: _: item: _: subitem:] path
-			either find [hscroll vscroll] item/style [
-				unless subitem/style = 'thumb [exit]	;-- do not react to drag of arrows (used by timer)
+			either find [hscroll vscroll] select item 'style [	;-- item may be none
+				if subitem/style <> 'thumb [exit]		;-- do not react to drag of arrows (used by timer)
 				scroll: item
-				map:    scroll/map
 				x:      scroll/axis
-				band:   scroll/size/:x - map/forth-arrow/size/:x - map/back-arrow/size/:x
-				cspace: space/content
-				csize:  cspace/size
+				;; map/subitem/size should take precedence over subitem/size
+				;; because map can get fetched from cache without affecting subitem object sizes (they become invalid at this point)
+				forth-arrow-geom: select/same scroll/map scroll/forth-arrow
+				back-arrow-geom:  select/same scroll/map scroll/back-arrow
+				band:   scroll/size/:x - forth-arrow-geom/size/:x - back-arrow-geom/size/:x
+				csize:  space/content/size				;@@ may get out of sync with the map?
 				vport:  space/viewport
 				hidden: csize/:x - vport/:x
 				ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
@@ -98,9 +100,9 @@ define-handlers [
 				unless spc =? path/-1 [exit]				;-- dragging started inside another space - ignore it
 				scrollable: path/-1
 				scrollable/move-by/scale
-					switch/default subitem [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
-					switch subitem [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
-					any [select [hscroll x vscroll y] item  exit]
+					switch/default subitem/style [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
+					switch subitem/style [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
+					any [select [hscroll x vscroll y] item/style  exit]
 					delay + 100%
 			]
 		]

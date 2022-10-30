@@ -191,19 +191,13 @@ VID: context [
 		face/draw: drawn
 		
 		if object? focused [							;-- has to be focused after render creates the tree
-			;; this is the only viable way to set focus,
-			;; as multiple `wrap-space` funcs create spaces that cannot be accounted for in VID code
-			foreach path list-*aces anonymize face/type face [
-				if focused =? last path [
-					#assert [face? face/parent]
-					focus-space path: compose [
-						(anonymize 'screen system/view/screens/1)	;-- not linked to the screen yet, has no /parent
-						(anonymize 'window face/parent)
-						(as [] path)
-					] 
-					break
-				]
-			]
+			path: get-full-path focused
+			#assert [path]
+			focus-space compose [
+				(system/view/screens/1)
+				(face/parent)							;-- not linked to the screen yet, has no /parent
+				(as [] path)
+			] 
 		]
 	]
 	
@@ -265,9 +259,9 @@ VID: context [
 		=batch=: [
 			opt =at=
 			s: to [ahead word! ['at | 'return | 'across | 'below] | end] e: (	;-- lay out part between keywords
-				names: lay-out-vids/styles copy/part s e sheet
-				foreach name names [
-					repend code ['put 'content xy to lit-word! name]
+				spaces: lay-out-vids/styles copy/part s e sheet
+				foreach space spaces [
+					repend code ['put 'content xy space]
 					xy: xy + step
 				]
 			)

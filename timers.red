@@ -92,7 +92,7 @@ timers: context [
 				space/rate: none
 				continue
 			]
-			#debug events [#print "timer rate (rate) has path (mold path)"]
+			#debug timer [#print "timer rate (rate) has path (mold path)"]
 			pos: find/same/tail marks space
 			set [prev: bias:] any [pos [0:0 0:0]]
 			delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer

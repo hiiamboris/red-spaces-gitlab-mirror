@@ -29,13 +29,12 @@ keyboard: object [
 	;-- spaces can be created in a vacuum, but their map should contain rendered only items
 	;@@ TODO: externalize this, as it is general enough ?
 	valid-path?: function [path [path! block!]] [
-		foreach name path [
-			obj: get name
-			either host? obj [
-				unless all [obj/state obj/visible?] [return no]
+		foreach space path [
+			either host? space [
+				unless all [space/state space/visible?] [return no]
 			][
-				if all [map  not find map name] [return no]
-				map: select obj 'map
+				if all [map  not find/same map space] [return no]
+				map: select space 'map
 			]
 		]
 		yes
@@ -64,17 +63,17 @@ focused?: function [
 ][
 	n: any [n if parent [1] 0]
 	all [
-		name1: last keyboard/focus
-		name2: pick tail current-path -1 - n
-		(get name1) =? get name2
+		space1: last keyboard/focus
+		space2: pick tail current-path -1 - n
+		space1 =? space2
 	]													;-- result: true or none
 ]
 
 
 ;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
 find-next-focal-space: function [dir "forth or back"] [
-	focus: any [keyboard/last-valid-focus reduce [anonymize 'screen system/view/screens/1]]
-	#debug focus [#print "last valid focus: (as path! focus)"]
+	focus: any [keyboard/last-valid-focus reduce [system/view/screens/1]]
+	#debug focus [#print "last valid focus: (mold as path! focus)"]
 	; #assert [focus]										;@@ TODO: cover the case when it's none
 	foreach: pick [										;@@ use apply
 		foreach-*ace/next
@@ -83,11 +82,11 @@ find-next-focal-space: function [dir "forth or back"] [
 	do compose/only [
 		(foreach) path next: focus [			;-- default to already focused item (e.g. it's the only focusable)
 			#debug focus [
-				space: get last path 
+				space: last path 
 				text: mold any [select space 'text  select space 'data] 
 				#print "find-next-focal-space @(mold path), text=(text)"
 			]
-			if find keyboard/focusable last path [next: path break]
+			if find keyboard/focusable select last path 'style [next: path break]
 		]
 	]
 	path: copy as focus next					;-- preserve the original type
@@ -104,18 +103,18 @@ focus-space: function [
 	; return: [logic!] "True if focus changed"
 ] with events [
 	path: append clear [] path							;-- make a copy so we can modify it
-	while [name: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
-		unless find keyboard/focusable name [continue]
-		append path new-name: name
+	while [space: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
+		unless find keyboard/focusable space/style [continue]
+		append path space								;-- restore the taken item
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
-		#debug focus [print ["Moving focus from" as path! keyboard/focus "to" as path! path]]
+		#debug focus [#print "Moving focus from (mold as path! keyboard/focus) to (mold as path! path)"]
 
-		foreach name path [								;-- if faces are provided, find the innermost one
-			if host? f: get name [face: f break]
+		foreach obj path [								;-- if faces are provided, find the innermost one
+			if host? obj [face: obj break]
 		]
 		
 		unless empty? old-path: keyboard/focus [
-			if space? obj: get last old-path [invalidate obj]	;-- let space remove it's focus decoration
+			if space? obj: last old-path [invalidate obj]	;-- let space remove it's focus decoration
 			with-stop [									;-- init a separate stop flag for a separate event
 				unfocus-event!/face: face
 				process-event old-path unfocus-event! [] yes
@@ -130,7 +129,7 @@ focus-space: function [
 			]
 		]
 		keyboard/focus: copy path						;-- copy since the path is static
-		if space? obj: get last path [invalidate obj]	;-- let space paint it's focus decoration
+		if space? obj: last path [invalidate obj]		;-- let space paint it's focus decoration
 
 		with-stop [										;-- init a separate stop flag for a separate event
 			focus-event!/face: face
@@ -146,15 +145,15 @@ focus-space: function [
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks may change focus
 	function [space [object!] path [block!] event [event!]] [
-		path: keep-type head path word!					;-- for focus path we want style names only
+		path: keep-type head path object!				;-- for focus path we want style names only
 
 		f: event/face									;-- list also all face parents in the path
 		until [
-			insert path anonymize f/type f
+			insert path f
 			none? f: f/parent
 		]
 
-		#debug focus [#print "Attempting to focus (as path! path)"]
+		#debug focus [#print "Attempting to focus (mold as path! path)"]
 		focus-space path
 	]
 

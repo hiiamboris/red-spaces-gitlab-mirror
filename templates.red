@@ -274,8 +274,8 @@ cell-ctx: context [
 		set [canvas: fill:] decode-canvas canvas
 		canvas: constrain canvas space/limits
 		mrg2:   2x2 * space/margin
-		drawn:  render/on space/content encode-canvas (subtract-canvas canvas mrg2) fill
 		cspace: space/content
+		drawn:  render/on cspace encode-canvas (subtract-canvas canvas mrg2) fill
 		size:   mrg2 + cspace/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 		size:   max size (finite-canvas canvas) * fill	;-- only extends along fill-enabled axes
@@ -476,14 +476,14 @@ scrollable-space: context [
 		cspace: space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
-		cdraw: render/on space/content encode-canvas box fill
+		cdraw: render/on cspace encode-canvas box fill
 		if all [
 			axis: switch space/content-flow [vertical ['y] horizontal ['x]]
 			cspace/size/:axis > box/:axis
 		][												;-- have to add the scroller and subtract it from canvas width
 			scrollers: space/vscroll/size/x by space/hscroll/size/y
 			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
-			cdraw: render/on space/content encode-canvas box fill
+			cdraw: render/on cspace encode-canvas box fill
 		]
 		csz: cspace/size
 		origin: space/origin							;-- must be read after render (& possible roll)
@@ -1225,7 +1225,7 @@ list-view-ctx: context [
 		canvas [pair!]    "Canvas on which it is rendered; positive!" (0x0 +<= canvas)	;-- other funcs must pass positive canvas here
 		level  [integer!] "Offset in pixels from the 0 of main axis"
 	][
-		#assert ['list = last current-path  "Out of tree rendering detected!"]
+		#assert [list =? last current-path  "Out of tree rendering detected!"]
 		x: list/axis
 		if level < mrgx: list/margin along 'x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
@@ -2655,7 +2655,7 @@ field-ctx: context [
 	draw: function [field [object!] canvas: infxinf [none! pair!]] [
 		ctext: field/spaces/text						;-- text content
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
-		drawn: render/on in field/spaces 'text infxinf	;-- this sets the size
+		drawn: render/on field/spaces/text infxinf		;-- this sets the size
 		set [canvas: fill:] decode-canvas canvas
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		cmargin: field/caret/look-around
@@ -2676,15 +2676,15 @@ field-ctx: context [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
 			sxy2: caret-to-offset/lower ctext/layout sel/2
 			field/selection/size: ssize: sxy2 - sxy1
-			sdrawn: compose/only [(render in field 'selection)]
+			sdrawn: render field/selection
 		]
-		cdrawn: render in field 'caret
+		cdrawn: render field/caret
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
 		ofs: field/origin by 0
 		quietly field/map: reshape-light [
-			@[in field/spaces 'text]      [offset: @(ofs) size: @(ctext/size)]
-		/?	@[in field/spaces 'selection] [offset: @(ofs + mrg + sxy1) size: @(ssize)]		/if sel
-			@[in field/spaces 'caret]     [offset: @(ofs + mrg + cxy1) size: @(csize)]
+			@[field/spaces/text]      [offset: @(ofs) size: @(ctext/size)]
+		/?	@[field/spaces/selection] [offset: @(ofs + mrg + sxy1) size: @(ssize)]		/if sel
+			@[field/spaces/caret]     [offset: @(ofs + mrg + cxy1) size: @(csize)]
 		]
 		reshape-light [									;@@ can compose-map be used without re-rendering?
 			clip @(mrg) @(field/size - mrg) [
@@ -2722,7 +2722,7 @@ field-ctx: context [
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
 			caret:     make-space 'caret     []
-			selection: make-space 'rectangle []			;-- can be styled
+			selection: make-space 'rectangle [style: 'selection]	;-- can be styled
 		] #type [object!]
 		
 		;; shortcuts

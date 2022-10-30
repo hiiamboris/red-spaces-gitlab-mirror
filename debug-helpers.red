@@ -18,9 +18,9 @@ dump-event: function [event] [
 ]
 
 dump-tree: function [] [
-	foreach-*ace path: anonymize 'screen system/view/screens/1 [
-		spc: get last path
-		print [pad spc/size 10 path]
+	foreach-*ace path: system/view/screens/1 [
+		spc: last path
+		print [pad spc/size 10 mold path]
 	]
 	()
 ]
@@ -119,7 +119,7 @@ if action? :mold [
 					if 'block! = type [
 						try [							;-- fails on system/words
 							parse value: copy value [any [	;-- simple grouping ;@@ TODO: also find periodic patterns
-								s: ahead [set x skip (xtype: type? :x) xtype] [
+								s: ahead [set x skip (xtype: type? :x) 9 xtype] [	;@@ how many items minimum to group?
 									skip change [some x e:] (to word! rejoin ['x offset? s e])
 								|	change xtype (to word! xtype)
 									change [some xtype e:]  (to word! rejoin ['x offset? s e])

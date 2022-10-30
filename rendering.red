@@ -90,7 +90,7 @@ context [
 
 	;@@ move this somewhere else
 	set 'get-full-path function [
-		"Get path for SPACE on the last rendered frame, or none if it's not there"
+		"Get host-relative path for SPACE on the last rendered frame, or none if it's not there"
 		space  [object!] (space? space)
 		; return: [path! none!]
 	][
