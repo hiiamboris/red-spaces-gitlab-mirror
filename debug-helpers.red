@@ -158,7 +158,7 @@ if action? :mold [
 			if decor [append/only mold-stack :value]
 			switch/default type [
 				event! object! map! hash! block! paren! path! get-path! set-path! lit-path! [
-					if 'path! = type [sp: "/" flat': flat flat: yes]
+					if any-path? value [sp: "/" flat': flat flat: yes]
 					step 'depth
 					;; output events too ;@@ won't be loadable since can't make events
 					if 'event! = type [
@@ -222,7 +222,7 @@ if action? :mold [
 					emit [decor/2]
 					if skip-decor [emit [skip-decor/2]]
 					step/down 'depth
-					if 'path! = type [flat: flat']
+					if any-path? value [flat: flat']
 				]
 				function! action! native! routine! [
 					spec: spec-of :value
