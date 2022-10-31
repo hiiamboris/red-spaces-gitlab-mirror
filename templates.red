@@ -39,7 +39,7 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 	cache:  [size]	#type [word! (find [valid invalid] cache)  logic! (cache = off)  block!]
 	limits: none	#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
-	last-frame: make block! 3	#type [block!]			;-- used internally to check if space is connected to the tree
+	last-frame: copy [0.0 #[none]]	#type [block!]		;-- used internally to check if space is connected to the tree
 ]
 
 ;; a trick not to enforce some facets (saves RAM) but still provide default typechecks for them:
@@ -1911,8 +1911,8 @@ grid-ctx: context [
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
-			unless spc: grid/cells/pick cell [continue]
-			cspace: grid/wrap-space cell spc			;-- apply cell style too (may influence min. size by margin, etc)
+			unless space: grid/cells/pick cell [continue]
+			cspace: grid/wrap-space cell space			;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
 				render/on cspace encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
 			][
@@ -2095,7 +2095,7 @@ grid-ctx: context [
 		foreach [cell scope] grid/frame/invalid [
 			if scope = 'size [
 				either cell [
-					invalidate-xy grid pick find/same grid/frame/cells cell -2
+					invalidate-xy grid pick find/same grid/frame/cells cell -1
 				][
 					quietly grid/size: none
 				]
