@@ -105,16 +105,6 @@ hide-popups: function [
 	show window
 ]
 
-;@@ put this into museum
-; invalidate-face: function [
-	; "Remove all spaces used by HOST face from cache"
-	; host [object!]
-; ][
-	; foreach path list-spaces host/space [
-		; invalidate/forget/only get last path
-	; ]
-; ]
-
 hint-text?: function [
 	"Get text of the shown hint for WINDOW; none if not shown"
 	window [object!] "Each window has it's own popups stack"
@@ -139,8 +129,8 @@ show-hint: function [
 		
 		hint: make-popup window 0						;@@ working around #5131 here, can't use `layout`
 		hint/rate: none									;-- unlike menus, hints should not add timer pressure
-		space: get hint/space: make-space/name 'hint []
-		space/content: make-space/name 'text compose [text: (text)]
+		space: hint/space: make-space 'hint []
+		space/content: make-space 'text compose [text: (text)]
 		space/origin: either above? [0x1][0x0]			;-- corner where will the arrow be (cannot be absolute - no size yet)
 		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
 		hint/size: none									;-- to make render set face/size
@@ -162,53 +152,51 @@ show-hint: function [
 ]
 
 ;@@ should it be here or in vid.red?
-lay-out-menu: function [spec [block!] /local code name tube list flags radial? round?] reshape [
+lay-out-menu: function [spec [block!] /local code name space value tube list flags radial? round?] reshape [
 	;@@ preferably VID/S should be used here and in hints above
-	data*:       clear []								;-- consecutive data values
 	row*:        clear []								;-- space names of a single row
 	menu*:       clear []								;-- row names list
 	
-	=menu=:      [opt =flags= any =menu-item= #expect end]
+	=menu=:      [opt =flags= collect into row* [any =menu-item=] #expect end]
 	=flags=:     [ahead block! into [any =flag=]]
 	=flag=:      [set radial? 'radial | set round? 'round]
 	=menu-item=: [not end =content= (do new-item) ahead #expect [paren! | block!] [=code= | =submenu=]]
-	=content=:   [ahead #expect [word! | string! | char! | image! | logic!] some [=data= | =space=]]
-	=data=:      [collect into data* some keep [string! | char! | image! | logic!] (do flush-data)]
-	=space=:     [set name word! (#assert [space? get/any name]) (append row* name)]
+	=content=:   [ahead #expect [word! | object! | string! | char! | image! | logic!] some [=data= | =name= | =space=]]
+	=data=:      [set value [string! | char! | image! | logic!] keep (VID/wrap-value value no)]
+	=name=:      [set name word! (#assert [templates/:name]) keep (make-space name [])]
+	=space=:     [set space object! (#assert [space? space]) keep (space)]
 	; =submenu=:   [ahead block! into =menu=]	;@@ not yet supported
 	=code=:      [set code paren! (item/command: code)]
 	
-	flush-data: [
-		append row* VID/lay-out-data/only data*
-		clear data*
-	]
 	new-item: [
-		name: either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
-		append menu* anonymize name item: make-space 'clickable [
-			margin: 4x4
-			content: anonymize 'tube set 'tube make-space 'tube [spacing: 10x5]
+		append menu* item: make-space 'clickable [
+			style:   either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
+			margin:  4x4
+			content: make-space 'tube [spacing: 10x5]
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
 		;; stretch first text item by default (to align rows), but only if there's another item and no explicit <->
 		any [
-			empty? pos: find/tail row* 'text		
-			find row* '<->
-			find row* 'stretch
-			insert pos make-space/name '<-> []
+			not pos: locate row* [spc .. /style = 'text]	;-- only auto-insert separator after text
+			single? pos									;-- don't insert separator at tail
+			locate row* [spc .. /style = 'stretch]		;-- or if already got a separator
+			insert next pos make-space '<-> []
 		]
-		tube/content: flush row*
+		tube: item/content
+		tube/content: flush head row*
 	]
 	parse spec =menu=
 	
 	list: either radial? [
-		make-space name: 'ring []
-	][	make-space name: 'list [axis: 'y margin: 4x4]
+		make-space 'ring []
+	][	make-space 'list [axis: 'y margin: 4x4]
 	]
 	list/content: flush menu*
-	layout: anonymize 'menu make-space 'cell [
-		content: anonymize name list
+	menu: make-space 'cell [
+		style:   'menu
+		content: list
 	]
-	layout
+	menu
 ]
 
 show-menu: function [
@@ -225,8 +213,7 @@ show-menu: function [
 	face/size:  none									;-- to make render set face/size
 	face/draw:  render face
 	either radial?: has-flag? :menu/1 'radial [			;-- radial menu is centered ;@@ REP #113
-		cont: get select get face/space 'content
-		offset: offset + cont/origin
+		offset: offset + face/space/content/origin
 		;; radial menu is transparent but should catch clicks that close it
 		face/color: system/view/metrics/colors/panel + 0.0.0.254
 	][
@@ -246,7 +233,7 @@ context [
 		all [
 			event/type = 'time
 			host? host									;-- a host face?
-			word? host/space							;-- has a space assigned?
+			space? host/space							;-- has a space assigned?
 			on-time host event
 			none   										;-- the event can be processed by other handlers
 		]
@@ -273,7 +260,7 @@ context [
 		type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types
 		until [											;@@ use for-each/reverse
 			path: skip path -2
-			space: get path/1
+			space: path/1
 			value: select space name
 			if do type-check [return :value]
 			head? path
