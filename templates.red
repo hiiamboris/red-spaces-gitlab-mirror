@@ -2420,7 +2420,7 @@ declare-template 'rotor/space [
 	content: none	#type =? :invalidates [object! none!]
 	angle:   0		#type =  :invalidates-look [integer! float!]
 
-	ring: make-space 'space [size: 360x10]
+	ring: make-space 'space [style: 'ring size: 360x10]
 	tight?: no
 	;@@ TODO: zoom for round spaces like spiral
 
@@ -2438,11 +2438,11 @@ declare-template 'rotor/space [
 		]
 		r2: r1 + 10
 		c: cosine angle  s: negate sine angle
-		p0: p: xy - (size / 2)
+		p0: p: xy - (size / 2)							;-- p0 is the center
 		p: as-pair  p/x * c - (p/y * s)  p/x * s + (p/y * c)	;-- rotate the coordinates
 		xy: p + (size / 2)
 		xy1: size - spc/size / 2
-		if any [child =? content  within? xy xy1 spc/size] [
+		if any [child =? content  r1 > distance? 0x0 p] [
 			return reduce [content xy - xy1]
 		]
 		r: p/x ** 2 + (p/y ** 2) ** 0.5
