@@ -873,7 +873,7 @@ icon-ctx: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
 			box:   make-space 'box [content: text]		;-- used to align paragraph
-			set 'content [image box]
+			set 'content reduce [image box]
 		] #type [object!]
 		
 		;; exposed inner facets for easier access
