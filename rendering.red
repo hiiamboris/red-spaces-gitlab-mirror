@@ -81,6 +81,7 @@ context [
 			last-gen: space/last-frame/1
 			next-gen: attempt [current-generation]
 			last-gen = next-gen
+			:space/owner
 			unless :space/owner =? :new-owner [
 				print `"*** Warning on rendering of (space/style):"`
 				assert [:space/owner =? :new-owner "Owner sharing detected!"]
@@ -145,14 +146,13 @@ context [
 	;@@ move this out, it's no longer part of render
 	set 'invalidate function [
 		"Invalidate SPACE cache, to force next redraw"
-		space [object!]
+		space [object!] (space? space)
 		/only "Do not invalidate parents (e.g. if they are invalid already)"
 		/info "Provide info about invalidation"
 			cause [none! object!] "Invalidated child object or none"	;@@ support word that's changed? any use outside debugging?
 			scope [none! word!]   "Invalidation scope: 'size or 'look"
 		/local custom									;-- can be unset during construction
 	][
-		#assert [not host? space]
 		#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
 		unless block? space/cache [						;-- block means space is not created yet; early exit
 			#debug profile [prof/manual/start 'invalidation]
