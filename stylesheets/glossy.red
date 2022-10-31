@@ -190,7 +190,7 @@ context with spaces/ctx [
 	define-styles [
 		host: [
 			below: [
-				(when not find [hint menu radial-menu] space (compose [image (bgnd-image) 0x0 (size)]))
+				(when not find [hint menu radial-menu] space/style (compose [image (bgnd-image) 0x0 (size)]))
 				fill-pen off
 				font (system-font)
 				pen  (silver)
@@ -234,10 +234,11 @@ context with spaces/ctx [
 			maybe self/size/(ortho self/axis): 20
 			self/draw
 			reverse?: either self/axis = 'x [:do][:reverse]
+			thumb-geom: select/same self/map self/thumb
 			compose/deep/only [
 				translate (reverse? 0x4) [
 					(draw-frame self/size 10 glass)
-					translate (reverse? self/map/thumb/offset)
+					translate (reverse? thumb-geom/offset)
 						(draw-glossy-box reverse? self/thumb/size glass 10 100%) 
 				]
 			]
@@ -250,9 +251,9 @@ context with spaces/ctx [
 			inner: subtract-canvas canvas pad * 2x2
 			drawn: self/draw/on encode-canvas inner fill
 			shift: pad * 1x1
-			foreach [name geom] self/map [geom/offset: geom/offset + shift]
-			if find self/map 'hscroll [step/by 'self/map/hscroll/offset 0x4]
-			if find self/map 'vscroll [step/by 'self/map/vscroll/offset 4x0]
+			foreach [_ geom] self/map [geom/offset: geom/offset + shift]
+			if hscroll-geom: select/same self/map self/hscroll [step/by 'hscroll-geom/offset 0x4]
+			if vscroll-geom: select/same self/map self/vscroll [step/by 'vscroll-geom/offset 4x0]
 			quietly self/size: self/size + (pad * 2)
 			reduce [
 				draw-frame self/size pad * 2 opaque black 50%
