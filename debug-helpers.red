@@ -184,7 +184,9 @@ if action? :mold [
 						]
 					]
 					;; emit opening
-					if new-line? block [append/dup indent #" " 4]
+					if all [not empty? block new-line? block] [	;@@ not empty = workaround for #5235
+						append/dup indent #" " 4
+					]
 					lf: unless flat [rejoin ["^/" indent]]
 					emit [decor/1]
 					;; emit contents
@@ -213,10 +215,12 @@ if action? :mold [
 						]
 						if limit <= 0 [break]
 					]
-					if new-line? block [
+					if all [not empty? block new-line? block] [	;@@ not empty = workaround for a heisenbug
 						clear skip tail indent -4
-						lf: unless flat [rejoin ["^/" indent]]
-						emit [lf]
+						unless flat [
+							lf: rejoin ["^/" indent]
+							emit [lf]
+						]
 					]
 					;; emit closing & skip closing
 					emit [decor/2]
