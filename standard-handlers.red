@@ -149,6 +149,8 @@ define-handlers [
 		]
 	]
 	
+	data-clickable: extends 'clickable []
+	
 	menu: [
 		list: [
 			clickable: extends 'clickable [

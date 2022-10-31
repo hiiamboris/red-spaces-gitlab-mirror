@@ -98,7 +98,9 @@ make-space: function [
 		]
 		; unless r/style = 'space [type: r/style]			;-- type may have been enforced by the template, so pick it up
 		; quietly r/style: anonymize type r				;-- pay anonymization price up front, to lighten path formation
-		if r/style = 'space [quietly r/style: type]		;-- replace the type if it was not enforced by the template
+		;; replace the type if it was not enforced by the template:
+		;; `class?` is used instead of `type` to force `<->` have style `stretch`
+		if r/style = 'space [quietly r/style: class? r]
 		init-cache r
 	]
 	r
@@ -977,7 +979,7 @@ label-ctx: context [
 			body:       make-space 'list [margin: 0x0 spacing: 0x0 axis: 'y  content: reduce [text comment]]
 			text-box:   make-space 'box  [content: body]		;-- needed for text centering
 			lists: [text: [text] comment: [text comment]]		;-- used to avoid extra bind in on-change
-			set 'content [image-box text-box]
+			set 'content reduce [image-box text-box]
 		]
 
 		image: none		#type :on-image-change [image! string! char! none!]
@@ -2379,7 +2381,7 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
-	declare-template 'clickable/data-view [
+	declare-template 'clickable/box [					;-- low-level primitive, unlike data-view
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
 		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
@@ -2392,7 +2394,20 @@ button-ctx: context [
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 	]
 	
-	declare-template 'button/clickable [				;-- styled with decor
+	declare-template 'data-clickable/data-view [		;@@ any better name?
+		;@@ should pushed be in button rather?
+		align:    0x0									;-- center by default
+		command:  []									;-- code to run on click (on up: when `pushed?` becomes false)
+		
+		pushed?:  no	#type =? [logic!]				;-- becomes true when user pushes it; triggers `command`
+		#on-change [space word value] [
+			invalidate space
+			unless value [do space/command]				;-- trigger when released
+		]
+		;@@ should command be also a function (actor)? if so, where to take event info from?
+	]
+	
+	declare-template 'button/data-clickable [			;-- styled with decor
 		weight:   0										;-- button should not be stretched by tubes
 		margin:   10x5
 		rounding: 5	#type [integer!] (rounding >= 0)	;-- box rounding radius in px
