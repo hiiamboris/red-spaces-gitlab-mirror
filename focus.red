@@ -104,7 +104,10 @@ focus-space: function [
 ] with events [
 	path: append clear [] path							;-- make a copy so we can modify it
 	while [space: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
-		unless find keyboard/focusable space/style [continue]
+		unless all [
+			space? space
+			find keyboard/focusable space/style
+		] [continue]
 		append path space								;-- restore the taken item
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
 		#debug focus [#print "Moving focus from (mold as path! keyboard/focus) to (mold as path! path)"]
