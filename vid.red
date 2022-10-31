@@ -134,7 +134,9 @@ VID: context [
 	
 	host?: func ["Check if OBJ is a HOST face" obj [object!]]['host = class? obj]
 	
-	host-on-change: function [host word value] [if word? :host/space [invalidate get host/space]]
+	host-on-change: function [host word value] [
+		if space? :host/space [invalidate host/space]
+	]
 	
 	;; basic event dispatching face
 	system/view/VID/styles/host: reshape [
@@ -143,7 +145,10 @@ VID: context [
 		template: /use (declare-class/manual 'host [
 			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
 			on-change*: function spec-of :classy-object!/on-change*
-				with self append copy body-of :classy-object!/on-change* body-of :face!/on-change*
+				with self append copy body-of :classy-object!/on-change* compose/only [
+					;; this shields space object from being owned by the host and from cascades of on-deep-change events!
+					unless word = 'space (body-of :face!/on-change*)
+				]
 			classify-object self 'host
 			#assert [host? self]
 			
