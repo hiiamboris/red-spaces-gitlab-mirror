@@ -42,7 +42,7 @@ declare-template 'zoomer/cell [
 	; pivot: ?
 	draw: function [] [
 		drawn: render content
-		maybe self/size: select get content 'size
+		maybe self/size: content/size
 		compose/only/deep [
 			clip 0x0 (self/size) [
 				translate (size / 2)					;-- zoom in effect
@@ -78,7 +78,7 @@ view/no-wait/options expand-directives [
 					grid/heights/default: cell-size/y
 					grid-view: self
 					grid/cells: func [/pick xy /size] [
-						either pick ['grid-view][1x1 * ratio + 1]
+						either pick [grid-view][1x1 * ratio + 1]
 					]
 					set-style 'grid/grid-view function [gview] reshape [
 						drawn: gview/draw
@@ -111,7 +111,7 @@ view/no-wait/options expand-directives [
 		]
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]

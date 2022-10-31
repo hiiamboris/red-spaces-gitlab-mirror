@@ -37,7 +37,7 @@ view/no-wait/options [
 		]
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x40
 ] [offset: 250x10]

@@ -55,7 +55,7 @@ view/no-wait/options [
 				grid/cells: func [/pick xy /size] [			;-- cells picker that injects grid into itself
 					case [
 						size [old-cells/size]
-						ratio / 2 + 1x1 = xy [grid/content/:xy: 'grid-view]
+						ratio / 2 + 1x1 = xy [grid/content/:xy: grid-view]
 						'else [old-cells/pick xy]
 					]
 				]
@@ -98,7 +98,7 @@ view/no-wait/options [
 		]
 	] on-time [invalidate gv]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]

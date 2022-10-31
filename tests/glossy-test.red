@@ -49,7 +49,8 @@ view/flags [
 		]
 	] react [
 		face/size: face/parent/size - 20
-		invalidate get face/space
+		invalidate-tree face
 	]
+	; on-over [probe hittest face/space event/offset]
 ] 'resize
 

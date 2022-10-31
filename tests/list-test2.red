@@ -32,7 +32,7 @@ view/no-wait/options [
 		lv: list-view 300x400 source= list1d
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x40
 	rate 3 on-time [

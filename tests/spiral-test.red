@@ -18,9 +18,9 @@ declare-template 'spiral/space [
 	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
 	map: [field [offset 0x0 size 999x999]]
 
-	into: function [xy [pair!] /force name [word! none!]] [
+	into: function [xy [pair!] /force child [object! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
-		render/on 'field infxinf	;-- produce layout 
+		render/on field infxinf	;-- produce layout 
 		r: field/spaces/text/layout
 		assert [r]
 
@@ -43,14 +43,14 @@ declare-template 'spiral/space [
 		unless cycles [return none]			;-- math failed :(
 		cycles: cycles + (angle / 360)
 		length: cycles * 2 * pi * rmid
-		reduce ['field as-pair length 1]
+		reduce [field as-pair length 1]
 	]
 
 	draw: function [] [
 		unless r: field/spaces/text/layout [
 			;; render is needed to produce layout and cached parents tree
 			;; so on key press paragraph invalidates also spiral itself
-			render/on 'field infxinf			;-- produce layout 
+			render/on field infxinf			;-- produce layout 
 			r: field/spaces/text/layout
 			assert [r]
 		]
@@ -113,7 +113,7 @@ view/no-wait/options [
 			]
 		]
 	]
-	on-over [status/text: form hittest face/space event/offset]
+	on-over [status/text: mold hittest face/space event/offset]
 	status: text 300x40
 ] [offset: 10x10]
 

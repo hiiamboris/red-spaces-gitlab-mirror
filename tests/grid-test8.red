@@ -20,7 +20,7 @@ declare-template 'zoomer/box [
 				clip [negate infxinf/y infxinf/y] canvas/y / zoom/y
 		]
 		drawn: render/on content canvas'
-		size:  select get content 'size
+		size:  content/size
 		maybe self/size: as-pair
 			size/x * zoom/x
 			size/y * zoom/y
@@ -101,7 +101,7 @@ view/no-wait/options/flags reshape [
 		zoo/canvas: face/offset - host/offset
 		;; render immediately, not waiting for the timer - to reduce the visible lag:
 		host/draw: render host
-		show select host 'parent
+		if host/parent [show host/parent]
 	]
 	do [block/offset: host/size + 20]
 ][

@@ -12,6 +12,7 @@ Red [
 declare-template 'web/inf-scrollable [
 	web: self
 	canvas: make-space 'space [
+		style: 'canvas
 		available?: function [axis dir from requested] [requested]
 	
 		draw: function [/window xy1 xy2 /on canvas] [
@@ -54,7 +55,7 @@ declare-template 'web/inf-scrollable [
 		]
 	]
 
-	window/content: 'canvas
+	window/content: canvas
 ]
 
 
@@ -67,13 +68,13 @@ append spaces/keyboard/focusable 'web
 
 view/no-wait/options [
 	below
-	b: host [web 900x600]
+	b: host [web 900x550]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold as path! hittest face/space event/offset
 	]
 	; rate 3 on-time [b/draw: render b]
-	status: text 300x40
+	status: text 900x40
 ] [offset: 10x10]
 ; foreach-*ace/next path system/view/screens/1 [probe path]
 either system/build/config/gui-console? [halt][do-events]
-
+prof/show

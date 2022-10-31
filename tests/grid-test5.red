@@ -36,7 +36,7 @@ view/no-wait/options [
 			grid/heights/default: cell-size/y
 			grid-view: self
 			grid/cells: func [/pick xy /size] [
-				either pick ['grid-view][1x1 * ratio + 1]
+				either pick [grid-view][1x1 * ratio + 1]
 			]
 			depth: 0
 			old-draw: :draw
@@ -59,7 +59,7 @@ view/no-wait/options [
 		]
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x100
 	rate 0:0:1 on-time [prof/show prof/reset]

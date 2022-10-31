@@ -43,11 +43,11 @@ boxes: map-each spec [
 	[size: 30x10 text: "F"]
 	[size: 10x10 text: "G"]
 ][
-	; make-space/name 'rectangle spec
-	; make-space/name 'field spec
-	make-space/name 'cell [
+	; make-space 'rectangle spec
+	; make-space 'field spec
+	make-space 'cell [
 		weight: 1
-		content: make-space/name 'field spec
+		content: make-space 'field spec
 	]
 ]
 
@@ -80,7 +80,7 @@ view/no-wait compose/only/deep [
 		]
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	return status: text 500x40
 ]

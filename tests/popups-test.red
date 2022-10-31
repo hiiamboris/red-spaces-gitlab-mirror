@@ -53,7 +53,7 @@ view/no-wait [
 						"Approve the course" #[true] (print "On our way") 
 						"Alter the course" #[false] (rocket/angle: random 360 invalidate rocket print "Adjusting...")
 						"Beam me up" "🔭" (print "Zweeee..^/- Welcome onboard!")
-						"Thrusters overload" !(anonymize 'switch r-switch: make-space 'switch [state: on]) (
+						"Thrusters overload" !(r-switch: make-space 'switch [state: on]) (
 							r-switch/state: rocket/burn?: not rocket/burn?
 							print pick ["Thrusters at maximum" "Keeping quiet"] rocket/burn?
 						)

@@ -80,7 +80,7 @@ view/no-wait compose/only/deep [
 		]
 	]
 	on-over [
-		status/text: form hittest face/space event/offset
+		status/text: mold hittest face/space event/offset
 	]
 	return status: text 500x40
 ]

@@ -8,10 +8,10 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 
 	content: reduce [					;) content is a block of NAMES of spaces
 
-		make-space/name 'text [			;) each make-space/name returns a name referring to an object
+		make-space 'text [				;) each make-space a space object
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
-		make-space/name 'button [
+		make-space 'button [
 			data: "OK"					;) data can be any Red type
 			limits: 80 .. 80			;) limit with min=max fixes the button's size
 			command: [unview]			;) code that is evaluated when button is released
@@ -20,7 +20,7 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 ]
 
 host: make-face 'host					;) host face we need to draw spaces on
-host/space:  'list						;) host must have exactly one space attached to it - here it's `list`
+host/space:  list						;) host must have exactly one space attached to it - here it's `list`
 host/draw:   render host				;) `render` returns a list of draw commands, but also sets the /size facet of spaces
 host/size:   list/size					;) now we know how big host face we need from previously set list/size
 host/offset: 10x10						;) apply default VID margin

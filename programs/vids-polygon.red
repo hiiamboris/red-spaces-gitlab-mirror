@@ -22,7 +22,7 @@ view/flags/options compose [
 			face/space: first lay-out-vids data
 			write %vids-polygon.cfg space/text
 		]
-	] on-over [status/text: form hittest face/space event/offset]
+	] on-over [status/text: mold hittest face/space event/offset]
 	return status: text 400x40
 ] 'resize [
 	actors: object [
@@ -30,7 +30,7 @@ view/flags/options compose [
 			status/size: window/size/x - 20 by 40 
 			status/offset/y: window/size/y - 50
 			host/size: window/size - 20x155
-			if host/space [invalidate get host/space]
+			if host/space [invalidate host/space]
 		]
 	]
 ]
