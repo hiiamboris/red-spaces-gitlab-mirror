@@ -287,7 +287,7 @@ layouts: context [
 						;@@ this needs to be documented, and maybe another sizing type should be possible: a list of valid sizes
 						weights: clear []				;-- can be static, not used after distribute
 						extras:  clear []
-						foreach [_ _ _ available weight] row [	;@@ use 2 map-eachs
+						foreach [_ _ available weight] row [	;@@ use 2 map-eachs
 							append weights weight
 							append extras  available
 						]
@@ -299,7 +299,7 @@ layouts: context [
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
 								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
-								item/3: render/on space encode-canvas desired-size reverse? 1x-1
+								item/2: render/on space encode-canvas desired-size reverse? 1x-1
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -341,7 +341,7 @@ layouts: context [
 					;; always re-renders items, because they were painted on an infinite canvas
 					;; finite canvas will most likely bring about different outcome
 					desired-size: reverse? space/size/:x by row-size/y
-					item/3: render/on space encode-canvas desired-size 1x1
+					item/2: render/on space encode-canvas desired-size 1x1
 				]
 			]
 			
@@ -366,7 +366,7 @@ layouts: context [
 			size: 2 * margin + reverse? total-width by total-length
 			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive
 				shift: size * abs shift
-				foreach [space geom] map [geom/offset: geom/offset + shift]
+				foreach [_ geom] map [geom/offset: geom/offset + shift]
 			]
 			#debug sizing [print ["tube c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
