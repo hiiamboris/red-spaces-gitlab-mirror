@@ -17,7 +17,7 @@ define-handlers [
 			case [
 				find [hscroll vscroll] select item 'style [		;-- move or start dragging
 					axis: item/axis
-					switch subitem/style [
+					switch select subitem 'style [
 						forth-arrow [space/move-by 'line 'forth axis]
 						back-arrow  [space/move-by 'line 'back  axis]
 						forth-page  [space/move-by 'page 'forth axis]
@@ -28,7 +28,7 @@ define-handlers [
 				; item = none []							;-- dragging by the empty area of scrollable
 			]
 			;; remove cells or other content from the path, as they do not have to persist during window moves:
-			unless find [hscroll vscroll] item/style [clear skip path 2]
+			unless find [hscroll vscroll] select item 'style [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
 			start-drag path
 		]
@@ -37,7 +37,7 @@ define-handlers [
 			unless dragging?/from space [pass exit]		;-- let inner spaces handle it
 			set [_: _: item: _: subitem:] path
 			either find [hscroll vscroll] select item 'style [	;-- item may be none
-				if subitem/style <> 'thumb [exit]		;-- do not react to drag of arrows (used by timer)
+				if 'thumb <> select subitem 'style [exit]		;-- do not react to drag of arrows (used by timer)
 				scroll: item
 				x:      scroll/axis
 				;; map/subitem/size should take precedence over subitem/size
@@ -100,9 +100,9 @@ define-handlers [
 				unless spc =? path/-1 [exit]				;-- dragging started inside another space - ignore it
 				scrollable: path/-1
 				scrollable/move-by/scale
-					switch/default subitem/style [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
+					switch/default select subitem 'style [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
 					switch subitem/style [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
-					any [select [hscroll x vscroll y] item/style  exit]
+					any [select [hscroll x vscroll y] select item 'style  exit]
 					delay + 100%
 			]
 		]
@@ -166,7 +166,7 @@ define-handlers [
 		]
 		on-click [space path event] [
 			item: path/5
-			if find [round-clickable clickable] item/style [
+			if find [round-clickable clickable] select item 'style [
 				do item/command
 			]
 			hide-popups event/window 1					;-- click on a menu hides all visible menus
