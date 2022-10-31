@@ -112,7 +112,7 @@ if action? :mold [
 			sp: " "
 			output: make string! 16
 			decor: select pick decor* all type: type?/word :value
-			all [decor  find/same/only mold-stack :value  return emit ["..."]]
+			~/all [decor  find/same/only mold-stack :value  return emit ["..."]]
 			unless deep [
 				if :value =? as-pair 2e9 2e9 [return emit ["INFxINF"]]		;@@ not sure about this since it's too tightly tied to spaces...
 				if 0 < depth [
@@ -157,7 +157,7 @@ if action? :mold [
 			
 			if decor [append/only mold-stack :value]
 			switch/default type [
-				event! object! map! hash! block! paren! path! get-path! set-path! lit-path! [
+				object! map! hash! block! paren! path! get-path! set-path! lit-path! event! [
 					if any-path? value [sp: "/" flat': flat flat: yes]
 					step 'depth
 					;; output events too ;@@ won't be loadable since can't make events
@@ -184,7 +184,7 @@ if action? :mold [
 						]
 					]
 					;; emit opening
-					if all [not empty? block new-line? block] [	;@@ not empty = workaround for #5235
+					if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for #5235
 						append/dup indent #" " 4
 					]
 					lf: unless flat [rejoin ["^/" indent]]
@@ -196,7 +196,7 @@ if action? :mold [
 						remove/part find/skip pos [on-change*] 2 2
 						remove/part find/skip pos [on-deep-change*] 2 2
 					]
-					if all [not flat  find [object! map!] type] [	;-- find max word length (excluding on-change possibly) 
+					if ~/all [not flat  find [object! map!] type] [	;-- find max word length (excluding on-change possibly) 
 						align: 1 + any [
 							maximum-of map-each [word _] block [length? form word]
 							0
@@ -215,7 +215,7 @@ if action? :mold [
 						]
 						if limit <= 0 [break]
 					]
-					if all [not empty? block new-line? block] [	;@@ not empty = workaround for a heisenbug
+					if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for a heisenbug
 						clear skip tail indent -4
 						unless flat [
 							lf: rejoin ["^/" indent]
@@ -231,7 +231,7 @@ if action? :mold [
 				function! action! native! routine! [
 					spec: spec-of :value
 					body: body-of :value
-					if all [not deeep depth > 1] [
+					if ~/all [not deep depth > 1] [
 						new-line/all spec: copy spec no
 						parse spec [
 							any [/local remove to end | not 'return all-word! | remove skip]
