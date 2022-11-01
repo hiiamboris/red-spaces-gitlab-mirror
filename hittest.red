@@ -9,13 +9,15 @@ Red [
 exports: [hittest]
 
 into-map: function [
-	map [block!] xy [pair!] child [none! object!]
+	map [block!] xy [pair!] child [object! (space? child) none!]
 	/only list [block!] "Only try to enter selected spaces"
 ][
 	either child [
-		#assert [find/same map child]
-		geom: select/same map child
-		reduce [child  xy - geom/offset]
+		#debug events [#assert [find/same map child]]	;-- may fail, but still worth seeing it
+		;; geom=none possible if e.g. hittest on 'up' event uses drag-path of 'down' event
+		;; and some code of 'down' event replaces part of the tree:
+		xy: either geom: select/same/only map child [xy - geom/offset][0x0] 
+		reduce [child xy]
 	][
 		either list [
 			foreach child list [
@@ -35,14 +37,14 @@ into-map: function [
 	]
 ]
 
-;-- has to be fast, for on-over events
+;; has to be fast, for on-over events
 hittest: function [
 	"Map a certain point deeply into the tree of spaces"
 	space [object!] "Top space in the tree (host/space usually)" (space? space)
 	xy [pair!] "Point in that top space"
 	/into "Append into a given buffer"
 		path: (make [] 16) [block! path!]
-	;-- this is required for dragging, as we need to follow the same path as at the time of click
+	;; this is required for dragging, as we need to follow the same path as at the time of click
 	/as "Force coordinate translation to follow a given path"
 		template [block! path! (space =? template/1) none!]
 ][
@@ -51,11 +53,9 @@ hittest: function [
 			set [space: _: child:] template
 			repend path [space xy]
 			#assert [xy]
-			; #assert [name2]							;-- can be none!
 			case [
 				into: select space 'into [
 					set [_ xy] do copy/deep [into/force xy child]	;@@ workaround for #4854 - remove me
-					; set [_ xy] into/force xy name2
 				]
 				map: select space 'map [
 					set [_ xy] into-map map xy child

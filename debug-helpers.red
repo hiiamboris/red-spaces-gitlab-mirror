@@ -54,7 +54,7 @@ if action? :mold [
 	;; and generally will be closer to `help` output
 	;; mold/all will output loadable info in format acceptable by %load-anything.red
 	context [
-		;@@ there's some heisenbug: empty blocks sometimes get a new-line between brackets! no idea how to pinpoint it
+		; system/words/native-mold: :mold
 		native-mold: :mold
 		
 		decor*: [[
@@ -106,7 +106,6 @@ if action? :mold [
 		
 		~: system/words
 			
-		font-words: words-of font!
 		mold-stack: make hash! 100						;-- used to avoid cycles
 		mold*: function [value [any-type!] limit /extern deep flat] with :mold [
 			sp: " "
