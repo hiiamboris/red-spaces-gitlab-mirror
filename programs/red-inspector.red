@@ -9,6 +9,7 @@ Red [
 	}
 ]
 
+; recycle/off
 #include %../../cli/cli.red
 ; #include %../../common/assert.red
 ;@@ stupid include bugs turn off assertions in some crooked way, can't use them to debug inspector
@@ -17,9 +18,9 @@ Red [
 ; #do [disable-space-cache?: yes]
 #include %../everything.red
 
-; #process off											;@@ hack to avoid #include bugs
+#process off											;@@ hack to avoid #include bugs
 ; do/expand [#include %../stylesheets/glossy.red]
-; #process on
+#process on
 
 import/only spaces/ctx [top]
 append spaces/keyboard/focusable 'tube
@@ -61,26 +62,26 @@ context [
 	][
 		; prof/manual/start 'wrap-value
 		switch/default type?/word :value [
-			string! [name: make-space/name pick [paragraph text] wrap? [text:  value]]
-			logic!  [name: make-space/name 'logic [state: value]]
-			url!    [name: make-space/name 'link  [data:  value]]
+			string! [space: make-space pick [paragraph text] wrap? [text:  value]]
+			logic!  [space: make-space 'logic [state: value]]
+			url!    [space: make-space 'link  [data:  value]]
 			tuple!  [
-				either find [3 4] length? value [			;-- possibly a color
+				space: either find [3 4] length? value [		;-- possibly a color
 					s: form to binary! value
-					name: make-space/name 'cell [
+					make-space 'cell [
 						align: -1x0
 						color: value
-						content: make-space/name 'text [
+						content: make-space 'text [
 							color: contrast-with value
 							text: rejoin [value " #" copy/part skip s 2 back tail s]
 						]
 					]
 				][
-					name: make-space/name 'text [text: mold :value]
+					make-space 'text [text: mold :value]
 				]
 			]
 			image!  [
-				space: get name: make-space/name 'grid-view [
+				space: make-space 'grid-view [
 					type: 'image
 					grid/widths/1: 50
 					grid/pinned:  1x0
@@ -88,9 +89,9 @@ context [
 					limits: 30x50 .. none
 					old-wrap-data: :wrap-data
 					wrap-data: func [data] [
-						either all [word? :data space? get/any data] [
-							;@@ maybe grid should wrap the word as space too?
-							make-space/name 'cell [align: -1x0 content: data]
+						either space? :data [
+							;@@ maybe grid should wrap the space as cell too?
+							make-space 'cell [align: -1x0 content: data]
 						][
 							old-wrap-data :data
 						]
@@ -99,7 +100,7 @@ context [
 				extend space/source reduce [
 					'size 2x2
 					1x1 "Size" 2x1 form value/size
-					1x2 "Look" 2x2 make-space/name 'image [
+					1x2 "Look" 2x2 make-space 'image [
 						limits: 20x20 .. none
 						data: value
 					] 
@@ -140,10 +141,10 @@ context [
 				attempt [put map <value> get/any value]		;-- might not be available
 			]
 		][
-			name: make-space/name 'text [text: mold :value]
+			space: make-space 'text [text: mold :value]
 		]
 		
-		unless name [
+		unless space [
 			if map [
 				source: copy [["Key" "Type" "Value"]] 
 				keys: keys-of map
@@ -153,7 +154,7 @@ context [
 					[form key  type? :val  :val]
 				]
 			]
-			space: get name: make-space/name 'grid-view [
+			space: make-space 'grid-view [
 				type: 'data
 				pages: 5
 				grid/pinned: 0x1
@@ -163,7 +164,7 @@ context [
 			space/source: source
 		]
 		; prof/manual/end 'wrap-value
-		name
+		space
 	]
 	
 	
@@ -179,7 +180,7 @@ context [
 		
 		too-deep: function [space [object!] canvas [none! pair!]] [
 			default canvas: 0x0
-			make-space/name 'text [
+			make-space 'text [
 				quietly text: mold/flat/part :space/data 1000
 				quietly flags: [ellipsize]
 			]
@@ -292,7 +293,8 @@ context [
 		reload: does [
 			set/any 'browser/data get-path history/1
 			set-details
-			invalidate browser
+			; invalidate browser
+			invalidate-tree host
 			; invalidate details
 		]
 		jump: function [] [
@@ -345,12 +347,12 @@ context [
 					;@@ currently scrollable doesn't know how to render itself on inf canvas, becomes zero and complains
 					browser: data-view data=(get/any target) on-dbl-click [
 						if all [ 
-							pos: find path 'grid
-							grid: get pos/1
+							pos: locate path [obj .. /style = 'grid]
+							grid: pos/1
 						][
 							set [cell: offset:] grid/locate-point pos/2
-							contspace: get grid/content/(3 by cell/y)
-							namespace: get grid/content/(1 by cell/y)
+							contspace: grid/content/(3 by cell/y)
+							namespace: grid/content/(1 by cell/y)
 							if all [0 <= offset/y  offset/y < contspace/size/y  string? namespace/data] [
 								new-path: append copy history/1 transcode/one namespace/data
 								if all [
@@ -372,7 +374,8 @@ context [
 				on-resize: on-resizing: function [window event] [
 					new-size: window/size - 20x20
 					host/size: new-size
-					if host/space [invalidate get host/space]
+					if host/space [invalidate-tree host]
+					; if host/space [invalidate host/space]
 				]
 			]
 		]
