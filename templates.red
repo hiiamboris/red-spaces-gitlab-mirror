@@ -1083,7 +1083,7 @@ window-ctx: context [
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
 		quietly window/map: compose/deep [(content) [offset: (org) size: (size)]]
-		compose/only [translate (org) (cdraw)]
+		either cdraw [ compose/only [translate (org) (cdraw)] ][ []]
 	]
 	
 	declare-template 'window/space [

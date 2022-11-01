@@ -192,7 +192,7 @@ VID: context [
 		if face/size = 0x0 [face/size: none]
 		drawn: render face
 		#assert [face/size]								;-- should be set by `render-face`, `size: none` blows up `layout`
-		#debug draw [prin "host/draw: " probe~ drawn] 
+		#debug draw [prin "host/draw: " probe drawn] 
 		face/draw: drawn
 		
 		if object? focused [							;-- has to be focused after render creates the tree

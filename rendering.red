@@ -423,7 +423,7 @@ context [
 			if error? error: try/keep [draw 1x1 drawn] [
 				prin "*** Invalid draw block: "
 				attempt [copy/deep drawn]				;@@ workaround for #5111
-				probe~ drawn
+				probe drawn
 				do error
 			]
 		]
