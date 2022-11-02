@@ -115,7 +115,6 @@ if action? :mold [
 			decor: select pick decor* all type: type?/word :value
 			~/all [decor  find/same/only mold-stack :value  return emit ["..."]]
 			unless deep [
-				if :value =? as-pair 2e9 2e9 [return emit ["INFxINF"]]		;@@ not sure about this since it's too tightly tied to spaces...
 				if 0 < depth [
 					if 'block! = type [
 						try [							;-- fails on system/words
@@ -158,6 +157,18 @@ if action? :mold [
 			
 			if decor [append/only mold-stack :value]
 			switch/default type [
+				pair! [
+					either all [
+						emit [(native-mold value)]
+					][
+						x: value/x  y: value/y
+						if x =  2e9 [x: 'INF]
+						if x = -2e9 [x: '-INF]
+						if y =  2e9 [y: 'INF]
+						if y = -2e9 [y: '-INF]
+						emit [(native-mold x) "x" (native-mold y)]
+					]
+				]
 				object! map! hash! block! paren! path! get-path! set-path! lit-path! event! [
 					if any-path? value [sp: "/" flat': flat flat: yes]
 					step 'depth
@@ -191,11 +202,17 @@ if action? :mold [
 					lf: unless flat [rejoin ["^/" indent]]
 					emit [decor/1]
 					;; emit contents
-					~/all [								;-- exclude on-change in normal mold
+					if ~/all [							;-- exclude on-change in normal mold
 						not deep
 						object? value
-						remove/part find/skip pos [on-change*] 2 2
-						remove/part find/skip pos [on-deep-change*] 2 2
+					][
+						remove/part find/skip pos 'on-change* 2 2
+						remove/part find/skip pos 'on-deep-change* 2 2
+						~/all [
+							space? value
+							pos': find/skip pos 'cached 2
+							change/only next pos' extract pos'/2 (2 + length? value/cache)	;-- minify /cached to only canvas sizes
+						]
 					]
 					if ~/all [not flat  find [object! map!] type] [	;-- find max word length (excluding on-change possibly) 
 						align: 1 + any [
