@@ -72,6 +72,7 @@ if action? :mold [
 			action!   ["##[make action!" "]"]			;-- can't use native mold since it will use it's own indentation 
 			native!   ["##[make native!" "]"] 
 			routine!  ["##[routine" "]"] 
+			image!    ["##[make image! [" "]]"] 
 		][
 			block!    ["[" "]"]
 			paren!    ["(" ")"]
@@ -87,6 +88,7 @@ if action? :mold [
 			action!   ["action" ""] 
 			native!   ["native" ""] 
 			routine!  ["routine" ""] 
+			image!    ["image [" "]"] 
 		]]
 		
 		set 'mold function [
@@ -226,6 +228,18 @@ if action? :mold [
 					if skip-decor [emit [skip-decor/2]]
 					step/down 'depth
 					if any-path? value [flat: flat']
+				]
+				image! [
+					size:  value/size
+					either ~/all [not deep depth >= 1] [
+						emit [decor/1 (native-mold size) " ..." decor/2]
+					][
+						rgb:   value/rgb
+						alpha: value/alpha
+						emit [decor/1 (native-mold size) sp]	;-- mulitple emits will update limit on the go
+						emit [(mold* rgb limit) sp]
+						emit [(mold* alpha limit) decor/2]
+					]
 				]
 				function! action! native! routine! [
 					spec: spec-of :value
