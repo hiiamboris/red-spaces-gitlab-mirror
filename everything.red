@@ -31,6 +31,7 @@ do/expand [
 	; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus									;-- turn on to see focus changes and errors
 	; #debug set events									;-- turn on to see what events get dispatched by hosts
+	; #debug set timer									;-- turn on to see timer events
 	; #debug set styles									;-- turn on to see which styles get applied
 	; #debug set grid-view
 	; #debug set list-view
@@ -63,6 +64,7 @@ do/expand [
 	; #include %../common/selective-catch.red
 	#include %../common/mapparse.red
 	#include %../common/reshape.red
+	#include %../common/sift-locate.red
 	#include %../common/do-queued-events.red
 	#include %../common/show-trace.red
 	#include %../common/do-atomic.red
@@ -76,6 +78,7 @@ do/expand [
 				#include %debug-helpers.red
 				#include %auxi.red
 				#include %styles.red
+				#include %cache.red
 				#include %rendering.red
 				#include %layouts.red
 				#include %vid.red

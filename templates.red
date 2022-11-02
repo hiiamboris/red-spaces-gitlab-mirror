@@ -23,23 +23,16 @@ invalidates-look: function [space [object!] word [word!] value [any-type!]] [
 	invalidate/info space none 'look
 ]
 
-;@@ cache should be another module
-init-cache: function [space [object!]] [
-	if block? :space/cache [
-		space/cache: bind 'invalid object [valid: invalid: tail reduce [space/cache]]
-	]													;-- returns bound 'invalid word, so no invalidation is triggered until rendered
-]
-
 templates/space: declare-class 'space [					;-- minimum basis to build upon
 	style:	'space	#type [word!] =						;-- used for styling, may be different from template name!
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
 	owner:  none	#type [object! none!]
 	draw:   []   	#type [block! function!]
 	;-- `drawn` is an exception and not held in the space, so just `size`
-	cache:  [size]	#type [word! (find [valid invalid] cache)  logic! (cache = off)  block!]
+	cache:  [size]	#type [block! none!]
+	cached: tail copy [0.0 #[none]]	#type [block!]		;-- used internally to check if space is connected to the tree, and holds cached facets
 	limits: none	#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
-	last-frame: copy [0.0 #[none]]	#type [block!]		;-- used internally to check if space is connected to the tree
 ]
 
 ;; a trick not to enforce some facets (saves RAM) but still provide default typechecks for them:
@@ -66,7 +59,8 @@ space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
 		any [
 			templates/(class? obj)						;-- fast check, but will fail for e.g. list-in-list-view
 			all [										;-- duck check ;@@ what words are strictly required to qualify?
-				in obj 'last-frame
+				in obj 'cached
+				in obj 'cache
 				in obj 'limits
 				in obj 'owner
 				in obj 'style
@@ -101,7 +95,6 @@ make-space: function [
 		;; replace the type if it was not enforced by the template:
 		;; `class?` is used instead of `type` to force `<->` have style `stretch`
 		if r/style = 'space [quietly r/style: class? r]
-		init-cache r
 	]
 	r
 ]
@@ -154,7 +147,7 @@ compose-map: function [
 
 declare-template 'timer/space [							;-- template space for timers
 	rate:  0											;-- unlike space, must always have a /rate facet
-	cache: off
+	cache: none
 ]		
 
 ;@@ move to auxi?
@@ -2084,7 +2077,7 @@ grid-ctx: context [
 		scope [none! word!]
 	][
 		repend grid/frame/invalid [cell scope]
-		invalidate-cache grid							;-- clears the cached canvas+sizes block so render will be called again
+		cache/invalidate grid							;-- clears the cached canvas+sizes block so render will be called again
 	]
 	
 	invalidate-xy: function [grid [object!] xy [pair!]] [
@@ -2337,7 +2330,7 @@ grid-view-ctx: context [
 		;; cacheability requires window to be fully rendered but
 		;; full window render is too slow (many seconds), can't afford it
 		;; so instead, grid redraws visible part every time
-		window/cache: off
+		window/cache: none
 		
 		window/content: grid: make-space 'grid [
 			;; while this should not pose a danger of extra invalidation, since cells are not under user's control,

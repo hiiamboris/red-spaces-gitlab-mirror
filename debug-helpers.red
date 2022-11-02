@@ -320,7 +320,7 @@ if function? :system/words/help [						;-- if console present, remove the annoyi
 		{Displays information about functions, values, objects, and datatypes}
 		'word [any-type!]
 	][
-		if #"^/" = last msg: help-string :word [take/last msg]
+		if #"^/" = last msg: help-string :word [take/last msg]	;@@ unfortunately, help-string is happy to dump full images: #4464
 		print msg
 	]
 ]

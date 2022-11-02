@@ -177,7 +177,7 @@ view/no-wait/flags compose/deep [
 					(triplets)
 				]
 			]
-		] react [pair/text: form scr/size] 
+		] react [maybe pair/text: form scr/size] 
 	] react [
 		face/size: max 0x0 face/parent/size - 20		;-- adjust face size
 		scr/limits: face/size .. face/size				;-- adjust scrollable size
