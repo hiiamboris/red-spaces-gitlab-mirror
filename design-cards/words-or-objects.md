@@ -118,7 +118,8 @@ If I'm not using words to refer to objects, then I don't need anonymous contexts
 Pros:
 - noticeably lower resource consumption, and especially faster cache operation due to it being more readibly accessible (as it's just a block now)
 - ease (and readability) of child object access, not need to bother with `get`
-- /style is kept within the object, easy to override, no need to keep it elsewhere (e.g. grid's internal cache can contain just cell objects, not word+object pairs)                  
+- /style is kept within the object, easy to override, no need to keep it elsewhere (e.g. grid's internal cache can contain just cell objects, not word+object pairs)
+- control over mold allows to patch other issues (like [#4464](https://github.com/red/red/issues/4464))
 
 Cons:
 - custom `mold` is a requirement (means also hacking `save` and help system)
