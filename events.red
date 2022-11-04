@@ -266,13 +266,13 @@ events: context [
 	;-- has to be set later so we can refer to 'events' to get the drag functions
 	commands: none
 
-	;-- fundamentally there are 3 types of events here:
-	;-- - events tied to a coordinate (mouse, touch) - then hittest is used to obtain path
-	;-- - events tied to focus (keyboard, focus changes) - these use keyboard/focus path in the tree
-	;-- - events without both (timer) - but timer has path too, and also delay
-	;-- coordinate events' path includes pairs of coordinates (hittest format)
-	;-- other events' path does not (tree node format)
-	;-- focus/unfocus events have not 'event' arg!
+	;; fundamentally there are 3 types of events here:
+	;; - events tied to a coordinate (mouse, touch) - then hittest is used to obtain path
+	;; - events tied to focus (keyboard, focus changes) - these use keyboard/focus path in the tree
+	;; - events without both (timer) - but timer has path too, and also delay
+	;; coordinate events' path includes pairs of coordinates (hittest format)
+	;; other events' path does not (tree node format)
+	;; focus/unfocus events have not 'event' arg!
 	;@@ any way to unify these 2 formats?
 	dispatch: function [face [object!] event [event!] /local result /extern resolution last-on-time] [
 		focused?: no
@@ -283,10 +283,9 @@ events: context [
 				over wheel up mid-up alt-up aux-up
 				down mid-down alt-down aux-down click dbl-click [	;-- `click` is simulated by single-click.red
 					;@@ should spaces all be `all-over`? or dupe View 'all-over flag into each space?
-					hittest/as/into
-						face/space
+					hittest/into
+						either dragging? [head drag-path][face/space]
 						event/offset
-						if dragging? [head drag-path]
 						make block! 12
 				]
 				key key-down key-up enter [

@@ -17,10 +17,9 @@ register-previewer [
 	extract/into path 2 wpath: clear []
 	unless same-paths? wpath last-wpath [
 		unless empty? last-wpath [
-			hittest/as/into
-				event/face/space
-				event/offset
+			hittest/into
 				last-path
+				event/offset
 				away-path: clear []
 			#assert [not empty? away-path]
 			event/away?: yes
