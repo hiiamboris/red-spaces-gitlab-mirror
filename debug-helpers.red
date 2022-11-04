@@ -17,21 +17,13 @@ dump-event: function [event] [
 	help event
 ]
 
-dump-tree: function [] [
-	foreach-*ace path: system/view/screens/1 [
+dump-tree: function [
+	"List hierarchical tree of currently rendered spaces"
+	/from host [object!] "Root face to list from (by default - the screen)" (host? host)
+][
+	foreach-*ace path: any [host system/view/screens/1] [
 		spc: last path
 		print [pad spc/size 10 mold path]
-	]
-	()
-]
-
-dump-host-tree: function [
-	"List hierarchical tree of currently rendered spaces"
-	host [object!] "Root face to list from" (host? host)
-][
-	foreach-*ace path: host [
-		spc: get last path
-		print [pad spc/size 10 path]
 	]
 	()
 ]
