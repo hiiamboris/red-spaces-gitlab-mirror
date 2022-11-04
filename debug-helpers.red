@@ -23,7 +23,7 @@ dump-tree: function [
 ][
 	foreach-*ace path: any [host system/view/screens/1] [
 		spc: last path
-		print [pad spc/size 10 mold path]
+		probe path
 	]
 	()
 ]
