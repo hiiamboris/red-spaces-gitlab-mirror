@@ -14,19 +14,19 @@ templates: #()											;-- map for extensibility
 
 ;; default on-change function to avoid replicating it in every template
 invalidates: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [#print "change/size of (space/style)/(word) to (mold/flat/part :value 40)"]
+	#debug changes [#print "change/size of (space/type)/(word) to (mold/flat/part :value 40)"]
 	invalidate space
 ]
 
 invalidates-look: function [space [object!] word [word!] value [any-type!]] [
-	#debug changes [#print "change/look of (space/style)/(word) to (mold/flat/part :value 40)"]
+	#debug changes [#print "change/look of (space/type)/(word) to (mold/flat/part :value 40)"]
 	invalidate/info space none 'look
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
-	style:	'space	#type [word!] =						;-- used for styling, may be different from template name!
+	type:	'space	#type [word!] =						;-- used for styling and event handler lookup, may differ from template name!
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
-	owner:  none	#type [object! none!]
+	parent: none	#type [object! none!]
 	draw:   []   	#type [block! function!]
 	;-- `drawn` is an exception and not held in the space, so just `size`
 	cache:  [size]	#type [block! none!]
@@ -59,11 +59,11 @@ space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
 		any [
 			templates/(class? obj)						;-- fast check, but will fail for e.g. list-in-list-view
 			all [										;-- duck check ;@@ what words are strictly required to qualify?
-				in obj 'cached
+				in obj 'cached							;-- starts with less common words ;@@ needs REP #102
 				in obj 'cache
 				in obj 'limits
-				in obj 'owner
-				in obj 'style
+				in obj 'parent
+				in obj 'type
 				in obj 'size
 				in obj 'draw
 			]
@@ -90,11 +90,9 @@ make-space: function [
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
-		; unless r/style = 'space [type: r/style]			;-- type may have been enforced by the template, so pick it up
-		; quietly r/style: anonymize type r				;-- pay anonymization price up front, to lighten path formation
 		;; replace the type if it was not enforced by the template:
-		;; `class?` is used instead of `type` to force `<->` have style `stretch`
-		if r/style = 'space [quietly r/style: class? r]
+		;; `class?` is used instead of `type` to force `<->` have type `stretch`
+		if r/type = 'space [quietly r/type: class? r]
 	]
 	r
 ]
@@ -379,11 +377,11 @@ scrollbar: context [
 		
 		map:         []
 		cache:       [size map]
-		back-arrow:  make-space 'triangle  [style: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
-		back-page:   make-space 'rectangle [style: 'back-page   draw: []]           #type (space? back-page)	;-- go back a page
-		thumb:       make-space 'rectangle [style: 'thumb       margin: 2x1]        #type (space? thumb)		;-- draggable
-		forth-page:  make-space 'rectangle [style: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
-		forth-arrow: make-space 'triangle  [style: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
+		back-arrow:  make-space 'triangle  [type: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
+		back-page:   make-space 'rectangle [type: 'back-page   draw: []]           #type (space? back-page)		;-- go back a page
+		thumb:       make-space 'rectangle [type: 'thumb       margin: 2x1]        #type (space? thumb)			;-- draggable
+		forth-page:  make-space 'rectangle [type: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
+		forth-arrow: make-space 'triangle  [type: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
 		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
 		draw: does [~/draw self]
@@ -548,11 +546,11 @@ scrollable-space: context [
 		content:      none		#type =? :invalidates [object! none!]	;-- should be defined (overwritten) by the user
 		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
 		
-		hscroll:  make-space 'scrollbar [style: 'hscroll axis: 'x]						#type (space? hscroll)
-		vscroll:  make-space 'scrollbar [style: 'vscroll axis: 'y size: reverse size]	#type (space? vscroll)
+		hscroll:  make-space 'scrollbar [type: 'hscroll axis: 'x]						#type (space? hscroll)
+		vscroll:  make-space 'scrollbar [type: 'vscroll axis: 'y size: reverse size]	#type (space? vscroll)
 		;; timer that scrolls when user presses & holds one of the arrows
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		scroll-timer: make-space 'timer [style: 'scroll-timer]							#type (space? scroll-timer)
+		scroll-timer: make-space 'timer [type: 'scroll-timer]							#type (space? scroll-timer)
 
 		map:   []
 		cache: [size map]
@@ -1175,7 +1173,7 @@ inf-scrollable-ctx: context [
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [style: 'roll-timer]	#type (space? roll-timer)
+		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
 		roll: function [/in path: (as path! []) [path!] "Inject subpath into current styling path"] [
 			~/roll self path
 		] #type [function!]
@@ -1425,7 +1423,7 @@ list-view-ctx: context [
 		
 		wrap-data: function [item-data [any-type!]][	;-- can be overridden (but with care)
 			spc: make-space 'data-view [
-				quietly style: 'item
+				quietly type:  'item
 				quietly wrap?:  on
 			]
 			set/any 'spc/data :item-data
@@ -2131,6 +2129,7 @@ grid-ctx: context [
 		;; data about the last rendered frame, may be used by /draw to avoid extra recalculations
 		frame: context [								;@@ hide it maybe from mold? unify with /last-frame ?
 			;@@ maybe cache size too here? just to avoid setting grid/size to none in case it's relied upon by some reactors
+			;@@ maybe cache drawn and map and only remake the changed parts? is it worth it?
 			;@@ maybe width not canvas?
 			canvas:  none								;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
 			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
@@ -2163,7 +2162,7 @@ grid-ctx: context [
 				cell: make-space 'cell []
 				repend frame/cells [xy cell] 
 			]
-			quietly cell/owner: none					;-- prevent grid invalidation in case new space is assigned
+			quietly cell/parent: none					;-- prevent grid invalidation in case new space is assigned
 			cell/content: space
 			cell
 		] #type [function!] :invalidates
@@ -2318,7 +2317,7 @@ grid-view-ctx: context [
 		;; only called initially or after invalidate-range
 		wrap-data: function [item-data [any-type!]] [
 			spc: make-space 'data-view [				;@@ 'quietly' used as optimization but must be in sync with data-view/on-change
-				quietly style: 'cell
+				quietly type:  'cell
 				quietly wrap?:  on						;-- will be considered upon /data change
 				quietly margin: 3x3
 				quietly align: -1x0
@@ -2413,7 +2412,7 @@ declare-template 'rotor/space [
 	content: none	#type =? :invalidates [object! none!]
 	angle:   0		#type =  :invalidates-look [integer! float!]
 
-	ring: make-space 'space [style: 'ring size: 360x10]
+	ring: make-space 'space [type: 'ring size: 360x10]
 	tight?: no
 	;@@ TODO: zoom for round spaces like spiral
 
@@ -2730,7 +2729,7 @@ field-ctx: context [
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
 			caret:     make-space 'caret     []
-			selection: make-space 'rectangle [style: 'selection]	;-- can be styled
+			selection: make-space 'rectangle [type: 'selection]	;-- can be styled
 		] #type [object!]
 		
 		;; shortcuts

@@ -346,35 +346,34 @@ events: context [
 		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
 		wpath: copy path  unit: 1										;-- word-only path
 		if pair? second path [
-			hodl: obtain block! (length? path) / unit: 2			;-- need reentrancy because some events generate others
-			wpath: extract/into path unit hodl						;-- remove pairs ;@@ should be `map` - extract is slow
+			hodl: obtain block! (length? path) / unit: 2		;-- need reentrancy because some events generate others
+			wpath: extract/into path unit hodl					;-- remove pairs ;@@ should be `map` - extract is slow
 		]
-		;@@ /style and /type multiplicity becomes a nuisance now:
-		forall wpath [wpath/1: any [select wpath/1 'style wpath/1/type]]	;-- words needed to locate handler ;@@ use map-each
+		forall wpath [wpath/1: wpath/1/type]					;-- words needed to locate handler ;@@ use map-each
 		#leaving [if hodl [stash hodl]]
 		#assert [not find wpath pair!]
 		len: length? wpath
-		i2: either focused? [len][1]								;-- keyboard events should only go into the focused space
+		i2: either focused? [len][1]							;-- keyboard events should only go into the focused space
 		;; this also needs reentrancy or e.g. up event closes the menu face, over event slips in and changes template
 		template: change obtain path! 8 'handlers 
 		#leaving [stash template] 
 		;@@ TODO: this is O(len^2) and should be optimized...
-		while [i2 <= len] [											;-- walk from the outermost spaces to the innermost
+		while [i2 <= len] [										;-- walk from the outermost spaces to the innermost
 			;; last space is usually the one handler is intereted in, not `screen`
 			;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
-			target: skip head path i2 - 1 * unit					;-- position path at the space that receives event
+			target: skip head path i2 - 1 * unit				;-- position path at the space that receives event
 			do-previewers target event args
 			
 			unless commands/stop? [
-				repeat i1 i2 [										;-- walk from the longest path to the shortest
-					hpath:											;-- construct full path to the handler
+				repeat i1 i2 [									;-- walk from the longest path to the shortest
+					hpath:										;-- construct full path to the handler
 						append append/part
 						clear template 
-						at wpath i1  skip wpath i2					;-- add slice [i1,i2] of path
+						at wpath i1  skip wpath i2				;-- add slice [i1,i2] of path
 						hnd-name
 					unless block? try [list: get hpath] [continue]	;@@ REP #113
-					commands/stop									;-- stop after current stack unless `pass` gets called
-					foreach handler list [							;-- whole list is called regardless of stop flag change
+					commands/stop								;-- stop after current stack unless `pass` gets called
+					foreach handler list [						;-- whole list is called regardless of stop flag change
 						#assert [function? :handler]
 						do-handler template :handler target event args	;@@ should handler index in the list be reported on error?
 					]

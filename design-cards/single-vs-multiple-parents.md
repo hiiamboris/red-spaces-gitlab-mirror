@@ -16,7 +16,7 @@ Then what about timers? Problem with timers is that they have to be *blazing fas
 
 Then from user's perspective: if /parents is a list, it's just more annoying to access it (which is a common need).
 
-Enter the single parent model, which doesn't have all the aforementioned issues.
+Enter the single parent model, which doesn't have all the aforementioned issues. It uses explicit /parent facet both to obtain space's path (required for timers to work, handy for focusing and other tasks).
 
 The only problems I have with single parent model are:
 1. A space cannot legally contain itself anymore, making some very fun demos obsolete :(
@@ -24,6 +24,6 @@ The only problems I have with single parent model are:
 
 Problem 2 turned out to be tiny compared to the performance benefits of single-parent model. Even `image` space can simply share the same `image!` data, and only object gets copied.
 
-Problem 1 is bigger in my view, though I realize these demos have no practical value for UIs, and were just made to show off. In the end I decided to allow overriding the parent (/owner facet) during render of the same tree (`grid-view` first has a `zoomer` owner, then a `cell`), raise no error, but show a warning in debug mode, that this is most likely a bug. For these demos focus and timers won't work for `grid-view` and it's subtree.
+Problem 1 is bigger in my view, though I realize these demos have no practical value for UIs, and were just made to show off. In the end I decided to allow overriding the parent during render of the same tree (`grid-view` first has a `zoomer` parent, then a `cell`), raise no error, but show a warning in debug mode, that this is most likely a bug. For these demos focus and timers won't work for `grid-view` and it's subtree.
 
 So, same space object cannot *legally* appear more than once in the tree anymore. *Technincally* it can, and it still works, but with all the risks explained above accepted.

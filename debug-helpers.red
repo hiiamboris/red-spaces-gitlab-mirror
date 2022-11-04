@@ -138,7 +138,7 @@ if action? :mold [
 								]
 							]
 							space? value [
-								rejoin [:value/style ":" mold* :value/size limit]
+								rejoin [:value/type ":" mold* :value/size limit]
 							]
 							(class-of value) = class-of font! [native-mold value/name]
 							'else [

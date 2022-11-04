@@ -89,8 +89,6 @@ traversal: context [
 		new-line/all target yes
 	]
 
-	;@@ screen and window doesn't have a /style, so their addition complicates path to words conversion in events code
-	;@@ but if all paths become host-relative, global cross-window tabbing (even cross-host) is out of the question
 	set 'path-from-face function [
 		"Return FACE's path from the screen"
 		face [object!] (is-face? face)					;@@ no need in spaces support here?

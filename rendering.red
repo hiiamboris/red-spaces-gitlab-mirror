@@ -34,7 +34,7 @@ get-current-style: function [
 	"Fetch styling code object for the current space being drawn"
 ][
 	path: copy current-path
-	forall path [path/1: path/1/style]
+	forall path [path/1: path/1/type]
 	get-style as path! path
 ]
 
@@ -76,15 +76,15 @@ combine-style: function [
 
 ;@@ what may speed everything up is a rendering mode that only sets the size and nothing else
 context [
-	check-owner-override: function [space [object!] new-owner [object!]] [	;-- only used before changing the /owner
+	check-parent-override: function [space [object!] new-parent [object!]] [	;-- only used before changing the /parent
 		all [
 			last-gen: cache/last-generation space
 			next-gen: cache/current-generation
 			last-gen = next-gen
-			:space/owner
-			unless :space/owner =? :new-owner [
-				print `"*** Warning on rendering of (space/style):"`
-				assert [:space/owner =? :new-owner "Owner sharing detected!"]
+			:space/parent
+			unless :space/parent =? :new-parent [
+				print `"*** Warning on rendering of (space/type):"`
+				assert [:space/parent =? :new-parent "Parent sharing detected!"]
 			]
 		]
 	]
@@ -112,12 +112,12 @@ context [
 		thrown: try/all [do code  ok?: yes]				;-- result is ignored for simplicity
 		unless ok? [
 			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
-			#print "*** Failed to render (space/style)!^/(msg)^/"
+			#print "*** Failed to render (space/type)!^/(msg)^/"
 		]
 		;@@ would be great to use trap here instead, but it slows down cached renders obviously
 		; trap/all/catch code [
 			; msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
-			; #print "*** Failed to render (space/style)!^/(msg)^/"
+			; #print "*** Failed to render (space/type)!^/(msg)^/"
 		; ]
 		clear top
 	]
@@ -159,7 +159,7 @@ context [
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
-		name: space/style
+		name: space/type
 		#debug cache [#print "Rendering (name)"]	
 		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [
@@ -179,8 +179,8 @@ context [
 		]
 
 		unless tail? current-path [						;-- can be at tail on out-of-tree renders
-			#debug [check-owner-override space last current-path]
-			quietly space/owner: last current-path
+			#debug [check-parent-override space last current-path]
+			quietly space/parent: last current-path
 		]
 		with-style space [
 			window?: all [

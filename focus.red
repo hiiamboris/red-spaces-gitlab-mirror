@@ -86,7 +86,7 @@ find-next-focal-space: function [dir "forth or back"] [
 				text: mold any [select space 'text  select space 'data] 
 				#print "find-next-focal-space @(mold path), text=(text)"
 			]
-			if find keyboard/focusable select last path 'style [next: path break]
+			if find keyboard/focusable select last path 'type [next: path break]
 		]
 	]
 	path: copy as focus next					;-- preserve the original type
@@ -98,15 +98,20 @@ focus-event!:   object [type: 'focus   face: none]
 unfocus-event!: object [type: 'unfocus face: none]
 
 focus-space: function [
-	"Focus space with a given PATH"
-	path [block!] "May include faces"
+	"Focus given space object"
+	space [object! (space? space) block!] "Space object or a full path to it (may include faces)"
 	; return: [logic!] "True if focus changed"
 ] with events [
+	if object? path: space [
+		path: get-full-path space
+		#assert [path "space is not on the tree"]		;@@ should be an error?
+		unless path [exit] 
+	]
 	path: append clear [] path							;-- make a copy so we can modify it
 	while [space: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
 		unless all [
 			space? space
-			find keyboard/focusable space/style
+			find keyboard/focusable space/type
 		] [continue]
 		append path space								;-- restore the taken item
 		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target

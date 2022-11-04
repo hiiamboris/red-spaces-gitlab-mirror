@@ -188,9 +188,9 @@ context with spaces/ctx [
 	
 	bgnd-image: load %glossy-bgnd.jpg
 	define-styles [
-		host: [
+		base: [
 			below: [
-				(when not find [hint menu radial-menu] space/style (compose [image (bgnd-image) 0x0 (size)]))
+				(when not find [hint menu radial-menu] space/type (compose [image (bgnd-image) 0x0 (size)]))
 				fill-pen off
 				font (system-font)
 				pen  (silver)

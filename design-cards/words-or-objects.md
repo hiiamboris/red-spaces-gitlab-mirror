@@ -8,7 +8,7 @@ Even after Spaces core somewhat matured I was unsure if I should continue using 
 
 This document evaluates the pros and cons of three possible space tree models:
 1. Each object reference is a word:
-   - in space facets: /content and /owner are a words (or blocks of words), and /items function returns words
+   - in space facets: /content and /parent are a words (or blocks of words), and /items function returns words
    - in maps: /map contains words and /into returns a word
    - in paths: event handlers receive paths consisting of words, and traversal functions generate lists of paths with words in them
 2. Only /content and /items become objects, words are used in all other places
@@ -57,7 +57,7 @@ RAM waste can be measured more precisely:
 | 9-16  | 2428  | >150 |
 | 17-33 | 3500  | >106 |
 
-I used words for /content, /owner and /cache, each is 424 bytes, totalling 1272 bytes of pure overhead over the 1868-2428 normal space size, which makes for +50-70%. Quite a lot!
+I used words for /content, /parent and /cache, each is 424 bytes, totalling 1272 bytes of pure overhead over the 1868-2428 normal space size, which makes for +50-70%. Quite a lot!
 
 In my opinion these numbers can be halved for `0-4` and `7-8` intervals, but in the end the wasted percentage will be the same, because minimal space has around 7-10 words regardless of how I organize it.
 
@@ -97,28 +97,28 @@ quit
 
 
 
-## Model 2. Only /content and /owner are words
+## Model 2. Only /content and /parent are words
 
 The idea is to make path access `space/content/facet...` possible (for convenience), but to keep paths as lists of words.
 
-Drawback is it requires addition of a `/style` facet to all spaces, because now I don't know the name of the object in /content facet anymore, and I need it to apply both style and dispatch to the relevant event handler. Class name could be used as a style name, but it's sometimes meant to be internal (like `list-in-list-view`), and I don't want to expose that into stylesheet, nor make it styled any differently than just `list`. So I ruled that out.
+Drawback is it requires addition of a /type facet to all spaces, because now I don't know the name of the object in /content facet anymore, and I need it to apply both style and dispatch to the relevant event handler. Class name could be used as a style name, but it's sometimes meant to be internal (like `list-in-list-view`), and I don't want to expose that into stylesheet, nor make it styled any differently than just `list`. So I ruled that out.
 
 Pros:
 - has path access to child spaces within /content (which is now object of block of objects)
 
 Cons:
 - mold has increased risk of big output, e.g. if /content is a block of objects and each object also contains multiple objects, so custom `mold` function is required
-- resource waste is even bigger than in model 1: adding 106 bytes per space for /style facet (since paths still have to contain bound words, I still have to create anonymous objects and bind /style word to them, so /style word would back reference it's own object)
+- resource waste is even bigger than in model 1: adding 106 bytes per space for /type facet (since paths still have to contain bound words, I still have to create anonymous objects and bind /type word to them, so /type word would back reference it's own object)
 - in many places `get` still has to be used to access the object, e.g. in event handlers (which receive paths of words)
 
 ## Model 3. Objects everywhere
 
-If I'm not using words to refer to objects, then I don't need anonymous contexts to hold these words in. /style facet is a simple word then.
+If I'm not using words to refer to objects, then I don't need anonymous contexts to hold these words in. /type facet is a simple word then.
 
 Pros:
 - noticeably lower resource consumption, and especially faster cache operation due to it being more readibly accessible (as it's just a block now)
 - ease (and readability) of child object access, not need to bother with `get`
-- /style is kept within the object, easy to override, no need to keep it elsewhere (e.g. grid's internal cache can contain just cell objects, not word+object pairs)
+- /type is kept within the object, easy to override, no need to keep it elsewhere (e.g. grid's internal cache can contain just cell objects, not word+object pairs)
 - control over mold allows to patch other issues (like [#4464](https://github.com/red/red/issues/4464))
 
 Cons:

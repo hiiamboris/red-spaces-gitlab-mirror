@@ -12,7 +12,7 @@ Red [
 declare-template 'web/inf-scrollable [
 	web: self
 	canvas: make-space 'space [
-		style: 'canvas
+		type: 'canvas
 		available?: function [axis dir from requested] [requested]
 	
 		draw: function [/window xy1 xy2 /on canvas] [

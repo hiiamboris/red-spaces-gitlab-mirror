@@ -124,7 +124,7 @@ do with context [
 
 	;@@ TODO: organize this internally as a map of nested words-blocks
 	define-styles/unique reshape [
-		host: [
+		base: [
 			below: [
 				fill-pen !(svmc/panel)
 				font     !(fonts/text)

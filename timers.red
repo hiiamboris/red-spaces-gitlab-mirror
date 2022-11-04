@@ -100,7 +100,7 @@ timers: context [
 			
 			args: reduce/into [to 1% delay / rate] clear []
 			wpath: copy path: new-line/all as [] path no				;@@ need new-line here?
-			forall wpath [wpath/1: wpath/1/style]						;@@ use map-each
+			forall wpath [wpath/1: wpath/1/type]						;@@ use map-each
 			;; even if no time handler, actors or previewers/finalizers may be defined
 			events/do-previewers top path event args
 			forall wpath [

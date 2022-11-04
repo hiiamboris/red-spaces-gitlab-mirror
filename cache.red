@@ -48,7 +48,8 @@ cache: context [
 		clear parents-list
 		while [
 			all [
-				space: select space 'owner
+				not host? space							;-- stop at host, no need to list further
+				space: space/parent
 				not find/same parents-list space		;-- cycle prevention
 			]
 		] [append parents-list space]
@@ -68,7 +69,7 @@ cache: context [
 		]
 		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
-			name: space/style
+			name: space/type
 			if cache: space/cache [period: 2 + length? space/cache]
 			either slot [
 				n: (length? cached) / period
@@ -76,7 +77,7 @@ cache: context [
 			][
 				reason: case [
 					cache [rejoin ["cache=" mold extract cache period]]
-					not space/owner ["never drawn"]
+					not space/parent ["never drawn"]
 					not space/cache ["cache disabled"]
 					empty? space/cached ["invalidated"]
 					'else ["unknown reason"]
@@ -103,7 +104,7 @@ cache: context [
 		#assert [period = length? words]
 		rechange slot words
 		#debug cache [
-			#print "Saved cache for (space/style):(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
+			#print "Saved cache for (space/type):(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
 		]
 		#debug profile [prof/manual/end 'cache]
 	]
@@ -112,7 +113,7 @@ cache: context [
 		"Invalidate SPACE's cache, to force it's next redraw (low-level, doesn't call custom invalidators)"
 		space [object!] (space? space)
 	][
-		#debug cache [if space/cache [#print "Invalidating (space/style):(space/size)"]]
+		#debug cache [if space/cache [#print "Invalidating (space/type):(space/size)"]]
 		clear space/cached
 	]
 ]
@@ -146,7 +147,7 @@ invalidate: function [
 	][
 		cache/invalidate space							;-- generic (full) invalidation
 	]
-	if all [space/owner not only] [						;-- no matter if cache is valid, parents have to be invalidated
+	if all [space/parent not only] [					;-- no matter if cache is valid, parents have to be invalidated
 		host: take/last parents: cache/list-parents space		;-- no need to invalidate the host, as it has no cache
 		;; only proceed if space is already connected to the tree (traceable to a host face)
 		;; otherwise, it's likely still being created
@@ -154,7 +155,7 @@ invalidate: function [
 		if all [host  host? host] [
 			#debug changes [
 				path: as path! compose [(reverse to [] parents) (space)]
-				#print "invalidating from (mold path), scope=(scope), cause=(if cause [cause/style])"
+				#print "invalidating from (mold path), scope=(scope), cause=(if cause [cause/type])"
 			]			
 			cause: space								;-- cause is the child object
 			foreach space copy parents [				;-- copy in case some custom handler calls list-parents
@@ -174,7 +175,7 @@ get-full-path: function [
 	space  [object!] (space? space)
 	; return: [path! none!]
 ][
-	#assert [space/owner]
+	#assert [space/parent]
 	unless all [										;-- fails on self-containing grid
 		host: first parents: reverse cache/list-parents space
 		host? host

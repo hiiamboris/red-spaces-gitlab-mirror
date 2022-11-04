@@ -170,16 +170,16 @@ lay-out-menu: function [spec [block!] /local code name space value tube list fla
 	
 	new-item: [
 		append menu* item: make-space 'clickable [
-			style:   either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
+			type:    either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
 			margin:  4x4
 			content: make-space 'tube [spacing: 10x5]
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at
 		;; stretch first text item by default (to align rows), but only if there's another item and no explicit <->
 		any [
-			not pos: locate row* [.. /style = 'text]	;-- only auto-insert separator after text
+			not pos: locate row* [.. /type = 'text]		;-- only auto-insert separator after text
 			single? pos									;-- don't insert separator at tail
-			locate row* [.. /style = 'stretch]			;-- or if already got a separator
+			locate row* [.. /type = 'stretch]			;-- or if already got a separator
 			insert next pos make-space '<-> []
 		]
 		tube: item/content
@@ -192,10 +192,7 @@ lay-out-menu: function [spec [block!] /local code name space value tube list fla
 	][	make-space 'list [axis: 'y margin: 4x4]
 	]
 	list/content: flush menu*
-	menu: make-space 'cell [
-		style:   'menu
-		content: list
-	]
+	menu: make-space 'cell [type: 'menu  content: list]
 	menu
 ]
 
