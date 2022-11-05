@@ -112,12 +112,18 @@ define-handlers [
 	;@@ TODO: when dragging and roll succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `roll` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-down     [space path event] [space/roll]		;-- after button clicks
-		on-key-down [space path event] [space/roll]		;-- during key holding
+		on-down     [space path event] [				;-- after button clicks
+			without-children: as path! copy/part head path next path	;@@ should I make a function for this?
+			space/roll/in without-children				;-- /in is used to provide proper styling context to out-of-tree render!
+		]
+		on-key-down [space path event] [				;-- during key holding
+			without-children: as path! copy/part head path next path
+			space/roll/in without-children
+		]
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
-				scrollable: path/-1
-				scrollable/roll/in as path! copy/part head path path
+				without-children: as path! copy/part head path path
+				path/-1/roll/in without-children
 			]
 		]
 	]

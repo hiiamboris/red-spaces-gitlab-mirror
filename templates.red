@@ -105,7 +105,6 @@ make-template: function [
 	make-space/block base spec
 ]
 
-;@@ need to doc this func
 declare-template: function [
 	"Declare a named class and put into space templates"
 	name-base [path!] "template-name/prototype-name"
