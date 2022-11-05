@@ -72,7 +72,7 @@ cache: context [
 			name: space/type
 			if cache: space/cache [period: 2 + length? space/cache]
 			either slot [
-				n: (length? cached) / period
+				n: (length? space/cached) / period
 				#print "Found cache for (name):(space/size) on canvas=(canvas) out of (n): (mold/flat/only/part slot 40)"
 			][
 				reason: case [
