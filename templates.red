@@ -459,7 +459,7 @@ scrollable-space: context [
 		set [canvas: fill:] decode-canvas canvas
 		if any [
 			space/content =? none 
-			any [canvas/x = 0 canvas/y = 0]				;-- `area?` overflows here
+			zero? area? canvas
 		][
 			set-empty-size space canvas
 			return quietly space/map: []

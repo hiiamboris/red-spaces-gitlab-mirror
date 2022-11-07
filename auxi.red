@@ -215,7 +215,7 @@ context [
 	set 'obtain function [
 		"Get a series of type TYPE with a buffer of at least SIZE length"
 		type [datatype!] "Any series type" (any [map! = type find series! type])
-		size [integer!]  "Minimal length before reallocation, >= 1"
+		size [integer! float!]  "Minimal length before reallocation, >= 1"
 	][
 		size:   max 1 size								;-- else log will be infinite
 		name:   to word! type							;-- datatype is not supported by maps
@@ -403,7 +403,7 @@ wrap: func [
 	reduce [:value]
 ]
 
-area?: func [xy [pair!]] [xy/x * xy/y]					;-- maybe support infxinf? or partialy infinity?
+area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
 
 skip?: func [series [series!]] [-1 + index? series]
 
