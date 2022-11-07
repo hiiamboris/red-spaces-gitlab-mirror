@@ -31,11 +31,12 @@ Self-containing grid shows that there are no limitations: every space can contai
 
 ## Docs
 
-#### [Quickstart](quickstart.md) - if you just wanna use one in your program
+#### [Quickstart](quickstart.md) - installation and quick usage summary
 #### [VID/S manual](vids.md) - description of the layout dialect (must read after Quickstart)
 #### [Tinkerer's manual](manual.md) - for deeper understanding and how to alter things
 #### [Widget Reference](reference.md) - reference of all available space templates and their properties
-#### [Creators Guide](creators.md) - description of the architecture that will help you write your own Spaces
+#### [Creators Guide](creators.md) - description of the architecture that will help you write your own spaces
+#### [Design cards](design-cards/) - underlying designs and design decisions, for those who love asking deeper questions
 
 
 ## Status
@@ -49,11 +50,11 @@ Good enough to write basic apps with. Design enhancements proposals and feature 
 | Widget architecture | Stable |
 | Events | Stable |
 | Timers | Stable |
-| Styling | Syntax may change |
+| Styling | Stable |
 | Focus model | Stable |
 | [Tabbing](https://en.wikipedia.org/wiki/Tabbing_navigation) | Stable |
 | [Spatial navigation](https://en.wikipedia.org/wiki/Spatial_navigation) | Not implemented |
-| Resize model | Mostly stable. Needs some internal work. |
+| Resize model | Stable |
 | Layout | Designed and [documented](vids.md), will be extended when required |
 | Grid/Table | Requires interactivity: columns dragging, sorting, filtering |
 | Reactivity | Waiting for [PR #4529](https://github.com/red/red/pull/4529) (reactivity has to be scalable for Spaces scope). Temporary kludges are inserted by VID/S |
@@ -61,7 +62,7 @@ Good enough to write basic apps with. Design enhancements proposals and feature 
 | User guide | [Written](manual.md) |
 | Widget reference | [Written](reference.md) |
 | Creator's guide | [Written](creators.md) |
-| Templates | None made so far |
+| UI templates | None made so far |
 | Alternate stylesheets | [Glossy](stylesheets/#glossy-glossy-red) |
 
 

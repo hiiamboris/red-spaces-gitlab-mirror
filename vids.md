@@ -11,7 +11,7 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 
 | Feature | VID, View, Faces | VID/S, Spaces |
 | - | - | - |
-| Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly¹ linked `space!` objects (parents have /map facet). Same space can appear in multiple places². |
+| Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly¹ or doubly linked `space!` objects (parents have /content, /items and /map facets, children have /parent only after render). Same space can appear in only a single place². |
 | Geometry | All faces are boxes sized in (virtual) pixels. | Each space can rotate/scale/bend it's children if it can express that in Draw. For interactivity support, it should provide coordinate transformation. |
 | Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://w.red-lang.org/en/draw), redrawn continuously over time³. |
 | Naming | `name:` can prefix a face definition. | `name:` can prefix a space definition. |
@@ -27,11 +27,11 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 | Reactivity | Faces are deeply reactive. | Spaces are not reactive⁵, but VID/S adds (shallow) reactivity to spaces with a name or reaction defined. |
 
 **Footnotes**:\
-¹ Internally there's still a link from child to parent which is used for cache invalidation and fast provision of paths to timer events. It lives from one rendered frame until another.\
-² For a space to appear in multiple places it's size and map must not depend on canvas size, because these are parts of the `space!` object and every new render (in a new place) will invalidate the old data.\
-³ Draw block and map are cached internally, so space's `draw` function is only called when it's invalid. Invalidation is triggered by a change of it's facet (not a deep change!). A redraw cycle is only triggered when `/dirty?` facet of the `host` is true. Actors must use `update` function to mark it as dirty (when they change the look).\
+¹ Space tree uses /content or /items facet to fetch children. /map and /parent facets get auto-populated during render and are only valid for the last frame. They should be considered changing with each new frame.\
+² It's illegal but techincally allowed (with a warning) to render the same space in multiple places on the tree (as do some self-containing grid tests). These spaces will not support timer events, invalidation (because they don't know all of their parents), and must have the same size and map everywhere.\
+³ Draw block and map are cached internally, so space's `draw` function is only called when it's invalid. Invalidation is triggered by a change of it's facet (not a deep change!), and results in next timer event rendering changed parts of the tree.\
 ⁴ It's possible to write a VID-like layout function, but most likely it won't be able to react to resizes in a meaningful way.\
-⁵ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time.
+⁵ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time. Spaces however employ their own reactivity implementation to track facet changes.
 
 
 ## Predefined styles
@@ -66,27 +66,30 @@ All [supported space *templates*](reference.md) can be used in VID/S, but withou
 
 ## Dialect
 
-VID/S is handled by `lay-out-vids` function which takes a VID/S block and returns a block of space names (each name refers to space object). Example:
+VID/S is handled by `lay-out-vids` function which takes a VID/S block and returns a block of space objects. Example:
 ```
->> names: lay-out-vids [text "foo" vlist [] button "bar"]
-== [text list button]
+>> spaces: lay-out-vids [text "foo" vlist [] button "bar"]
 
->> ? :names/1
-TEXT is an object! with the following words and values:
-     on-change*       function!     [word [any-word!] old [any-type!] new [...
-     draw             function!     [/on canvas [pair! none!]]
-     size             none!         none
-     limits           none!         none
-     cache?           logic!        true
-     text             string!       "foo"
-     margin           pair!         0x0
-     font             none!         none
-     flags            block!        length: 0  []
-     weight           integer!      0
-     layouts          map!          []
-     layout           none!         none
-     invalidate       function!     []
-     space-on-change  function!     [word [any-word!] old [any-type!] new [...
+>> ?? spaces
+spaces: [text:0x0 list:0x0 button:0x0]		;) custom mold implementation shortens objects to their type and size signature
+
+>> ? spaces/1
+SPACES/1 is an object! with the following words and values:
+     on-change*  function!     [word [any-word!] old [any-type!] new [any-type!]]
+     type        word!         text
+     size        pair!         0x0
+     parent      none!         none
+     draw        function!     [/on canvas [pair!]]
+     cache       block!        length: 2  [size layout]
+     cached      block!        length: 0 index: 3 []
+     limits      none!         none
+     text        string!       "foo"
+     flags       block!        length: 0  []
+     font        none!         none
+     color       none!         none
+     margin      integer!      0
+     weight      integer!      0
+     layout      none!         none
 ```
 Upon `host` initialization, this list is rendered into Draw code.
 
@@ -253,7 +256,7 @@ Example: `button "text" focus`
 
 ### Facet assignment
 
-Sets space's facet to the value of expression. Non-existing facets are silently added, so check your speling. Facets supported by each space are listed in the [Widget Reference](reference.md).
+Sets space's facet to the value of expression. Non-existing facets are silently added, so check your spelling. Facets supported by each space are listed in the [Widget Reference](reference.md).
 
 Syntax: `<name>= <expression>`
 - `name` is any word that ends in `=`
@@ -403,10 +406,10 @@ view/flags [
 	host 200x40 [
 		row white [
 			text "left" red				;) text does not stretch by default
-			<-> 0 .. 200				;) this area will stretch up to 200 px but no more
+			<-> 0 .. 200				;) this area will stretch up to 200 px but no more (<-> is a template name)
 			text "right" green
 		]
-	] react [face/size: face/parent/size - 20 face/dirty?: yes]
+	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining.gif)
@@ -420,7 +423,7 @@ view/flags [
 			cell yellow 50 .. 100		;) will fill the row height defined by the highest cell
 			cell green  none .. none	;) will fill the rest
 		]
-	] react [face/size: face/parent/size - 20 face/dirty?: yes]
+	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining-2.gif)
@@ -438,7 +441,7 @@ view/flags [
 			cell green 40 .. 100 weight= 0.5	;) also has size constraints, receives 1/2 extension 
 			cell red             weight= 3		;) receives triple extension
 		]
-	] react [face/size: face/parent/size - 20 face/dirty?: yes]
+	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-weight-effect.gif)
@@ -511,7 +514,7 @@ It starts with optional flags. Currently supported are:
 **Each menu item** is one or more values to display, followed by a `paren!` with code to evaluate when this item is chosen:\
 `data data ... (code)`
 
-Item data can contain: `char!`, `string!`, `logic!` and `image!` values, as well as `word!`s referring to spaces. It is laid out using [`row` layout](reference.md#row). When aligning separator (`stretch` aka `<->`) is missing in the row, one is automatically added after first textual space, so rows like `"Find..." "Ctrl+F"` become `"Find..." <-> "Ctrl+F"` and get aligned properly (name to the left, key to the right).
+Item data can contain: `char!`, `string!`, `logic!` and `image!` values, as well as `object!`s referring to existing spaces, or `word!`s referring to template names. It is laid out using [`row` layout](reference.md#row). When aligning separator (`stretch` aka `<->`) is missing in the row, one is automatically added after first textual space, so rows like `"Find..." "Ctrl+F"` become `"Find..." <-> "Ctrl+F"` and get aligned properly (name to the left, key to the right).
 
 Example from [`popups-test.red`](tests/popups-test.red):
 ```
@@ -528,7 +531,7 @@ menu: reshape [
 	"Beam me up" "🔭" (print "Zweeee..^/- Welcome onboard!")
 	
 	;) note how `switch` space is created by `reshape` and inserted as word into the item block:
-	"Thrusters overload" !(anonymize 'switch r-switch: make-space 'switch [state: on]) (
+	"Thrusters overload" !(r-switch: make-space 'switch [state: on]) (
 		r-switch/state: rocket/burn?: not rocket/burn?
 		print pick ["Thrusters at maximum" "Keeping quiet"] rocket/burn?
 	)

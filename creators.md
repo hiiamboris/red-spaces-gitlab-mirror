@@ -23,54 +23,54 @@ Everything else is an implementation detail, with the aim of making programmer's
 
 Draw-based widgets are called *spaces* because they are (separate) coordinate spaces that know how to draw themselves.
 
-Minimal space:
+Minimal space includes only a few facets:
 ```
-object [
-	size: none! or pair!
-	draw: func [] -> block!
+spaces/templates/space: declare-class 'space [
+	;) type is used for styling and event handler lookup, may differ from template name!
+	type:	'space	#type [word!] =
+	
+	;) draw tells how to render this space
+	draw:   []   	#type [block! function!]
+	
+	;) size tells outside observers how big the render was
+	size:   0x0		#type [pair! (0x0 +<= size)] =?
+	
+	;) parent is used to invalidate upper spaces when important facet changes
+	parent: none	#type [object! none!]
+	
+	;) limits specify sizing constraints
+	limits: none	#type [object! (range? limits)  none!] =? :invalidates
+	
+	;) cache lists words that internal cache should memorize and restore along with rendered look
+	cache:  [size]	#type [block! none!]
+	
+	;) cached holds internal cache data (explained in the relevant chapter)
+	cached: tail copy [0.0 #[none]]	#type [block!]
 ]
 ```
-Nothing else! `draw` tells how to render this space. `size` tells outside observers how big the render was.
+As you can see, all facets have type, validity check, and equality type used to detect a change. `limits` also triggers invalidation when changed. More about class system you can read in [classy-object.red](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red).
 
 To make spaces more lightweight, optimal **definition model** looks like this:
 ```
 my-space-context: context [							;) context for functions shared by all spaces of this type
 	~: self											;) shortcut for the wrapping context
+	
 	my-fun: function [space [object!] ...] [		;) functions should accept space instance
 		...lots of code...
 	]
 
-	spaces/templates/my-space: make-template 'space [
+	declare-template 'my-space/space [
 		my-fun: function [...] [
 			~/my-fun self ...						;) in-space function should delegate it's task to the shared function
 		]
 	]
 ]
 ```
-This way, every instance of `my-space` carries only short dispatching code rather than copying all the big functions from it's template.
+This way, every instance of `my-space` carries only short dispatching code rather than copying all the big functions from it's template. `my-space-context` name is not necessary: contexts can be anonymous. But functions from named contexts can be used by respective event handlers or when debugging.
 
-Building a space on top of another is done like this:
-```
-new-space-context: context [
-	~: self											;) another shortcut - only affects new functions
-	my-fun: function [space [object!] ...] [		;) another big task solver
-		...lots of code...
-	]
+`my-space` is built upon the most basic `space` template, inheriting all of it's facets, constraints and on-change handlers. After that you can use `my-space` as a base for new templates.
 
-	spaces/templates/new-space:
-		make-template 'my-space [					;) extends previously defined 'my-space' type
-			my-space-my-fun: :my-fun				;) old `my-fun` can be saved by prefixing it with a prototype name `my-space-`
-			my-fun: function [...] [
-				~/myfun self ...
-				my-space-my-fun ...					;) new `my-fun` now can call the old one when it needs to
-			]
-		]
-]
-```
-
-`my-space-context` and `new-space-context` names are not necessary: contexts can be anonymous. But functions from named contexts can be used by respective event handlers or when debugging.
-
-Instantiation of space type is done using [`make-space` function](reference.md#make-space).
+Instantiation of space template is done using [`make-space` function](reference.md#make-space).
 
 Spaces can be created and rendered freely, but to properly use them and apply styles one needs a `host` face. It is based on the [`base` View widget](https://w.red-lang.org/en/view/#base), and provides event dispatching, styling and visual updates.
 
@@ -80,44 +80,41 @@ How to use `host` face is explained in [`quickstart`](quickstart.md).
 
 Is done by calling `render` function: `draw-commands: render 'some-space`.
 
-`render` accepts either:
-- a space name (word!)
-- a face object!
+`render` accepts either a space! or face! object. It uses /type facet to find a proper style for it.
 
 `render` internally calls:
 - space's style function if style is a function, not a block (style function should call `draw` then)
 - space's `draw` function otherwise 
 
-Space's `draw` function must:
+Space's `draw` function (as well as it's style function) must:
 - return a block of draw commands to visualize that space
 - set space's /size facet to a `pair!` value, unless space is infinite
 - set space's /map facet if space contains other spaces ([map syntax described below](#map)); for that it must `render` those spaces, resulting in a tree of `render` calls
 
-Host face is rendered as `host/draw: render host` if out of order update is required, otherwise it takes care of redrawing itself on *next timer event*.
-
-Space's redraw is the most expensive operation, so it is only done when necessary. Necessity is signalled by setting face's `/dirty?` facet to true. Usually it is done either by `update` command available to event handlers, or by `invalidate` function that gets called when an imporant facet of a space is changed.
-
-Internally a cache of rendered blocks is kept for each canvas size. When such (still valid) block is available, `render` grabs and returns it and sets `/size` and `/map` facets to cached values corresponding to that canvas. Consequently, both map and draw block should be created anew by the `draw` call, and cannot be modified in place.
+Host face is rendered as `host/draw: render host` if out of order update is required, otherwise it takes care of redrawing itself on *next timer event* of the host.
 
 `draw` may support the following refinements (if it does, it's style function must also support these and pass through):
 - `/window xy1 [pair! none!] xy2 [pair! none!]` if it makes sense to draw only an area (xy1..xy2) of it. E.g. spaces that are likely to occur inside a `scrollable` (list, grid) support it. Infinite spaces *must* support it, because one cannot draw an infinite space wholly.
-- `/on canvas [pair! none!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Explained [below](#canvas).
+- `/on canvas [pair!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Explained [below](#canvas).
+
+Space's redraw is the most expensive operation, so it is only done when necessary. Host checks if it's assigned space was invalidated to decide if it should render it. Render will fetch from cache anything that was not invalidated.
+
+Another very expensive operation is the drawing itself, that is setting host's /draw facet, even if it's value didn't change. So if you have a complex layout that is cached, but some tiny thing that is updated often, you'll pay with big CPU load. [`grid-test4`](tests/grid-test4.red) is an example of that: it only updates the FPS text, but Draw has to redraw everything anew. In such cases it will be preferable to have FPS on a separate host face.
 
 ### Size
 
 Some spaces have a fixed size (e.g. `rectangle`'s size is controlled by the owner).\
 Most other spaces however set their own size, adapting it to the given `canvas` size within range allowed by `limits` facet.
 
+`size` can be `0x0` before the first call to `draw`, and `none` for infinite spaces.
 
-`size` can be `none` before the first call to `draw` or for infinite spaces.
-
-Since `size` is set by `draw`, it is quite volatile and represents *space's size on the last rendered frame in a given canvas*. New frame - new size. Moreover, often to render a single frame, a series of canvas sizes is given to the `draw` before the optimal final size is found. Layout can be moving, resizing, rotating, distorting, but between two frames size is a constant.
+Since `size` is set by `draw`, it is quite volatile and represents *space's size on the last rendered frame in a given canvas*. New frame - new size. Moreover, often to render a single frame, a series of canvas sizes is given to the `draw` before the optimal final size is found. Layout can be moving, resizing, rotating, distorting, but between two frames (two `render` calls) size is a constant.
 
 ### Canvas
 
-Is an argument to `draw` function of spaces and to their style function, which is passed if these functions support `/on canvas [pair! none!]` refinement. To properly handle resizing one must understand how to interpret it.
+Is an argument to spaces' `draw` function and to their style function, which is passed if these functions support `/on canvas [pair!]` refinement. To properly handle resizing one must understand how to interpret it.
 
-`canvas` is best understood as the *amount of free space inside the parent*. Colored `box` space can be used to visualize it, as it tries to fill all of it.
+`canvas` is best understood as the *amount of free space inside the parent*. Colored `box` space can be used to visualize it, as it tries to fill all of it's canvas.
 
 It's a bit more complicated though, as required for proper handling of flow layouts (`paragraph`, `tube`). Each axis of the canvas can have the following values:
 
@@ -126,11 +123,11 @@ It's a bit more complicated though, as required for proper handling of flow layo
 | < 0 | Size of available area that should be filled if possible | `-300x-200` means area size of `300x200` should be filled |
 | = 0 | Intent is to minimize space along given axis | text rendered on `0x200` canvas should put 1 char per line |
 | 0 < canvas < infxinf/x | Size of available area should be used to limit the space but should not be filled | text or tube rendered on `200x0` canvas should wrap itself at 200 pixels and start a new line, but should not extend to fill the width `200` |
-| = infxinf/x | Size is infinite: space should not wrap itself along this axis, but should otherwise minimize itself, because infinity cannot be filled | text rendered on `infxinf` canvas should always render as a single line |
+| = infxinf/x | Size is infinite: space should take as much space as it wants, but should not constrain itself or try to fill the infinite size | text rendered on `infxinf` canvas should always render as a single line |
 
 Notes:
 - `infxinf` is a special `pair!` value exported by Spaces and is used to represent virtual infinity. Equals `2e9 by 2e9`
-- `canvas` can be `none`, in which case it has the same meaning as `infxinf`
+- `/on canvas` can be absent, in which case it has the same meaning as `infxinf`
 
 To simplify working with canvas, following *functions* exist in `spaces/ctx` context:
 - `decode-canvas canvas [pair!]` returns a block `[abs-canvas [pair!] fill-flags [pair!]]`:
@@ -149,13 +146,14 @@ To simplify working with canvas, following *functions* exist in `spaces/ctx` con
 To minimize the risk of clashing with the user names, an umbrella namespace is used to access common features:
 ```
 >> ? spaces
-SPACES is a map! with the following words and values:
-     ctx        object!       [by abs block-stack when range clip for clo...
-     events     object!       [cache on-time previewers finalizers handle...
-     templates  map!          [space timer rectangle triangle image scrol...
-     styles     block!        length: 8  [host [pen off fill-pen 255.252....
-     layouts    object!       [list tube list-layout-ctx tube-layout-ctx]
-     keyboard   object!       [focusable focus history valid-path? last-v.
+SPACES is an object! with the following words and values:
+     ctx        object!       [exports dump-event dump-tree dorc add-indent mold pr...
+     events     object!       [cache on-time previewers finalizers handlers registe...
+     templates  map!          [space timer stretch <-> rectangle triangle image box...
+     styles     hash!         length: 58  make hash! [base [below: [fill-pen 255.25...
+     layouts    object!       [list tube ring]
+     keyboard   object!       [focusable focus history valid-path? last-valid-focus...
+     VID        object!       [styles host? host-on-change init-spaces-tree wrap-va...
 ```
 `spaces/ctx` contains every function and context defined, and it is the context under which all spaces code operates internally. By binding your code to it you get access to all the features:
 ```
@@ -176,33 +174,27 @@ Just painting inner spaces is not enough. Need interactivity (e.g. for [hittesti
 
 Composite space (that "contains" other spaces) should be extended with any or both of:
 ```
-into: func [xy [pair!] /force name [word! none!]] -> [word! pair!]
+into: func [xy [pair!] /force child [object! none!]] -> [object! pair!] or none
+
 map: [
-	word! [offset pair! size pair!]		;) e.g.: inner-name [offset 10x10 size 100x100]
-	word! [offset pair! size pair!]
+	object! [offset pair! size pair!]		;) e.g.: inner-space [offset 10x10 size 100x100]
+	object! [offset pair! size pair!]
 	...
 ]
 ```
+`/map` facet can be static (unlikely case), but most of the time it is filled by space's `/draw` function. If space can support caching, it should list `map` in it's `/cached` facet, e.g. `cached: [size map]`.
 
-<details>
-	<summary>
-There is no <code>parent</code> facet. <i>Same</i> space object can be shared between various parents, or it can even be it's own child.
-	</summary>
+`/parent` facet is set by `render` automatically depending on what parent space called it. Only single parent is allowed (you can read a [design card](design-cards/single-vs-multiple-parents.md) for more details on that).
 
-<br>
+These facets are used to construct tree paths:
+- `map` is used by traversal functions (like `list-spaces` or `foreach-*ace`), and by hittest (descending order)
+  Traversal functions are in turn used by tabbing mechanics to switch keyboard focus
+- `into` is used (and preferred over `map`) by hittest (also descending order), and `into` often uses `map` itself
+- `parent` is used by cache invalidation and by timers (ascending order)
 
-A tree nonetheless exists:
-- root for spaces is the `host` face
-- each space's children are listed in the `map`
-- internal cache holds the parent references, for `invalidate` to affect them, and as an optimization for timers
-
-Event handlers receive a path on this tree, so child spaces handlers can access their parents.
-
-A space can only be shared if:
-- it's `size` and `map` are fixed and do not depend on the canvas (otherwise a render somewhere else on another canvas invalidates these set by render in a previous place); an example of that would be some avatar icon
-- it's non-interactive, has no map, and no one cares if it's size becomes invalid after it's rendered; example: `stretch` space that paints nothing
-
-</details>
+Tree paths are used to look up:
+- styles in style sheets
+- event handlers among defined events
 
 
 ### `into`
@@ -211,12 +203,12 @@ Function that is used in hittesting only.
 
 - takes a point in it's space's coordinate system
 - determines which *inner* space this point lands to
-- returns *name* of the inner space and a point in inner space's coordinate system
-- when `name` argument is not `none`, it should return provided (by name) inner space even if the point lies outside it (only required if this space wants to support dragging). `/force` value should be ignored.
+- returns the inner space and a point in inner space's coordinate system, or `none` if it lands outside
+- when `child` argument is not `none`, it should translate coordinates into the given child (only required if this space wants to support dragging) even it point lands outside; `/force` value should be ignored
 
 This allows for rotation, compression, reflection, anything. Can we make a "mirror" space that reflects another space along some axis? Easily.
 
-`into` is not required for hittesting, it just makes it possible to use all these transformations on events. If all inner spaces are just boxes, `map` should be defined instead. Where `into` is also useful is in infinite spaces like `grid-view`.
+`into` is not required for hittesting, it just makes it possible to use all these transformations on events. If all inner spaces are just boxes, `map` should be defined instead. `into` is also often used for translation in spaces that support `origin` (containers of all kind).
 
 <details>
 	<summary>
@@ -234,59 +226,76 @@ Geometries in such `map` are ignored and can be absent or contain invalid/dummy/
 
 ### `map`
 
-Is a block that tells which inner face occupies which region (offset & size) of this space.\
-Order: first items get precedence in case of overlap. So `map` can be thought of a reverse Z-order: topmost child appears first in the map.
+Is a block that tells which inner space occupies which region (offset & size) of this space on the last frame.\
+Order: first items get precedence in case of overlap. So `map` can be thought of a reverse Z-order: topmost child appears first in the map.\
+Format described above.
 
 Map is only good for rectangular geometry (which is the majority of use cases anyway). In this case `into` is not needed and `map` is used for hittesting.
 
-`map` should be filled by each `draw` call (or if it's constant - defined on space creation). Before the 1st `draw` call: what isn't drawn does not exist.
-
-<details>
-	<summary>
-Names in the <code>map</code> may repeat (by spelling), but each should refer to a unique object.
-	</summary>
-
-<br>
-
-Examples of that are `list` and `grid` styles that can contain hundreds of `item` or `cell` occurrences in their `map`. Each `item`/`cell` is styled using the same style, and shares same event handlers, but objects (`get item`/`get cell`) are not the same.
-
-</details>
+`map` should be filled by each `draw` call (or if `draw` is a static block - `map` must be defined at space creation). Before the 1st `draw` call: what isn't drawn does not exist.
 
 `map/child/size <> child/size` in general case: `map` defines it's geometry in parent's coordinates, while `child/size` is it's size in it's own coordinates. E.g. parent may scale it's child.
 
-### Names
 
-Every space has a name (word)! This name refers to a space object which can be obtained using `get`.
+### Caching
 
-Names are used everywhere in place of objects: in `map`, in `items-list` and `cell-map`, `into` returns a name, tree path received by event handlers contains names, etc.
+Is controlled by the `/cache` facet, which is a block listing what other facets to cache. Most spaces are cached by default, which can be turned off by setting `cache: none`.
 
-Space can only be rendered by it's name (`render` won't accept a space object), because this name tells it which style to use. Event dispatcher uses names to decide what event handlers to call.
+What caching system does is for each given canvas it remembers the outcome: result of `/draw`, as well as any other facets listed in the `/cache` block (usually it's `[size map]`). Then if the same canvas value is provided, it fetches and sets the cached facets and returns the recalled `/draw` result.
 
-Why a name is needed?
-- styles are based on names
-- events are dispatched by names
-- what is focusable or not depends on it's name
-- possible to repurpose a generic (e.g. `rectangle`) space by giving it a name (e.g. `thumb` of a `hscroll` or `vscroll`) - such space will behave and be styled differently (e.g. `rectangle` doesn't need events, but `thumb` may react)
+Most facets use the [class system](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red) to define equality type (e.g. `=?` for numbers and `==` for strings) and a function that gets called when facet change is detected by equality test. One way or another, this function eventually calls `invalidate` on the space in question. `invalidate` bubbles up the tree to clear this space's cache and cache of all of it's parents. So important facet change eventually leads to a redraw.
 
-<details>
-	<summary>
-Why <code>(get name) = object</code> rather than <code>object [name: ..]</code>?
-</summary>
+Meet:
+```
+>> ? invalidate
+USAGE:
+     INVALIDATE [space]
+
+DESCRIPTION: 
+     Invalidate SPACE cache, to force it's next redraw. 
+     INVALIDATE is a function! value.
+
+ARGUMENTS:
+     space        [object!] {If present, space/on-invalidate is called instead of cache/invalidate.}
+
+REFINEMENTS:
+     /only        => Do not invalidate parents (e.g. if they are invalid already).
+     /info        => Provide info about invalidation.
+        cause        [object! none!] "Invalidated child object or none."
+        scope        [word! none!] "Invalidation scope: 'size or 'look."
+```
+You can have your own caching mechanism if you define `on-invalidate` facet of the following form:
+```
+on-invalidate: function [
+    space [object!]
+    cause [none! object!]
+    scope [none! word!]
+] [...]
+```
+It will be called by `invalidate` instead of clearing the `cached` facet.
+
+On parameters:
+- `cause` starts with `none`, but as invalidation bubbles up, it gets set to the child that caused invalidation of the parent receiving the call. It is used e.g. by `grid` to find out the coordinate of invalidated cell and contain invalidation to given row and column, while maintaining cache on the other rows and columns.
+- `scope` can be:
+  - `'size` or `none` for full invalidation
+  - `'look` for a hint that only color or other cosmetic change was detected, that doesn't affect the size
+    `'look` can be used as an optimization, e.g. in some big list an item changes it's look and list doesn't have to re-render all other items as it knows it's overall size did not change: it only needs to re-render the item in question.
+
+<details><summary>Cache is held within the <code>/cached</code> facet.</summary>
 
 <br>
+It has the following form:
+```
+[
+	<last-generation-number> <last-state>		;) block's head is located after these 2 values
+	<canvas> <slot-generation-number> <draw-commands> <size> <map> <any other cached facets...>
+	<canvas> <slot-generation-number> <draw-commands> <size> <map> <any other cached facets...>
+	...
+]
+```
+Generation number gets updated from the host's `/generation` facet which is increased on every render call. Last state can be either `'cached` (fetched from cache during last render) or `'drawn` (an actual call to `/draw` happened during last render). This data is used by timers to track spaces that are still live (on the tree), so timers for orphaned subtrees can be disabled to save resources. Slot generation numbers are used by cache to keep itself from creep.
 
-- dumping particular spaces tree: if you've ever tried `?? my-face` you know it is a bad idea that will force you to kill the console; spaces however are always fully inspectable
-- it makes style and event paths also inspectable, which is very helpful when debugging
-- simpler listing of the tree of spaces (otherwise all those words would have to be created anew every time a tree is listed)
-- to test and evaluate an approach different to the one taken in View
-
-Drawbacks:
-- have to call `get` an extra round sometimes. But other way would have to `select .. 'name`, so no big deal.
-- to fetch a deep subspace for inspection (e.g. `probe host/space/list/item`), such path has to be preprocessed (done automatically by Spaces Console - `red console.red`).
-
-I'm not totally against the alternative though, if more benefits will be discovered.
-
-</details>
+</summary>
 
 
 ## Styles
@@ -399,13 +408,11 @@ ARGUMENTS:
 Focus allows to direct keyboard events (`key key-down key-up enter`) into a particular "focused" space. Tabbing cycles focus between spaces when Tab key is pressed.
 
 `spaces/keyboard/focus` holds the currently focused space's path. Focused space can be changed via:
-- calling `focus-space` function directly (it accepts a tree path)
+- calling `focus-space` function directly (it accepts a space or it's tree path)
 - clicking (`down mid-down alt-down aux-down dbl-click`) on a point that intersects with a *focusable* space
 - [tabbing (module)](tabbing.red)
 
-[comment]: # (TODO: a more user-friendly focusing way is needed since path isn't always available, sometimes only the space object)  
-
-Focused space is a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus) and attempt to focus next or previous space will start from last valid focused path.
+Focused space is saved as a tree path. So for tabbing (and focus in general) to work properly, items in that path should not be discarded. If object in that path is no longer in it's parent's map, focus becomes invalid (which is equivalent to no focus) and attempt to focus next or previous space will start from last valid focused path.
 
 Focusable space types are listed in `spaces/keyboard/focusable` block (new types can be added there at will, simply as words).
 
@@ -440,11 +447,15 @@ Example code with a new *focusable* space:
 ```
 #include %spaces/everything.red
 
-spaces/templates/my-space: make-template 'space [
+declare-template 'my-space/space [
 	size: 50x50
 	draw: [box 1x1 49x49]
 ]
 append spaces/keyboard/focusable 'my-space
+
+set-style 'my-space [
+	above: when focused? (compose [text 7x17 "FOCUS"])
+]
 
 define-handlers [
 	my-space: [on-key [space path event] [print event/key]]
@@ -452,7 +463,7 @@ define-handlers [
 
 view [host focus [my-space]]
 ```
-Press Tab or click on the box space to focus it. Then it will print every key pressed.
+Press Tab or click on the box space to focus it (should be indicated by "FOCUS" word). Then it will print every key pressed.
 
 ## Debugging
 
@@ -463,14 +474,14 @@ Usually the first thing to do when something unexplicable happens is to ensure a
 #include %../common/assert.red
 ; #assert off
 ```
-Assertions may slow down Spaces operation by up to 30%, but are useful to contain the error.
+Assertions may slow down Spaces operation some, but are useful to contain the error.
 
 Then:
 - divert the output of your program to a file, e.g. `red myscript.red |tee log` or `red myscript.red >log`
 - run the script until the error occurs
 - inspect the `log` file: usually the *first* failed assertion is the cause of misbehavior
 
-Assertions are assumptions about how my code works. They can often fail if something is misused though. E.g. you assign a string to `/draw` facet, or an object to `/content` facet, or trying to measure the size of an infinite grid. In time, when design solidifies, most of that should become error messages, but we're not there yet.
+Assertions are assumptions about how code works. Failed assumptions do not necessarily mean bugs. Sometimes it's the assumption that's wrong, which helps you build a correct mental model at earlier stages of development. But sometimes I'm using them in places where proper errors must be thrown but I have no time to bother with proper error detection and reporting (yet).
 
 ### Debug output
 
@@ -478,28 +489,47 @@ Is very helpful in nailing down the issue. E.g. Red tells you that `none` is une
 
 In [`everything.red`](everything.red) there's a whole bunch of commented out debug directives:
 ```
-; #debug on											;-- general (unspecialized) debug logs
+#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
+; #debug off										;-- turn off type checking and general (unspecialized) debug logs
 ; #debug set draw									;-- turn on to see what space produces draw errors
 ; #debug set profile								;-- turn on to see rendering and other times
+; #debug set changes								;-- turn on to see value changes and invalidation
 ; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
 ; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
 ; #debug set focus									;-- turn on to see focus changes and errors
 ; #debug set events									;-- turn on to see what events get dispatched by hosts
+; #debug set timer									;-- turn on to see timer events
 ; #debug set styles									;-- turn on to see which styles get applied
 ```
 Uncomment relevant item, run your script and see if there's a clue in the log.
 
-For `profile` output, add `prof/show` before exit or at the point where you want the output. `prof/reset` can be used to reset stats. E.g. load during initialization can be different from load during usage, so it makes sense to call `prof/show prof/reset` after the `view/no-wait` call to see initialization phase, then `prof/show` after `do-events` loop quits to see the usage phase. It also makes sense sometimes to do `prof/show prof/reset` every one or few seconds in `on-time` actor, to have smaller profiling slices.
+I strongy recommend `#debug off` be always commented out during development as it affects type and range checks of all space facets and helps you detect errors earlier.
+
+For `profile` output to work, add `prof/show` before exit or at the point where you want the output. `prof/reset` can be used to reset stats. E.g. load during initialization can be different from load during usage, so it makes sense to call `prof/show prof/reset` after the `view/no-wait` call to see initialization phase, then `prof/show` after `do-events` loop quits to see the usage phase. It also makes sense sometimes to do `prof/show prof/reset` every one or few seconds in `on-time` actor, to have smaller profiling slices.
 
 `debug-draw` command can be used to bring up GUI where you can inspect the spaces tree and look of each space in the tree.
 
 ### Inspecting your data
 
-Biggest issue with this comes from spaces using words for links to other spaces, not objects. So usual `space-a/space-b/space-c` approach doesn't work.
+Spaces have a custom `mold` implementation, which is aimed at producing readable output for programmers. It affects `?`, `??`, `probe` and `save` output.
 
-Spaces console (that is run by `run.bat` or `red console.red`) automatically converts such paths to those understood by Red, so give it a try. But it may create other issues, as it's not a bug-free hack. In normal Red console, after including `everything.red`, same effect can be achieved with `do fix-paths [..code..]`. Also Red [`get` bugs](https://github.com/red/red/issues/4988) may make the experience much worse that it should be.
+Most notably, it shortens by default space objects inside other data to `type:size`, so don't take that for an url!:
+```
+>> render list: first lay-out-vids [hlist [text text text]]
+>> ?? list/map
+list/map: [
+	text:0x16 [offset 10x10 size 0x16]
+	text:0x16 [offset 20x10 size 0x16]
+	text:0x16 [offset 30x10 size 0x16]
+]
+```
+ 
+Do use spaces console (that is run by `run.bat` or `red console.red`) or put a `halt` in your script where you can inspect values interactively.
 
-Inspect data at the point in the code where it's relevant. In event handlers, styles, etc. `??~` is a variant of `??` that does not expand objects, to keep the output small. `probe~` is a variants of `probe` with the same behavior. Data will be auto formatted by `probe~` using `prettify` function, which helps with unformatted/generated block data, but sometimes messes formatted data a bit.
+`??` function is also extended:
+- it accepts words and paths as the native function did
+- it also accepts blocks of words and paths to dump multiple values in a line, e.g. `?? [x y size]`
+- it also accepts any value, e.g. `?? (compute something)`, in which case it works as `probe`
 
 `dorc` (short for `do read-clipboard`) command can be used to evaluate code from the clipboard without messing up console's history. I use it a lot.
 

@@ -14,32 +14,9 @@ A few terms for less confusion:
 
 ## Space creation
 
-### `anonymize`
+### `make-space`
 
-A core concept in spaces is that each space object must be named. Name is what makes it possible to look up styles and choose proper event handlers, because there is no other connection between styles/events and the space object.
-
-However all these names (words) have to belong to different contexts as they share spelling while referring to different `space!` objects.
-
-For this `anonymize` function is used:
-```
->> ? anonymize
-USAGE:
-     ANONYMIZE word value
-
-DESCRIPTION: 
-     Return WORD bound in an anonymous context and set to VALUE. 
-     ANONYMIZE is a function! value.
-
-ARGUMENTS:
-     word         [word!] 
-     value        [any-type!] 
-```
-
-Words created by this function appear in a lot of facets: `map`, `content`, `item-list`, `cell-map`, etc.
-
-### `make-space` & `make-template`
-
-Are the functions that should be used to create new space instances, and define new space templates.
+Used to create new space instances from a known template name.
 
 ```
 >> ? make-space
@@ -56,26 +33,35 @@ ARGUMENTS:
 
 REFINEMENTS:
      /block       => Do not instantiate the object.
-     /name        => Return a word referring to the space, rather than space object.
-
->> ?? make-template
-make-template: func [
-    "Declare a space template" 
-    base [word!] "Type it will be based on" 
-    spec [block!] "Extension code"
-][
-    make-space/block base spec
-]
 ```
 Similar to the native `make`, `spec` of `make-space` can add new facets to the spaces it creates.
 
+#### `declare-template`
+
+Used to create new templates.
+```
+>> ? declare-template
+USAGE:
+     DECLARE-TEMPLATE [name-base spec]
+
+DESCRIPTION: 
+     Declare a named class and put into space templates. 
+     DECLARE-TEMPLATE is a function! value.
+
+ARGUMENTS:
+     name-base    [path!] "template-name/prototype-name."
+     spec         [block!] 
+```
+`name-base` should be a path of two words: template name and prototype name (e.g. `'my-widget/space` or `'my-list/list`). This allows to inherit class info from the prototype - see [classy-object](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red) for more background.
+
+`spec` may contain any extended class syntax supported by `classy-object`.
+
 ### Usage scenarios examples
 
-#### 1. Defining a new template (block) that could later be used to create new space objects
+#### 1. Defining a new template that could later be used to create new space objects
 
-New templates should be placed into the `templates` map:
 ```
-spaces/templates/bold-text: make-template 'text [	;) `text` is the prototype template, `bold-text` is a new one
+declare-template 'bold-text/text [					;) `text` is the prototype template, `bold-text` is a new one
 	flags: [bold]									;) we define default `flags` in the spec
 ]
 ```
@@ -84,7 +70,7 @@ Now it can be used:
 view [host [
 	vlist [
 		text "normal text"
-		bold-text text="bold text"
+		bold-text text="bold text"					;) template name used to instantiate a space
 	]
 ]]
 ```
@@ -93,11 +79,11 @@ view [host [
 Note that there's no VID/S style or template style defined for it yet, so VID/S won't be able to use [auto-facets](vids.md#auto-facets), and font and color won't work (because their application for `bold-text` template must defined by `bold-text` style akin to what `text` style does).
 
 
-#### 2. Creating a new named `space!` object inside another template
+#### 2. Creating a new `space!` object inside another template or as a child
 
 Let's consider a simple template consisting of two others. For simplicity, all sizes are fixed:
 ```
-spaces/templates/boxed-image: make-template 'space [
+declare-template 'boxed-image/space [
 	;) these two are objects:
 	cell:  make-space 'cell  [limits: 70x60 .. 70x60]
 	image: make-space 'image [limits: 60x50 .. 60x50]
@@ -105,7 +91,7 @@ spaces/templates/boxed-image: make-template 'space [
 	
 	draw:  does [
 		compose/only [
-			(render 'cell) translate 5x5 (render 'image)
+			(render cell) translate 5x5 (render image)
 		]
 	]
 ]
@@ -121,12 +107,10 @@ view [host [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-new-space-object.png)
 
-#### 3. Creating a new named `space!` object and getting it's name (as word) at the same time
-
-This is an alias to `anonymize 'name make-space 'name [...]`, often used when reference to space object itself is not needed:
+Child space created manually example:
 ```
 view [host [
-	cell 100x50 content= make-space/name 'text [text: "abc"]	;) content facet expects a word! 
+	cell 100x50 content= make-space 'text [text: "abc"]
 ]]
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-new-named-space.png)
@@ -146,31 +130,49 @@ All examples of code in this reference (except those above, which are more expli
    ```
    >> view [host [...code from the example...]]
    ```
-3. Or just pasted into running [VID/S Polygon](programs/vids-polygon.red)
+3. Or just pasted into running [VID/S Polygon](programs/vids-polygon.red) window
 
 
 ## Common facets
 
-In contrast to REBOL & Red's `face!` object that always includes every possible facet, `space` is minimalistic and includes only those facets that each widget requires. And those usually vary, but some have **reserved** meaning (cannot be used for anything else):
+In contrast to REBOL & Red's `face!` object that always includes every possible facet, `space` is minimalistic and includes only those facets that each widget requires. And those usually vary.
 
+`space!` object itself defines a minimal set of facets:
+```
 | Facet | Type | Description |
 |-|-|-|
+| `type` | `word!` | Used for styles and event handler lookups. Usually equals space's template name, but can be renamed freely. |
 | `size` | `pair!` `none!` | Size of this space in it's own coordinate system.<br> Usually updated during every `draw` call (as such, it is the *size of the last rendered frame* in a sequential chain of redraws), but sometimes fixed.<br> Used by container spaces (e.g. list) to arrange their items. <br> Can be `none` if space is infinite, or if it was never drawn yet. |
-| `draw` | `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
-| `rate` | `time!` `integer!` `float!` `none!` | Specifies rate of the `on-time` event. `time!` sets period, numbers set rate (1 / period).<br> Not usually present in most spaces by default, but can be added using `make-space` or `with [rate: ..]` keyword in VID/S.<br> If `none` or absent, no `on-time` event is generated. |
-| `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[name [offset: pair! size: pair!] name ...]`.<br> `name` is the name (word) of inner space that should refer to it's object.<br> Used for hittesting and tree iteration. |
-| `into` | `func [xy [pair!]] -> [name xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns name (word) of an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force name [word! none!]` refinement that takes full path to an inner space into which translation should happen even if `xy` point does not land on it. |
+| `draw` | `block!` `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
+| `parent` | `none!` `object!` | After space is rendered, contains it's owner object. |
 | `limits` | `none!` `range!` | Object with /min and /max size this space can span. See [VID/S manual](vids.md#constraining-the-size) on details. |
-| `weight` | `none!` `integer!` `float!` | Used for relative scaling of items in containers like `tube`. `none` or `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
-| `cache?` | `logic!` | Turns off caching of some space (for debugging or if look constantly changes). |
-| `on-change*` | `func [word old new]` | Used internally to help enforce consistency, reset cache, etc. |
+| `cache` | `none!` `block!` | List of cached words (usually `[size map]`). Turns off caching if set to `none`. |
+| `cached` | `block!` | Used internally to hold cached data. |
+| `on-change*` | `func [word old new]` | Used internally by the class system to help enforce consistency, types, reset cache, etc. |
+```
+They are chosen to be mandatory because they are either strictly required, or (as is the case for /limits) apply to all spaces and can be assigned at runtime.
 
-Some facets are not reserved or prescribed but are **recommended** as a guideline for consistency:
+---
+
+Some other facets are not mandatory but have a **reserved** meaning (cannot be used for anything else):
 
 | Facet | Type | Description |
 |-|-|-|
-| `content` | `word!` `block! of words` `map! of words` | Used by container spaces to hold references to children. |
+| `rate` | `time!` `integer!` `float!` `none!` | Specifies rate of the `on-time` event. `time!` sets period, numbers set rate (1 / period).<br> Not usually present in most spaces by default, but can be added using `make-space` or `with [rate: ..]` keyword in VID/S.<br> If `none` or absent, no `on-time` event is generated. |
+| `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[child [offset: pair! size: pair!] child ...]`.<br> Used for hittesting and tree iteration. |
+| `into` | `func [xy [pair!]] -> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
+| `weight` | `number!` | Used for relative scaling of items in containers like `tube`. `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
+| `on-invalidate` | `func [space [object!] cause [object! none!] scope [word! none!]]` | Custom invalidation function, if cache is managed by the space itself. |
+
+---
+
+Some facets are not reserved or prescribed but have a **recommended** meaning as a guideline for consistency:
+
+| Facet | Type | Description |
+|-|-|-|
+| `content` | `word!` `block! of spaces` `map! of spaces` | Used by container spaces to hold references to children. |
 | `source`  | `block!` `map!` | Used by some container spaces as default data source. |
+| `items`   | `function!` | Used by container spaces as an abstraction over `source`. |
 | `text`    | `string!` | Usually specifies text string for textual spaces. |
 | `data`    | varies  | Specifies which data should be displayed if it's not always textual (e.g. button can accept multiple data types). |
 | `origin`  | `pair!` | Point at which content should be placed in this space's coordinate system. |
@@ -198,7 +200,7 @@ Some facets are not reserved or prescribed but are **recommended** as a guidelin
 
 </details>
 
-Spaces do not impose any structural limitations. If a space can hold a box or a piece of text, then it can hold *any* other space, no matter how complex it is.
+Spaces do not impose any structural limitations. If a space can hold a box or a piece of text, then it can hold *any* other space, no matter how complex it is. The only requirement is that same space should not normally appear in multiple places on the tree.
 
 
 
@@ -206,10 +208,14 @@ Spaces do not impose any structural limitations. If a space can hold a box or a 
 
 Minimal space template to build upon:
 ```
-spaces/templates/space: [
-	draw:   []
-	size:   0x0
-	limits: none
+spaces/templates/space: declare-class 'space [
+	type:	'space
+	size:    0x0
+	draw:    []   	
+	limits:  none
+	parent:  none	
+	cache:   [size]	
+	cached:  tail copy [0.0 #[none]]
 ]
 ```
 Serves no other function: has zero size and draws nothing.\
@@ -221,10 +227,10 @@ Since all composite spaces consist of other smaller spaces, this minimalism play
 
 Template used to create timers:
 ```
-spaces/templates/timer: make-template 'space [rate: none]
+declare-template 'timer/space [rate: none]
 ```
 Timer is not required for `on-time` event handler to receive events. Any space that has a `rate` facet set will receive these. In fact `make-space 'space [rate: 1]` produces a space identical to `make-space 'timer [rate: 1]`.\
-However `timer` makes the intent of code a tiny bit clearer. So it is advised to base timers on this space.
+However `timer` makes the intent of code a bit clearer. So it is advised to base timers on this space.
 
 Note: for timers to work, they have to be `render`ed by their owner's `draw` function. This requirement is imposed by the necessity of having tree paths for each timer to be readily available, otherwise they consume too much resources.
 
@@ -356,7 +362,7 @@ Basic alignment box: aligns a single child space on the canvas.
 |-|-|-|
 | `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to 0x0 (center) |
 | `margin` | pair! integer! | horizontal and vertical space from the inner space to the bounding box of the canvas; should be set in styles |
-| `content` | word! | name of the inner space; defaults to an empty space |
+| `content` | object! none! | inner space; none if no content |
 
 ## Cell
 
@@ -379,7 +385,27 @@ Inherits all facets from `box`:
 |-|-|-|
 | `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to 0x0 (center); should be set in styles |
 | `margin` | pair! integer! | defaults to 1x1; should be set in styles |
-| `content` | word! | name of the inner space; defaults to an empty space |
+| `content` | object! none! | inner space; none if no content |
+
+
+## Clickable
+
+Basic undecorated clickable area, extends [`box`](#box).
+
+Inherits all of `box` facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to 0x0 (center); should be set in styles |
+| `margin` | pair! integer! | defaults to 1x1; should be set in styles |
+| `content` | object! none! | inner space; none if no content |
+
+Introduces new facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `command` | block! | code to evaluate when button gets pushed and then released |
+| `pushed?` | logic! | reflects it's pushed state, change from `true` to `false` automatically triggers `command` evaluation |
 
 
 ## Data-view
@@ -400,7 +426,7 @@ Inherits all facets from `box`:
 |-|-|-|
 | `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to -1x-1; should be set in styles |
 | `margin` | pair! integer! | defaults to 1x1; should be set in styles |
-| `content` | word! | name of the inner space; defaults to an empty space |
+| `content` | object! none! | inner space; none if no content |
 
 Introduces new facets:
 
@@ -412,9 +438,11 @@ Introduces new facets:
 | `wrap?` | logic! | when true, displays textual data using `paragraph` instead of `text`; should be set in styles |
 
 
-## Clickable
+## Data-clickable
 
-Basic undecorated clickable area, extends [`data-view`](#data-view).
+[comment]: # (not a great name, needs revisiting)
+
+Undecorated clickable area with arbitrary data support, extends [`data-view`](#data-view).
 
 Inherits all of `data-view` facets:
 
@@ -423,7 +451,7 @@ Inherits all of `data-view` facets:
 | `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to -1x-1; should be set in styles |
 | `margin` | pair! integer! | defaults to 1x1; should be set in styles |
 | `spacing` | pair! integer! | when data is a block, sets spacing of it's items; should be set in styles |
-| `content` | word! | name of the inner space; defaults to an empty space |
+| `content` | object! none! | inner space; none if no content |
 | `data` | any-type! | data value to be shown (see the list above) |
 | `font` | object! | when data is rendered using text or paragraph templates, affects font; should be set in styles |
 | `wrap?` | logic! | when true, displays textual data using `paragraph` instead of `text`; should be set in styles |
@@ -456,7 +484,7 @@ Inherits all of `clickable` facets:
 | `align` | pair! | -1x-1 to 1x1 (9 variants); defaults to -1x-1; should be set in styles |
 | `margin` | pair! integer! | defaults to 1x1; should be set in styles |
 | `spacing` | pair! integer! | when data is a block, sets spacing of it's items; should be set in styles |
-| `content` | word! | name of the inner space; defaults to an empty space |
+| `content` | object! none! | inner space; none if no content |
 | `data` | any-type! | data value to be shown (see the list above) |
 | `font` | object! | when data is rendered using text or paragraph templates, affects font; should be set in styles |
 | `wrap?` | logic! | when true, displays textual data using `paragraph` instead of `text`; should be set in styles |
@@ -616,7 +644,7 @@ Wrapper for bigger (but finite) spaces. Automatically shows/hides scrollbars and
 | facet  | type  | description |
 |-|-|-|
 | `origin` | pair! | point in scrollable's coordinate system at which to place `content`: <0 to left above, >0 to right below |
-| `content` | word! | name of the space it wraps, should refer to a space object |
+| `content` | object! none! | inner space; none if no content |
 | `content-flow` | word! | lets scrollable know how content is supposed to use canvas; can be one of: `planar` (default), `horizontal` or `vertical` (see below) |
 | `hscroll` | scrollbar space object! | horizontal scrollbar; can be styled as `scrollable/hscroll` |
 | `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
@@ -658,7 +686,7 @@ Used internally by `inf-scrollable` to wrap infinite spaces. Window has a size, 
 |-|-|-|
 | `size` | pair! none! | set by `draw` automatically, read-only for other code; it extends up to the smallest of `origin + content/size` (if defined) and `canvas * pages` |
 | `pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on it's parent's resize or auto adjustment) |
-| `content` | word! | name of the space it wraps, should refer to a space object |
+| `content` | object! none! | inner space; none if no content |
 | `origin` | pair! | point in window's coordinate system at which to place `content`: <0 to left above, >0 to right below |
 | `available?` | function! (see below) | used by the window to measure nearby content - to move window around and to determine it's `size` |
 
@@ -691,7 +719,7 @@ By default it is defined to:
 
 Wrapper for infinite spaces: `scrollable` with it's `content` set to `window`. Automatically moves the window across content when it comes near the borders, provides relevant event handlers.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-inf-scrollable.png) | <pre>inf-scrollable with [<br>	size: 100x100<br>	window/content: make-space/name 'space [<br>		available?: func [axis dir from req] [req]<br>	]<br>]</pre> |
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-inf-scrollable.png) | <pre>inf-scrollable with [<br>	size: 100x100<br>	window/content: make-space 'space [<br>		available?: func [axis dir from req] [req]<br>	]<br>]</pre> |
 |-|-|
 
 Inherits all of `scrollable` facets:
@@ -699,7 +727,7 @@ Inherits all of `scrollable` facets:
 | facet  | type  | description |
 |-|-|-|
 | `origin` | pair! | point in inf-scrollable's coordinate system at which `window` is placed: <0 to left above, >0 to right below; combined with `window/origin` can be used to translate coordinates into `content`'s coordinate system |
-| `content` | word! = `'window` | inherited from `scrollable` and should not be changed, set to `'window` |
+| `content` | object! = `window` | inherited from `scrollable` and should not be changed |
 | `hscroll` | scroller space object! | horizontal scrollbar; can be styled as `scrollable/hscroll` |
 | `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
 | `vscroll` | scroller space object! | vertical scrollbar; can be styled as `scrollable/vscroll` |
@@ -712,7 +740,7 @@ Introduces new facets:
 | facet  | type  | description |
 |-|-|-|
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
-| `window/content` | word! | space to wrap, possibly infinite or half-infinite along any of X/Y axes, or just huge |
+| `window/content` | object! none! | space to wrap, possibly infinite or half-infinite along any of X/Y axes, or just huge |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on inf-scrollable's resize or auto adjustment) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
@@ -727,7 +755,7 @@ Basic template for various layouts. Arranges multiple spaces in a predefined way
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of word!s | contains names of spaces to arrange and render |
+| `content` | block! of space object!s | contains spaces to arrange and render |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector |
 
 `items` is a picker interface that abstracts the data source:
@@ -813,7 +841,7 @@ Inherits all of `container` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of word!s | contains names of spaces to arrange and render (see [container](#container)) |
+| `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
 
 Adds new facets:
@@ -855,9 +883,9 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
 | `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `roll` | function! | can be called to manually check for a jump |
-| `content` | word! = `'window` | points to `window`, should not be changed |
+| `content` | object! = `window` | set to `window`, should not be changed |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
-| `window/content` | word! = `'list` | points to inner `list`, should not be changed |
+| `window/content` | object! = `list` | set to inner `list`, should not be changed |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on list-view's resize or auto adjustment) |
 | `list` | list space object! | inner (finite) list used to display currently visible page |
 | `list/axis` | word! | list's primary axis of extension; defaults to `y` but can be changed when needed |
@@ -908,7 +936,7 @@ Inherits all of `container` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of word!s | contains names of spaces to arrange and render (see [container](#container)) |
+| `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
 
 Adds new facets:
@@ -964,7 +992,7 @@ Inherits all of `container` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of word!s | contains names of spaces to arrange and render (see [container](#container)) |
+| `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
 
 Adds new facets:
@@ -993,13 +1021,13 @@ Features:
 |-|-|-|
 | `margin` | pair! | horizontal and vertical space between cells and the bounding box |
 | `spacing` | pair! | horizontal and vertical space between adjacent cells |
-| `content` | map! of `pair! (col x row) -> word! (space name)` | used to place spaces at specific row/col positions |
+| `content` | map! of `pair! (col x row) -> space object!` | used to place spaces at specific row/col positions |
 | `cells` | `func [/pick xy [pair!] /size]` | picker function that abstracts `content` |
 | `widths` | map! of `integer! (col) -> integer! (width)` | defines specific column widths in pixels; `widths/default` is a fallback value for absent column numbers; `widths/min` is only used by autofitting; columns are numbered from `1`; filled automatically if autofitting is on |
 | `autofit` | word! or none! | chooses one of automatic column width fitting methods: [`[width-difference width-total area-difference area-total]`](design-cards/grid-autofit.md); defaults to `area-total`; `none` to disable, always disabled on infinite grids |
 | `heights` | map! of `integer! (row) -> integer! or word! = 'auto` | defines specific row heights in pixels; `heights/default` is a fallback value that defaults to `auto`; `heights/min` sets the minimum height for `auto` rows (to prevent rows of zero size); rows are numbered from `1` |
 | `bounds` | pair! or block! `[x: lim-x y: lim-y]` | defines grid's number of rows and columns: `none` = infinite, `auto` = use upper bound of `cells`, integer = fixed |
-| `wrap-space` | `function! [xy [pair!] name [word!]] -> cell-name [word!]` | function that wraps spaces returned by `cells` into a `cell` template, for alignment and background drawing; can be overridden |
+| `wrap-space` | `function! [xy [pair!] name [word!]] -> cell [object!]` | function that wraps spaces returned by `cells` into a `cell` template, for alignment and background drawing; can be overridden |
 
 
 `cells` is a picker interface that abstracts the cell selection:
@@ -1023,7 +1051,6 @@ The following public API is exposed by each `grid` space:
 | `is-cell-pinned?` | True if cell at a given cell coordinate is pinned |
 | `infinite?` | True if not all grid dimensions are finite |
 | `calc-bounds` | Returns grid's number of columns and rows (useful e.g. if `bounds` facet is set to `auto`) |
-| `calc-size` | Measures grid's total width and height (may require rendering of all it's items) |
 
 For more info about these functions, create a grid `g: make-space 'grid []` and inspect each function e.g. `? g/get-span`.
 
@@ -1051,7 +1078,7 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 | `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `roll` | function! | can be called to manually check for a jump |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
-| `window/content` | word! = `'grid` | points to inner `grid` and should not be changed |
+| `window/content` | object! = `grid` | set to inner `grid` and should not be changed |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on grid-view's resize or auto adjustment) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |

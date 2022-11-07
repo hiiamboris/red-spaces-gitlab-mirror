@@ -26,7 +26,7 @@ Spaces provide infrastructure and model using which **you can**:
 
 Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only automated builds!!), [Git](https://git-scm.com/downloads)
 
-Spaces depend on the helpful functions & macros from [mezz warehouse](https://codeberg.org/hiiamboris/red-common). So, in your favorite directory, run:
+Spaces depend on the helpful functions & macros from [the mezz warehouse](https://codeberg.org/hiiamboris/red-common). So, in your favorite directory, run:
 ```
 git clone https://codeberg.org/hiiamboris/red-common common
 git clone https://codeberg.org/hiiamboris/red-spaces spaces
@@ -187,19 +187,19 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 
 	content: reduce [					;) content is a block of NAMES of spaces
 
-		make-space/name 'text [			;) each make-space/name returns a name referring to an object
+		make-space 'text [				;) each make-space creates and returns a new space object
 			text: "Hello, space!"		;) like `make prototype [spec..]`, make-space allows to define facets
 		]
-		make-space/name 'button [
-			data: "OK"					;) data can be any Red type
-			limits: 80 .. 80			;) limit with min=max fixes the button's size
+		make-space 'button [
+			data: "OK"					;) data for button can be any Red type
+			limits: 80 .. 80			;) limit with min=max fixes the button's size (`..` creates a range!)
 			command: [unview]			;) code that is evaluated when button is released
 		]
 	]
 ]
 
 host: make-face 'host					;) host face we need to draw spaces on
-host/space:  'list						;) host must have exactly one space attached to it - here it's `list`
+host/space:  list						;) host must have exactly one space attached to it - here it's `list`
 host/draw:   render host				;) `render` returns a list of draw commands, but also sets the /size facet of spaces
 host/size:   list/size					;) now we know how big host face we need from previously set list/size
 host/offset: 10x10						;) apply default VID margin
@@ -210,10 +210,9 @@ window/size: host/size + 20x20			;) add default VID margins to host/size to infe
 window/offset: system/view/screens/1/size - window/size / 2		;) center the window
 
 show window								;) finally, we display the layout
-set-focus host							;) focus host for it to receive keyboard events
+focus-space host/space/content/2		;) focus the button
 do-events								;) enter View event loop
 ```
-Note: in the above `..` is an operator that produces a `range!` object.
 
 </details>
 
@@ -235,4 +234,45 @@ More in-depth usage is covered in [Tinkerer's manual](manual.md).
 There's also a bunch of [test scripts](tests/README.md) that can serve as a study material and as templates.
 
 
+## Tips
 
+### Debug mode
+
+Spaces can operate in *debug* or *release* mode.
+
+Debug mode is used during development: it will do many extra checks to ensure early error detection, at the cost of some performance (in some cases it can halve FPS).
+
+Release mode is used for end products. It has all those checks disabled.
+
+If you open [everything.red](everything.red), you'll see roughly the following:
+```
+#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
+#debug off										;-- turn off type checking and general (unspecialized) debug logs
+; #debug set draw									;-- turn on to see what space produces draw errors
+; #debug set profile								;-- turn on to see rendering and other times
+; #debug set changes								;-- turn on to see value changes and invalidation
+; #debug set cache 									;-- turn on to see what gets cached (can be a lot of output)
+; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
+; #debug set focus									;-- turn on to see focus changes and errors
+; #debug set events									;-- turn on to see what events get dispatched by hosts
+; #debug set timer									;-- turn on to see timer events
+; #debug set styles									;-- turn on to see which styles get applied
+; #debug set grid-view
+; #debug set list-view
+
+#include %../common/assert.red
+#assert off
+```
+Debugging and assertions are turned off by default to make demos faster (ships in release mode).
+
+If you plan using Spaces in development, you should comment `#debug off` and `#assert off` lines until your program is ready. This will switch it into debug mode.
+
+### Compilation
+
+Due to numerous issues in include system, compilation is currently rather tricky. It should not be required until you come to release your product in executable form, since Spaces do not use any R/S code. When you do, the following steps should help you:
+1. Ensure you're not trying to compile your script from within `spaces/` directory. Bug [#4249](https://github.com/red/red/issues/4249) won't let you. Put your script outside `spaces/`.
+2. Download the [inline tool](https://gitlab.com/hiiamboris/red-cli/-/tree/master/mockups/inline) binary, put it into `PATH` or where your script is located.
+3. Run `inline -e <your-script.red> <output.red>` command from the command line. This will inline every included file, preprocess it and save as `output.red`. Result is a standalone script!
+4. Compile the `output.red` as you usually would (`redc -c output.red` or `redc -r output.red`). You can use `-o` option to control output binary name.
+
+If you cross compile, you'll need to provide the same `-t <platform>` option to both `inline` and `redc`!
