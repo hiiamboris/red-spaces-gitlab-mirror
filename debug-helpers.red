@@ -391,10 +391,15 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 		list: code: free: sized: drawn: path: obj: none
 		rea: reactor [canvas?: no]
 		fixed: make font! [name: system/view/fonts/fixed]
-		update: does [
+		;; can't put paths into list-view/data because of face's aggressive ownership system
+		paths: []
+		update: has [i] [
+			clear paths
 			list/data: collect [
-				foreach-*ace path: anonymize 'screen system/view/screens/1 [
-					keep reduce [form path path]
+				i: 0
+				foreach-*ace path: system/view/screens/1 [
+					append/only paths path
+					keep reduce [mold path i: i + 1]
 				]
 			]
 		]
@@ -411,14 +416,14 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 			code: area 400x600 font fixed react [
 				face/text: either any [
 					not list/selected
-					not path: pick list/data list/selected * 2
+					not path: pick paths list/selected
 				][
 					"Select a space in the list"
 				][
-					either is-face? obj: get last path [
+					either is-face? obj: last path [
 						sized/draw: none
 						either free/draw: drawn: obj/draw [
-							mold~/indent prettify/draw drawn 3
+							mold prettify/draw drawn
 						][
 							"Face has no Draw block!"
 						]
@@ -427,7 +432,7 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 							free/draw:  render    last path
 							sized/draw: render/on last path sized/size
 						]
-						mold~/indent prettify/draw pick drawn not rea/canvas? 3
+						mold prettify/draw pick drawn not rea/canvas?
 					]
 				] 
 			]
