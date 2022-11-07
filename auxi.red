@@ -343,7 +343,7 @@ exclude-from: function [
 
 set-flag: function [
 	"Include or exclude flag from series depending on present? value"
-	series [series!] flag [any-type!] present? [logic!]
+	series [series!] flag [any-type!] present? [logic! none!]
 ][
 	either present? [include-into series :flag][exclude-from series :flag]
 ]
