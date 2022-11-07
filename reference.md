@@ -143,7 +143,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 |-|-|-|
 | `type` | `word!` | Used for styles and event handler lookups. Usually equals space's template name, but can be renamed freely. |
 | `size` | `pair!` `none!` | Size of this space in it's own coordinate system.<br> Usually updated during every `draw` call (as such, it is the *size of the last rendered frame* in a sequential chain of redraws), but sometimes fixed.<br> Used by container spaces (e.g. list) to arrange their items. <br> Can be `none` if space is infinite, or if it was never drawn yet. |
-| `draw` | `block!` `func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
+| `draw` | `block!`<br>`func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
 | `parent` | `none!` `object!` | After space is rendered, contains it's owner object. |
 | `limits` | `none!` `range!` | Object with /min and /max size this space can span. See [VID/S manual](vids.md#constraining-the-size) on details. |
 | `cache` | `none!` `block!` | List of cached words (usually `[size map]`). Turns off caching if set to `none`. |
@@ -160,9 +160,9 @@ Some other facets are not mandatory but have a **reserved** meaning (cannot be u
 |-|-|-|
 | `rate` | `time!` `integer!` `float!` `none!` | Specifies rate of the `on-time` event. `time!` sets period, numbers set rate (1 / period).<br> Not usually present in most spaces by default, but can be added using `make-space` or `with [rate: ..]` keyword in VID/S.<br> If `none` or absent, no `on-time` event is generated. |
 | `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[child [offset: pair! size: pair!] child ...]`.<br> Used for hittesting and tree iteration. |
-| `into` | `func [xy [pair!]] -> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
+| `into` | `func [xy [pair!]]`<br>`-> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
 | `weight` | `number!` | Used for relative scaling of items in containers like `tube`. `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
-| `on-invalidate` | `func [space [object!] cause [object! none!] scope [word! none!]]` | Custom invalidation function, if cache is managed by the space itself. |
+| `on-invalidate` | <pre>func [<br>	space [object!]<br>	cause [object! none!]<br>	scope [word! none!]<br>]</pre> | Custom invalidation function, if cache is managed by the space itself. |
 
 ---
 
