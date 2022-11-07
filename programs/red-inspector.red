@@ -15,7 +15,7 @@ Red [
 ;@@ stupid include bugs turn off assertions in some crooked way, can't use them to debug inspector
 #include %../../common/setters.red
 #include %../../common/forparse.red
-#do [disable-space-cache?: yes]
+; #do [disable-space-cache?: yes]
 #include %../everything.red
 
 #process off											;@@ hack to avoid #include bugs
