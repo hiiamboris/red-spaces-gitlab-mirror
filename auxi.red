@@ -407,24 +407,18 @@ area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (
 
 skip?: func [series [series!]] [-1 + index? series]
 
-;-- `clip [a b] v` is far easier to understand than `max a min b v`
-;@@ although block-form [a b] requires extra reduction; maybe use just `clip a b v`?
-;@@ v is at the end because it's usually a big expression, OTOH order is not so relevant here:
-;@@ (clip [1 2] 3) = (clip [1 3] 2) = (clip [2 3] 1) - segment bounds just have to be sorted (not clip [3 1] 2)
-;@@ this means there really is no need to remember the argument order!
+;@@ remove it if PR #5194 gets merged
 clip: func [
-	"Get VALUE or margin closest to it if it's outside of [range/1 range/2] segment"
-	range [block!]  "Reduced"
-	value [scalar!]
+	"Return A if it's within [B,C] range, otherwise the range boundary nearest to A"
+	a [scalar!] b [scalar!] c [scalar!]
+	return: [scalar!]
 ][
-	range: reduce/into range clear []
-	#assert [any [not number? range/1  range/1 <= range/2]]
-	min range/2 max range/1 value
+	min max a b max min a b c
 ]
 
 ;@@ this should be just `clip` but min/max have no vector support
 clip-vector: function [v1 [vector!] v2 [vector!] v3 [vector!]] [
-	repeat i length? r: copy v1 [r/:i: clip [v2/:i v3/:i] v1/:i]
+	repeat i length? r: copy v1 [r/:i: clip v1/:i v2/:i v3/:i]
 	r
 ]
 
@@ -481,7 +475,7 @@ HSL2RGB: function [hsl [block!]] [
 	n: to integer! H / 60
 	triple: pick [[C X 0] [X C 0] [0 C X] [0 X C] [X 0 C] [C 0 X] [C X 0]] n + 1
 	rgb: 0.0.0
-	repeat i 3 [rgb/:i: clip [0 255] to integer! m + do triple/:i]
+	repeat i 3 [rgb/:i: clip 0 255 to integer! m + do triple/:i]
 	rgb
 ]
 
@@ -550,7 +544,7 @@ enhance: function [
 	bg-hsl: RGB2HSL resolve-color bgnd
 	fg-hsl: RGB2HSL resolve-color color
 	sign: pick [1 -1] fg-hsl/3 >= bg-hsl/3
-	fg-hsl/3: clip [0% 100%] fg-hsl/3 + (amnt - 1 / 2 * sign)
+	fg-hsl/3: clip 0% 100% fg-hsl/3 + (amnt - 1 / 2 * sign)
 	HSL2RGB fg-hsl
 ]
 
@@ -606,7 +600,7 @@ context [
 			F1: (call-f X1) [number!] 
 			F2: (call-f X2) [number!] 
 	][
-		#assert [fopt = clip [min f1 f2 max f1 f2] fopt  "Optimum value should be within [F1,F2]"]	;@@ rephrase when clip updates
+		#assert [fopt = clip fopt f1 f2  "Optimum value should be within [F1,F2]"]
 		sign: sign? (f2 - f1) * (x2 - x1)				;-- + if ascending
 		repeat n 1e3 [
 			df: abs f2 - f1
@@ -640,7 +634,7 @@ constrain: function [
 		pair!           [limits/max]
 		integer! float! [limits/max by infxinf/y]		;-- numeric limits only affect /x
 	] [infxinf]											;-- none and invalid treated as infinity
-	clip [min max] size
+	clip size min max
 ]
 
 #assert [infxinf = constrain infxinf none]

@@ -234,7 +234,7 @@ image-ctx: context [
 			default min-scale:    0.0
 			default max-scale:    1.#inf
 			default canvas-scale: 1.0
-			scale: clip [min-scale max-scale] canvas-scale
+			scale: clip canvas-scale min-scale max-scale 
 			; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
 			image/size: isize * scale + (2 * mrg)
 			reduce ['image image/data mrg image/size - mrg]
@@ -398,7 +398,7 @@ scrollable-space: context [
 	][
 		csize: select space/content 'size
 		box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
-		space/origin: clip [box - csize 0x0] origin
+		space/origin: clip origin box - csize 0x0
 	]
 	
 	;@@ or /line /page /forth /back /x /y ? not without apply :(
@@ -429,7 +429,7 @@ scrollable-space: context [
 			tail [xy: csize * 0x1]						;-- no right answer here, csize or csize*0x1
 		]
 		box: space/viewport
-		mrg: clip [0x0 mrg] box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
+		mrg: clip 0x0 mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
 		xy1: mrg - space/origin							;-- left top margin point in content's coordinates
 		xy2: xy1 + box - mrg							;-- right bottom margin point
 		dxy: 0x0
@@ -1044,7 +1044,7 @@ window-ctx: context [
 			cavail? axis dir from requested
 		][														;-- otherwise deduce from content/size
 			csize: any [cspace/size infxinf]
-			clip [0 requested] either dir < 0 [from][csize/:axis - from]
+			clip 0 requested (either dir < 0 [from][csize/:axis - from])
 		]
 	]
 
@@ -2288,7 +2288,7 @@ grid-view-ctx: context [
 			'infinite [requested]
 		]
 		#assert [r >= 0]
-		r: clip [0 r] requested
+		r: clip 0 r requested
 		#debug grid-view [#print "avail?/(axis) (dir) = (r) of (requested)"]
 		r
 	]
@@ -2574,7 +2574,7 @@ field-ctx: context [
 						co = sel/2 [sel/1]
 						'else      [co]					;-- shouldn't happen, but just in case
 					]
-					co: clip [0 len] co + n
+					co: clip 0 len co + n
 					sel: (min co other) by (max co other)
 				]
 				field/caret/offset: co
@@ -2596,7 +2596,7 @@ field-ctx: context [
 			|	'to set co integer!
 			|	'by set n  integer! (co: co + n)
 			] (
-				pos: skip text field/caret/offset: co: clip [0 len] co
+				pos: skip text field/caret/offset: co: clip 0 len co
 				field/selected: sel: none				;-- `select` should be used to keep selection
 			)
 			
@@ -2651,8 +2651,8 @@ field-ctx: context [
 		co: field/caret/offset + 1
 		cx: first system/words/caret-to-offset layout co
 		min-org: min 0 cmargin - cx
-		max-org: clip [min-org 0] view-width - cx - cw - cmargin
-		clip [min-org max-org] field/origin
+		max-org: clip min-org 0 view-width - cx - cw - cmargin
+		clip field/origin min-org max-org
 	]
 			
 	offset-to-caret: func [

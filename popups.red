@@ -140,7 +140,7 @@ show-hint: function [
 		
 		offset: pointer + either above? [2 by (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
 		limit: window/size - hint/size
-		fixed: clip [0x0 limit] offset					;-- adjust offset so it's not clipped
+		fixed: clip offset 0x0 limit					;-- adjust offset so it's not clipped
 		if fixed <> offset [
 			offset: fixed
 			space/origin: none							;-- disable arrow in this case
@@ -215,7 +215,7 @@ show-menu: function [
 		face/color: system/view/metrics/colors/panel + 0.0.0.254
 	][
 		limit: window/size - face/size
-		offset: clip [0x0 limit] offset					;-- adjust offset so it's not clipped
+		offset: clip offset 0x0 limit					;-- adjust offset so it's not clipped
 	]
 	show-popup window level offset face
 ]

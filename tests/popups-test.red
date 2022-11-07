@@ -27,7 +27,7 @@ declare-template 'rocket/wheel [
 	text: "🚀"
 	burn?: yes
 	draw: does [
-		if burn? [disp: clip [0x0 20x20] disp + (random 3x3) - 2x2]
+		if burn? [disp: clip 0x0 20x20 disp + (random 3x3) - 2x2]
 		drawn: text-draw
 		size: size + 20x20
 		compose/only [rotate (angle) (size / 2) translate (disp) (drawn)]
