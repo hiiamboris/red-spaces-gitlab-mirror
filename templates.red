@@ -1813,13 +1813,6 @@ grid-ctx: context [
 		]
 		reduce [map drawn]
 	]
-	;@@ this hack allows styles to know whether this cell is pinned or not
-	;@@ only a temporary kludge! until we get apply func, so I can pass /extra to render
-	rendered-xy: 1x1
-	pinned?: function [] [
-		grid: get bind 'grid :draw
-		grid/is-cell-pinned? rendered-xy
-	]
 
 	;; uses canvas only to figure out what cells are visible (and need to be rendered)
 	draw: function [grid [object!] canvas [none! pair!] wxy1 [none! pair!] wxy2 [none! pair!]] [
@@ -2097,6 +2090,14 @@ grid-ctx: context [
 		]
 	]
 	
+	pinned?: function [cell [object!] ('cell = select cell 'type)] [	;-- used by cell/pinned?
+		to logic! all [
+			grid: cell/parent
+			found: find/same grid/frame/cells cell
+			grid/is-cell-pinned? found/-1
+		]
+	]
+	
 	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
 	
 	declare-template 'grid/space [
@@ -2160,7 +2161,7 @@ grid-ctx: context [
 
 		wrap-space: function [xy [pair!] space [object! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			unless cell: frame/cells/:xy [
-				cell: make-space 'cell []
+				cell: make-space 'cell [pinned?: does [grid-ctx/pinned? self]]
 				repend frame/cells [xy cell] 
 			]
 			quietly cell/parent: none					;-- prevent grid invalidation in case new space is assigned
@@ -2322,6 +2323,7 @@ grid-view-ctx: context [
 				quietly wrap?:  on						;-- will be considered upon /data change
 				quietly margin: 3x3
 				quietly align: -1x0
+				pinned?: does [grid-ctx/pinned? self]
 			]
 			set/any 'spc/data :item-data
 			spc

@@ -174,7 +174,7 @@ do with context [
 			canvas: min abs canvas cell/size
 			color: any [
 				select cell 'color
-				if grid-ctx/pinned? [mix 'panel opaque 'text 15%]
+				if cell/pinned? [mix 'panel opaque 'text 15%]
 			]
 			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
 			reduce [bgnd drawn]
@@ -182,7 +182,7 @@ do with context [
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
 			;; careless setting causes full tree invalidation on each render, though if style is applied it's already invalid
-			set-flag flags 'bold grid-ctx/pinned?
+			set-flag flags 'bold if parent [parent/pinned?]
 		]
 		
 		
