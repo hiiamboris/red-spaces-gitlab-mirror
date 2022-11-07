@@ -205,7 +205,7 @@ context with spaces/ctx [
 		grid/cell/text: grid/cell/paragraph: function [self /on canvas] [
 			default self/font: system-font
 			draw-text self canvas self/text self/font glass			;-- sets the size in draw-text/draw
-				either grid-ctx/pinned? [linen][silver]
+				either self/parent/pinned? [linen][silver]
 		]
 		cell: function [self /on canvas] [
 			drawn: self/draw/on canvas
@@ -215,7 +215,7 @@ context with spaces/ctx [
 		grid/cell: function [self /on canvas] [
 			drawn: self/draw/on canvas
 			bgnd: compose [
-				pen off fill-pen (either grid-ctx/pinned? [w1][s0])
+				pen off fill-pen (either self/pinned? [w1][s0])
 				box 0x0 (min abs canvas self/size) 5
 			]
 			reduce [bgnd drawn]
