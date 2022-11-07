@@ -396,7 +396,7 @@ scrollable-space: context [
 		space  [object!]
 		origin [pair! word!]
 	][
-		csize: select space/content 'size
+		csize: space/content/size
 		box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
 		space/origin: clip origin box - csize 0x0
 	]
