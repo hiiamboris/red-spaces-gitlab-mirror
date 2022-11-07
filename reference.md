@@ -748,6 +748,7 @@ Introduces new facets:
 | `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `roll` | function! | can be called to manually check for a jump |
 
+`inf-scrollable` uses two origins (`origin` and `window/origin`) to provide pagination across unlimited (or big) dimensions. `window/origin` determines offset of window's content from window's left top corner. `inf-scrollable/origin` determines offset of window's lert top corner from viewport's left top corner. So both are normally negative pairs. You can jump around `inf-scrollable` by setting these two origins to desired offsets.
 
 ## Container
 
@@ -1067,7 +1068,7 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 
 | facet  | type | description |
 |-|-|-|
-| `origin` | pair! | offset of unpinned cells (mirrors `grid/origin`), together with `window/origin` can be used to translate coordinates into `grid`'s coordinate system |
+| `origin` | pair! | offset of unpinned cells, together with `window/origin` can be used to translate coordinates into `grid`'s coordinate system |
 | `hscroll` | scroller space object! | horizontal scrollbar; can be styled as `grid-view/hscroll` |
 | `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
 | `vscroll` | scroller space object! | vertical scrollbar; can be styled as `grid-view/vscroll` |
@@ -1101,6 +1102,9 @@ Adds new facets:
 - called as `data/pick xy` it should return the data value at (row=y, col=x), xy >= 1x1
 
 Default `data` just acts as a wrapper around `source`, picking from it and returning it's `source/size` value. But can be redefined to use any other source. In this case `source` will be unused.
+
+
+Pagination works as explained for [`inf-scrollable`](#inf-scrollable). The only thing to note is that pinned cells are displayed in the viewport regardless of the estimated content offset. 
 
 
 [comment]: # (not sure icon template is worth documenting / making available by default, we'll see)
