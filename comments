@@ -1774,7 +1774,7 @@ I'm all the more serious about single parent model
 		need to benchmark.. list-spaces takes 7ms for 1000 spaces, which should be a good visitor time estimate
 		and that crosses out visiting idea, then /parent should indeed be a word, or words
 	will have to remove 'generic' spaces
-	will be no need in limit or cycle detection in traversal algorithms ;@@ remove them
+	will be no need in limit or cycle detection in traversal algorithms
 	consider disabling cache for timers, as there's really no need
 	how to check for possible parent override during render?
 		maybe I shouldn't? 99% cases won't override anything, and self-containing grid still will work (hacky but..)
@@ -1802,9 +1802,10 @@ I'm all the more serious about single parent model
 		this will also affect /text space which must be fast
 		maybe a better way to use a `cache: block` at first until `make-space` turns it into an object
 		tricky part: without /only I need to visit all parents even if cache is 'invalid or off, but not if it's a block!
-	name is still a problem! if I have /parent chain I still don't have the names
+	name is still a problem! if I have /parent chain I still don't have the names themselves
 		and don't want another global registry for them, so perhaps name should also be in the cache!
 		but if I decide to expose it, won't be needed
+		ok solved by last-frame at least temporarily, need to think about explicit name even in existing model
 	what about timers that were rendered (and armed), but are no longer on the frame? how to turn them off?
 		they still have a /parent, which may be live, and name
 		I could scan parent's map for the name, but it's a big overhead in case of lists/grids
@@ -1840,11 +1841,36 @@ I'm all the more serious about single parent model
 		I could look up 'cached spaces in their parent map though to double check
 		oh but for 'cached I will have both generation and fence! so no problem at all
 		/last-frame: [name generation 'cached/drawn]
+		removed name in object model, now:
+		/last-frame: [generation 'cached/drawn]
 	this revives the question: should /map and /size be in the space object, or in the cache?
 		I hold /drawn in the cache because it's mold output is huge noise
 		I hold /size in the object because it's often accessed
-		/map is in the middle, it's used for traversal, it's also needed to persist even if cache is disabled (as well as size)
+		/map is in the middle, it's used for traversal, hittest, it's also needed to persist even if cache is disabled (as well as size)
 		/content is not used for traversal because it's *all* items, not visible items, so not UI-related and may be a func in the future
+		for object model: makes sense to also expose /drawn? or pointless?
+			it's not gonna be accessed anyway, the only value is if one wanted to inspect it, but then one may call render
+		is there a point in having /last-frame instead of /frame-generation + /frame-state ?
+			0-4   field object = 424b >106b/field
+			5-6   fields = 728b       >121b/field
+			7-8   fields = 1868b      >233b/field
+			9-16  fields = 2428b      >150b/field
+			17-33 fields = 3500b      >106b/field
+			so 106-250b/field, with an obvious anomaly around 7-8, maybe worth reporting
+			min. space with last-frame is 7 fields, so already in the big area
+			block is 28b + 16*number-of-values (5 values block fits 108b)
+		so there's a point
+		and maybe rename it to /internal or smth? in case I later want to extend it
+		may even put cached fields into /internal block, leaving /cache to be a simple logic/block
+		may even make /cache class-wide, saving some more RAM?
+			block of words will have to be bound on each cache fetch though, but may be worth it
+			but it's hard to achieve, need some modifications to the class declaration or what
+			besides, grid-view disables it's window/cache at runtime, not for any other windows
+		/cached - better name than /internal? less extensible, but still okay
+		both /size and /map are also parts of the frame techincally, but I'd rather not complicate access to them
+		/cache will not be logic anymore, but `none` to disable it: then I don't have to give meaning to 'true'
+		how to avoid invalidation during construction, if /cache is now legally a block?
+			will check /cached/-1 for now (which should be drawn/cached word), more reliable than /owner
 	and another one: should I still be using words, or /type: name inside the object?
 		I could rewrite `probe` finally.. could even write per-class variant of it
 		such /type could reference the object itself, so it will be easier to construct paths using it
@@ -1856,6 +1882,8 @@ I'm all the more serious about single parent model
 		and can solve that by `make-space [name: 'thumb]`
 		a bit dumb having `thumb: make-space [name: 'thumb]` from DRY perspective though - it has two names now
 		need more pros and cons to decide, for now seems different but not better
+	interesting note: no override in the grid-test5! because it calls /draw, not render()
+		so there are even two ways to get infinite trees - disregarding override warning and avoiding render...
 should there be dump-rendered-tree + dump-tree? since /map is only valid after render.. (dump-tree could walk across content)
 available? is still an issue
 	it's an out of the tree render, so it's broken styling is going to cause problems eventually
@@ -1925,12 +1953,216 @@ shit! in grid-test8 almost 3k renders...
 		affected: hcache, size-cache, map, size
 		won't be needed until next render: fitcache
 		OTOH, maybe I *should* let these funcs work on new data, while map preserves the frame? but out-of-tree is a problem then
-	should I bother caching drawn & map? not until proven to be required I guess ;@@ but this is the further optimization agenda
+		another problem is invalidation during render, e.g.:
+		- cells are added into content by data access
+		- data access is made by maybe measure-column
+		- which may invalidate all the rest
+		to ensure it doesn't, new cells should not be connected to the tree (so they have no /owner yet and cause no invalidation)
+	should I bother caching drawn & map in the grid? not until proven to be required I guess
+so the origin problem...
+	I want it to be clipped inside scrollable/draw only for draw purposes
+	this would eliminate the issue with zero-sized window affecting it during tube render
+	(the issue results in inability to scroll down when it should still be possible to, not sure why,
+	but likely because content(window) size becomes zero(multiple of zero canvas) and origin gets clipped within 0x0..0x0)
+	idea is not to affect real origin, only the one being drawn
+	but that breaks with grid, as grid-view/origin must be pushed to grid/origin and affects:
+	- where pinned cells appear
+	- what cells are even drawn 
+	(inferred by grid from it's origin and /window passed to it by window/draw, which is based on window/origin and canvas)
+	moreover, to clip origin I need to know content's size
+	but I only know it after content's render, result of which depends.. on origin
+	catch-fucking-22 and one of the trickiest design problems
+	maybe content (window) can adjust the origin of it's own content (grid)? no
+	maybe content (grid) can adjust it's own origin during it's /draw?
+	...so I decided to clip it in the event handler itself, where it's guaranteed that space has valid size (not an intermediate one)
+	one should use /clip-origin instead of setting origin directly when one wants clipping
+	one trouble: when dragging by content or empty space, roll changes origin asynchronously
+		and thus the idea of using origin as a point of reference doesn't work
+		so instead I'm now just resetting drag offset every time I react to it
+	another trouble: when dragging grid by content, the original cell may get out of the viewport
+		then it's not in the map anymore, but while LMB is still down, hittest/into expects it to exist there
+		I suppose a simple fix would be to clip the path after the window, or even grid-view
+		but that breaks another thing: dragging keeps the path given to drag-start, so thumb dragging is no more
+		so the "fix" would be to clip the path only if it doesn't land on a scroller
+reworked (inf-)scrollable's sizing but now inside the column it's as if on an infinite canvas...
+	doh! it's my min/max logic which is wrong..
+note on grid/frame/cells - why it's a hash of period 3:
+	(at least in the current model where space names are kept outside space objects)
+	need to lookup name by coordinate - so I cache them all and can render the *same* cell (persistence)
+	need to lookup coordinate by object - so I can tell the cell where it's located (e.g. to determine if it's pinned)
+	if I only hold objects and make new names every time I want to render them, then it's not persistent
+	even simple button click (in a cell) results in 2 redraws, and cell clicked is not the same word as cell released
+	which makes hittest's into-map fail as it's looking for the same word in the map 
+how is page size defined?
+	dumb way for scrollable is to use it's own (viewport) size, minus maybe scrollbars
+	but in case of some grid cells are pinned, I should subtract their size, which is complicated
+	perhaps, just 80% of the page for now?
+	and line size, what is the line size, who defines it? 10-20px seems okay but hardcoded
+how to determine whether scrollable should allow dragging by it's content
+	or it should let content handle the events
+maybe instead of origin/on-change make grid/origin a function accessing grid-view/origin?
+	grid needs to detect the moment of change and invalidate itself, but that's solvable
+	main reason not to do this is it's working as is anyway, and function will only increase complexity
+no need to cache spaces where /draw is not a function (optimization for timers)?
+	actually, style itself can evaluate any code and even replace /draw block, so this doesn't work
+	timers' cache is simply turned off for now
+out of tree renders problem located in list-view:
+	list-view uses it's own height estimation (e.g. locate-line), which renders it's items
+	while final items are rendered by list
+	so list-view misses window/list part which is bad for styling
+	how to solve?
+	why is locate-line needed? called by list-draw (in-tree) and by available (the culprit) which is called by roll!
+	shit.. makes sense.. roll is known only by inf-scrollable, not the inner container
+	I can't call 'roll' from within content's /draw, because I've no control over content, generally
+	will have to spoof the rendering tree then, make it look like it's deeper
+so `roll` now postpones `available?` until /draw
+	and /draw requires invalidation, and that happens 4/sec for every grid-view/list-view
+	is this heavy?
+	grid should still be cached, but reality is it calls both window/draw and grid/draw, wtf
+	right.. commit/cache is never called on grid because of /window xy1 xy2 usage
+	window itself is never cached in a grid
+	so for inspector (and alikes) it's a heavy solution
+	I could split `roll` in two parts: one (sync) detects nearby border, another (async) calls available
+	but then near 0x0 (which is almost always) it will slow down
+	then next acceptable solution is to spoof rendering path?
+	problem with that is while styles are going to be applied for the final item (grid),
+	all intermediate styles will be lost, even those applied by `host`
+	so it's a half-measure too, but perhaps the best one, realistically
+	plus, only font may affect the sizes of children, and not draw font, but real facet, so it shouldn't even matter
+	from grid-view/window/grid structure's POV, spoofed rendering should work fine
+	plus, it has an important role of not setting the /owner facet to `none`
+	let event handlers pass their path into roll, which requires it from now on
+new mold principles (or rather form? `?` and `??` will use it for human oriented output):
+	depth-dependent: big items are expanded fully at top level 0, into single line at level 1, and are not beyond that
+		should have ability to turn that off? need to be able to save draw blocks to compose later
+	item grouping in lists: same item, same type
+	ellipsization of long values within a single line (lenght depends on indent)
+	mold/part for big things to avoid delays
+	controllable molding of object's fields? or general principles are enough?
+		might wanna format /draw facet...
+		output of space at level 1 must focus on it's name, size
+	ideas how to make mold output loadable, yet readable:
+	- use issues to denote constructed values: #object #map #error (no literal maps)
+	  then plug in some construction macros file
+	- use generic construction syntax, e.g. ##[code] - ##[construct/only [...]], ##[make map! [...]], ##[func ..] etc
+	  extra bracket level is unfortunate here, but it's more flexible
+	  perhaps only with /all refinement, and use just names object/map/error normally?
+as expected, cache causes problems (in glossy-test):
+	parent column gets fetched from cache on big canvas, while children aren't affected
+	and they were previously rendered for smaller canvas, so their map & size are invalid
+	so invalidate host/space is a bad idea
+	it all only works if invalidation comes from the deepest child that causes it
+	on top level full invalidation is required
+dragging and tree modifications - tricky!
+	on-down calls 'start-drag' expecting later on-up to call 'stop-drag'
+	but if before on-up (e.g. in on-down or in on-dbl-click) the tree changes, drag-path becomes invalid
+	and system is locked in permanent dragging state
+	how to solve?
+	somehow keep visiting spaces in drag-path?
+		they're not in the map anymore, so I don't know their offset/size
+		maybe pass `none` as offset or some default (0x0?)?
+		0x0 seems most innocent, given that that space is no longer visible anyway
+		although, children may translate that 0x0 and get arbitrary offsets.. but it's still okay 
+	some global call to stop-drag?
+		but how do I know it's on-down that started dragging? maybe UI does it on RMB?
+	fall back to visible hittest path if drag-path is invalid?
+		may cause quite unexpected events flow
+	avoid tree rendering until dragging is complete?
+		out of the question, too limiting
+interesting bug case, took me some time to figure it out:
+	in resize-test, reactivity ties some space size to other space's text facet
+	when I fetch [size map] from the cache, after setting size, text of other space gets changed
+	this triggers invalidation of the space I'm fetching from the cache
+	and leads my cache source to become cleared, and I'm attempting to set map to none, which fails
+	how to approach this?
+	set-quiet is obviously not an option here, since /size is watched
+	forbid invalidation temporarily? will not update the text on next render
+	always compare /text ? not so good performance-wise
+	delay reactions? might work
+	and in the demo itself, ofc I should use `maybe`
+transition to objects from words:
+	1st problem: tried /type facet but it's hardcoded in View: `base`, not `host`, will rename style to `base`
+	every path now - should it still contain words (taken from /type) or objects (specifically molded)?
+	and map? where should I draw the line between words and objects?
+	I'm afraid if I put objects everywhere, and mold as words (e.g. paths), it will become even more misleading
+	OTOH, would be nice to have some path access
+	what do I need for path access? just /content? and that will require /type facet
+	also would be nice to get rid of `anonymize` (extra RAM and GC load), but how?
+	(one-word object is 424 bytes, average 8-word space is 1860 bytes, so that's ~25% overhead for items in generic containers)
+	if I use words in paths, I need them to resolve to objects
+	so this kind of half-here half-there model is crippled too
+	also style and event handler maps are always accessed words, which require path conversion from objects
+	but those paths don't require binding, so at least no extra allocations come from it
+	events(hittest) and timers should use objects in path or they will take a performance hit:
+		path of words will require as many objects
+	should traversal functions still output words? I'll try objects there too for more speed
+	form causes issues too.. runs out of memory on some recursive space... so will `to string!`
+	do I have to rewrite these two as well? what a mess
+	mold itself is an issue: I have to write mold/compact even in interpolated messages...
+	maybe make /compact a default and /deep for full dump? 
+	another problem: even if I change `form`, I have to change every compiled function that uses it
+	e.g. rejoin, but it calls `form` indirectly from append's R/S code..
+	nah, this becomes just way too much and too disruptive
+	if I make words for paths, what do I lose?
+	either I re-anonymize them all on every hittest or timer event (plenty of those, big overhead)
+	or I should anonymize /style during space creation, still paying the overhead but only once, while it's cached
+	event handlers will still get paths as words and need a `get` to access the objects
+	but I at least get path access
+	let maps use words as well? the only change will be /content type?
+	maps with objects are harder to access:
+		forth-arrow-geom: select/same map space/forth-arrow
+		back-arrow-geom:  select/same map space/back-arrow
+		band:   scroll/size/:x - forth-arrow-geom/size/:x - back-arrow-geom/size/:x
+	compared to:
+		band:   scroll/size/:x - map/forth-arrow/size/:x - map/back-arrow/size/:x
+	but putting words into map will require anonymization, which is undesired
+	OTOH, a lot of (select get content 'size) become just (content/size) which is great
+	this stupido morono triggers host's on-deep-change when I repend something to grid/frame/invalid !!!
+	(because I changed /space from word to object..)
+	now that's a performance hit! and I only found it because there's some bug in there
+	(fixed by avoiding face/on-change call for /space)
+	worst of all, there's some mold heisenbug that renders `[]` as `[^/]` sometimes, at random!! impossible to track
+		okay heisenbug fixed..
+	should menu DSL accept words as existing object names, or as template names?
+		main point was to have explicit `<->` there, which is a template name
+		OTOH for most template it's pointless - without data they have no value, so existing objects make more sense
+		if <-> becomes an "existing" global object it gets shared and messes up the cache
+		I could first check for existence, then check for template name, but it's easy to break
+		(e.g. by redefining <-> to something else, an op maybe, while it was meant to be a template name)
+		could menu DSL be a superset of VID/S?
+		maybe let inlined objects be existing spaces, and words be template names? makes most sense
+		also ;@@ it should be possible to extend just-word-template-names support to more complex VID/S expressions
+	cache is another memory consumer - since I'm using an object for each cache
+		should be possible to replace it with block
+		[valid/invalid fields... cached-values...]
+parent vs owner, type vs style
+	although I can't override /type of a base, it occurred to me that style can still differentiate between hosts
+	either by introducing a custom facet or by comparing the base for sameness to known bases
+	so it's solvable
+	besides, "style" name is already very overloaded with meanings
+	/owner is 1 letter shorter, but not critical otherwise
+	and /type and /parent have a value of code reuse between spaces and faces, so I'm renaming these to /type and /parent
+in single parent model, do I still need a map?
+	could have just assigned /offset to children and kept /pane
+	I do need it because map/space/size <> space/size, as map is expressed in parent's coordinates
+	I still do mix these two sometimes though, by mistake
+cache creep/buildup
+	tricky thing is, invalidation (esp. deep) might be missing (on resize?) and cache will accumulate old canvases
+	I could clean it up but idk after which length: e.g. space within row within column may use 9 slots per frame
+	so I have to add generation number into each cache slot, then on commit - walk over it and clean up
+	current and last generation (previous frame) should be enough to keep it fast?
+	what if cached previouosly space now gets drawn again but not due to invalidation, but because it's given new canvas?
+	I could leave infxinf and 0x0 canvases and infx0 or 0xinf, but rest is likely outdated
+	for less load, maybe should only clean it up after some length threshold? undecided yet
+	unfortunately now I'm iterating manually over the cache and hash will bring no benefit either
+	in very deep layout this may become a problem 
 	
 	
-;@@ I need ASAP move on-origin-change from scrollable into draw
-	
-	
+;@@ doc sizing policy of all spaces
+;@@ announce the changes and show smth for error reporting to the audience
+
+;@@ actually use 'look to optimize out unnecessary redraws
+;@@ remove preprocessor from sift/locate
 
 
 Timer design:
@@ -5718,4 +5950,153 @@ other old caching code
 	; clear body-of :set-parent
 	; clear body-of :enter-space
 	; clear body-of :leave-space
+; ]
+
+some old probe variant
+; context [
+	; containers: make typeset! [block! object! map! hash! paren! function!]
+	; openings: reduce [block! "[" object! "object [" map! "#(" hash! "make hash! [" paren! "(" function! "function"]
+	; closings: reduce [block! "]" object! "]"        map! ")"  hash! "]"            paren! ")" function! ""]
+
+	; indent-text: function [text [string!] isize [integer!] /after] [
+		; if isize <= 0 [return text]
+		; text: copy text
+		; indent: append/dup clear "" #" " isize
+		; append append clear line: "" "^/" indent
+		; unless after [insert text indent]
+		; replace/all text #"^/" line
+	; ]
+	
+	; set '?p function [depth [integer!] value [any-type!] /indent isize [integer!]] [
+		; isize: any [isize 0]
+		; either find containers type: type? :value [
+			; either depth = 0 [
+				; prin mold/flat/part :value 40
+			; ][
+				; either any [object? :value map? :value function? :value] [
+					; either function? :value [
+						; prin [select openings type  mold/flat spec-of :value  ""]
+						; ?p/indent depth - 1 body-of :value isize
+					; ][
+						; print indent-text select openings type isize
+						; foreach [k v] to [] :value [
+							; prin [indent-text pad mold k 10 isize + 4 ""]
+							; ?p/indent depth - 1 :v isize + 4
+							; print ""
+						; ]
+						; print indent-text select closings type isize
+					; ]
+				; ][
+					; prin select openings type
+					; if nl?: new-line? value [prin ["^/" indent-text "" isize + 4]]
+					; repeat i length? value [
+						; ?p/indent depth - 1 :value/:i isize + 4
+						; unless i = length? value [prin " "]
+						; if new-line? skip value i [prin ["^/" indent-text "" isize + 4]]
+					; ]
+					; if nl? [prin ["^/" indent-text "" isize]]
+					; prin select closings type
+				; ]
+			; ]
+		; ][
+			; prin indent-text/after mold/part :value 40 isize
+		; ]
+	; ]
+; ]
+
+find-deep I used to debug complex cache
+; find-deep: none
+; context [
+	; path: make path! 10
+	
+	; find-deep*: function [list [any-block!] value [any-type!]] [
+		; ;; find should be faster on hashes than parse
+		; either pos: find/only/same list :value [
+			; throw copy append path index? pos
+		; ][
+			; append path 1
+			; forall list [								;@@ for-each can't be used with throw yet!
+				; inner: list/1
+				; ;@@ [hash! block!] value filter seems buggy in for-each! can't locate the bug!
+				; unless any [hash? inner block? inner] [continue]	
+				; change top path index? list
+				; find-deep* inner :value
+			; ]
+			; remove top path
+		; ]
+		; none
+	; ]
+	
+	; set 'find-deep function [list [any-block!] value [any-type!]] [
+		; clear path
+		; catch [find-deep* list :value]
+	; ]
+; ]
+; dump-parents-list: function [list [hash! block!] cache [hash! block!]] [			;-- used for cache debugging only
+	; #print "parents-list: (\size = ((length? list) / 2)) ["
+	; foreach [space parents] list [
+		; prin ["   " mold/part/flat space 40 "(" pad find-deep cache space 12 ")" "-> "]
+		; foreach [node parent] parents [
+			; prin [find-deep cache node find-deep cache parent "| "]
+		; ]
+		; print ""
+	; ]
+	; print "]"
+; ]
+
+kludges that won't be needed with objects in place of words
+; fix-paths: function [
+	; "Replaces convenient but invalid space-referring paths with valid ones"
+	; code [block!] "Block where to replace paths"
+	; /local path
+; ][
+	; parse r: copy/deep code [any [
+		; change only set path any-path! (to path expand-space-path path)
+	; |	skip
+	; ]]
+	; r
+; ]
+; ;; helper to work with words as objects in paths
+; ;@@ can there be a -> operator for select+get+maplookup?
+; expand-space-path: function [path [any-word! any-path!] /local coll] [
+	; if word? path [path: to path! path]
+	; set/any 'coll get/any path/1
+	; out: head clear next copy path 
+	; for-each [pos: item] as [] next path [				;@@ as [] = workaround for #4421
+		; if any-function? :coll [append out pos  break]
+		; space: if word? :item [
+			; ;; substitute global word in the path with a word that refers to a space
+			; any [
+				; all [object? :coll  in coll 'map  found: find coll/map item  found/1]
+				; all [object? :coll  host? coll  any [item = 'space  item = select coll 'space]  coll/space]
+				; all [block?  :coll  found: find coll item  found/1]
+			; ]
+		; ]
+		; set/any 'coll either space [
+			; append clear out space
+			; get/any space
+		; ][
+			; unless any [series? :coll  any-object? :coll  map? :coll] [
+				; #print "Error getting path (path) after (out) which is (type?/word :coll)"
+			; ]
+			; append out :item
+			; :coll/:item
+		; ]
+	; ]
+	; if single? out [out: out/1]
+	; case [
+		; any [get-word? path get-path? path] [out: either word? out [to get-word! out][as get-path! out]]
+		; any [set-word? path set-path? path] [out: either word? out [to set-word! out][as set-path! out]]
+	; ]
+	; out
+; ]
+
+another failed design remnant
+; invalidate-face: function [
+	; "Remove all spaces used by HOST face from cache"
+	; host [object!]
+; ][
+	; foreach path list-spaces host/space [
+		; invalidate/forget/only get last path
+	; ]
 ; ]
