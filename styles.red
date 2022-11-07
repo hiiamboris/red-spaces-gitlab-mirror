@@ -182,7 +182,7 @@ do with context [
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold
 			;; careless setting causes full tree invalidation on each render, though if style is applied it's already invalid
-			set-flag flags 'bold if parent [parent/pinned?]
+			set-flag flags 'bold parent/pinned?
 		]
 		
 		

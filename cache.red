@@ -65,7 +65,7 @@ cache: context [
 	fetch: function [
 		"If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
 		space  [object!] (space? space)
-		canvas [pair! none!]	;@@ get rid of none
+		canvas [pair!]
 	][
 		#debug profile [prof/manual/start 'cache]
 		result: all [
@@ -73,7 +73,6 @@ cache: context [
 			slot: find/same/skip space/cached canvas 3 + length? space/cache
 			reduce [space/cache skip slot 2]			;-- skips canvas and generation, these are internal
 		]
-		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
 			name: space/type
 			if cache: space/cache [period: 3 + length? space/cache]
@@ -99,7 +98,7 @@ cache: context [
 	commit: function [
 		"Save SPACE's Draw block and cached facets on given CANVAS in the cache"
 		space  [object!] (space? space)
-		canvas [pair! none!]	;@@ get rid of none
+		canvas [pair!]
 		drawn  [block!]
 	][
 		unless space/cache [exit]						;-- do nothing if caching is disabled
@@ -116,9 +115,8 @@ cache: context [
 			forall slots [								;@@ use for-each
 				if all [
 					slots/2 < old-gen					;-- slot is old
-					pair: slots/1						;@@ get rid of none slots
-					pair <> infxinf						;-- keep infinite and zero canvases anyway
-					pair <> 0x0							;-- since they are always relevant, unlike 0x319 or smth
+					slots/1 <> infxinf					;-- keep infinite and zero canvases anyway
+					slots/1 <> 0x0						;-- since they are always relevant, unlike 0x319 or smth
 				][
 					slot: slots
 					break

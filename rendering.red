@@ -155,7 +155,7 @@ context [
 	render-space: function [
 		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
-		/on canvas [pair! none!]
+		/on canvas: infxinf [pair! none!]
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
@@ -166,28 +166,24 @@ context [
 			space? :space
 			not host? :space							;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
 			any [
-				none = canvas (abs canvas) +<= (1e6 by 1e6) canvas/x = 2e9 canvas/y = 2e9
+				(abs canvas) +<= (1e6 by 1e6)
+				canvas/x = infxinf/x
+				canvas/y = infxinf/y
 				also no #print "(name): canvas=(canvas)" 
 			] "Oversized canvas detected!"
-			any [
-				none = canvas
-				all [
-					canvas/x <> negate infxinf/x
-					canvas/y <> negate infxinf/y
-				]
-			] "Negative infinity canvas detected!"
+			(negate infxinf) +< canvas	"Negative infinity canvas detected!"
 		]
 
 		unless tail? current-path [						;-- can be at tail on out-of-tree renders
 			#debug [check-parent-override space last current-path]
-			quietly space/parent: last current-path
+			quietly space/parent: last current-path		;-- should be set before any child render call! so styles can access /parent
 		]
 		with-style space [
 			window?: all [
 				any [xy1 xy2]
 				function? draw: select space 'draw
 				find spec-of :draw /window
-				;@@ this should also check if style func supports /only but it's already too much hassle, maybe later
+				;@@ this should also check if style func supports /window but it's already too much hassle, maybe later
 			]
 			
 			either all [
@@ -200,7 +196,9 @@ context [
 				]
 				cache/update-generation space 'cached
 				#debug cache [							;-- add a frame to cached spaces after committing
-					drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
+					if space/size [
+						drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
+					]
 				]
 			][
 				; if name = 'list [print ["canvas:" canvas mold space/content]]

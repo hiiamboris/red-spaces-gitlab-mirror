@@ -625,41 +625,22 @@ context [
 ]
 
 ;; constraining is used by `render` to impose soft limits on space sizes
-;; constraining logic:
-;; no canvas (unlimited) and no limits (unlimited) => return `none` (also unlimited)
-;; no canvas (unlimited) and has upper limit => return upper limit
-;; pair canvas and no limits => pass canvas thru
-;; pair canvas and any of limits defined => clip canvas by limits
-;; this includes 0x0 and 0x2e9 canvases which aim for min (0) on one axis and max (2e9) on another
-;; numeric canvas defines only X coordinate, while Y remains unconstrained (min=0, max=2e9)
-;; 2e9 pair coordinate is treated exactly as `none` (unlimited)
-;; 2e9x2e9 result is normalized to `none`
-infxinf: 2000000000x2000000000							;-- used too often to always type it numerically
+infxinf: 2e9 by 2e9										;-- used too often to always type it numerically
 constrain: function [
-	"Clip SIZE within LIMITS (allows none for both)"
-	size    [none! pair!]   "none if unlimited (same as infxinf)"
+	"Clip SIZE within LIMITS"
+	size    [pair!] "use infxinf for unlimited; negative size will become zero"
 	limits  [object! (range? limits) none!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
-	either size [										;-- pair size
-		case [
-			none =? min: limits/min [min: 0x0]
-			number? min [min: min by 0]					;-- numeric limits only affect X
-		]
-		case [
-			none =? max: limits/max [max: infxinf]
-			number? max [max: max by infxinf/y]
-		]
-		size: clip [min max] size
-		;; rest is treated as `none`, not affecting size
-	][													;-- `none` size
-		case [
-			pair? max: limits/max [size: max]
-			number? max [size: max by infxinf/y]
-			;; no /max leaves unlimited size as `none`
-		]
-	]
-	size
+	min: switch/default type?/word limits/min [
+		pair!           [limits/min]
+		integer! float! [limits/min by 0]				;-- numeric limits only affect /x
+	] [0x0]												;-- none and invalid treated as 0x0
+	max: switch/default type?/word limits/max [
+		pair!           [limits/max]
+		integer! float! [limits/max by infxinf/y]		;-- numeric limits only affect /x
+	] [infxinf]											;-- none and invalid treated as infinity
+	clip [min max] size
 ]
 
 #assert [infxinf = constrain infxinf none]
@@ -778,16 +759,16 @@ normalize-alignment: function [
 
 decode-canvas: function [
 	"Turn pair canvas into positive value and fill flags"
-	canvas [none! pair!] "can be none, negative or infinite (no fill), positive (fill)"
+	canvas [pair!] "can be negative or infinite (no fill), positive (fill)"
 ][
 	reduce/into [
-		|canvas|: either canvas [abs canvas][canvas: infxinf]
-		fill: negate canvas / max 1x1 |canvas|			;-- 1 if fill=true, -1 if false, can be 0 (also false, but doesn't matter)
+		|canvas|: abs canvas
+		negate canvas / max 1x1 |canvas|				;-- 1 if fill=true, -1 if false, can be 0 (also false, but doesn't matter)
 	] clear []
 ]
 
 #assert [
-	(reduce [infxinf -1x-1]) = decode-canvas none
+	(reduce [infxinf -1x-1]) = decode-canvas infxinf
 	[10x20 -1x-1] = decode-canvas  10x20
 	[10x20  1x1]  = decode-canvas -10x-20
 	[10x0  -1x0]  = decode-canvas  10x0
@@ -804,7 +785,7 @@ encode-canvas: function [
 
 #localize [#assert [
 	reencode: func [b] [encode-canvas b/1 b/2]
-	infxinf = reencode decode-canvas  none
+	infxinf = reencode decode-canvas  infxinf
 	 10x20  = reencode decode-canvas  10x20
 	-10x-20 = reencode decode-canvas -10x-20
 	 10x0   = reencode decode-canvas  10x0
@@ -815,9 +796,9 @@ encode-canvas: function [
 
 finite-canvas: function [
 	"Turn infinite dimensions of CANVAS into zero"
-	canvas [pair! none!]
+	canvas [pair!]
 ][
-	remainder any [canvas 0x0] infxinf
+	canvas % infxinf
 ]
 
 #assert [0x20 = finite-canvas infxinf/x by 20]
