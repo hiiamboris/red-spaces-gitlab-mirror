@@ -39,6 +39,12 @@ cache: context [
 		]
 	]
 	
+	; get-slot-size: function [							;-- for internal use, abstracts the slot size computation
+		; space [object!] (space? space)
+	; ][
+		; if space/cache [3 + length? space/cache]
+	; ]
+	
 	;@@ should have a global safe wrapper
 	parents-list: make hash! 32
 	list-parents: function [
@@ -64,13 +70,13 @@ cache: context [
 		#debug profile [prof/manual/start 'cache]
 		result: all [
 			space/cache
-			slot: find/same/skip space/cached canvas 2 + length? space/cache
-			reduce [space/cache slot]
+			slot: find/same/skip space/cached canvas 3 + length? space/cache
+			reduce [space/cache skip slot 2]			;-- skips canvas and generation, these are internal
 		]
 		;@@ get rid of `none` canvas! it's just polluting the cache, should only be infxinf
 		#debug cache [
 			name: space/type
-			if cache: space/cache [period: 2 + length? space/cache]
+			if cache: space/cache [period: 3 + length? space/cache]
 			either slot [
 				n: (length? space/cached) / period
 				#print "Found cache for (name):(space/size) on canvas=(canvas) out of (n): (mold/flat/only/part slot 40)"
@@ -89,6 +95,7 @@ cache: context [
 		result
 	]
 	
+	#debug [max-slots: 0  culprit: none]
 	commit: function [
 		"Save SPACE's Draw block and cached facets on given CANVAS in the cache"
 		space  [object!] (space? space)
@@ -98,13 +105,28 @@ cache: context [
 		unless space/cache [exit]						;-- do nothing if caching is disabled
 		#debug profile [prof/manual/start 'cache]
 		#assert [pair? space/size]						;@@ should I enable caching of infinite spaces? see no point so far
-		period: 2 + length? space/cache					;-- custom words + (canvas + drawn)
-		slot:   any [find/same/skip space/cached canvas period  tail space/cached]
-		words:  compose [canvas drawn (space/cache)]	;-- [canvas drawn size map ...] all bound names
+		cur-gen: any [current-generation space/cached/-2]
+		old-gen: cur-gen - 1.0
+		period: 3 + length? space/cache					;-- custom words + (canvas + drawn)
+		words:  compose [canvas cur-gen drawn (space/cache)]	;-- [canvas gen drawn size map ...] all bound names
 		#assert [period = length? words]
-		rechange slot words
+		unless slot: find/same/skip space/cached canvas period [
+			;; if same canvas isn't found, try to reuse an old slot
+			slots: space/cached
+			forall slots [								;@@ use for-each
+				if slots/2 < old-gen [slot: slots  break]
+				slots: skip slots period - 1 
+			] 
+		]
+		either slot [rechange slot words] [repend slots words]
 		#debug cache [
 			#print "Saved cache for (space/type):(space/size) on canvas=(canvas): (mold/flat/only/part drawn 40)"
+			nslots: (length? space/cached) / period
+			if nslots > max-slots [
+				set 'max-slots nslots
+				set 'culprit `"(space/type):(space/size)"`
+				#print "Max cache slots=(nslots) in (culprit)"
+			]
 		]
 		#debug profile [prof/manual/end 'cache]
 	]

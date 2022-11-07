@@ -194,9 +194,9 @@ context [
 				not window?								;-- usage of region is not supported by current cache model
 				set [words: slot:] cache/fetch space canvas
 			][
-				drawn: slot/2
+				drawn: slot/1
 				do-atomic [								;-- prevent reactions from invalidating the cache while it's used by `set`
-					set words next next slot			;-- size map etc..
+					set words next slot					;-- size map etc..
 				]
 				cache/update-generation space 'cached
 				#debug cache [							;-- add a frame to cached spaces after committing

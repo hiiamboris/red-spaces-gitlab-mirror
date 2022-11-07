@@ -2091,8 +2091,10 @@ grid-ctx: context [
 	]
 	
 	pinned?: function [cell [object!] ('cell = select cell 'type)] [	;-- used by cell/pinned?
+		grid: cell										;-- sometimes grid is not an immediate parent
+		while [grid: grid/parent] [if grid/type = 'grid [break]]
 		to logic! all [
-			grid: cell/parent
+			grid
 			found: find/same grid/frame/cells cell
 			grid/is-cell-pinned? found/-1
 		]
