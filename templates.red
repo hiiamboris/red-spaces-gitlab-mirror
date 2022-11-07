@@ -677,8 +677,10 @@ paragraph-ctx: context [
 	]
 
 	draw: function [space [object!] canvas [pair! none!]] [
-		ellipsize?: to logic! find space/flags 'ellipsize
-		wrap?:      to logic! find space/flags 'wrap
+		if canvas [										;-- no point in wrapping/ellipsization on inf canvas
+			ellipsize?: find space/flags 'ellipsize
+			wrap?:      find space/flags 'wrap
+		]
 		layout:     space/layout
 		|canvas|: either any [wrap? ellipsize?][
 			constrain abs canvas space/limits			;-- could care less about fill flag for text
@@ -688,7 +690,7 @@ paragraph-ctx: context [
 		reuse?: all [not wrap?  not ellipsize?  space/layout  space/layout/size =? canvas]	;@@ REP #113
 		layout: any [
 			if reuse? [space/layout]					;-- text can reuse it's layout on any canvas
-			lay-out space |canvas| ellipsize? wrap?
+			lay-out space |canvas| to logic! ellipsize? to logic! wrap?
 		]
 
 		;; size can be adjusted in various ways:
