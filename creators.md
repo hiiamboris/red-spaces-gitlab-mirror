@@ -511,7 +511,7 @@ For `profile` output to work, add `prof/show` before exit or at the point where 
 
 ### Inspecting your data
 
-Spaces have a custom `mold` implementation, which is aimed at producing readable output for programmers. It affects `?`, `??`, `probe` and `save` output.
+Spaces are powered by custom `mold` implementation, which is aimed at producing readable output for programmers. It affects `?`, `??`, `probe` and `save` output.
 
 Most notably, it shortens by default space objects inside other data to `type:size`, so don't take that for an url!:
 ```
@@ -523,6 +523,7 @@ list/map: [
 	text:0x16 [offset 30x10 size 0x16]
 ]
 ```
+Also `save/all` output (and `mold/all`) now produces a fully loadable format, supported by [`load-anything` macro](https://codeberg.org/hiiamboris/red-common/src/branch/master/load-anything.red).
  
 Do use spaces console (that is run by `run.bat` or `red console.red`) or put a `halt` in your script where you can inspect values interactively.
 
