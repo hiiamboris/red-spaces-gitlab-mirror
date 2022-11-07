@@ -114,7 +114,15 @@ cache: context [
 			;; if same canvas isn't found, try to reuse an old slot
 			slots: space/cached
 			forall slots [								;@@ use for-each
-				if slots/2 < old-gen [slot: slots  break]
+				if all [
+					slots/2 < old-gen					;-- slot is old
+					pair: slots/1						;@@ get rid of none slots
+					pair <> infxinf						;-- keep infinite and zero canvases anyway
+					pair <> 0x0							;-- since they are always relevant, unlike 0x319 or smth
+				][
+					slot: slots
+					break
+				]
 				slots: skip slots period - 1 
 			] 
 		]
