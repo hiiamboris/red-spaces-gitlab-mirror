@@ -138,7 +138,7 @@ All examples of code in this reference (except those above, which are more expli
 In contrast to REBOL & Red's `face!` object that always includes every possible facet, `space` is minimalistic and includes only those facets that each widget requires. And those usually vary.
 
 `space!` object itself defines a minimal set of facets:
-```
+
 | Facet | Type | Description |
 |-|-|-|
 | `type` | `word!` | Used for styles and event handler lookups. Usually equals space's template name, but can be renamed freely. |
@@ -149,7 +149,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 | `cache` | `none!` `block!` | List of cached words (usually `[size map]`). Turns off caching if set to `none`. |
 | `cached` | `block!` | Used internally to hold cached data. |
 | `on-change*` | `func [word old new]` | Used internally by the class system to help enforce consistency, types, reset cache, etc. |
-```
+
 They are chosen to be mandatory because they are either strictly required, or (as is the case for /limits) apply to all spaces and can be assigned at runtime.
 
 ---
