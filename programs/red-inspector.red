@@ -352,7 +352,7 @@ context [
 					;@@ currently scrollable doesn't know how to render itself on inf canvas, becomes zero and complains
 					browser: data-view data=(get/any target) on-dbl-click [
 						if all [ 
-							pos: locate path [obj .. /style = 'grid]
+							pos: locate path [obj .. /type = 'grid]
 							grid: pos/1
 						][
 							set [cell: offset:] grid/locate-point pos/2
