@@ -15,7 +15,7 @@ Red [
 ;@@ stupid include bugs turn off assertions in some crooked way, can't use them to debug inspector
 #include %../../common/setters.red
 #include %../../common/forparse.red
-; #do [disable-space-cache?: yes]
+#do [disable-space-cache?: yes]
 #include %../everything.red
 
 #process off											;@@ hack to avoid #include bugs
@@ -34,7 +34,7 @@ context [
 	
 	define-styles [
 		cell/text: grid/cell/text: grid/cell/paragraph: [
-			spaces/ctx/set-flag flags 'bold spaces/ctx/grid-ctx/pinned?
+			spaces/ctx/set-flag flags 'bold if parent [parent/pinned?]
 			; default font: code-font
 			font: code-font
 			below: when color: select self 'color [pen (color)]
@@ -75,6 +75,7 @@ context [
 							color: contrast-with value
 							text: rejoin [value " #" copy/part skip s 2 back tail s]
 						]
+						pinned?: does [spaces/ctx/grid-ctx/pinned? self]
 					]
 				][
 					make-space 'text [text: mold :value]
@@ -82,7 +83,7 @@ context [
 			]
 			image!  [
 				space: make-space 'grid-view [
-					type: 'image
+					kind: 'image
 					grid/widths/1: 50
 					grid/pinned:  1x0
 					; pages: 2
@@ -91,7 +92,11 @@ context [
 					wrap-data: func [data] [
 						either space? :data [
 							;@@ maybe grid should wrap the space as cell too?
-							make-space 'cell [align: -1x0 content: data]
+							make-space 'cell [
+								align: -1x0
+								content: data
+								pinned?: does [spaces/ctx/grid-ctx/pinned? self]
+							]
 						][
 							old-wrap-data :data
 						]
@@ -155,7 +160,7 @@ context [
 				]
 			]
 			space: make-space 'grid-view [
-				type: 'data
+				kind: 'data
 				pages: 5
 				grid/pinned: 0x1
 				extend grid/widths [1 80 2 80]
@@ -213,7 +218,7 @@ context [
 		set-style 'grid-view function [gview /on canvas] [
 			default canvas: 0x0
 			widths: gview/grid/widths
-			image?: gview/type = 'image
+			image?: gview/kind = 'image
 			set [canvas: fill:] spaces/ctx/decode-canvas canvas
 			if all [
 				canvas/x < infxinf/x
@@ -397,6 +402,7 @@ red-inspector: function [
 	either empty? script [
 		inspect system
 	][
+		; debug-draw
 		do script/1
 	]
 	prof/show
