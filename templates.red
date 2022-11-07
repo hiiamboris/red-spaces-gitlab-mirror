@@ -820,7 +820,7 @@ list-ctx: context [
 	~: self
 		
 	declare-template 'list/container [
-		size:    0x0	#type [pair! none!]				;-- 'none' to allow infinite lists
+		size:    0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
 		axis:    'x		#type =  :invalidates [word!] (find [x y] axis)
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
 		margin:  0
