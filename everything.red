@@ -23,7 +23,7 @@ Red [
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	; #debug off										;-- turn off type checking and general (unspecialized) debug logs
+	#debug off										;-- turn off type checking and general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times
 	; #debug set changes								;-- turn on to see value changes and invalidation
@@ -37,7 +37,7 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	; #assert off
+	#assert off
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red
