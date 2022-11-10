@@ -281,7 +281,7 @@ VID: context [
 			
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
-		spec [block!]	;@@ document DSL, leave a link here
+		spec [block!] "See VID/S manual on syntax" 
 		/styles sheet [map! none!] "Add custom stylesheet to the global one"
 		/local w b x lo hi late?
 		/extern with									;-- gets collected from `def`
@@ -323,13 +323,7 @@ VID: context [
 			]
 			
 			either def/styling? [						;-- new style defined
-				new-style: copy/deep def/style
-				either new-style/spec [
-					new-style/spec: copy/deep space-spec
-				][
-					compose/only/into [spec: (space-spec)] tail new-style
-				]
-				put sheet def/link new-style
+				put sheet def/link copy/deep/part style-bgn style-end
 			][
 				space: make-space def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
@@ -401,18 +395,21 @@ VID: context [
 			=style-declaration=
 		]
 		=instantiating=:     [not end opt =space-name= =style-declaration=]
-		=style-declaration=: [=style-name= any =modifier= (do commit-style)]
+		=style-declaration=: [style-bgn: =style-name= any =modifier= style-end: (do commit-style)]
 		=space-name=:        [set w set-word! (def/link: to word! w)]
 		=style-name=:        [
-			set w #expect word! (
-				def/template: w
-				case [
-					x: sheet/:w [def/style: x]
-					x: VID/styles/:w [def/style: x]
-					templates/:w [def/style: reduce ['template w]]
-					'else [ERROR "Unsupported VID/S style: (w)"]
-				]
-			)
+			set w #expect word! [
+				if (x: sheet/:w) p: insert (x) :p =style-name=	;-- reprocess with the replaced style name
+			|	(
+					def/template: w
+					case [
+						x: sheet/:w [def/style: x]
+						x: VID/styles/:w [def/style: x]
+						templates/:w [def/style: reduce ['template w]]
+						'else [ERROR "Unsupported VID/S style: (w)"]
+					]
+				)
+			]
 		]
 		
 		=modifier=:   [
@@ -502,7 +499,7 @@ VID: context [
 			set x [limit! | word! | get-word! | paren!] (x: do x)
 		]
 		
-		parse spec =vids=
+		parse copy spec =vids=							;-- copy so styles can insert into it
 		pane
 	];; lay-out-vids: function
 	
