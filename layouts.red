@@ -113,8 +113,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   axes          [block! none!]   2 words, any of [n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s] (also supports arrows)
 		;;                                  in essence, any of n/e/s/w but both should be orthogonal, total 4x2
 		;;                                  default = [e s] - left-to-right items, top-down rows
-		;;   align         [block! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
-		;;                                  default = -1x-1 - both x/y stick to the negative size of axes
+		;;   align       [block! pair! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
+		;;                                      default = -1x-1 - both x/y stick to the negative size of axes
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing       [integer! pair!]   >= 0x0
 		;;   canvas         [none! pair!]   if none=inf, width determined by widest item

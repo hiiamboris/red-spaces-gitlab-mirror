@@ -612,7 +612,7 @@ paragraph-ctx: context [
 			text-size/x - tolerance > canvas/x				;-- doesn't fit horizontally (unwrapped text)
 		][
 			;; find out what are the extents of the last visible line:
-			last-visible-char: -1 + offset-to-caret layout canvas
+			last-visible-char: -1 + offset-to-char layout canvas
 			last-line-dy: -1 + second caret-to-offset/lower layout last-visible-char
 			
 			;; if last visible line is too much clipped, discard it an choose the previous line (if one exists)
@@ -624,7 +624,7 @@ paragraph-ctx: context [
 			;; this only works if text width is >= ellipsis, otherwise ellipsis itself gets wrapped to an invisible line
 			;@@ more complex logic could account for ellipsis itself spanning 2-3 lines, but is it worth it?
 			ellipsis-location: (max 0 canvas/x - ellipsis-width) by last-line-dy
-			last-visible-char: -1 + offset-to-caret layout ellipsis-location
+			last-visible-char: -1 + offset-to-char layout ellipsis-location
 			unless buffer [buffer: make string! last-visible-char + 3]		;@@ use `obtain` or rely on allocator?
 			quietly layout/text: append append/part clear buffer text last-visible-char "..."
 			; system/view/platform/update-view layout
@@ -657,7 +657,8 @@ paragraph-ctx: context [
 		either all [ellipsize? canvas +< infxinf] [		;-- size has to be limited from both directions for ellipsis to be present
 			;; ellipsization prioritizes the canvas, so may split long words
 			quietly layout/size:  max 1x1 canvas
-			quietly layout/extra: ellipsize layout (as string! space/text) canvas
+			quietly layout/extra: ellipsize layout (as string! space/text)
+				either wrap? [canvas][canvas * 1x0]		;-- without wrapping should be a single line
 		][
 			;; normal mode prioritizes words, so have to estimate min. width from the longest word
 			quietly layout/size: infxinf
