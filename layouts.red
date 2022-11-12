@@ -19,7 +19,7 @@ make-layout: function [
 	layouts/:type/create :spaces settings
 ]
 
-layouts: context [
+layouts: make map! to block! context [					;-- map can be extended at runtime
 
 	list: context [
 		;; settings for list layout:
