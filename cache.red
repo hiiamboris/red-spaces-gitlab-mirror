@@ -170,7 +170,7 @@ invalidate: function [
 	unless space/cached/-1 [exit]						;-- space was never rendered; early exit (for faster tree construction)
 	#debug profile [prof/manual/start 'invalidation]
 	default scope: 'size
-	either function? custom: select space 'on-invalidate [
+	either function? set/any 'custom select space 'on-invalidate [
 		custom space cause scope						;-- custom invalidation procedure
 	][
 		cache/invalidate space							;-- generic (full) invalidation
