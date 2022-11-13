@@ -640,6 +640,7 @@ paragraph-ctx: context [
 	;; wrap=off elli=on -> canvas=fixed, but wrapping should be off, i.e. layout/size=inf (don't use none! draw relies on this)
 	;; wrap=elli=on -> canvas=fixed
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
+	whitespace!: charset " ^-"								;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
 	lay-out: function [space [object!] canvas [pair!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
 		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
@@ -665,7 +666,7 @@ paragraph-ctx: context [
 			quietly layout/size: infxinf
 			if all [wrap? canvas/x < infxinf/x] [		;@@ perhaps this too should be a flag?
 				words: append clear "" as string! space/text
-				parse/case words [any [to #" " p: skip (change p #"^/")]]
+				parse/case words [any [to whitespace! p: skip (change p #"^/")]]
 				quietly layout/text: words
 				min-width: 1x0 * size-text layout
 				quietly layout/size: max 1x1 max canvas min-width
