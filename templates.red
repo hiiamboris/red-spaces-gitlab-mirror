@@ -161,6 +161,7 @@ set-empty-size: function [space [object!] canvas [pair!]] [
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
 put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 	weight: 1
+	cache:  none
 	draw: function [/on canvas [pair!]] [
 		set-empty-size self canvas
 		[]
