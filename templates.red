@@ -86,7 +86,7 @@ make-space: function [
 	r: append copy/deep base spec
 	unless block [
 		;; without trapping it's impossible to tell where the error happens during creation if it's caused e.g. by on-change
-		trap/catch [r: make space-object! r] [
+		trap/catch [r: make space-object! r] [			;@@ slower than `try` by 5% on make-space 'space []
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
