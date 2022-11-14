@@ -155,7 +155,11 @@ constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] 
 ;; used internally for empty spaces size estimation
 set-empty-size: function [space [object!] canvas [pair!]] [
 	set [canvas: fill:] decode-canvas canvas
-	space/size: constrain-canvas canvas fill space/limits
+	space/size: either positive? space/weight [
+		constrain-canvas canvas fill space/limits
+	][
+		constrain 0x0 space/limits						;-- don't stretch what isn't supposed to stretch
+	]
 ]
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
