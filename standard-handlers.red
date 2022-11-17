@@ -311,8 +311,7 @@ define-handlers [
 			
 			space/edit plan
 			quietly space/origin: field-ctx/adjust-origin space
-			invalidate space							;-- has to reconstruct layout in order to measure caret location
-			invalidate/only space/caret					;@@ any way to properly invalidate both at once?
+			invalidate space
 		]
 
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
