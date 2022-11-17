@@ -599,6 +599,12 @@ scrollable-space: context [
 paragraph-ctx: context [
 	~: self
 	
+	size-text2: function [layout [object!]] [			;@@ it's a workaround for #4841
+		size1: size-text layout
+		size2: caret-to-offset/lower layout 1 + length? layout/text
+		max size1 size2
+	]
+	
 	ellipsize: function [layout [object!] text [string!] canvas [pair!]] [
 		;; save existing buffer for reuse (if it's different from text)
 		buffer: unless layout/text =? text [layout/text]
@@ -674,13 +680,13 @@ paragraph-ctx: context [
 				words: append clear "" as string! space/text
 				parse/case words [any [to whitespace! p: skip (change p #"^/")]]
 				quietly layout/text: words
-				min-width: 1x0 * size-text layout
+				min-width: 1x0 * size-text2 layout
 				quietly layout/size: max 1x1 max canvas min-width
 			]
 			quietly layout/text:  as string! space/text
 			; system/view/platform/update-view layout
 			;; NOTE: #4783 to keep in mind
-			quietly layout/extra: size-text layout		;-- 'size-text' is slow, has to be cached (by using on-change)
+			quietly layout/extra: size-text2 layout		;-- 'size-text' is slow, has to be cached (by using on-change)
 		]
 		quietly space/layout: layout					;-- must return layout
 	]
