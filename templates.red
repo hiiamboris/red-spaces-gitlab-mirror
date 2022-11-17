@@ -652,9 +652,11 @@ paragraph-ctx: context [
 		layout: new-rich-text
 		; layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]	@@ this creates unexplainable random glitches!
 		unless empty? flags: space/flags [
-			flags: compose [(1 by length? space/text) (space/flags)]
 			remove find flags 'wrap						;-- leave no custom flags, otherwise rich-text throws an error
 			remove find flags 'ellipsize				;-- this is way faster than `exclude`
+			unless pair? :flags/1 [						;-- flags may be already provided in low-level form 
+				flags: compose [(1 by length? space/text) (space/flags)]
+			]
 		]
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		;; set width to determine height; but special case is ellipsization without wrapping: limited canvas but infinite layout
@@ -767,7 +769,6 @@ container-ctx: context [
 		; #assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
 		len: cont/items/size
 		#assert [len "container/draw works only for containers of limited items count"]
-		r: make [] 4 * len
 		
 		drawn: make [] len * 6
 		items: make [] len
@@ -903,6 +904,185 @@ tube-ctx: context [
 			#debug sizing [#print "tube with (content/type) on (mold canvas) -> (size)"]
 			drawn
 		]
+	]
+]
+
+
+context [
+	~: self
+
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		settings: with space [margin spacing align canvas limits breakpoints]
+		set [size: map: rows:] make-layout 'paragraph :space/items settings
+		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
+		quietly space/rows: rows
+		quietly space/map:  map
+		
+		count: space/items/size
+		#assert [count]
+		
+		drawn: make [] length? rows ; * 3 / 3
+		; items: make [] count
+		foreach [row-offset clip-offset row-size row] rows [
+			; ?? [row-offset row-size]
+			row-drawn: clear []
+			foreach [item item-offset item-drawn] row [
+				compose/only/into [
+					translate (item-offset) (item-drawn)
+				] tail row-drawn
+			]
+			blueprint: either all [
+				space/align = 'fill
+				(used: row-offset/x + row-size/x) < size/x
+				not row =? last rows					;-- don't stretch the last row! ;@@ though it should be optional
+			][
+				scale: size/x / used
+				[
+					push [
+						translate (space/margin * 1x1 + (row-offset * 0x1))
+						scale (scale) (1.0)
+						translate (row-offset * 1x0)
+						clip (row-offset * -1x0) (row-size) (copy row-drawn)
+					]
+				]
+			][
+				[
+					translate (space/margin * 1x1 + row-offset) [
+						;; clip every row separately from the hanging out parts,
+						;; as wrapping margin doesn't have to align with total width
+						clip (row-offset * -1x0 + clip-offset) (row-size) (copy row-drawn)
+					]
+				]
+			]
+			compose/deep/only/into blueprint tail drawn
+		]
+		; ?? drawn
+		; cont/origin: origin							;-- unused
+		mrg: space/margin * 1x1
+		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts
+	]
+	
+	declare-template 'rich-paragraph/container [		;-- used as a base for higher level rich-content
+		margin:      0
+		spacing:     0
+		align:       'left	#type = [word!] :invalidates-look
+		breakpoints: []		#type  [block!] :invalidates
+		
+		rows:        []		#type  [block!]				;-- internal frame data used by /into
+		cache:       [size map rows]
+		
+		;; container-draw is not used due to tricky geometry
+		draw: function [/on canvas [pair!]] [~/draw self canvas]
+	]
+]
+
+
+context [
+	~: self
+	
+	;@@ will need source editing facilities too
+	
+	on-source-change: function [space [object!] word [word!] value [any-type!] /local attr char string] [
+		if unset? :space/ranges [exit]					;-- not initialized yet
+		clear ranges:  space/ranges
+		clear content: space/content
+		; bold: italic: underline: strike: none
+		buffer: clear ""
+		offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
+		start: clear #()								;-- offset of each attr's opening
+		get-range-blueprint: [
+			switch attr [
+				bold italic underline strike [[pair attr]]
+				color size font command [[pair get attr]]
+				backdrop [[pair 'backdrop get attr]]
+			]
+		]
+		flush: [
+			if 0 < text-len: length? buffer [
+				text-ofs: offset - text-len				;-- offset of the buffer
+				command:  none
+				flags: parse ranges [collect any [		;-- add closed ranges if they intersect with text
+					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
+					not [set command block!]					;-- command is RTD dialect extension
+					keep (max 1 range - text-ofs) keep to [pair! | end]
+				|	to pair!
+				]]
+				foreach [attr-ofs attr] start [			;-- add all open ranges
+					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply
+					either attr = 'command [
+						command: get attr
+					][
+						pair: as-pair (max 1 1 + attr-ofs - text-ofs) len
+						value: get attr
+						repend flags do get-range-blueprint
+					]
+				]
+				
+				append content obj: make-space either command ['link]['text] []
+				quietly obj/text:  copy buffer
+				quietly obj/flags: flags
+				if command [quietly obj/command: command]
+				clear buffer
+			]
+		]
+		commit-attr: [
+			attr: to word! attr
+			if start/:attr [
+				pair: as-pair  1 + any [start/:attr attr]  offset
+				if pair/2 > pair/1 [repend ranges do get-range-blueprint]
+			]
+		]
+		=open-attr=:  [(do commit-attr  start/:attr: offset)]
+		=close-attr=: [(do commit-attr  start/:attr: none)]
+		
+		parse/case space/source [any [
+			ahead word! set attr ['bold | 'italic | 'underline | 'strike] (
+				unless start/:attr [start/:attr: offset]
+			)
+		|	ahead refinement! set attr [
+				/bold | /italic | /underline | /strike
+			|	/color | /backdrop | /size | /font | /command
+			] =close-attr=
+		|	ahead set-word! [
+				set attr quote color:    =open-attr= [
+					set color word! (color: get color #assert [tuple? color])
+				|	set color #expect tuple!
+				]
+			|	set attr quote backdrop: =open-attr= [
+					set backdrop word! (backdrop: get backdrop #assert [tuple? backdrop])
+				|	set backdrop #expect tuple!
+				]
+			|	set attr quote size:     =open-attr= set size    #expect integer!
+			|	set attr quote font:     =open-attr= set font    #expect string!
+			|	set attr quote command:  =open-attr= set command #expect block!
+			]
+		|	set string string! (
+				append buffer string
+				offset: offset + length? string
+			)
+		|	set char char! (
+				append buffer char
+				offset: offset + 1
+			)
+		; |	paren! reserved
+		; |	block! TODO grouping
+		|	set obj2 object! (
+				do flush
+				#assert [space? obj2]
+				append content obj2
+				offset: offset + 1
+			)
+		|	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
+		] end]
+		do flush										;-- commit last string
+		
+		invalidate space
+	]
+	
+	declare-template 'rich-content/rich-paragraph [
+		;; data flow: source -> breakpoints & (content -> items) -> make-layout
+		source: []	#type [block!] :on-source-change	;-- holds high-level dialected data
+		ranges: []	#type [block!]						;-- internal attribute range data
 	]
 ]
 

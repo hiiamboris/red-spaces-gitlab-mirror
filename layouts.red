@@ -44,14 +44,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [0x0 []]]	;-- empty list optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
-				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count` or global smth
+				#assert [:self/create =? context? bind word 'local]
+				set bind word 'local get word
 			]
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
-				limits   [object! (all [in limits 'min in limits 'max]) none!]
+				limits   [object! (range? limits) none!]
 				origin   [none! pair!]
 			]]
 			default origin: 0x0
@@ -74,6 +75,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			size: 0x0
 			repeat i count [							;-- first render cycle
 				space: either func? [spaces/pick i][spaces/:i]
+				#assert [space? :space]
 				drawn: render/on space canvas1
 				#assert [space/size +< (1e7 by 1e7)]
 				compose/only/deep/into [(space) [offset (pos) size (space/size) drawn (drawn)]] tail map
@@ -130,7 +132,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [0x0 []]]
 			foreach word settings [						;-- free settings block so it can be reused by the caller
-				set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
+				#assert [:self/create =? context? bind word 'local]
+				set bind word 'local get word
 			]
 			#debug [typecheck [
 				axes     [
@@ -156,7 +159,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
-				limits   [object! (all [in limits 'min in limits 'max]) none!]
+				limits   [object! (range? limits) none!]
 			]]
 			default axes:   [e s]
 			default align:  -1x-1
@@ -191,8 +194,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; when only limits/max is set, it's "height" overrides the infinite 2e9, "width" stays zero
 			
 			;; obtain constraints info
-			;; `info` can't be static since render may call another build-map; same for other arrays here
-			;; info format: [space-name space-object draw-block available-extension weight]
+			;; `info` can't be static since render may call another layout/create; same for other arrays here
+			;; info format: [space-object draw-block available-extension weight]
 			info: obtain block! count * 4
 			#leaving [stash info]
 			
@@ -213,6 +216,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
+				#assert [space? :space]
 				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
 				drawn: render/on space stripe
 				weight: any [select space 'weight 0]
@@ -240,7 +244,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			row:  obtain block! count * 4
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
 			allowed-row-width: ccanvas/:x				;-- how wide rows to allow (splitting margin)
-			peak-row-width: 0							;-- used to determine full layout size when canvas is not limited
+			peak-row-width: 0							;-- used to determine full layout size when some row is bigger than the canvas
 			total-length:   0							;-- used to extend row heights to fill finite canvas
 			row-weight:     0							;-- later used to expand rows with >0 peak weight
 			foreach [space drawn available weight] info [
@@ -374,6 +378,203 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		]
 	]
 	
+	;; unlike tube this allows the single space to span multiple lines, wrapping it accordingly
+	;; wrapping occurs between spaces and at breakpoints
+	;; it is able to wrap any space without that space knowing about it, letting it keep simple box-like rendering logic
+	;; has no support for axes or weight
+	;@@ maybe remove limits and apply them to canvas in advance?
+	paragraph: context [
+		;; settings for paragraph layout:
+		;;   align          [none! word!]   one of: [left center right fill], default: left
+		;;   margin        [integer! pair!]   >= 0x0
+		;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
+		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
+		;;   limits        [none! object!]
+		;;   breakpoints   [none! block!]   block of vectors of integers:
+		;;       each vector corresponds to a space in spaces block
+		;;       each positive integer is offset from the left of that space where it can be wrapped (word or char margins usually)
+		;;       negative integers specify rendering offset of the new row if wrapping occurs there (used to suppress leading spaces)
+		create: function [
+			"Build a paragraph layout out of given spaces and settings as bound words"
+			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+			settings [block!] "Any subset of [align margin spacing canvas limits breakpoints]"
+			;; settings - imported locally to speed up and simplify access to them:
+			/local align margin spacing canvas limits breakpoints
+		][
+			func?: function? :spaces
+			count: either func? [spaces/size][length? spaces]
+			if count <= 0 [return copy/deep [0x0 []]]
+			foreach word settings [						;-- free settings block so it can be reused by the caller
+				#assert [:self/create =? context? bind word 'local]
+				set bind word 'local get word
+			]
+			#debug [typecheck [
+				align    [word! (find [left center right fill] align) none!]
+				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
+				canvas   [none! pair!]
+				limits   [object! (range? limits) none!]
+				breakpoints [block! none!]
+			]]
+			default align:  'left
+			default canvas: infxinf						;-- none to pair normalization
+			default breakpoints: []
+			set [canvas: fill:] decode-canvas canvas
+			margin:  margin  * 1x1						;-- integer to pair normalization
+			spacing: spacing * 1x1
+			info: obtain block! count * 2
+			#leaving [stash info]
+			
+			;; clipped canvas - used for allowed width fitting
+			ccanvas: subtract-canvas constrain canvas limits 2 * margin
+			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
+			;; along Y canvas becomes infinite, later expanded to fill the row
+			stripe: encode-canvas infxinf/x by ccanvas/y -1x-1	;-- fill is not used by paragraph ;@@ not sure about this fill mask
+			#debug sizing [print ["paragraph canvas=" canvas "ccanvas=" ccanvas "stripe=" stripe]]
+			
+			;; render everything
+			repeat i count [
+				space: either func? [spaces/pick i][spaces/:i]
+				#assert [space? :space]
+				drawn: render/on space stripe
+				repend info [space drawn]
+			]
+			
+			;; split info into rows according to found widths
+			rows: obtain block! 40						;-- [row-offset row-clipping-offset row-size row ...]
+			row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
+			row-size:          -1x0 * spacing			;-- works because no row is empty, so spacing will be added (count=0 handled above)
+			row-offset:        0x0						;-- may be altered for rows 2+
+			allowed-row-width: ccanvas/x				;-- how wide rows to allow (splitting margin)
+			total-width:       0						;-- used to determine full layout size when it's less than canvas
+			index: 0
+			foreach [space drawn] info [				;@@ use for-each
+				index:  index + 1
+				breaks: pick breakpoints index
+				slice:  none
+				
+				new-row-size: as-pair					;-- add item-size and check if it hangs over
+					row-size/x + space/size/x + spacing/x
+					max row-size/y space/size/y
+					
+				;; try to split the crossing space itself, maybe multiple times
+				while [
+					left: allowed-row-width - (row-offset/x + row-size/x + spacing/x)	;-- allowed to be negative, e.g. if canvas/x = 0!
+					all [
+						left < space/size/x						;-- doesn't fully fit (still)?
+						not empty? breaks						;-- any more breakpoints ahead?
+						any [left > 0  empty? row]				;-- either have free space or have to put at least 1 slice per row
+					]
+				][
+					;; breaks may not be at head here if space spans more than 2 rows
+					#assert [breaks/1 > 0]						;-- should never be at a negative integer here
+					if empty? row [breaks: next breaks]			;-- enforce at least one slice per row
+					while [not tail? breaks] [					;@@ locate would be a muuuch better fit
+						if breaks/1 > left [break]
+						breaks: next breaks
+					]
+					
+					;; breaks are now before the breakpoint index that is too wide, or at tail
+					;; but it can be at head too - no break possible then (and row is not empty)
+					if head? breaks [break]
+					either negative? breaks/-1 [				;-- ignorable interval (spacing)?
+						slice: breaks/-2
+						shift: breaks/-1
+					][
+						slice: breaks/-1
+						shift: 0
+					]
+					
+					;; count this space in the row; offset cannot be estimated until row is finished
+					repend row [space 0x0 drawn]				;-- space will appear on 2 or more rows
+					row-size: as-pair
+						row-size/x + spacing/x + slice
+						new-row-size/y							;-- slice affects both spanned rows height
+					
+					;; commit the accumulated row
+					append (new-row: obtain block! length? row) row
+					repend rows [row-offset 0x0 row-size new-row]	;-- row-size includes the clipped part
+					; print ["partial commit:" row-offset row-size mold new-row]
+					
+					;; estimate the initial next row properties
+					row-offset: as-pair
+						shift - slice
+						row-offset/y + row-size/y + spacing/y
+					row-size: -1x0 * spacing
+					new-row-size: space/size
+					clear row
+				]
+				
+				;; variants to consider now:
+				;; - item fully fits (possibly a slicing leftover) -> no new row
+				;; - item doesn't fit (possibly big slicing leftover) but it's not the 1st on the row -> new row
+				;; - item doesn't fit (possibly big slicing leftover) but it is the 1st -> no new row
+				
+				either all [
+					not empty? row
+					left < space/size/x
+				][												;-- start a new row
+					;; commit the accumulated row
+					append (new-row: obtain block! length? row) row
+					repend rows [row-offset 0x0 new-row-size new-row]	;-- row-size includes the clipped part
+					; print ["full commit:" row-offset new-row-size mold new-row]
+					
+					clear row
+					repend row [space 0x0 drawn]
+					row-offset: row-offset + new-row-size + spacing * 0x1
+					row-size:   space/size
+				][												;-- don't start a new row
+					repend row [space 0x0 drawn]
+					row-size:   new-row-size					;-- just accept new width
+				]
+				
+				total-width: max total-width row-offset/x + row-size/x	;-- clipped part excluded from total width
+			]
+			repend rows [row-offset 0x0 row-size row]
+			; print ["final commit:" row-offset row-size mold row]
+			nrows: (length? rows) / 3
+			total-length: row-offset/y + row-size/y
+			#leaving [foreach [_ _ _ row] rows [stash row]  stash rows]
+			
+			;; adjust row alignment
+			if factor: select #(right 1 center 0.5) align [
+				forall rows [							;@@ use for-each
+					set [row-offset: _: row-size: _:] rows
+					?? [row-offset row-size total-width]
+					free: max 0 total-width - (row-size/x + row-offset/x)
+					rows/2: free * factor * 1x0
+					rows/1: rows/1 + rows/2
+					?? [free rows/2]
+					rows: skip rows 3
+				]
+			]
+
+			;; build the map & measure the final layout size
+			;; map cannot have doubled (wrapped) items, because focus should be set on the whole item
+			;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
+			map: clear []
+			foreach [_ _ row-size row] rows [
+				pos: 0x0
+				forall row [							;@@ use for-each
+					space: row/1
+					row/2: pos + (row-size - space/size * 0x1)	;-- remember offset within the row (used by /draw and /into)
+					unless space =? pick tail map -2 [	;-- do not duplicate
+						repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
+					]
+					pos: pos + (space/size + spacing * 1x0)
+					row: skip row 2
+				]
+			]
+			size: 2 * margin + (total-width by total-length)
+			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
+			#assert [size +< infxinf]
+			
+			;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
+			;; so return format is different too ;@@ any way to unify return format with the others?
+			reduce [size copy map copy/deep rows]
+		]
+	]
+	
 	ring: context [
 		;; settings for ring layout:
 		;;   angle       [integer! float!]   unrestricted, defaults to 0
@@ -392,7 +593,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [0x0 []]]	;-- empty layout optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
-				set bind word 'local get word			;@@ check that only allowed words are overwritten
+				#assert [:self/create =? context? bind word 'local]
+				set bind word 'local get word
 			]
 			#debug [typecheck [
 				angle  [integer! float! none!]
@@ -411,6 +613,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				;; round items are also considered almost equal in size, so it's easy math
 				repeat i count [
 					space:  either func? [spaces/pick i][spaces/:i]
+					#assert [space? :space]
 					drawn:  render space
 					center: space/size / 2
 					rad:    radius + max center/x center/y
@@ -438,6 +641,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				
 				repeat i count [
 					space: either func? [spaces/pick i][spaces/:i]
+					#assert [space? :space]
 					drawn: render space
 					size:  space/size
 					rad:   radius
