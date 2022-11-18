@@ -658,11 +658,15 @@ paragraph-ctx: context [
 		layout: new-rich-text
 		; layout: any [space/layouts/:width  space/layouts/:width: new-rich-text]	@@ this creates unexplainable random glitches!
 		unless empty? flags: space/flags [
+			;@@ unfortunately this way 'wrap & 'ellipsize cannot precede low-level flags, or pair test fails
+			flags: either pair? :flags/1 [				;-- flags may be already provided in low-level form 
+				copy flags
+			][
+				compose [(1 by length? space/text) (space/flags)]
+			]
+			;; remove only after copying!
 			remove find flags 'wrap						;-- leave no custom flags, otherwise rich-text throws an error
 			remove find flags 'ellipsize				;-- this is way faster than `exclude`
-			unless pair? :flags/1 [						;-- flags may be already provided in low-level form 
-				flags: compose [(1 by length? space/text) (space/flags)]
-			]
 		]
 		;; every setting of layout value is slow, ~12us, while set-quiet is ~0.5us, size-text is 5+ us
 		;; set width to determine height; but special case is ellipsization without wrapping: limited canvas but infinite layout
@@ -1024,6 +1028,9 @@ context [
 					]
 				]
 				
+				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
+				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
+				;@@ only benchmark can tell when splitting should occur
 				append content obj: make-space either command ['link]['text] []
 				quietly obj/text:  copy buffer
 				quietly obj/flags: flags
@@ -1085,10 +1092,52 @@ context [
 		invalidate space
 	]
 	
+	space!: charset " ^-"
+	
+	;; custom draw fills /breakpoints, which requires preliminary content rendering
+	;; so it's done inside draw to avoid out of tree renders
+	;; however ranges and breakpoints do not depend on canvas, so no need put them into cache
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		breaks: clear space/breakpoints
+		vec: clear make vector! 8
+		
+		;@@ keep stripe in sync with paragraph layout, or find another way to avoid double rendering:
+		set [canvas': fill:] decode-canvas canvas
+		ccanvas: subtract-canvas constrain canvas' space/limits 2x2 * space/margin
+		stripe:  encode-canvas infxinf/x by ccanvas/y -1x-1
+		
+		foreach item space/content [
+			;; this way I won't be able to distinguish produced text spaces from those coming from /source
+			;; but then, maybe it's fine to have them all breakable...
+			entry: none
+			if find [link text] item/type [
+				render/on item stripe					;-- produces /layout to measure text on
+				h1: second size-text item/layout
+				h2: second caret-to-offset/lower item/layout 1
+				if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
+					pos: item/text
+					while [pos: find/tail pos space!] [
+						index: -1 + index? pos
+						left:  first caret-to-offset       item/layout index
+						right: first caret-to-offset/lower item/layout index
+						repend vec [left left - right right]
+					]
+					entry: copy vec
+					clear vec
+				]
+			]
+			append/only breaks unless empty? entry [entry]
+		]
+		space/rich-paragraph-draw/on canvas
+	]
+	
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
 		source: []	#type [block!] :on-source-change	;-- holds high-level dialected data
 		ranges: []	#type [block!]						;-- internal attribute range data
+		
+		rich-paragraph-draw: :draw	#type [function!]
+		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 ]
 
@@ -2294,6 +2343,7 @@ grid-ctx: context [
 		]
 	]
 	
+	;@@ add simple proportional algorithm?
 	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
 	
 	declare-template 'grid/space [
