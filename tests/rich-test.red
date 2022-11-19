@@ -38,11 +38,12 @@ view/no-wait/options/flags [
 				box left forest [rich-content source= reduce source align= 'fill]
 			]
 		]
-	] react [face/size: face/parent/size - 100x0]
-	; on-over [
-		; status/text: mold as path! hittest face/space event/offset
-	; ]
-	; status: text 400x40
+	] react [
+		face/size: face/parent/size - 200x100
+		status/size/x: face/parent/size/x - 20
+	]
+	on-over [status/text: mold hittest face/space event/offset]
+	status: text 400x60
 ] [offset: 10x10] 'resize
 
 either system/build/config/gui-console? [halt][do-events]
