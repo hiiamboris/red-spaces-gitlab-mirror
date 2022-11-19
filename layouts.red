@@ -468,8 +468,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 			]
 			unless empty? row [new-row]					;-- count last row's size
-			#assert [empty? last row]
-			clear skip tail rows -4						;-- get rid of the closing empty row now
+			#assert [not empty? last rows]
 			if total-length > 0 [total-length: total-length - spacing/y]
 			
 			;; build the map & fix alignment
