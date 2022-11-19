@@ -499,7 +499,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
 			;; so return format is different too ;@@ any way to unify return format with the others?
-			reduce [size copy map copy/deep rows]
+			reduce [size copy map copy/deep rows]		;@@ should rows include margin offset? currently they do not
 		]
 		
 		;; these are externalized from the /create function to avoid spawning new functions all the time

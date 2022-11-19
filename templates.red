@@ -968,6 +968,44 @@ context [
 		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts
 	]
 	
+	;; /into required because /map cannot contain duplicates, but /rows can; plus this considers scaling
+	into: func [space [object!] xy [pair!] child [object! none!]] [
+		xy: xy - space/margin							;@@ margin may get out of sync with frame data
+		mrg2: space/margin along 'x * 2
+		scaled-xy: [										;-- correct xy/x for scaling if it's applied
+			either all [
+				space/align = 'fill						;@@ this should be held in /rows, or may get out of sync with the layout
+				not row =? last space/rows
+			][
+				scale: clip-end/x - clip-start/x / max 1 (space/size/x - mrg2) 
+				(round/to xy/x * scale 1) by xy/y 
+			][
+				xy
+			]
+		]
+		either child [
+			foreach [row-offset clip-start clip-end row] space/rows [
+				if child-offset: select/skip/same row child 3 [	;-- relies on [space offset drawn] row layout
+					return reduce [child (do scaled-xy) - row-offset - child-offset]
+				]
+			]
+		][
+			foreach [row-offset clip-start clip-end row] space/rows [
+				row-xy: (do scaled-xy) - row-offset
+				if clip-start +<= row-xy +< clip-end [
+					foreach [child child-offset _] row [
+						child-xy: row-xy - child-offset
+						if 0x0 +<= child-xy +< child/size [
+							return reduce [child child-xy]
+						]
+					]
+					break
+				]
+			]
+		]
+		none
+	]
+		
 	declare-template 'rich-paragraph/container [		;-- used as a base for higher level rich-content
 		margin:      0
 		spacing:     0
@@ -976,6 +1014,7 @@ context [
 		
 		rows:        []		#type  [block!]				;-- internal frame data used by /into
 		cache:       [size map rows]
+		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		
 		;; container-draw is not used due to tricky geometry
 		draw: function [/on canvas [pair!]] [~/draw self canvas]
