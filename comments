@@ -135,6 +135,8 @@ perhaps I could use base's panel to put popups/caret there instead of parent's p
 	that would further limit the clipping region for popups, but for caret it should work, but only if it won't steal focus	
 maybe a text-length? func that will measure size of any space's text as if it was not wrapped?
 	aesthetically optimal paragraph size estimation may use sqrt of that for it's width	
+use 'look to optimize list invalidation as well (maybe box too? any other space?) (grid is optimized)	
+need to document sizing policy of all spaces (but it's not finally set in stone yet)
 
 
 key aspects: draggable columns, rearrange by styles
@@ -2156,14 +2158,253 @@ cache creep/buildup
 	for less load, maybe should only clean it up after some length threshold? undecided yet
 	unfortunately now I'm iterating manually over the cache and hash will bring no benefit either
 	in very deep layout this may become a problem 
-	
-	
-;@@ doc sizing policy of all spaces
-;@@ announce the changes and show smth for error reporting to the audience
-
-;@@ actually use 'look to optimize out unnecessary redraws
-;@@ remove preprocessor from sift/locate
-
+so markdown reader
+	images - will cache them to not read the same files again (GC requirement)
+	gifs - not supported by Red yet, will be static
+	file - will stat it once in a while and reload if changed, relaying out the widgets, keeping the origin
+	will work by translating .md into a vlist (VID/S code) of: grids, text (code), and high-level paragraphs
+	should remember it's last geometry in config file
+	also I'll probably make it a GUI tool, not CLI, to get rid of the terminal
+		so will need an UI: empty window, dialog to open md file, can be closed, maybe multiple tabs support too?
+	html tags to support:
+		&html-entities;
+		block-level tags - should be separated by empty lines to be recognized, otherwise they're just text:
+			pre blockquote table header footer ol ul hr li dt dl dd
+			full list here: https://www.w3schools.com/html/html_blocks.asp
+			don't expand markdown within these paragraphs! but inbetween tags - should!
+		inline tags:
+		img src= width=
+		details+summary
+		h1 ..  
+	md feats:
+		# .. ###### - headings
+		=== --- - headings
+		`..` - code
+		`` .. `` - code
+		*italic*, _italic_, **bold**, ~~strike~~ - not sure if these need spaces around or work intra-word?
+		\^/ - to force a newline
+		[text](link)
+		![image-text](link)
+		:emojis:
+	TOC variants: github gitlab gitea, but probbably no need to support it yet
+	or maybe generate toc automatically? should be a separate app I think
+	links:
+		https://www.markdownguide.org/basic-syntax/
+		https://daringfireball.net/projects/markdown/syntax
+		https://gist.github.com/seanh/13a93686bf4c2cb16e658b3cf96807f2
+	fucking tricky this markdown parsing..
+	so:
+		found https://github.github.com/gfm/
+		https://spec-md.com/ is better written though not GFM specific
+		block-level html should end with empty line (doesn't have to begin) otherwise it becomes text
+			everything until the empty line is part of html
+		grid should be separated by empty lines from both sides or it becomes text
+		``` switches to code mode and back, interrupts text
+		heading needs not any padding, breaks text
+		up to 3 spaces before anything, else switch to code
+	what to trim? only code is not trimmed
+	state diagram:
+		blank -> text code heading grid html
+		text -> code heading
+		code -> text
+		heading -> text code
+		grid -> blank, otherwise commit as text
+			preliminary grid is a sequence of |-lines
+			any invalid grid should be committed as text too
+		html -> blank, otherwise continue as html
+I wanted for rich text to accept both strings and spaces first
+	but I need to wrap links as well... or maybe auto-generate links from urls?
+	and relative urls make dynamically with `as url!` ? might work!
+	may support more datatypes eventually
+	also want wrapping on for links (if they span many lines)
+	but then they'll be rectangular and will have empty space after
+	still worth turning it on? or split them into 2+ separate links, one per line?
+	perhaps I shouldn't split links at all though... will be weird seeing it begin on one line, end on another
+	what about code? I don't want to wrap it, but clearly most md renderers wrap long code strings
+	it's bad look either way, but if I split it by words, I'll have to style the background with respect to adjacent spaces
+	as a workaround I could - if code is longer than the canvas - make it wrap and set limits/min to canvas/x
+	so it would go to the next line, but will become a box - might be even better than the usual spaghetti
+	spaghetti support would require upper level style to paint the background
+	not something hard too, but will abstain for now
+rich-paragraph design	
+	I'd like to have a 'fill alignment in it, but it's tricky...
+	I could use weight>0 to stretch text spaces themselves,
+	but I can't stretch the text proportioally without altering the kerning (and manual kerning is too slow and imprecise)
+	old trick: I could make each word a separate space with `stretch`es inbetween, would that work?
+	even better, if that worked, I would not need to split the text in any other way
+	might be slow, but we'll see.. it has a benefit of no tube prerender requirement
+	a bit of a trouble will be to provide selection across multiple spaces, but it's a must anyway
+	ahh.. but I need spaces to be nonzero, meaning I will have to add stretches there, with min size
+	good thing is that space size becomes normalized (double spaces equal single) 
+	so:
+	- text is split by words
+	- fill alignment needs `stretch`es inserted to work, except the last line
+	  I can add a stretch after the last line with weight= 1000 to suppress the other ones
+	- min stretch size will be determined by the measured space size
+	  but in what layout to measure if adjacent fonts/font-sizes differ?
+	  makes sense to use default text, but need at least one string then in the items list
+	  if no string? maybe just render an empty text space and measure it?
+	  but without a string, I can't know the font size, maybe it's all big images
+	- to optimize other than 'fill alignments I could split them at line granularity
+	  but this will require trimming of long spaces into single ones
+	what about spaces between text and other stuff? e.g. image may stick to the text?
+	I suppose the parser should save all spaces as they are (except at paragraph's head and tail)
+	paragraph layout will then use info about spaces for stretch insertion
+	new problem: how to carry text flags into rich-paragraph? (coming from emphasis in markdown)
+	perhaps just insert flag blocks before the string? or support rtd-layout syntax?
+	rtd-layout is slow though I might implement a subset of it
+	key is: links consist of rich content too, but need to carry the color and underline
+	so it makes sense to use rtd flags..
+	I guess I'll just use refinements as flag toggles, no stack, no alternate names, etc
+	what about color? tuple to set it, but how to reset? #[none] too generic?
+	words can be reserved for now, maybe I'll find a good use later
+	but how to make link underlined if it includes spaces? maybe don't split it by words, only by spaces?
+	if I want it to be wrappable, I'll need to split it on line granularity and leave alone otherwise
+	or alternatively make my own underlining style that crosses stretch-regions (benefit: fill align includes links)
+	then I could use this style also to make code wrappable
+tube has an issue with markdown
+	sometimes I'm using long strings (e.g. in code) - this makes tube very wide
+	and paragraphs wrap at it's big width, making it all unreadable
+	options:
+	- I measure big items and wrap them into scrollable, before using tube (in rich-content?)
+	- I wrap all code and images into scrollables with limit that of the canvas (still doesn't defend from huge words)
+	- tube respects canvas when it's smaller than longest item, but still reports it's size as that of max item
+	  since tube is very general algorithm and it may be inside a scrollable, this is not an good option to enforce this
+	  scrollable should deal with stuff sticking out of the tube
+	  (canvas is usually limited inside a scrollable, not infinite, can't be used as a hint)
+	- I set /limits to the tube itself to that of the canvas, so it can't stick out
+	  but then I won't be able to scroll and see the big lines, as tube is narrow now
+	  what GH does is it wraps even code, gitter OTOH uses a scrollable (GH way is preferable)
+	  still doesn't work.. need to make tube respect limits more than it respects the canvas
+	  but if it does, it becomes smaller and I can't scroll over it.. shit
+	  image by design doesn't try to downscale to the canvas, else no point in having it in a scrollable..
+	  so I'll fix it by setting image's max size to the window, for now
+how to handle newlines?
+	tube has no notion of carriage return, so rich-content cannot make it go to the next line
+	what however if I insert wide space of zero height in place of newlines? might work
+	otherwise I would have to split paragraph into multiple tubes, which is unwelcome, will hurt selection continuity etc
+also space-as-stretch has a flaw: such stretch may be pushed into a new line, making line start with a space
+	I'll need special handling for these, measure rows, turn split stretches into carriage returns
+	maybe two styles: linebreak and paragraph-break? shitty names.. linefeed and linebreak maybe?
+I guess no way around measuring each row...
+	also I can't just pass url to rich-content, because I lose the link's destination
+	but if I pass a link space it won't be split, besides I need to pass a mix spaces and text with the same destination
+	I may use url for destination instead!
+	how to reset the url? pass empty one?
+	or use blocks for both color and url? but not for flags?
+	e.g. given a link [follow `me`](target) I pass:
+		(as url! "target") [(link's color) ["follow" (code space /text="me")]]
+	how do I construct a map then if text can be partially split?
+	besides one day I may want to focus the whole link (interactivity), that is focus frame will span the line break
+	this can only work with custom /into: logically all content will be a single line, however rendered as many
+	such link will be a container (`divisible`?) for other (indivisible) spaces,
+	because other spaces won't know how to render a focus frame that is split into lines
+	not sure how to define coordinates between spaces (considering 'fill align) and between lines though
+	maybe area outside spaces falls to the rich-content's canvas, there's "nothing" in it
+	clicks will have to leverage some tricky logic to determine on what line it lands, to place a caret
+	selection must be able to include/exclude any space though
+	I guess stretching makes it harder, otherwise space could be literal, but with stretching it has to be a space
+	editor will need to map such caret location to it's internal data,
+	and it may pay to split strings into chars for ease of mapping
+	vocabulary:
+	- chars will constitute text content
+	- spaces - other content
+	- blocks will group chars and spaces into single items from caret's perspective (up to the user what and when to group)
+	  blocks will also act as a stack for attributes
+	- parens will act like a stack for attibutes (color, link target, flags etc) ?
+	  on flags: test `xx*a**bb*cc**dd` shows that I can't turn italic on, bold on, italic off, bold off (result: `xxa**bbcc**dd`)
+	  also: `xx_a**bb_cc**dd` results in `xx_abb_ccdd` - seems that underscore can only start emphasis after a space
+	  tried `xx _a**bb_ cc**dd` too but it doesn't recognize ** as bold marker, nor does `xx _a**bb_** ccdd`
+	  anyway, means that markdown attributes are stack-like, which limits them but makes sense
+	  so paren works for attributes, although no so great for caret...
+	- another idea: word enables a flag, refinement removes it: bold .. /bold (html-like)
+	  set-word: value sets color or command or other facet, and set-word: none unsets it
+	  but this is bad for caret too, although at least shallow, but set-word is a complication when walking back
+	- perhaps each item should be either char with no flags, or paren with both char and flags block, but this is expensive
+	  first idea (of parens) was better, just needs more advanced caret to content mapping
+	  and why paren? use the block - just wrap each char with it's metadata
+	  benefit of this model: can easly cut selection, paste somewhere, no parsing/reconstruction needed
+	  drawback: need speedy production of rich-text flags, incl. application of flags during measurement phase
+	  so, if I use this model, my final rtd ranges will just be replaced wholly on every change to be efficient
+	  plus sameness is used for consequential items, when copying flags are also copied
+	  if I use ranges, on every modification I will have to scan them all and probably split, leading to even bigger mess
+	  if I use linear structure with attributes mixed with the text,
+	  every change will have to scan the whole thing to produce proper in/out attr changes
+	  both linear structure and isolated one seem to be of equal complexity, ranges are more complex
+	  but linear wins in RAM usage and easier to build, and as long as I can cache the parsing result, it should be efficient
+	so, linear is chosen then, only need to find a syntax for it
+	rtd-layout's syntax may be fine for range generation, but I'll need only a subset
+	grouping isn't so great when you add items: need to split the whole stack of groups if attributes to be pasted too
+	linear structure is better, but need to keep track of all flags and figure out which ones to alter
+	also should consider removal, e.g. `"a" b "b" /b "c"` -> `"a" b /b "c"` (need to get rid of b /b)
+	in more complex case it may be `b i /b /i` - to avoid this, attribute on/off order must be maintained as LIFO  
+	syntax:
+	- char - single text char
+	- string - works as if a sequence of chars
+	- word (bold, italic, underline, strike) enables the attr (no need to support alternate spellings I think, but can be added later)
+	- refinement (same) disables it
+	- set-words take a parameter:
+	  color: tuple or word (maybe issue too), /color removes
+	  backdrop: same, /backdrop removes
+	  size: sets font size, /size removes (back to default)
+	  font: sets font face, /font removes (no font)
+	  command: sets click action, /command removes
+	- paren reserved for now
+	- block groups things into single item for caret, automatically providing stack of attributes
+	  though I may implement this later
+	ranges may be created either for the whole, and then split into individual faces (easily, by subtracting caret from them)
+		then whole set of ranges changes with content change but not with canvas
+	or can be created per every text sequence, but then sequences will change with canvas, and require reparsing
+	ranges will have groups unrolled, because it's not caret offset anymore but char offsets for the richtext face
+	parsing results in global set of ranges then of the syntax (prefixed by pair for range, mostly aligns with internal rich-text format):
+	- word for flags
+	- tuple for color
+	- 'backdrop tuple for backdrop
+	- integer for font-size
+	- string for font face
+	- block for command
+	when drawing on given canvas, spaces will be created and flags applied
+	will need a lower-level text space, `text-span` that allows to control flags fully?
+	or better: if flags block starts with a pair, it's not processed?
+	what about clicks? I want clicks on spaces between words to work too
+	do I need to create text spaces for text regions? they should not use the general `text` style
+	nor there's any sizing magick that should be embedded
+	so the only reason to create them is to have them in the map: any benefits?
+	on click I need to translate coordinate into a caret offset in the initial high-level spec
+	so need to have a map of item indexes mapped to boxes on the output layout
+	but blocks may span multiple lines and be a single item,
+	so boxes will not be on the final layout but on an unrolled layout (single row)
+	and there will be a block of row lengths
+	I don't need events on chars to be handled outside the rich-content, only events on spaces that appear in it
+	so no need in the map for text
+	but cache will include row sizes (lengths and heights), boxes (pair x ranges of each item are enough)
+	so the only reason for not using tube (save for speed) is links that span multiple lines
+	but here's another idea: tube-like space that wraps it's content using draw facilities
+	(using clipping render the wrapped child twice: once on the right, once on the left)
+	however it should wrap on whole words, not just any place, not in the middle of a char
+	so I will need to give it a set of offsets where wrapping is allowed
+	I also will need to give it offsets where stretching for 'fill align occurs - how?
+	or instead just scale the row? indeed! seems much less complex and not worse visually
+	may even be used as a feature - like some magazines, banners etc
+design issue/question in paragraph layout:
+	if it's not left-aligned, e.g. right-aligned, to what margin should it align itself?
+	normally I would contract the final size if it's less than canvas
+	or extend if it's bigger than canvas
+	but in this case, it's tricky
+	1. left-aligned paragraph with a huuuge word that will certainly stick out
+	   I want only that word stick out, and then full size extended to it
+	   but other words should wrap properly at canvas, not at the huge word
+	2. center-aligned paragraph with a huuuge word
+	   if I center everything around half of the final size, likely only huge word will be visible
+	   although technically it's a burden of the container
+	3. right-aligned paragraph with a huuuge word - same thing
+	   I could align around right canvas margin, but that would be an unexpected mess
+	4. fill-align, huge word - will simply zoom out the word, this one is the simplest
+	5. center-aligned, smaller than canvas, fine - centered around real center 
+	6. right-aligned, smaller than canvas, no so great unless container itself also right-aligns it
+	   ok that's the key then, container alignment should be the same as paragraph alignment for good result
+	   
+	  
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
@@ -6099,4 +6340,291 @@ another failed design remnant
 	; foreach path list-spaces host/space [
 		; invalidate/forget/only get last path
 	; ]
+; ]
+
+paragraph that splits on line granularity - I might return to that if speed requires
+; layouts/paragraph: context [
+	; ;; unlike tube, this will require extra render and will split text spaces at right margin
+	; ;; settings for paragraph layout:
+	; ;;   align         [word! none!]   'left (default), 'center, 'right, 'fill
+	; ;;   margin        [integer! pair!]   >= 0x0
+	; ;;   spacing       [integer! pair!]   >= 0x0
+	; ;;   canvas         [none! pair!]   if none=inf, width determined by widest item
+	; ;;   limits        [none! object!]
+	; create: function [
+		; "Build a rich pagagraph out of given spaces and settings as bound words"
+		; list [block! function!] "List of spaces & strings/urls, or a picker func [/size /pick i]"
+		; settings [block!] "Any subset of [align margin spacing canvas limits]"
+		; ;; settings - imported locally to speed up and simplify access to them:
+		; /local align margin spacing canvas limits
+	; ][
+		; foreach word settings [							;-- free settings block so it can be reused by the caller
+			; set bind word 'local get word				;@@ check that only allowed words are overwritten, not e.g. `count`
+		; ]
+		; axes: [e s]										;-- hardcoded
+		; original-canvas: canvas
+			
+		; ;@@ how do I make 'fill alignment? or drop it and use -1/0/1 for it?
+		; ;@@ perhaps, it should just assign weight= 1 to all text spaces? but stretching a text line requires kerning..
+		; default align: 'left
+		; align: select #(left -1x0 center 0x0 right 1x0) align
+		
+		; spaces: map-each item list [
+			; switch/default type?/word item [
+				; string! [make-space 'text [text: item]]
+				; url!    [make-space 'link [text: item]]
+				; object! [item]
+			; ][assert [false]]							;@@ raise an error
+		; ]
+		; ;@@ if no strings - early exit
+		
+		; ;@@ ensure it doesn't fill the height, save a render
+		; canvas: infxinf									;-- lay out a row first
+		; settings: [axes align margin spacing canvas limits]
+		; set [size: map:] make-layout 'tube spaces settings
+		
+		; ;@@ if size/x < canvas return early but align it
+		
+		; ;; now that each item's width is known, can split
+		; ;@@ should cache created text spaces? text cannot be focused so maybe no reason to
+		
+		; mrg2: margin * 2x2
+		; spc: spacing along 'x
+		; set [canvas: fill:] decode-canvas original-canvas
+		; left: total: canvas/x - mrg2/x				;@@ if infinite, shouldn't bother; check for positivity
+		; assert [total < 1e5]
+		; spaces: clear copy list
+		; for-each [/i item] list [
+			; set [space: geom:] skip map i - 1 * 2
+			; width: geom/size/x
+			; switch/default type?/word item [
+				; string! [
+					; cut: 0
+					; while [left < width] [
+						; limit: at head item offset-to-char space/layout cut + left by 0
+						; if limit =? item [limit: next item]	;-- take at least 1 char
+						; limit: any [				;-- wrap on word boundary if possible
+							; find/last/tail/part item space! limit
+							; limit
+						; ]
+						; cut:   first caret-to-offset/lower length? limit
+						; width: geom/size/x - cut
+						; part:  trim copy/part item item: limit
+						; left:  total
+						; append spaces make-space 'text [text: part]
+					; ]
+					; space: make-space 'text [text: copy item]
+				; ]
+				; url! [
+					; space: make-space 'link [
+						; text:  item
+						; flags: [underline]				;-- don't wrap
+						; command: compose [browse (copy item)]	;@@ make local openers
+					; ]
+				; ]
+				; object! [space: item]
+			; ] [assert [false]]							;@@ raise an error
+			; left: left - width - spc
+			; if left <= 0 [left: total]
+			; append spaces space
+		; ]
+		
+		; canvas: original-canvas
+		; make-layout 'tube spaces settings
+	; ]
+; ]
+
+first implementation of paragraph/flow layout, rather boring and buggy
+; foreach [space drawn] info [				;@@ use for-each
+	; index:  index + 1
+	; breaks: pick breakpoints index
+	; slice:  none
+	
+	; new-row-size: as-pair					;-- add item-size and check if it hangs over
+		; row-size/x + space/size/x + spacing/x
+		; max row-size/y space/size/y
+		
+	; ;; try to split the crossing space itself, maybe multiple times
+	; while [
+		; left: allowed-row-width - (row-offset/x + row-size/x + spacing/x)	;-- allowed to be negative, e.g. if canvas/x = 0!
+		; all [
+			; left < space/size/x						;-- doesn't fully fit (still)?
+			; not empty? breaks						;-- any more breakpoints ahead?
+			; any [left > 0  empty? row]				;-- either have free space or have to put at least 1 slice per row
+		; ]
+	; ][
+		; ;; breaks may not be at head here if space spans more than 2 rows
+		; #assert [breaks/1 >= 0]						;-- should never be at a negative integer here
+		; if empty? row [breaks: next breaks]			;-- enforce at least one slice per row
+		; while [not tail? breaks] [					;@@ locate would be a muuuch better fit
+			; if breaks/1 > left [break]
+			; breaks: next breaks
+		; ]
+		
+		; ;; breaks are now before the breakpoint index that is too wide, or at tail
+		; ;; but it can be at head too - no break possible then (and row is not empty)
+		; if head? breaks [break]
+		; either negative? breaks/-1 [				;-- ignorable interval (spacing)?
+			; slice: breaks/-2
+			; shift: breaks/-1
+		; ][
+			; slice: breaks/-1
+			; shift: 0
+		; ]
+		
+		; ;; count this space in the row; offset cannot be estimated until row is finished
+		; repend row [space 0x0 drawn]				;-- space will appear on 2 or more rows
+		; row-size: as-pair
+			; row-size/x + spacing/x + slice
+			; new-row-size/y							;-- slice affects both spanned rows height
+		
+		; ;; commit the accumulated row
+		; append (new-row: obtain block! length? row) row
+		; repend rows [row-offset 0x0 row-size new-row]	;-- row-size includes the clipped part
+		; print ["partial commit:" row-offset row-size mold new-row]
+		
+		; ;; estimate the initial next row properties
+		; row-offset: as-pair
+			; shift - slice
+			; row-offset/y + row-size/y + spacing/y
+		; row-size: -1x0 * spacing
+		; new-row-size: space/size
+		; clear row
+	; ]
+	
+	; ;; variants to consider now:
+	; ;; - item fully fits (possibly a slicing leftover) -> no new row
+	; ;; - item doesn't fit (possibly big slicing leftover) but it's not the 1st on the row -> new row
+	; ;; - item doesn't fit (possibly big slicing leftover) but it is the 1st -> no new row
+	
+	; either all [
+		; not empty? row
+		; left < space/size/x
+	; ][												;-- start a new row
+		; ;; commit the accumulated row
+		; append (new-row: obtain block! length? row) row
+		; repend rows [row-offset 0x0 new-row-size new-row]	;-- row-size includes the clipped part
+		; print ["full commit:" row-offset new-row-size mold new-row]
+		
+		; clear row
+		; repend row [space 0x0 drawn]
+		; row-offset: row-offset + new-row-size + spacing * 0x1
+		; row-size:   space/size
+		
+		; ;; special case for opening break (space) - shift the row
+		; ;; e.g. text starting with a space comes after a non-text item and starts a new row
+		; if all [breaks  0 = breaks/1  shift: breaks/2  negative? shift] [
+			; row-offset/x: row-offset/x + shift
+		; ]
+	; ][												;-- don't start a new row
+		; repend row [space 0x0 drawn]
+		; row-size:   new-row-size					;-- just accept new width
+	; ]
+	
+	; total-width: max total-width row-offset/x + row-size/x	;-- clipped part excluded from total width
+; ]
+; repend rows [row-offset 0x0 row-size row]
+; print ["final commit:" row-offset row-size mold row]
+; nrows: (length? rows) / 3
+; total-length: row-offset/y + row-size/y
+; #leaving [foreach [_ _ _ row] rows [stash row]  stash rows]
+
+; ;; adjust row alignment
+; if factor: select #(right 1 center 0.5) align [
+	; forall rows [							;@@ use for-each
+		; set [row-offset: _: row-size: _:] rows
+		; ?? [row-offset row-size total-width]
+		; free: max 0 total-width - (row-size/x + row-offset/x)
+		; rows/2: free * factor * 1x0
+		; rows/1: rows/1 + rows/2
+		; ?? [free rows/2]
+		; rows: skip rows 3
+	; ]
+; ]
+
+; ;; build the map & measure the final layout size
+; ;; map cannot have doubled (wrapped) items, because focus should be set on the whole item
+; ;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
+; map: clear []
+; foreach [_ _ row-size row] rows [
+	; pos: 0x0
+	; forall row [							;@@ use for-each
+		; space: row/1
+		; row/2: pos + (row-size - space/size * 0x1)	;-- remember offset within the row (used by /draw and /into)
+		; unless space =? pick tail map -2 [	;-- do not duplicate
+			; repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
+		; ]
+		; pos: pos + (space/size + spacing * 1x0)
+		; row: skip row 2
+	; ]
+; ]
+; size: 2 * margin + (total-width by total-length)
+; #debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
+; #assert [size +< infxinf]
+
+; ;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
+; ;; so return format is different too ;@@ any way to unify return format with the others?
+; reduce [size copy map copy/deep rows]
+
+another unfinished flow attempt, not better
+; length: 0									;-- height of all committed (previous) rows = offset - spacing of current row
+; width:  0									;-- width used by current row so far
+; nitems: 0									;-- number of spaces fully committed so far
+; next-spacing: 0
+; while [nitems < count] [
+	; set [space: drawn:] skip info nitems * 2
+	; unless breaks [
+		; breaks: any [pick breakpoints nitems + 1  []]
+		; breakable?: 2 < length? breaks
+	; ]
+	; left: allowed-row-width - width
+	; if empty? row [next-spacing: 0]
+	; offset: width + next-spacing			;-- vertical offset will be determined later once row sizes are known
+	
+	; ;; add full space
+	; if all [
+		; head? breaks						;-- only when at beginning of the space
+		; any [
+			; offset + space/size/x <= allowed-row-width
+			; all [not breakable?  empty? row]
+		; ]
+	; ][
+		; repend row [space offset drawn]
+		; nitems: nitems + 1
+		; width:  offset + space/size/x
+		; next-spacing: spacing/x
+		; continue
+	; ]
+	
+	; ;; add part of the space
+	; if breakable? [
+		; #assert [0 = first head breaks]				;-- required for algorithm's simplicity
+		; #assert [space/size/x = last breaks]		;-- also
+		; set [offset1: offset2:] breaks
+		; if offset2 < hide: 0 [
+			; set [hide: offset2:] next breaks
+		; ]
+		; empty-part?: hide < 0
+		; part: offset2 - offset1
+		; if any [									;-- only if part fits or enforced by empty row
+			; offset + part <= allowed-row-width		;-- fits fully?
+			; empty? row								;-- 
+			; empty-part?
+		; ][
+			; if any [head? breaks  empty? row] [		;-- don't list the same space twice
+				; if empty? row [offset: offset + hide]
+				; repend row [space offset drawn]
+			; ]
+			; breaks: skip breaks either hide = 0 [1][2]
+			; either single? breaks [
+				; breaks: none
+				; nitems: nitems + 1
+				; next-spacing: spacing/x
+			; ][
+				; next-spacing: 0
+			; ]
+			; continue
+		; ]
+	; ]
+	
 ; ]

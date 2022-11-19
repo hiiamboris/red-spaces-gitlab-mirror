@@ -441,129 +441,58 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			
 			;; split info into rows according to found widths
-			rows: obtain block! 40						;-- [row-offset row-clipping-offset row-size row ...]
+			rows: obtain block! 40						;-- [row-offset clip-start clip-end row ...]
 			row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
-			row-size:          -1x0 * spacing			;-- works because no row is empty, so spacing will be added (count=0 handled above)
-			row-offset:        0x0						;-- may be altered for rows 2+
-			allowed-row-width: ccanvas/x				;-- how wide rows to allow (splitting margin)
-			total-width:       0						;-- used to determine full layout size when it's less than canvas
-			index: 0
-			foreach [space drawn] info [				;@@ use for-each
-				index:  index + 1
-				breaks: pick breakpoints index
-				slice:  none
-				
-				new-row-size: as-pair					;-- add item-size and check if it hangs over
-					row-size/x + space/size/x + spacing/x
-					max row-size/y space/size/y
-					
-				;; try to split the crossing space itself, maybe multiple times
-				while [
-					left: allowed-row-width - (row-offset/x + row-size/x + spacing/x)	;-- allowed to be negative, e.g. if canvas/x = 0!
-					all [
-						left < space/size/x						;-- doesn't fully fit (still)?
-						not empty? breaks						;-- any more breakpoints ahead?
-						any [left > 0  empty? row]				;-- either have free space or have to put at least 1 slice per row
-					]
-				][
-					;; breaks may not be at head here if space spans more than 2 rows
-					#assert [breaks/1 > 0]						;-- should never be at a negative integer here
-					if empty? row [breaks: next breaks]			;-- enforce at least one slice per row
-					while [not tail? breaks] [					;@@ locate would be a muuuch better fit
-						if breaks/1 > left [break]
-						breaks: next breaks
-					]
-					
-					;; breaks are now before the breakpoint index that is too wide, or at tail
-					;; but it can be at head too - no break possible then (and row is not empty)
-					if head? breaks [break]
-					either negative? breaks/-1 [				;-- ignorable interval (spacing)?
-						slice: breaks/-2
-						shift: breaks/-1
-					][
-						slice: breaks/-1
-						shift: 0
-					]
-					
-					;; count this space in the row; offset cannot be estimated until row is finished
-					repend row [space 0x0 drawn]				;-- space will appear on 2 or more rows
-					row-size: as-pair
-						row-size/x + spacing/x + slice
-						new-row-size/y							;-- slice affects both spanned rows height
-					
-					;; commit the accumulated row
-					append (new-row: obtain block! length? row) row
-					repend rows [row-offset 0x0 row-size new-row]	;-- row-size includes the clipped part
-					; print ["partial commit:" row-offset row-size mold new-row]
-					
-					;; estimate the initial next row properties
-					row-offset: as-pair
-						shift - slice
-						row-offset/y + row-size/y + spacing/y
-					row-size: -1x0 * spacing
-					new-row-size: space/size
-					clear row
-				]
-				
-				;; variants to consider now:
-				;; - item fully fits (possibly a slicing leftover) -> no new row
-				;; - item doesn't fit (possibly big slicing leftover) but it's not the 1st on the row -> new row
-				;; - item doesn't fit (possibly big slicing leftover) but it is the 1st -> no new row
-				
-				either all [
-					not empty? row
-					left < space/size/x
-				][												;-- start a new row
-					;; commit the accumulated row
-					append (new-row: obtain block! length? row) row
-					repend rows [row-offset 0x0 new-row-size new-row]	;-- row-size includes the clipped part
-					; print ["full commit:" row-offset new-row-size mold new-row]
-					
-					clear row
-					repend row [space 0x0 drawn]
-					row-offset: row-offset + new-row-size + spacing * 0x1
-					row-size:   space/size
-				][												;-- don't start a new row
-					repend row [space 0x0 drawn]
-					row-size:   new-row-size					;-- just accept new width
-				]
-				
-				total-width: max total-width row-offset/x + row-size/x	;-- clipped part excluded from total width
-			]
-			repend rows [row-offset 0x0 row-size row]
-			; print ["final commit:" row-offset row-size mold row]
-			nrows: (length? rows) / 3
-			total-length: row-offset/y + row-size/y
 			#leaving [foreach [_ _ _ row] rows [stash row]  stash rows]
 			
-			;; adjust row alignment
-			if factor: select #(right 1 center 0.5) align [
-				forall rows [							;@@ use for-each
-					set [row-offset: _: row-size: _:] rows
-					?? [row-offset row-size total-width]
-					free: max 0 total-width - (row-size/x + row-offset/x)
-					rows/2: free * factor * 1x0
-					rows/1: rows/1 + rows/2
-					?? [free rows/2]
-					rows: skip rows 3
+			allowed-row-width: ccanvas/x				;-- how wide rows to allow (splitting margin)
+			total-length: total-width: 0				;-- total final extent of non-empty area
+			row-hidden: row-visible: row-width: row-height: 0	;-- per-row counters
+			
+			;; next part relies on other functions from the context:
+			foreach [space: drawn:] info [				;@@ use for-each
+				breaks: first breakpoints
+				breakpoints: next breakpoints 
+				either all [breaks 2 < length? breaks] [
+					parse breaks [any [
+						set offset1 skip [
+							'- ahead set offset2 skip
+							(commit-empty offset2 - offset1)
+						|	ahead set offset2 skip
+							(commit-part space drawn offset1 offset2)
+						]
+					]]
+				][
+					commit-space space drawn
+					commit-empty spacing/x
 				]
 			]
-
-			;; build the map & measure the final layout size
+			unless empty? row [new-row]					;-- count last row's size
+			#assert [empty? last row]
+			clear skip tail rows -4						;-- get rid of the closing empty row now
+			if total-length > 0 [total-length: total-length - spacing/y]
+			
+			;; build the map & fix alignment
+			;; vertical alignment requires final row height
+			;; horizontal alignment requires final total width (known after all rows are finished)
 			;; map cannot have doubled (wrapped) items, because focus should be set on the whole item
 			;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
 			map: clear []
-			foreach [_ _ row-size row] rows [
+			forall rows [								;@@ use for-each or map-each
+				set [row-offset: row-clip-start: row-clip-end: row:] rows
+				left: total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
+				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
+				rows/1: row-offset + (shift by 0)
 				pos: 0x0
-				forall row [							;@@ use for-each
+				forall row [							;@@ use for-each or map-each
 					space: row/1
-					row/2: pos + (row-size - space/size * 0x1)	;-- remember offset within the row (used by /draw and /into)
-					unless space =? pick tail map -2 [	;-- do not duplicate
+					row/2: row/2 by (row-clip-end/y - space/size/y)	;-- remember offset within the row (used by /draw and /into)
+					unless space =? pick tail map -2 [	;-- do not duplicate items in the map
 						repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
 					]
-					pos: pos + (space/size + spacing * 1x0)
 					row: skip row 2
 				]
+				rows: skip rows 3
 			]
 			size: 2 * margin + (total-width by total-length)
 			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
@@ -572,6 +501,51 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
 			;; so return format is different too ;@@ any way to unify return format with the others?
 			reduce [size copy map copy/deep rows]
+		]
+		
+		;; these are externalized from the /create function to avoid spawning new functions all the time
+		commit-empty: func [width] with :create [
+			if empty? row [row-hidden: row-hidden + width]
+			row-width: row-width + width
+		]
+		commit-space: func [space drawn] with :create [
+			claim space/size/x
+			row-height: max row-height space/size/y
+			repend row [space row-width - space/size/x drawn]
+		]
+		commit-part: func [space drawn offset1 offset2] with :create [
+			claim width: offset2 - offset1
+			unless space =? pick tail row -3 [
+				row-height: max row-height space/size/y
+				if empty? row [
+					row-hidden: offset1
+					row-width: offset2
+				]
+				repend row [space row-width - offset2 drawn]
+			]
+		]
+		claim: func [width] with :create [
+			if all [
+				not empty? row
+				row-width - row-hidden + width > allowed-row-width
+			] [new-row]
+			row-width: row-width + width
+			row-visible: row-width - row-hidden
+		]
+		
+		;; hidden [ visible ] empty
+		;; <-      row-width     ->
+		new-row: does with :create [
+			repend rows [
+				(negate row-hidden) by total-length
+				row-hidden by 0
+				row-hidden + row-visible by row-height
+				copy row
+			]
+			clear row
+			total-length: total-length + row-height + spacing/y
+			total-width:  max total-width row-visible
+			row-hidden: row-visible: row-width: row-height: 0
 		]
 	]
 	

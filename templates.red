@@ -931,44 +931,40 @@ context [
 		count: space/items/size
 		#assert [count]
 		
-		drawn: make [] length? rows ; * 3 / 3
-		; items: make [] count
-		foreach [row-offset clip-offset row-size row] rows [
-			; ?? [row-offset row-size]
+		;; I clip every row separately from the hanging out parts,
+		;; as wrapping margin doesn't have to align with total width
+		;; e.g. row may be visibly smaller than canvas but contain "hidden" parts duped on another row
+		scaled-row: [
+			translate (row-offset * 0x1 + mrg) [
+				scale (size/x / used) 1.0				;-- can be both zooming in and out (<1 or >1)
+				translate (clip-start * -1x0)
+				clip 0x0 (clip-end) (copy row-drawn)
+			]
+		]
+		normal-row: [
+			translate (row-offset + mrg) [
+				clip (clip-start) (clip-end) (copy row-drawn)
+			]
+		]
+		
+		mrg:   space/margin * 1x1
+		drawn: make [] (length? rows) / 4 * 3
+		foreach [row-offset clip-start clip-end row] rows [
 			row-drawn: clear []
 			foreach [item item-offset item-drawn] row [
 				compose/only/into [
 					translate (item-offset) (item-drawn)
 				] tail row-drawn
 			]
-			blueprint: either all [
+			fill?: all [
 				space/align = 'fill
-				(used: row-offset/x + row-size/x) < size/x
+				0 < used: clip-end/x - clip-start/x
 				not row =? last rows					;-- don't stretch the last row! ;@@ though it should be optional
-			][
-				scale: size/x / used
-				[
-					push [
-						translate (space/margin * 1x1 + (row-offset * 0x1))
-						scale (scale) (1.0)
-						translate (row-offset * 1x0)
-						clip (row-offset * -1x0) (row-size) (copy row-drawn)
-					]
-				]
-			][
-				[
-					translate (space/margin * 1x1 + row-offset) [
-						;; clip every row separately from the hanging out parts,
-						;; as wrapping margin doesn't have to align with total width
-						clip (row-offset * -1x0 + clip-offset) (row-size) (copy row-drawn)
-					]
-				]
 			]
+			blueprint: either fill? [scaled-row][normal-row]
 			compose/deep/only/into blueprint tail drawn
 		]
-		; ?? drawn
-		; cont/origin: origin							;-- unused
-		mrg: space/margin * 1x1
+		; space/origin: origin							;-- unused
 		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts
 	]
 	
@@ -1099,34 +1095,41 @@ context [
 	;; however ranges and breakpoints do not depend on canvas, so no need put them into cache
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		breaks: clear space/breakpoints
-		vec: clear make vector! 8
 		
 		;@@ keep stripe in sync with paragraph layout, or find another way to avoid double rendering:
 		set [canvas': fill:] decode-canvas canvas
 		ccanvas: subtract-canvas constrain canvas' space/limits 2x2 * space/margin
 		stripe:  encode-canvas infxinf/x by ccanvas/y -1x-1
 		
+		vec: clear []
 		foreach item space/content [
 			;; this way I won't be able to distinguish produced text spaces from those coming from /source
 			;; but then, maybe it's fine to have them all breakable...
 			entry: none
-			if find [link text] item/type [
+			if all [
+				find [link text] item/type
+				not empty? item/text
+			][
 				render/on item stripe					;-- produces /layout to measure text on
 				h1: second size-text item/layout
 				h2: second caret-to-offset/lower item/layout 1
 				if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
 					pos: item/text
+					unless find space! pos/1 [append vec 0]
 					while [pos: find/tail pos space!] [
 						index: -1 + index? pos
 						left:  first caret-to-offset       item/layout index
 						right: first caret-to-offset/lower item/layout index
-						repend vec [left left - right right]
+						repend vec [left '- right]
 					]
-					entry: copy vec
+					unless find space! last item/text [
+						append vec first caret-to-offset/lower item/layout 1 + length? item/text
+					]
+					if 2 < length? vec [entry: copy vec]
 					clear vec
 				]
 			]
-			append/only breaks unless empty? entry [entry]
+			append/only breaks entry
 		]
 		space/rich-paragraph-draw/on canvas
 	]
