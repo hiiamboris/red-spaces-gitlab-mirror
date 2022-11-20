@@ -985,7 +985,7 @@ context [
 		rows:   space/frame/rows
 		margin: space/frame/margin
 		align:  space/frame/align
-		scales: space/frame/scales
+		scales: any [space/frame/scales []]
 		xy:     xy - margin
 		either child [
 			foreach [row-offset clip-start clip-end row] rows [
