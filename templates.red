@@ -1039,16 +1039,15 @@ context [
 		if unset? :space/ranges [exit]					;-- not initialized yet
 		clear ranges:  space/ranges
 		clear content: space/content
-		; bold: italic: underline: strike: none
 		buffer: clear ""
 		offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
 		start: clear #()								;-- offset of each attr's opening
 		get-range-blueprint: [
-			switch attr [
+			switch/default attr [
 				bold italic underline strike [[pair attr]]
 				color size font command [[pair get attr]]
 				backdrop [[pair 'backdrop get attr]]
-			]
+			][ [] ]
 		]
 		flush: [
 			if 0 < text-len: length? buffer [
@@ -1060,15 +1059,15 @@ context [
 					keep (max 1 range - text-ofs) keep to [pair! | end]
 				|	to pair!
 				]]
-				foreach [attr-ofs attr] start [			;-- add all open ranges
+				; ?? [offset ranges flags start]
+				foreach [attr attr-ofs] start [			;-- add all open ranges
+					attr: bind to word! attr 'local
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply
-					either attr = 'command [
-						command: get attr
-					][
-						pair: as-pair (max 1 1 + attr-ofs - text-ofs) len
-						value: get attr
+					if attr <> 'command [
+						pair: as-pair (max 1 1 + attr-ofs - text-ofs) text-len
 						repend flags do get-range-blueprint
 					]
+					; ?? [attr pair flags]
 				]
 				
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
@@ -1077,19 +1076,20 @@ context [
 				append content obj: make-space either command ['link]['text] []
 				quietly obj/text:  copy buffer
 				quietly obj/flags: flags
+				; ?? [buffer flags]
 				if command [quietly obj/command: command]
 				clear buffer
 			]
 		]
 		commit-attr: [
-			attr: to word! attr
+			attr: bind to word! attr 'local
 			if start/:attr [
 				pair: as-pair  1 + any [start/:attr attr]  offset
 				if pair/2 > pair/1 [repend ranges do get-range-blueprint]
 			]
 		]
 		=open-attr=:  [(do commit-attr  start/:attr: offset)]
-		=close-attr=: [(do commit-attr  start/:attr: none)]
+		=close-attr=: [(do commit-attr  remove/key start attr)]
 		
 		parse/case space/source [any [
 			ahead word! set attr ['bold | 'italic | 'underline | 'strike] (
@@ -1131,6 +1131,7 @@ context [
 		|	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
 		] end]
 		do flush										;-- commit last string
+		; ?? content ?? ranges		
 		
 		invalidate space
 	]
