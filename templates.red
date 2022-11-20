@@ -925,8 +925,14 @@ context [
 		settings: with space [margin spacing align canvas limits breakpoints]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
-		quietly space/rows: rows
 		quietly space/map:  map
+		scales: if space/align = 'fill [make [] (length? rows) / 4]
+		quietly space/frame: compose/only [				;-- store data about the last frame for /into to use
+			margin: (space/margin)
+			align:  (space/align)
+			rows:   (rows)
+			scales: (scales)
+		]
 		
 		count: space/items/size
 		#assert [count]
@@ -936,7 +942,7 @@ context [
 		;; e.g. row may be visibly smaller than canvas but contain "hidden" parts duped on another row
 		scaled-row: [
 			translate (row-offset * 0x1 + mrg) [
-				scale (size/x / used) 1.0				;-- can be both zooming in and out (<1 or >1)
+				scale (scale) 1.0
 				translate (clip-start * -1x0)
 				clip 0x0 (clip-end) (copy row-drawn)
 			]
@@ -948,6 +954,7 @@ context [
 		]
 		
 		mrg:   space/margin * 1x1
+		width: size/x - (mrg/x * 2)						;-- used for scaling; based on real unconstrained 'size'
 		drawn: make [] (length? rows) / 4 * 3
 		foreach [row-offset clip-start clip-end row] rows [
 			row-drawn: clear []
@@ -956,42 +963,43 @@ context [
 					translate (item-offset) (item-drawn)
 				] tail row-drawn
 			]
-			fill?: all [
-				space/align = 'fill
-				0 < used: clip-end/x - clip-start/x
-				not row =? last rows					;-- don't stretch the last row! ;@@ though it should be optional
+			if space/align = 'fill [
+				fill?: all [
+					0 < used: clip-end/x - clip-start/x
+					not row =? last rows				;-- don't stretch the last row! ;@@ though it should be optional
+				]
+				scale: either fill? [width / used][1]	;-- can be both zooming in and out (<1 or >1)
+				append scales scale
 			]
 			blueprint: either fill? [scaled-row][normal-row]
 			compose/deep/only/into blueprint tail drawn
 		]
 		; space/origin: origin							;-- unused
-		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts
+		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts; uses unconstrained 'size'
 	]
 	
-	;; /into required because /map cannot contain duplicates, but /rows can; plus this considers scaling
+	;; /into required because /map cannot contain duplicates, but frame/rows can; plus this considers scaling
 	into: func [space [object!] xy [pair!] child [object! none!]] [
-		xy: xy - space/margin							;@@ margin may get out of sync with frame data
-		mrg2: space/margin along 'x * 2
-		scaled-xy: [										;-- correct xy/x for scaling if it's applied
-			either all [
-				space/align = 'fill						;@@ this should be held in /rows, or may get out of sync with the layout
-				not row =? last space/rows
-			][
-				scale: clip-end/x - clip-start/x / max 1 (space/size/x - mrg2) 
-				(round/to xy/x * scale 1) by xy/y 
-			][
-				xy
-			]
-		]
+		;; /frame holds rows data as well alignment and margin used to draw these rows
+		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
+		rows:   space/frame/rows
+		margin: space/frame/margin
+		align:  space/frame/align
+		scales: space/frame/scales
+		xy:     xy - margin
 		either child [
-			foreach [row-offset clip-start clip-end row] space/rows [
+			foreach [row-offset clip-start clip-end row] rows [
 				if child-offset: select/skip/same row child 3 [	;-- relies on [space offset drawn] row layout
-					return reduce [child (do scaled-xy) - row-offset - child-offset]
+					xy': (xy/x * any [scales/:irow 1]) by xy/y	;-- correct xy/x for scaling if it's applied
+					return reduce [child xy' - row-offset - child-offset]
 				]
 			]
 		][
-			foreach [row-offset clip-start clip-end row] space/rows [
-				row-xy: (do scaled-xy) - row-offset
+			irow: 0
+			foreach [row-offset clip-start clip-end row] rows [	;@@ use for-each
+				irow: irow + 1
+				xy': (xy/x * any [scales/:irow 1]) by xy/y		;-- correct xy/x for scaling if it's applied
+				row-xy: xy' - row-offset
 				if clip-start +<= row-xy +< clip-end [
 					foreach [child child-offset _] row [
 						child-xy: row-xy - child-offset
@@ -1012,8 +1020,8 @@ context [
 		align:       'left	#type = [word!] :invalidates-look
 		breakpoints: []		#type  [block!] :invalidates
 		
-		rows:        []		#type  [block!]				;-- internal frame data used by /into
-		cache:       [size map rows]
+		frame:       []		#type  [block!]				;-- internal frame data used by /into
+		cache:       [size map frame]
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		
 		;; container-draw is not used due to tricky geometry
