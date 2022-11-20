@@ -18,10 +18,10 @@ Red [
 				; ] align= 'left
 				
 source: [
-	"12 34 "
-	make-space 'text [text: "ab cde f" color: cyan]
-	" 56 "
-	make-space 'text [text: "efh" color: yellow]
+	italic "12 " bold "34^/ "
+	(make-space 'text [text: "ab cde f" color: cyan])
+	color: white " 56 " /color /bold /italic
+	(make-space 'text [text: "efh" color: yellow])
 	" 78"
 ]
 				
@@ -30,12 +30,12 @@ view/no-wait/options/flags [
 	b: host 200x500 [
 		row tight [
 			column tight weight= 1 [
-				box left forest [rich-content source= reduce source align= 'left]
-				box right blue  [rich-content source= reduce source align= 'right]
+				box left forest [rich-content source= compose source align= 'left]
+				box right blue  [rich-content source= compose source align= 'right]
 			]
 			column tight weight= 1 [
-				box center blue [rich-content source= reduce source align= 'center]
-				box left forest [rich-content source= reduce source align= 'fill]
+				box center blue [rich-content source= compose source align= 'center]
+				box left forest [rich-content source= compose source align= 'fill]
 			]
 		]
 	] react [

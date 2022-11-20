@@ -1035,6 +1035,11 @@ context [
 	
 	;@@ will need source editing facilities too
 	
+	linebreak-prototype: make-space 'space [
+		type: 'linebreak
+		cache: none
+	]
+	
 	on-source-change: function [space [object!] word [word!] value [any-type!] /local attr char string] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
 		clear ranges:  space/ranges
@@ -1051,7 +1056,7 @@ context [
 		]
 		flush: [
 			if 0 < text-len: length? buffer [
-				text-ofs: offset - text-len				;-- offset of the buffer
+				text-ofs: offset - text-len			;-- offset of the buffer
 				command:  none
 				flags: parse ranges [collect any [		;-- add closed ranges if they intersect with text
 					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
@@ -1059,7 +1064,7 @@ context [
 					keep (max 1 range - text-ofs) keep to [pair! | end]
 				|	to pair!
 				]]
-				; ?? [offset ranges flags start]
+				; ?? [offset text-ofs buffer ranges flags start]
 				foreach [attr attr-ofs] start [			;-- add all open ranges
 					attr: bind to word! attr 'local
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply
@@ -1113,11 +1118,22 @@ context [
 			|	set attr quote command:  =open-attr= set command #expect block!
 			]
 		|	set string string! (
-				append buffer string
-				offset: offset + length? string
+				chunks: next split string #"^/"
+				append buffer chunks/-1
+				offset: offset + length? chunks/-1
+				forall chunks [							;@@ use for-each
+					do flush
+					append content copy linebreak-prototype
+					append buffer chunks/1
+					offset: offset + 1 + length? chunks/1
+				]
 			)
 		|	set char char! (
-				append buffer char
+				either char = #"^/" [
+					append content copy linebreak-prototype
+				][
+					append buffer char
+				]
 				offset: offset + 1
 			)
 		; |	paren! reserved
@@ -1148,20 +1164,25 @@ context [
 		set [canvas': fill:] decode-canvas canvas
 		ccanvas: subtract-canvas constrain canvas' space/limits 2x2 * space/margin
 		stripe:  encode-canvas infxinf/x by ccanvas/y -1x-1
+		break-size: (pick finite-canvas ccanvas 'x) by 0 
 		
 		vec: clear []
 		foreach item space/content [
+			entry: none
+			if item/type = 'linebreak [quietly item/size: break-size]	;-- special handling of linebreaks
+			
 			;; this way I won't be able to distinguish produced text spaces from those coming from /source
 			;; but then, maybe it's fine to have them all breakable...
-			entry: none
+			; ?? [item/type item/text]
 			if all [
 				find [link text] item/type
 				not empty? item/text
 			][
 				render/on item stripe					;-- produces /layout to measure text on
-				h1: second size-text item/layout
-				h2: second caret-to-offset/lower item/layout 1
-				if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
+				; h1: second size-text item/layout		not working - #5241
+				; h2: second caret-to-offset/lower item/layout 1
+				; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
+				unless find item/text #"^/" [			;-- avoid breakpoints if text has multiple lines
 					pos: item/text
 					unless find space! pos/1 [append vec 0]
 					while [pos: find/tail pos space!] [
@@ -1179,6 +1200,7 @@ context [
 			]
 			append/only breaks entry
 		]
+		; ?? breaks
 		space/rich-paragraph-draw/on canvas
 	]
 	

@@ -456,8 +456,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				either all [breaks 2 < length? breaks] [
 					parse breaks [any [
 						set offset1 skip [
-							'- ahead set offset2 skip
+							'- ahead set offset2 skip	;-- soft break on empty region (space)
 							(commit-empty offset2 - offset1)
+						; |	'/ ahead set offset2 skip	;-- hard break
+							; (commit-break offset2 - offset1)
 						|	ahead set offset2 skip
 							(commit-part space drawn offset1 offset2)
 						]
@@ -503,16 +505,19 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		]
 		
 		;; these are externalized from the /create function to avoid spawning new functions all the time
-		commit-empty: func [width] with :create [
+		commit-empty: func [width] with :create [				;-- soft break (usually whitespace)
 			if empty? row [row-hidden: row-hidden + width]
 			row-width: row-width + width
 		]
-		commit-space: func [space drawn] with :create [
+		; commit-break: func [width] with :create [				;-- hard break (usually newline)
+			; new-row
+		; ]
+		commit-space: func [space drawn] with :create [			;-- whole space object (indivisible)
 			claim space/size/x
 			row-height: max row-height space/size/y
 			repend row [space row-width - space/size/x drawn]
 		]
-		commit-part: func [space drawn offset1 offset2] with :create [
+		commit-part: func [space drawn offset1 offset2] with :create [	;-- region of space (usually chars)
 			claim width: offset2 - offset1
 			unless space =? pick tail row -3 [
 				row-height: max row-height space/size/y
