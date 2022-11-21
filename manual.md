@@ -148,7 +148,7 @@ Style descriptor carries the style body. It can be either a block or a function.
 
 Is just a block bound to space and evaluated. It minimizes the amount of boilerplate code and makes styles more readable.
 
-Block style may contain special `below:` and `above:` blocks with [Draw commands](https://w.red-lang.org/en/draw/#draw-commands) which will be inserted before and after the Draw block returned by the space's `/draw` function:
+Block style may contain special `below:` and `above:` blocks with [Draw commands](https://github.com/red/docs/blob/master/en/draw.adoc#draw-commands) which will be inserted before and after the Draw block returned by the space's `/draw` function:
 - `below` is great for drawing frame and background after `/size` gets set
 - `above` is great for drawing focus overlay or tinting the space (like button in it's "pushed" state)
 

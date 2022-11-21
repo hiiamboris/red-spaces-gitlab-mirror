@@ -5,7 +5,7 @@ include_toc: true
 
 # VID/S - Visual Interface Dialect for Spaces
 
-VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a completely different design.
+VID/S is different from [VID](https://github.com/red/docs/blob/master/en/vid.adoc) because it serves a completely different design.
 
 ## Quick VID to VID/S and faces to spaces comparison
 
@@ -13,14 +13,14 @@ VID/S is different from [VID](https://w.red-lang.org/en/vid) because it serves a
 | - | - | - |
 | Organization | Tree of static doubly linked `face!` objects (children have a /parent facet, parents have /pane). Face can appear in only a single place. | Tree of singly¹ or doubly linked `space!` objects (parents have /content, /items and /map facets, children have /parent only after render). Same space can appear in only a single place². |
 | Geometry | All faces are boxes sized in (virtual) pixels. | Each space can rotate/scale/bend it's children if it can express that in Draw. For interactivity support, it should provide coordinate transformation. |
-| Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://w.red-lang.org/en/draw), redrawn continuously over time³. |
+| Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://github.com/red/docs/blob/master/en/draw.adoc), redrawn continuously over time³. |
 | Naming | `name:` can prefix a face definition. | `name:` can prefix a space definition. |
 | VID styles | `style` keyword allows to define a new style with new defaults. | `style` keyword allows to define a new style with new defaults. |
 | Stylesheets | No support. Faces look is mostly cast in stone. | Whole classes of spaces can be styled using a single style block or function. Styling is affected by the hierarchy. Spaces look can be fully customized, animated, effects applied (no limits). |
 | Coloring | Faces support both foreground and background colors. | Spaces support only one color, which will be e.g. text color for `text` and fill color for `box`. |
 | Font styles | Faces support `font` facet as well as `bold/italic/underline/font-size` shortcuts. | Text spaces support `bold/italic/underline` shortcuts, while font and size can only be set by stylesheet. |
-| Actors | Each individual face can have a [set of actors](https://w.red-lang.org/en/view/#actors). | Each individual space can have the same set of actors. |
-| Event handlers | Events are handled by the OS. Some little customization can be done using a stack of [event functions](https://w.red-lang.org/en/view/#insert-event-func). | Events are handled by [standard event handlers](standard-handlers.red). Each space can have a stack of event handlers defining different levels of behavior from basic to custom. |
+| Actors | Each individual face can have a [set of actors](https://github.com/red/docs/blob/master/en/view.adoc#actors). | Each individual space can have the same set of actors. |
+| Event handlers | Events are handled by the OS. Some little customization can be done using a stack of [event functions](https://github.com/red/docs/blob/master/en/view.adoc#insert-event-func). | Events are handled by [standard event handlers](standard-handlers.red). Each space can have a stack of event handlers defining different levels of behavior from basic to custom. |
 | Facets | Each face has exactly the same set of facets that cannot be extended from VID. Mapping of VID datatypes to facets is hardcoded. | Each space defines it's own set of facets (only a few are shared), which can be extended by user with the `facet=` notation. Mapping of datatypes to facets is defined by [`spaces/styles` map](vid.red) which can be altered at any time. |
 | Sizing | Each face has a fixed size that has to be changed manually when required. | Most spaces automatically adjust their sizes, virtually eliminating the need for manual intervention. `limits` facet controls the range in which the size can vary. |
 | Positioning | VID allows for quite tricky static layouts with rows, columns, alignment. Every pane is pre-arranged using the same powerful algorithm. | VID/S uses [layout functions](layouts.red) to position spaces (some support alignment). They are more limited⁴ and predictable but able to adapt to size changes. Some spaces can only contain a single child. |
@@ -206,7 +206,7 @@ view [host [
 
 ### `react`
 
-Defines a reactive relation on a space and makes the space [reactive](https://w.red-lang.org/en/reactivity/). Reaction may refer to this space by `self` or by [bound name](#style-instantiation) (if one is given).
+Defines a reactive relation on a space and makes the space [reactive](https://github.com/red/docs/blob/master/en/reactivity.adoc). Reaction may refer to this space by `self` or by [bound name](#style-instantiation) (if one is given).
 
 Syntax:
 - `react <relation>`
@@ -236,7 +236,7 @@ Syntax:
 - `<on-event> :<reference>`
 
 Where:
-- `on-event` is any word that starts with `on-` (see [list of supported events](https://w.red-lang.org/en/view/#events))
+- `on-event` is any word that starts with `on-` (see [list of supported events](https://github.com/red/docs/blob/master/en/view.adoc#events))
 - `body` and `spec` are blocks. In the first case, actor is defined implicitly as `function [space path event] body`, so `body` should use these names
 - `reference` is either a get-word or get-path referring to the actor function
 

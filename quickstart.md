@@ -9,11 +9,11 @@ Will guide you through the basics required to use Spaces in your code.
 
 ## What's this
 
-[Red language](http://red-lang.org/) comes with a set of OS-native widgets - [Faces](https://w.red-lang.org/en/view/#face-types).\
+[Red language](http://red-lang.org/) comes with a set of OS-native widgets - [Faces](https://github.com/red/docs/blob/master/en/view.adoc#face-types).\
 They're great: familiar look-n-feel, respect for user settings, speed, etc.\
 But they're limited: simplistic, not customizable, portability goes down with the number of features, Red support for them varies between platforms, and is often packed with bugs due to complexity of OS APIs.
 
-To provide for the need, this project introduces **[Draw](https://w.red-lang.org/en/draw)-based widgets into Red.**\
+To provide for the need, this project introduces **[Draw](https://github.com/red/docs/blob/master/en/draw.adoc)-based widgets into Red.**\
 These widgets are **called Spaces**. Name comes from the fact that each widget is a separate *coordinate space* that knows how to draw itself.
 
 Spaces provide infrastructure and model using which **you can**:
@@ -165,7 +165,7 @@ Code assumes /spaces and /common reside in this script's directory, if they're n
 
 A few notes:
 
-- `host` is a face on which all spaces are drawn. Like [`panel`](https://w.red-lang.org/en/vid/#panel) but for Spaces.
+- `host` is a face on which all spaces are drawn. Like [`panel`](https://github.com/red/docs/blob/master/en/vid.adoc#panel) but for Spaces.
 - `host` uses it's `rate` and `draw` facets internally, requires `all-over` flag to be set, but other facets can be repurposed as you see fit.
 - The example is written in a mix of DSLs: standard [VID](https://doc.red-lang.org/en/vid.html) starts after `view [` and is used to describe faces layout. After `host [` VID ends and specialized [VID/S](#layout-dsl) begins.
 - In the example above you might have noticed that I never specified `vlist`'s size. Most spaces will automatically adjust their `/size` facet when drawn. `vlist` adjusts it's size to fit it's whole content. See [Constaining the size](Constaining the size) chapter of VID/S manual for details and common usage examples.

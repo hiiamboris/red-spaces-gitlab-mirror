@@ -72,7 +72,7 @@ This way, every instance of `my-space` carries only short dispatching code rathe
 
 Instantiation of space template is done using [`make-space` function](reference.md#make-space).
 
-Spaces can be created and rendered freely, but to properly use them and apply styles one needs a `host` face. It is based on the [`base` View widget](https://w.red-lang.org/en/view/#base), and provides event dispatching, styling and visual updates.
+Spaces can be created and rendered freely, but to properly use them and apply styles one needs a `host` face. It is based on the [`base` View widget](https://github.com/red/docs/blob/master/en/view.adoc#base), and provides event dispatching, styling and visual updates.
 
 How to use `host` face is explained in [`quickstart`](quickstart.md). 
 
@@ -337,7 +337,7 @@ Comments above basically summarize the whole syntax of it. A few remarks:
 Events handlers provide interactivity to a space template. See [the manual](manual.md#defining-behavior) about how to write event handlers. Space should include all necessary levers inside, and event handlers used only to operate these levers and be kept short and clean.
 
 Key takeaways:
-- same event and handler names [as in View](https://w.red-lang.org/en/view/#events)
+- same event and handler names [as in View](https://github.com/red/docs/blob/master/en/view.adoc#events)
 - `function` constructor is used to prevent set-words leakage
 - handlers are function lists, not single functions
 - receive path on the tree
