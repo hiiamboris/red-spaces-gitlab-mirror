@@ -487,22 +487,23 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			map: clear []
 			forall rows [								;@@ use for-each or map-each
 				set [row-offset: _: row-clip-start: row-clip-end: row:] rows
-				left: total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
+				left:  total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
 				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
 				if align = 'fill [						;-- set the scale
-					closing?: any [						;-- what determines a closing (not split) row
-						'break = select (pick tail row -3) 'type	;-- row ending with a break (currently stands alone)
-						tail? skip rows 5							;-- last row
-					]
-					width: first row-clip-end - row-clip-start
-					if all [
-						not closing?					;-- only scale split rows
-						width < allowed-row-width		;-- only upscale smaller rows, don't downscale
-						;@@ maybe also require a width limit, e.g. not less than 90% of the canvas?
+					either all [
+						not empty? row
+						row/1/type = 'break
 					][
-						;; scale around allowed-row-width, not total-width
-						;; allowing big rows to stick out, still aligning the rest:
-						rows/2: allowed-row-width / (max 1 width)
+						if last-row [last-row/2: 1.0]	;-- reset scaling for lines before linebreak
+					][
+						width: first row-clip-end - row-clip-start
+						if width < allowed-row-width [	;-- only upscale smaller rows, never downscale
+							;@@ maybe also require a width limit, e.g. not less than 90% of the canvas?
+							;@@ and then downscale < 110% ?
+							;; scale around allowed-row-width, not total-width
+							;; allowing big rows to stick out, still aligning the rest:
+							rows/2: allowed-row-width / (max 1 width)
+						]
 					]
 				]
 				rows/1: row-offset + (shift by 0)
@@ -515,8 +516,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					]
 					row: skip row 2
 				]
+				last-row: rows
 				rows: skip rows 4
 			]
+			if last-row [last-row/2: 1.0]				;-- reset scaling for last line
 			size: 2 * margin + (total-width by total-length)
 			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
