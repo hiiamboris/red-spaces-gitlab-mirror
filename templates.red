@@ -1058,12 +1058,13 @@ context [
 		=flush=: [(do flush)]
 		flush: [
 			if 0 < text-len: length? buffer [
-				text-ofs: offset - text-len			;-- offset of the buffer
+				text-ofs: offset - text-len				;-- offset of the buffer
 				cmd: none
 				flags: parse ranges [collect any [		;-- add closed ranges if they intersect with text
 					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
 					not [set cmd block!]						;-- command is RTD dialect extension
-					keep (max 1 range - text-ofs) keep to [pair! | end]
+					keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
+					keep to [pair! | end]
 				|	to pair!
 				]]
 				; ?? [offset text-ofs buffer ranges flags start]
@@ -1073,7 +1074,10 @@ context [
 					either attr = 'command [
 						cmd: command					;-- cmd is not none only if applies to current buffer
 					][
-						pair: as-pair (max 1 1 + attr-ofs - text-ofs) text-len
+						flag-ofs: attr-ofs - text-ofs
+						pair: as-pair
+							1 + max 0 flag-ofs
+							max 0 text-len - flag-ofs
 						repend flags do get-range-blueprint
 					]
 					; ?? [attr pair flags]
@@ -1094,7 +1098,7 @@ context [
 		commit-attr: [
 			attr: bind to word! attr 'local
 			if start/:attr [
-				pair: as-pair  1 + any [start/:attr attr]  offset
+				pair: as-pair  any [start/:attr attr]  offset
 				if pair/2 > pair/1 [repend ranges do get-range-blueprint]
 			]
 		]
