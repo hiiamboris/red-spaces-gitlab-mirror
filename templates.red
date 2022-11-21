@@ -178,8 +178,10 @@ context [
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		;; as an optimization, this doesn't use decode-canvas
 		;; negative canvas is just the only one that gets filled
+		;; break must have zero width when rendered on infinitely wide canvas
 		canvas: max 0x0 negate finite-canvas canvas 
 		space/size: canvas/x by space/length
+		[]
 	]
 		
 	declare-template 'break/space [						;-- template space for line breaks in rich paragraph
@@ -935,7 +937,7 @@ tube-ctx: context [
 ]
 
 
-context [
+context [												;-- rich paragraph
 	~: self
 
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
@@ -943,12 +945,10 @@ context [
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:  map
-		scales: if space/align = 'fill [make [] (length? rows) / 4]
 		quietly space/frame: compose/only [				;-- store data about the last frame for /into to use
 			margin: (space/margin)
 			align:  (space/align)
 			rows:   (rows)
-			scales: (scales)
 		]
 		
 		count: space/items/size
@@ -959,7 +959,7 @@ context [
 		;; e.g. row may be visibly smaller than canvas but contain "hidden" parts duped on another row
 		scaled-row: [
 			translate (row-offset * 0x1 + mrg) [
-				scale (scale) 1.0
+				scale (row-scale) 1.0
 				translate (clip-start * -1x0)
 				clip 0x0 (clip-end) (copy row-drawn)
 			]
@@ -971,24 +971,15 @@ context [
 		]
 		
 		mrg:   space/margin * 1x1
-		width: size/x - (mrg/x * 2)						;-- used for scaling; based on real unconstrained 'size'
-		drawn: make [] (length? rows) / 4 * 3
-		foreach [row-offset clip-start clip-end row] rows [
+		drawn: make [] (length? rows) / 5 * 3
+		foreach [row-offset row-scale clip-start clip-end row] rows [
 			row-drawn: clear []
 			foreach [item item-offset item-drawn] row [
 				compose/only/into [
 					translate (item-offset) (item-drawn)
 				] tail row-drawn
 			]
-			if space/align = 'fill [
-				fill?: all [
-					0 < used: clip-end/x - clip-start/x
-					not row =? last rows				;-- don't stretch the last row! ;@@ though it should be optional
-				]
-				scale: either fill? [width / used][1]	;-- can be both zooming in and out (<1 or >1)
-				append scales scale
-			]
-			blueprint: either fill? [scaled-row][normal-row]
+			blueprint: either row-scale <> 1 [scaled-row][normal-row]
 			compose/deep/only/into blueprint tail drawn
 		]
 		; space/origin: origin							;-- unused
@@ -1003,20 +994,19 @@ context [
 		rows:   space/frame/rows
 		margin: space/frame/margin
 		align:  space/frame/align
-		scales: any [space/frame/scales []]
 		xy:     xy - margin
 		either child [
-			foreach [row-offset clip-start clip-end row] rows [
+			foreach [row-offset row-scale clip-start clip-end row] rows [
 				if child-offset: select/skip/same row child 3 [	;-- relies on [space offset drawn] row layout
-					xy': (xy/x * any [scales/:irow 1]) by xy/y	;-- correct xy/x for scaling if it's applied
+					xy': (xy/x * row-scale) by xy/y				;-- correct xy/x for scaling if it's applied
 					return reduce [child xy' - row-offset - child-offset]
 				]
 			]
 		][
 			irow: 0
-			foreach [row-offset clip-start clip-end row] rows [	;@@ use for-each
+			foreach [row-offset row-scale clip-start clip-end row] rows [	;@@ use for-each
 				irow: irow + 1
-				xy': (xy/x * any [scales/:irow 1]) by xy/y		;-- correct xy/x for scaling if it's applied
+				xy': (xy/x * row-scale) by xy/y					;-- correct xy/x for scaling if it's applied
 				row-xy: xy' - row-offset
 				if clip-start +<= row-xy +< clip-end [
 					foreach [child child-offset _] row [
@@ -1048,15 +1038,12 @@ context [
 ]
 
 
-context [
+context [												;-- rich content
 	~: self
 	
 	;@@ will need source editing facilities too
 	
-	linebreak-prototype: make-space 'space [
-		type: 'linebreak
-		cache: none
-	]
+	linebreak-prototype: make-space 'break []
 	
 	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr char string obj2] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
@@ -1195,7 +1182,6 @@ context [
 		vec: clear []
 		foreach item space/content [
 			entry: none
-			if item/type = 'linebreak [quietly item/size: break-size]	;-- special handling of linebreaks
 			
 			;; this way I won't be able to distinguish produced text spaces from those coming from /source
 			;; but then, maybe it's fine to have them all breakable...
