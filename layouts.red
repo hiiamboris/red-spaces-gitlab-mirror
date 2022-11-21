@@ -490,12 +490,19 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				left: total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
 				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
 				if align = 'fill [						;-- set the scale
-					closing: last row
-					if any [
-						closing/type = 'break			;-- avoid scaling rows ending with a break (currently stands alone)
-						tail? skip rows 5				;-- avoid scaling last row
+					closing?: any [						;-- what determines a closing (not split) row
+						'break = select (pick tail row -3) 'type	;-- row ending with a break (currently stands alone)
+						tail? skip rows 5							;-- last row
+					]
+					width: row-clip-end - row-clip-start
+					if all [
+						not closing?					;-- only scale split rows
+						width < allowed-row-width		;-- only upscale smaller rows, don't downscale
+						;@@ maybe also require a width limit, e.g. not less than 90% of the canvas?
 					][
-						rows/2: total-width / (max 1 row-clip-end - row-clip-start)
+						;; scale around allowed-row-width, not total-width
+						;; allowing big rows to stick out, still aligning the rest:
+						rows/2: allowed-row-width / (max 1 width)
 					]
 				]
 				rows/1: row-offset + (shift by 0)
