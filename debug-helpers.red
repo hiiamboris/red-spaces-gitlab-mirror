@@ -204,6 +204,8 @@ if action? :mold [
 							(length? pos) < 100			;-- exclude system/words and copies, which also return true on space? check
 							space? value
 							pos': find/skip pos 'cached 2
+							block? :value/cache
+							block? :value/cached
 							change/only next pos' extract pos'/2 (3 + length? value/cache)	;-- minify /cached to only canvas sizes
 						]
 					]
