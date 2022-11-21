@@ -419,14 +419,14 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default align:  'left
 			default canvas: infxinf						;-- none to pair normalization
 			default breakpoints: []
-			set [canvas: fill:] decode-canvas canvas
+			set [|canvas|: fill:] decode-canvas canvas
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
 			info: obtain block! count * 2
 			#leaving [stash info]
 			
 			;; clipped canvas - used for allowed width fitting
-			ccanvas: subtract-canvas constrain canvas limits 2 * margin
+			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes infinite, later expanded to fill the row
 			stripe: encode-canvas infxinf/x by ccanvas/y -1x-1	;-- fill is not used by paragraph ;@@ not sure about this fill mask
@@ -436,7 +436,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
-				drawn: render/on space stripe
+				;; breaks will be rendered on finite canvas so they set their size:
+				drawn: render/on space either space/type = 'break [canvas][stripe]
 				repend info [space drawn]
 			]
 			
@@ -458,15 +459,19 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						set offset1 skip [
 							'- ahead set offset2 skip	;-- soft break on empty region (space)
 							(commit-empty offset2 - offset1)
-						; |	'/ ahead set offset2 skip	;-- hard break
-							; (commit-break offset2 - offset1)
 						|	ahead set offset2 skip
 							(commit-part space drawn offset1 offset2)
 						]
 					]]
 				][
-					commit-space space drawn
-					commit-empty spacing/x
+					either space/type = 'break [		;-- ensure break is always on a separate line
+						new-row
+						commit-space space drawn
+						new-row
+					][									;-- normal space
+						commit-space space drawn
+						commit-empty spacing/x
+					]
 				]
 			]
 			unless empty? row [new-row]					;-- count last row's size
@@ -509,9 +514,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			if empty? row [row-hidden: row-hidden + width]
 			row-width: row-width + width
 		]
-		; commit-break: func [width] with :create [				;-- hard break (usually newline)
-			; new-row
-		; ]
 		commit-space: func [space drawn] with :create [			;-- whole space object (indivisible)
 			claim space/size/x
 			row-height: max row-height space/size/y
