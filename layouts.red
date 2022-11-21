@@ -494,7 +494,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						'break = select (pick tail row -3) 'type	;-- row ending with a break (currently stands alone)
 						tail? skip rows 5							;-- last row
 					]
-					width: row-clip-end - row-clip-start
+					width: first row-clip-end - row-clip-start
 					if all [
 						not closing?					;-- only scale split rows
 						width < allowed-row-width		;-- only upscale smaller rows, don't downscale
