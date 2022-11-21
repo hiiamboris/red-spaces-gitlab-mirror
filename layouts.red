@@ -436,15 +436,16 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
-				;; breaks will be rendered on finite canvas so they set their size:
+				;; breaks will be rendered on finite canvas so they set their size (matters if they are made visible):
+				;@@ not sure, maybe they should stretch to total-width, but canvas/x seems more reasonable
 				drawn: render/on space either space/type = 'break [canvas][stripe]
 				repend info [space drawn]
 			]
 			
 			;; split info into rows according to found widths
-			rows: obtain block! 40						;-- [row-offset clip-start clip-end row ...]
+			rows: obtain block! 50						;-- [row-offset row-scale clip-start clip-end row ...]
 			row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
-			#leaving [foreach [_ _ _ row] rows [stash row]  stash rows]
+			#leaving [foreach [_ _ _ _ row] rows [stash row]  stash rows]
 			
 			allowed-row-width: ccanvas/x				;-- how wide rows to allow (splitting margin)
 			total-length: total-width: 0				;-- total final extent of non-empty area
@@ -485,9 +486,18 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
 			map: clear []
 			forall rows [								;@@ use for-each or map-each
-				set [row-offset: row-clip-start: row-clip-end: row:] rows
+				set [row-offset: _: row-clip-start: row-clip-end: row:] rows
 				left: total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
 				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
+				if align = 'fill [						;-- set the scale
+					closing: last row
+					if any [
+						closing/type = 'break			;-- avoid scaling rows ending with a break (currently stands alone)
+						tail? skip rows 5				;-- avoid scaling last row
+					][
+						rows/2: total-width / (max 1 row-clip-end - row-clip-start)
+					]
+				]
 				rows/1: row-offset + (shift by 0)
 				pos: 0x0
 				forall row [							;@@ use for-each or map-each
@@ -498,7 +508,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					]
 					row: skip row 2
 				]
-				rows: skip rows 3
+				rows: skip rows 4
 			]
 			size: 2 * margin + (total-width by total-length)
 			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
@@ -543,9 +553,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; <-      row-width     ->
 		new-row: does with :create [
 			repend rows [
-				(negate row-hidden) by total-length
-				row-hidden by 0
-				row-hidden + row-visible by row-height
+				(negate row-hidden) by total-length		;-- row size
+				1.0										;-- row scale
+				row-hidden by 0							;-- clip start
+				row-hidden + row-visible by row-height	;-- clip end
 				copy row
 			]
 			clear row
