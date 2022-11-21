@@ -143,6 +143,12 @@ define-handlers [
 	
 	;-- *************************************************************************************
 	link: [
+		;; without explicit start-drag here
+		;; parent (e.g. scrollable) may start it's own dragging
+		;; and -up event won't reach the link
+		on-down [space path event] [start-drag path] 
+		on-up   [space path event] [stop-drag]
+		
 		on-click [space path event] [
 			do space/command
 		]
