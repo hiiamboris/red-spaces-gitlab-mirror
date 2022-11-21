@@ -172,6 +172,23 @@ put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 	]
 ]
 
+context [
+	~: self
+	
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		;; as an optimization, this doesn't use decode-canvas
+		;; negative canvas is just the only one that gets filled
+		canvas: max 0x0 negate finite-canvas canvas 
+		space/size: canvas/x by space/length
+	]
+		
+	declare-template 'break/space [						;-- template space for line breaks in rich paragraph
+		length: 0	#type [integer!]					;-- determines linebreak thickness (exposed for styling)
+		cache:  none
+		draw:   function [/on canvas [pair!]] [~/draw self canvas]
+	]		
+]		
+
 rectangle-ctx: context [
 	~: self
 	
