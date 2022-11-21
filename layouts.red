@@ -490,19 +490,16 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				left:  total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
 				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
 				if align = 'fill [						;-- set the scale
-					either all [
-						not empty? row
+					unless any [
+						empty? row
 						row/1/type = 'break
 					][
-						if last-row [last-row/2: 1.0]	;-- reset scaling for lines before linebreak
-					][
 						width: first row-clip-end - row-clip-start
-						if width < allowed-row-width [	;-- only upscale smaller rows, never downscale
-							;@@ maybe also require a width limit, e.g. not less than 90% of the canvas?
-							;@@ and then downscale < 110% ?
-							;; scale around allowed-row-width, not total-width
-							;; allowing big rows to stick out, still aligning the rest:
-							rows/2: allowed-row-width / (max 1 width)
+						scale: allowed-row-width / (max 1 width)
+						limit: 90%
+						if all [limit <= scale scale <= (1 / limit)] [
+							total-width: max total-width allowed-row-width
+							rows/2: scale
 						]
 					]
 				]
@@ -516,10 +513,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					]
 					row: skip row 2
 				]
-				last-row: rows
 				rows: skip rows 4
 			]
-			if last-row [last-row/2: 1.0]				;-- reset scaling for last line
 			size: 2 * margin + (total-width by total-length)
 			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
 			#assert [size +< infxinf]
