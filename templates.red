@@ -980,6 +980,7 @@ context [
 	
 	;; /into required because /map cannot contain duplicates, but frame/rows can; plus this considers scaling
 	into: func [space [object!] xy [pair!] child [object! none!]] [
+		; ?? [xy child]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
 		rows:   space/frame/rows
@@ -1040,7 +1041,7 @@ context [
 		cache: none
 	]
 	
-	on-source-change: function [space [object!] word [word!] value [any-type!] /local attr char string] [
+	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr char string obj2] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
 		clear ranges:  space/ranges
 		clear content: space/content
@@ -1054,13 +1055,14 @@ context [
 				backdrop [[pair 'backdrop get attr]]
 			][ [] ]
 		]
+		=flush=: [(do flush)]
 		flush: [
 			if 0 < text-len: length? buffer [
 				text-ofs: offset - text-len			;-- offset of the buffer
-				command:  none
+				cmd: none
 				flags: parse ranges [collect any [		;-- add closed ranges if they intersect with text
 					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
-					not [set command block!]					;-- command is RTD dialect extension
+					not [set cmd block!]						;-- command is RTD dialect extension
 					keep (max 1 range - text-ofs) keep to [pair! | end]
 				|	to pair!
 				]]
@@ -1068,7 +1070,9 @@ context [
 				foreach [attr attr-ofs] start [			;-- add all open ranges
 					attr: bind to word! attr 'local
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply
-					if attr <> 'command [
+					either attr = 'command [
+						cmd: command					;-- cmd is not none only if applies to current buffer
+					][
 						pair: as-pair (max 1 1 + attr-ofs - text-ofs) text-len
 						repend flags do get-range-blueprint
 					]
@@ -1078,12 +1082,13 @@ context [
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
 				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
 				;@@ only benchmark can tell when splitting should occur
-				append content obj: make-space either command ['link]['text] []
+				append content obj: make-space either cmd ['link]['text] []
 				quietly obj/text:  copy buffer
 				quietly obj/flags: flags
 				; ?? [buffer flags]
-				if command [quietly obj/command: command]
+				if cmd [quietly obj/command: cmd]
 				clear buffer
+				; ?? obj
 			]
 		]
 		commit-attr: [
@@ -1102,7 +1107,7 @@ context [
 			)
 		|	ahead refinement! set attr [
 				/bold | /italic | /underline | /strike
-			|	/color | /backdrop | /size | /font | /command
+			|	/color | /backdrop | /size | /font | [/command =flush=]
 			] =close-attr=
 		|	ahead set-word! [
 				set attr quote color:    =open-attr= [
@@ -1115,7 +1120,7 @@ context [
 				]
 			|	set attr quote size:     =open-attr= set size    #expect integer!
 			|	set attr quote font:     =open-attr= set font    #expect string!
-			|	set attr quote command:  =open-attr= set command #expect block!
+			|	set attr quote command:  =open-attr= set command #expect block! =flush=
 			]
 		|	set string string! (
 				chunks: next split string #"^/"
