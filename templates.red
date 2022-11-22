@@ -2041,8 +2041,9 @@ grid-ctx: context [
 			height1: 0
 			if content: grid/cells/pick cell1 [
 				set-quiet 'rendered-xy cell1			;@@ temporary kludge until apply!
-				render/on grid/wrap-space cell1 content canvas	;-- render to get the size
-				height1: content/size/y
+				cspace: grid/wrap-space cell1 content
+				render/on cspace canvas					;-- render to get the size
+				height1: cspace/size/y
 			]
 			case [
 				span/y = 1 [
