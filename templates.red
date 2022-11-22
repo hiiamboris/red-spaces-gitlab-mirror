@@ -1022,7 +1022,8 @@ context [												;-- rich paragraph
 		none
 	]
 		
-	declare-template 'rich-paragraph/container [		;-- used as a base for higher level rich-content
+	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
+	declare-template 'rich-paragraph/container [
 		margin:      0
 		spacing:     0
 		align:       'left	#type = [word!] :invalidates-look
@@ -1216,10 +1217,13 @@ context [												;-- rich content
 		space/rich-paragraph-draw/on canvas
 	]
 	
+	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
 		source: []	#type [block!] :on-source-change	;-- holds high-level dialected data
 		ranges: []	#type [block!]						;-- internal attribute range data
+		color:       none								;-- color & font are accounted for in style
+		font:        none
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]

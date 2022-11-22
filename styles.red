@@ -263,6 +263,13 @@ do with context [
 			]
 		]
 		
+		rich-content: /skip [
+			below: reshape-light [
+			/?	font @(font)	/if font
+			/?	pen @(color)	/if color
+			]
+		]
+		
 		;@@ scrollbars should prefer host color
 	]
 ]
