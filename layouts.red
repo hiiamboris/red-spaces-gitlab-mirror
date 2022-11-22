@@ -403,7 +403,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [0x0 []]]
+			if count <= 0 [return copy/deep [0x0 [] []]]
 			foreach word settings [						;-- free settings block so it can be reused by the caller
 				#assert [:self/create =? context? bind word 'local]
 				set bind word 'local get word
@@ -476,7 +476,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 			]
 			unless empty? row [new-row]					;-- count last row's size
-			#assert [not empty? last rows]
+			#assert [any [empty? rows  not empty? last rows]]	;-- can be empty if all spaces are whitespace
 			if total-length > 0 [total-length: total-length - spacing/y]
 			
 			;; build the map & fix alignment
