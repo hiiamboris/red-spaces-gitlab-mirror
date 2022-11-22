@@ -89,13 +89,15 @@ context [
 		]
 	]
 
-	#debug changes [
+	;; this is very important to see in profile results, as it's the main cause for slowdown
+	;; so I moved this from 'changes' to 'profile' category (must be synced with render-face)
+	#debug profile [
 		;; checks after full face render for any invalidated spaces (have /cache enabled but /cached empty):
 		verify-validity: function [host [object!] (host? host)] [
-			paths: sift list-spaces host/space [.. /cache empty? /cached]
+			paths: sift list-spaces host/space [path .. obj: last path  obj/cache  empty? obj/cached]
 			unless empty? paths [
 				print "*** Unwanted invalidation of the following spaces detected during render: ***"
-				print mold/only paths
+				print mold/only new-line/all paths on
 			]
 		]
 	]
@@ -148,7 +150,7 @@ context [
 			]
 			face/generation: cache/current-generation	;-- only updated if no error happened during render
 		]
-		#debug changes [verify-validity face]			;-- check for unwanted invalidations during render, which may loop it
+		#debug profile [verify-validity face]			;-- check for unwanted invalidations during render, which may loop it
 		any [drawn copy []]								;-- drawn=none in case of error during render
 	]
 
