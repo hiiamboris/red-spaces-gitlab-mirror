@@ -94,7 +94,14 @@ context [
 	#debug profile [
 		;; checks after full face render for any invalidated spaces (have /cache enabled but /cached empty):
 		verify-validity: function [host [object!] (host? host)] [
-			paths: sift list-spaces host/space [path .. obj: last path  obj/cache  empty? obj/cached]
+			paths: sift list-spaces host/space [		;-- obtain a list of possibly invalidated spaces
+				path .. obj: last path
+				obj/cache								;-- cache enabled?
+				empty? obj/cached						;-- no cached slots?
+				obj/size								;-- has a finite size? (else can't be cached)
+				not zero? area? obj/size				;-- not empty size? (may have no cached slots otherwise)
+				not :obj/on-invalidate					;-- not using custom cache? (otherwise this heuristic doesn't apply)
+			]
 			unless empty? paths [
 				print "*** Unwanted invalidation of the following spaces detected during render: ***"
 				print mold/only new-line/all paths on
