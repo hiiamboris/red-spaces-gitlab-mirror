@@ -1,6 +1,6 @@
 # Programs written with Spaces
 
-## Red Inspector
+## [Red Inspector](red-inspector.red)
 
 A GUI tool to browse current interpreter's state.
 
@@ -48,8 +48,48 @@ ARGUMENTS:
 
 If you'd rather run Inspector from sources, you'll need the [`cli` library](https://gitlab.com/hiiamboris/red-cli/) along with `spaces` & `common` usual setup. Otherwise use provided binaries.
 
-## VID/S Polygon
+## [VID/S Polygon](vids-polygon.red)
 
 A livecoding tool to experiment with various VID/S layouts.
 
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/vids-polygon.gif)
+
+
+## [Red Mark](redmark.red) - world's smallest markdown viewer
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-redmark.gif)
+
+This tool's main purpose *for now* is to showcase and test rich content, so:
+- it contains only a [*toy* 250-LOC markdown-to-VID/S converter](toy-markdown.red)
+- I didn't bother making a UI for it
+- on startup it downloads images from the web *painfully slowly* (it should be done anynchronously as in browsers)
+- Red is still crash happy esp. on [`reference.md`](../reference.md) 🤷
+
+I have no plan on extending RedMark right now. But my plan *for the future*: 
+
+1. Real markdown parser.
+
+   GitHub-flavored markdown has a [specification](https://github.github.com/gfm) which will be tedious to implement but eventually it's worth it. There's [another](https://spec-md.com/) (likely incompatible) spec, but a better organized one.
+   
+   I'd like to either have a full GFM-compliant parser, or at least a parser for the most compatible subset of markdown features (so one can write documents more strictly to ensure it works everywhere). Or both parsers, with mode switch.
+   
+   In addition it should be able to decode HTML tags supported by GFM (spoilers, tables, etc.)
+   
+   If you'd like to implement this or enhance, PRs are welcome. @rebolek has [some parser](https://gitlab.com/rebolek/castr/-/blob/5fca70c37ac1bdcfc45028b038f65f7ccc372342/mm.red) but it looks unfinished and abandoned. Might be a good starting point for serious parser anyway :)
+   
+2. Make it a GUI tool.
+
+   I want it to be detect changes in the file and automatically update the view, navigating to the place of last change.
+
+   So I could edit markdown file in my text editor and in split-screen see the output rendered. I hate having to push file to the repository only to see if I fixed some typos, and I'd rather use a desktop tool (but all the existing ones are either bloated or have no spoiler or even tables support, and totally no HTML). I don't want to turn RedMark into an editor of it's own.
+   
+   Line diffing could be added to make it more responsive: it should be able to reconstruct only changed widgets.
+   
+3. Markdown template as an optional module for Spaces.
+
+   This will be handy for in-program documentation browsing, and RedMark will become even smaller ;)
+
+4. Animated GIFs.
+
+   Red has no animated GIF support as of now. Animations can be distracting and hypnotic, and it's likely not a good idea to animate GIFs by default, but I'd like it to be a controllable option.
+
