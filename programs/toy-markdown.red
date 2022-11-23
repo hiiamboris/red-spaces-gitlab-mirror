@@ -48,7 +48,7 @@ context [
 		]
 	]
 	
-	no-image: 70x70 [text 8x20 "image not^/ available"]
+	no-image: draw 70x70 [text 8x20 "image not^/ available"]
 	
 	;@@ this should support many more inlined html tags
 	;@@ inline code should be word-wrapped, so should be part of the text in rich-content
