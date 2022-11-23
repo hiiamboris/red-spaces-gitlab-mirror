@@ -55,7 +55,11 @@ A livecoding tool to experiment with various VID/S layouts.
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/vids-polygon.gif)
 
 
-## [Red Mark](redmark.red) - world's smallest markdown viewer
+## [Red Mark](redmark.red)
+
+World's smallest markdown viewer.
+
+Binaries: [Windows](redmark.exe), [Linux](redmark), [Mac 32-bit](redmark-mac). 
 
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-redmark.gif)
 
