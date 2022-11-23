@@ -767,13 +767,13 @@ paragraph-ctx: context [
 		quietly draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 
-	;; unlike paragraph, text is never wrapped
+	;; unlike text, paragraph is wrapped
 	declare-template 'paragraph/text [
-		quietly weight: 0								;-- used by tube, should trigger a re-render
+		quietly weight: 1								;-- used by tube, should trigger a re-render
 		quietly flags:  [wrap]
 	]
 
-	;; url is underlined in style; is a paragraph for it's often long and needs to be wrapped
+	;; url is underlined in style; wrapped for it's often long
 	declare-template 'link/paragraph [
 		quietly flags: [wrap underline]
 		quietly color: 50.80.255						;@@ color should be taken from the OS theme
@@ -1028,6 +1028,7 @@ context [												;-- rich paragraph
 		spacing:     0
 		align:       'left	#type = [word!] :invalidates-look
 		breakpoints: []		#type  [block!] :invalidates
+		weight:      1									;-- non-zero default so tube can stretch it
 		
 		frame:       []		#type  [block!]				;-- internal frame data used by /into
 		cache:       [size map frame]
