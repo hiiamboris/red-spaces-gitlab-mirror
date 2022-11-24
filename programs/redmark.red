@@ -51,6 +51,8 @@ do/expand with spaces/ctx [
 	declare-template 'pre/paragraph []
 	declare-template 'code/text []
 	declare-template 'thematic-break/stretch [limits: 0x20 .. (infxinf/x by 20)]
+	;; automatically word-break code spans
+	declare-template 'rich-content/rich-content [append breakable 'code]
 	
 	;; extend grid with per-column alignment setting
 	declare-template 'grid/grid [
