@@ -1190,7 +1190,7 @@ context [												;-- rich content
 			;; but then, maybe it's fine to have them all breakable...
 			; ?? [item/type item/text]
 			if all [
-				find [link text] item/type
+				find space/breakable item/type
 				not empty? item/text
 			][
 				render/on item stripe					;-- produces /layout to measure text on
@@ -1222,10 +1222,12 @@ context [												;-- rich content
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
-		source: []	#type [block!] :on-source-change	;-- holds high-level dialected data
-		ranges: []	#type [block!]						;-- internal attribute range data
-		color:       none								;-- color & font are accounted for in style
-		font:        none
+		source:    []			#type [block!] :on-source-change	;-- holds high-level dialected data
+		breakable: [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
+		color:     none												;-- color & font are accounted for in style
+		font:      none
+		
+		ranges:    []			#type [block!]						;-- internal attribute range data
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
