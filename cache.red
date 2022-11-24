@@ -222,7 +222,7 @@ get-full-path: function [
 
 
 #if true = get/any 'disable-space-cache? [
-	clear body-of :invalidate
+	; clear body-of :invalidate							custom invalidation must still work, since I can't turn it off
 	clear body-of :cache/invalidate
 	append clear body-of :cache/fetch none
 	clear body-of :cache/commit
