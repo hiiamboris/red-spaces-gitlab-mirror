@@ -64,9 +64,9 @@ Binaries: [Windows](redmark.exe), [Linux](redmark), [Mac 32-bit](redmark-mac).
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-redmark.gif)
 
 This tool's main purpose *for now* is to showcase and test rich content, so:
-- it contains only a [*toy* 250-LOC markdown-to-VID/S converter](toy-markdown.red)
+- it contains only a [*toy* 250-LOC markdown-to-VID/S converter](toy-markdown.red) (I may call it a toy, but some webchat implementations do away with worse for years...)
 - I didn't bother making a UI for it
-- on startup it downloads images from the web *painfully slowly* (it should be done anynchronously as in browsers)
+- on startup it downloads images from the web *painfully slowly* (it should be done anynchronously as in browsers, but for now it will at least cache them in `%appdata%\Red\cache`)
 - Red is still crash happy esp. on [`reference.md`](../reference.md) 🤷
 
 I have no plan on extending RedMark right now. But my plan *for the future*: 
