@@ -2414,6 +2414,7 @@ grid-ctx: context [
 	
 	do-invalidate: function [grid [object!]] [
 		foreach [cell scope] grid/frame/invalid [
+			; print ["INVAL" mold cell scope]
 			if scope = 'size [
 				either cell [
 					invalidate-xy grid pick find/same grid/frame/cells cell -1
@@ -2422,6 +2423,7 @@ grid-ctx: context [
 				]
 			]
 		]
+		clear grid/frame/invalid
 	]
 	
 	pinned?: function [cell [object!] ('cell = select cell 'type)] [	;-- used by cell/pinned?
@@ -2482,6 +2484,7 @@ grid-ctx: context [
 			invalid: make block! 8						;-- invalidation list for the next frame
 		] #type [object!]
 		
+		;@@ perhaps 'self' argument should be implicit in on-invalidate?
 		on-invalidate: :~/on-invalidate					;-- grid uses custom invalidation or it's too slow
 		
 		;@@ TODO: margin & spacing - in style??
