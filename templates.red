@@ -632,7 +632,8 @@ paragraph-ctx: context [
 		;; measuring "..." (3 dots) is unreliable
 		;; because kerning between the last letter and first "." is not accounted for, resulting in random line wraps
 		quietly layout/text: "...."
-		ellipsis-width: first size-text layout
+		ellipsis-width: first ellipsis-size: size-text layout
+		canvas: max canvas ellipsis-size				;-- prevent canvas/y=0 from triggering ellipsization
 		
 		quietly layout/text: text
 		text-size: size-text layout						;@@ size-text required to renew offsets/carets because I disabled on-change in layout!

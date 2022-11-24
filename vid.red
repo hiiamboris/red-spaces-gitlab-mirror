@@ -135,6 +135,7 @@ VID: context [
 	host?: func ["Check if OBJ is a HOST face" obj [object!]]['host = class? obj]
 	
 	host-on-change: function [host word value] [
+		;@@ maybe call a tree invalidation instead?
 		if space? :host/space [invalidate host/space]
 	]
 	
