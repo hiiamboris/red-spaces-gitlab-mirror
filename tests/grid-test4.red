@@ -5,6 +5,7 @@ Red [
 	needs:   view
 ]
 
+#do [disable-space-cache?: yes]
 #include %../everything.red
 
 append spaces/keyboard/focusable 'grid-view
@@ -13,12 +14,12 @@ append spaces/keyboard/focusable 'grid-view
 
 ; system/view/auto-sync?: no
 
-view/no-wait/options [
+view/no-wait/options/flags [
 	below
-	b: host [
-		vlist [
+	host: host 1000x500 [
+		column [
 			fps-meter
-			grid-view 1000x500 focus with [
+			grid-view focus with [
 				grid/pinned: 2x1
 				grid/bounds: [x: #[none] y: #[none]]
 				; grid/content/(1x2): make-space/name 'button [data: "button1"]
@@ -40,7 +41,15 @@ view/no-wait/options [
 		status/text: mold hittest face/space event/offset
 	]
 	status: text 300x40
-] [offset: 250x10]
+] [
+	offset: 250x10
+	actors: object [
+		on-resize: on-resizing: function [window event] [
+			host/size: window/size - 20x60
+			invalidate-tree host/space
+		]
+	]
+] 'resize
 
 prof/show
 prof/reset
