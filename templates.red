@@ -1188,6 +1188,7 @@ context [												;-- rich content
 			
 			;; this way I won't be able to distinguish produced text spaces from those coming from /source
 			;; but then, maybe it's fine to have them all breakable...
+			;@@ this code doesn't account for /limits though - need to support it
 			; ?? [item/type item/text]
 			if all [
 				find space/breakable item/type
@@ -1198,16 +1199,22 @@ context [												;-- rich content
 				; h2: second caret-to-offset/lower item/layout 1
 				; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
 				unless find item/text #"^/" [			;-- avoid breakpoints if text has multiple lines
+					;@@ not sure if I should account for margins here or in the layout, but here seems more general
+					mrg: item/margin along 'x
 					pos: item/text
-					unless find space! pos/1 [append vec 0]
+					if any [mrg > 0  not find space! pos/1] [append vec 0]	;-- avoid `0 0` at head
 					while [pos: find/tail pos space!] [
 						index: -1 + index? pos
-						left:  first caret-to-offset       item/layout index
-						right: first caret-to-offset/lower item/layout index
+						left:  mrg + first caret-to-offset       item/layout index
+						right: mrg + first caret-to-offset/lower item/layout index
 						repend vec [left '- right]
 					]
-					unless find space! last item/text [
-						append vec first caret-to-offset/lower item/layout 1 + length? item/text
+					if any [
+						mrg > 0
+						not find space! last item/text
+					][
+						width: first caret-to-offset/lower item/layout 1 + length? item/text
+						append vec mrg * 2 + width
 					]
 					if 2 < length? vec [entry: copy vec]
 					clear vec
