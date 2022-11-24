@@ -198,11 +198,11 @@ context [
 				find deep-types type? :space/data
 			][
 				saved: space/content
-				set-quiet in space 'content too-deep space canvas
+				quietly space/content: too-deep space canvas
 			]
 			trap/catch [drawn: space/old-draw/on canvas] [error: thrown]
 			depth: depth - 1
-			if saved [set-quiet in space 'content saved]
+			if saved [quietly space/content: saved]
 			either error [do error][drawn]
 		]
 	
@@ -225,9 +225,12 @@ context [
 				canvas/x <> attempt [gview/size/x]
 			][
 				ncol: either image? [2][3]
-				new-width: max 50 canvas/x - widths/1 - (any [widths/2 0]) - (gview/grid/margin/x * 2) - (gview/grid/spacing/x * ncol) - gview/vscroll/size/x
+				new-width: max 50 canvas/x - widths/1 - (any [widths/2 0])
+					- (gview/grid/margin/x * 2) - (gview/grid/spacing/x * ncol) - gview/vscroll/size/x
 				if widths/default <> new-width [
 					widths/default: new-width
+					invalidate gview/grid
+					; gview/grid/do-invalidate
 					; clear gview/grid/frame/heights
 				]
 			]
