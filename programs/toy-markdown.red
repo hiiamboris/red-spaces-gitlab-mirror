@@ -66,6 +66,7 @@ context [
 				append list make-space 'code [text: code]
 			)
 		|	change ["&" copy name some alpha! ";"] (decode-entity name)	;@@ entity can be numeric too
+		|	change <br> "^/"
 		|	[
 				[
 					set image opt "!"
@@ -86,7 +87,13 @@ context [
 				either image [
 					link: as either find/match link "http" [url!][file!] link
 					image: any [
-						attempt [load-thru/as link codec]			;@@ cache it ;@@ suffers from #3457
+						attempt [
+							either url? link [
+								load-thru/as link codec			;-- cached ;@@ suffers from #3457
+							][
+								load/as link codec				;-- no need to cache local files
+							]
+						]
 						no-image
 					]
 					size: either width [image/size * width / image/size/x][image/size]
