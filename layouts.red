@@ -89,7 +89,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			; size: constrain size limits
 			canvas2: constrain canvas2 limits
 			canvas2: encode-canvas canvas2 fill
-			#debug sizing [print ["list c1=" canvas1 "c2=" canvas2]]
+			#debug sizing [#print "list c1=(canvas1) c2=(canvas2)"]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
@@ -212,7 +212,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			; stripe: subtract-canvas canvas 2 * margin
 			; stripe/:x: round/to stripe/:x infxinf/x
 			; stripe/:y: infxinf/x
-			#debug sizing [print ["tube canvas=" canvas "ccanvas=" ccanvas "stripe=" stripe]]
+			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
 			
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
@@ -372,7 +372,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				shift: size * abs shift
 				foreach [_ geom] map [geom/offset: geom/offset + shift]
 			]
-			#debug sizing [print ["tube c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
+			#debug sizing [#print "tube c=(canvas) cc=(ccanvas) stripe=(stripe) >> size=(size)"]
 			#assert [size +< infxinf]
 			reduce [size copy map]
 		]
@@ -427,10 +427,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			;; clipped canvas - used for allowed width fitting
 			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
-			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
-			;; along Y canvas becomes infinite, later expanded to fill the row
-			stripe: encode-canvas infxinf/x by ccanvas/y -1x-1	;-- fill is not used by paragraph ;@@ not sure about this fill mask
-			#debug sizing [print ["paragraph canvas=" canvas "ccanvas=" ccanvas "stripe=" stripe]]
+			#debug sizing [#print "paragraph canvas=(canvas) ccanvas=(ccanvas)"]
 			
 			;; render everything
 			repeat i count [
@@ -438,7 +435,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				#assert [space? :space]
 				;; breaks will be rendered on finite canvas so they set their size (matters if they are made visible):
 				;@@ not sure, maybe they should stretch to total-width, but canvas/x seems more reasonable
-				drawn: render/on space either space/type = 'break [canvas][stripe]
+				;; using infxinf canvas for the rest to avoid wrapping and any canvas dependence (which also avoids extra renders)
+				;@@ I could make an extra render run to stretch items vertically to row height,
+				;@@ but that won't work for spaces that get wrapped to the next row: row sizes may differ
+				;@@ I could use min of all of them, but so far I see no clear need in this slowdown
+				drawn: render/on space either space/type = 'break [canvas][infxinf]
 				repend info [space drawn]
 			]
 			
@@ -516,7 +517,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				rows: skip rows 4
 			]
 			size: 2 * margin + (total-width by total-length)
-			#debug sizing [print ["paragraph c=" canvas "cc=" ccanvas "stripe=" stripe ">> size=" size]]
+			#debug sizing [#print "paragraph c=(canvas) cc=(ccanvas) >> size=(size)"]
 			#assert [size +< infxinf]
 			
 			;; container/draw cannot be used with this layout due to it's tricky coordinate shifts

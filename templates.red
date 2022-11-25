@@ -1176,12 +1176,6 @@ context [												;-- rich content
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		breaks: clear space/breakpoints
 		
-		;@@ keep stripe in sync with paragraph layout, or find another way to avoid double rendering:
-		set [canvas': fill:] decode-canvas canvas
-		ccanvas: subtract-canvas constrain canvas' space/limits 2x2 * space/margin
-		stripe:  encode-canvas infxinf/x by ccanvas/y -1x-1
-		break-size: (pick finite-canvas ccanvas 'x) by 0 
-		
 		vec: clear []
 		foreach item space/content [
 			entry: none
@@ -1194,7 +1188,7 @@ context [												;-- rich content
 				find space/breakable item/type
 				not empty? item/text
 			][
-				render/on item stripe					;-- produces /layout to measure text on
+				render/on item infxinf					;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
 				; h1: second size-text item/layout		not working - #5241
 				; h2: second caret-to-offset/lower item/layout 1
 				; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
