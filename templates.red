@@ -1047,6 +1047,8 @@ context [												;-- rich content
 	;@@ will need source editing facilities too
 	
 	linebreak-prototype: make-space 'break []
+	text-prototype:      make-space 'text []
+	link-prototype:      make-space 'link []
 	
 	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr char string obj2] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
@@ -1097,7 +1099,8 @@ context [												;-- rich content
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
 				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
 				;@@ only benchmark can tell when splitting should occur
-				append content obj: make-space either command ['link]['text] []
+				proto: either command [link-prototype][text-prototype]
+				append content obj: make proto [quietly cached: clone proto/cached cached]
 				quietly obj/text:  copy buffer
 				quietly obj/flags: copy flags
 				if command [quietly obj/command: command]
