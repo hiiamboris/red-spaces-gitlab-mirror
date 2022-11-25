@@ -1161,6 +1161,8 @@ context [												;-- rich content
 		|	set obj2 object! (
 				do flush
 				#assert [space? obj2]
+				obj2: space/apply-attributes obj2 attrs
+				#assert [space? obj2  "apply-attributes must return the space object!"]
 				append content obj2
 				offset: offset + 1
 			)
@@ -1231,6 +1233,9 @@ context [												;-- rich content
 		breakable: [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
 		color:     none												;-- color & font are accounted for in style
 		font:      none
+		
+		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
+		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
 		ranges:    []			#type [block!]						;-- internal attribute range data
 		
