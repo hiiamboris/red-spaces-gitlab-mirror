@@ -1055,32 +1055,36 @@ context [												;-- rich content
 		buffer: clear ""
 		offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
 		start: clear #()								;-- offset of each attr's opening
+		attrs: clear #()								;-- last value of each attribute
 		get-range-blueprint: [
-			switch/default attr [
+			switch/default attr [						;-- transforms attributes into RTD low-level format
 				bold italic underline strike [[pair attr]]
-				color size font command [[pair get attr]]
-				backdrop [[pair 'backdrop get attr]]
+				color size font command [[pair attrs/:attr]]
+				backdrop [[pair 'backdrop attrs/backdrop]]
 			][ [] ]
 		]
 		=flush=: [(do flush)]
 		flush: [
 			if 0 < text-len: length? buffer [
 				text-ofs: offset - text-len				;-- offset of the buffer
-				cmd: none
-				flags: parse ranges [collect any [		;-- add closed ranges if they intersect with text
+				command: none
+				flags: clear []
+				parse ranges [collect after flags any [		;-- add closed ranges if they intersect with text
 					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
-					not [set cmd block!]						;-- command is RTD dialect extension
-					keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
-					keep to [pair! | end]
+					[
+						set command block!						;-- command is RTD dialect extension
+					|	keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
+						keep to [pair! | end]
+					]
 				|	to pair!
 				]]
 				; ?? [offset text-ofs buffer ranges flags start]
 				foreach [attr attr-ofs] start [			;-- add all open ranges
-					attr: bind to word! attr 'local
-					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply
+					attr: to word! attr
+					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
 					either attr = 'command [
-						cmd: command					;-- cmd is not none only if applies to current buffer
-					][
+						command: attrs/command
+					][									;-- rest goes into the /flags facet
 						flag-ofs: attr-ofs - text-ofs
 						pair: as-pair
 							1 + max 0 flag-ofs
@@ -1093,45 +1097,41 @@ context [												;-- rich content
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
 				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
 				;@@ only benchmark can tell when splitting should occur
-				append content obj: make-space either cmd ['link]['text] []
+				append content obj: make-space either command ['link]['text] []
 				quietly obj/text:  copy buffer
-				quietly obj/flags: flags
-				; ?? [buffer flags]
-				if cmd [quietly obj/command: cmd]
-				clear buffer
+				quietly obj/flags: copy flags
+				if command [quietly obj/command: command]
 				; ?? obj
+				clear buffer
 			]
 		]
 		commit-attr: [
-			attr: bind to word! attr 'local
+			attr: to word! attr							;-- convert /ref & set-word: to words
 			if start/:attr [
-				pair: as-pair  any [start/:attr attr]  offset
+				pair: start/:attr by offset
 				if pair/2 > pair/1 [repend ranges do get-range-blueprint]
 			]
 		]
-		=open-attr=:  [(do commit-attr  start/:attr: offset)]
-		=close-attr=: [(do commit-attr  remove/key start attr)]
+		=open-flag=:  [(unless start/:attr [start/:attr: offset  attrs/:attr: on])]
+		=open-attr=:  [(do commit-attr  start/:attr: offset  attrs/:attr: value)]
+		=close-attr=: [(do commit-attr  remove/key start attr  attrs/:attr: off)]
+		=color=: [
+			set value word! (value: get value #assert [tuple? value])
+		|	set value #expect tuple!
+		]
 		
 		parse/case space/source [any [
-			ahead word! set attr ['bold | 'italic | 'underline | 'strike] (
-				unless start/:attr [start/:attr: offset]
-			)
-		|	ahead refinement! set attr [
+			ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
+		|	ahead refinement! set attr [						;-- first closing closes the attribute
 				/bold | /italic | /underline | /strike
 			|	/color | /backdrop | /size | /font | [/command =flush=]
 			] =close-attr=
 		|	ahead set-word! [
-				set attr quote color:    =open-attr= [
-					set color word! (color: get color #assert [tuple? color])
-				|	set color #expect tuple!
-				]
-			|	set attr quote backdrop: =open-attr= [
-					set backdrop word! (backdrop: get backdrop #assert [tuple? backdrop])
-				|	set backdrop #expect tuple!
-				]
-			|	set attr quote size:     =open-attr= set size    #expect integer!
-			|	set attr quote font:     =open-attr= set font    #expect string!
-			|	set attr quote command:  =open-attr= set command #expect block! =flush=
+				set attr quote color:    =open-attr= =color= (attrs/color:    value)
+			|	set attr quote backdrop: =open-attr= =color= (attrs/backdrop: value)
+			|	set attr quote size:     =open-attr= set value #expect integer! (attrs/size: value)
+			|	set attr quote font:     =open-attr= set value #expect string!  (attrs/font: value)
+			|	set attr quote command:  =open-attr= set value #expect block! =flush= (attrs/command: value)
 			]
 		|	set string string! (
 				chunks: next split string #"^/"
@@ -1146,6 +1146,7 @@ context [												;-- rich content
 			)
 		|	set char char! (
 				either char = #"^/" [
+					do flush
 					append content copy linebreak-prototype
 				][
 					append buffer char
