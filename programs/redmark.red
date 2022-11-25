@@ -51,8 +51,18 @@ do/expand with spaces/ctx [
 	declare-template 'pre/paragraph []
 	declare-template 'code/text []
 	declare-template 'thematic-break/stretch [limits: 0x20 .. (infxinf/x by 20)]
-	;; automatically word-break code spans
-	declare-template 'rich-content/rich-content [append breakable 'code]
+	declare-template 'rich-content/rich-content [
+		;; automatically word-break code spans
+		append breakable 'code
+		;; code inside links should be painted blue
+		apply-attributes: function [space attrs] [
+			if space/type = 'code [
+				space/color: all [attrs/color]
+				space/flags: only if attrs/underline [[underline]]
+			]
+			space
+		]
+	]
 	
 	;; extend grid with per-column alignment setting
 	declare-template 'grid/grid [
@@ -101,12 +111,13 @@ do/expand with spaces/ctx [
 			font: styling/fonts/code/base
 			below: [(underbox size 2 5)]
 		]
-		code: [
+		code: using [pen] [
 			if parent/font [							;-- different fonts for all headings and text
 				font: styling/fonts/code/(parent/font/size)
 			]
 			margin: 4x0
-			below: [(underbox size 1 3)]
+			pen: when color (compose [pen (color)])
+			below: [(underbox size 1 3) (pen)]
 		]
 		thematic-break: [
 			below: [

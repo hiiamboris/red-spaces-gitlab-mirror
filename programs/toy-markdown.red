@@ -104,10 +104,12 @@ context [
 					]
 				][
 					compose/deep/into [
-						underline							;-- no need for color, as link has it's own
+						underline
+						color: 50.80.255				;@@ color should be taken from the OS theme, or from link style
 						command: [browse (as url! link)]
 						(decode-text name)
 						/command
+						/color
 						/underline
 					] tail list
 				]
