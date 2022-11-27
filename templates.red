@@ -938,7 +938,7 @@ tube-ctx: context [
 ]
 
 
-context [												;-- rich paragraph
+rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
@@ -987,14 +987,43 @@ context [												;-- rich paragraph
 		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts; uses unconstrained 'size'
 	]
 	
+	;; unlike /into, this has to consider empty (space) itervals between items and rows, and never fails except on empty layout
+	;; "closest" is implemented so that y<0 returns first child, y>size/y returns last child
+	;@@ another way would be to project y<0 to y=0 and y>size/y to y=size/y - need to think what's better UX-wise
+	locate-child: function [
+		"Find a child closest to XY and return corresponding row and child pointers and offsets"
+		space [object!] xy [pair!]
+	][
+		rows:   space/frame/rows
+		margin: space/frame/margin
+		xy:     xy - margin
+		for-each [prow: row-offset row-scale clip-start clip-end row] rows [
+			last-row: prow
+			xy': (xy/x * row-scale) by xy/y				;-- correct xy/x for scaling if it's applied
+			row-xy: xy' - row-offset
+			if row-xy/y < clip-end/y [					;-- last line always accepts xy
+				row-xy: clip row-xy clip-start clip-end			;-- contain xy within row, so it doesn't get into hidden child areas
+				for-each [pchild: child child-offset _] row [
+					last-child: pchild
+					child-xy: row-xy - child-offset
+					if child-xy/x < child/size/x [break]
+				]
+				break
+			]
+			unless empty? row [last-child: skip tail row -3]	;-- if for-each terminates, last child in a row is "closest" to xy
+		]
+		if last-child [
+			child-xy: row-xy - last-child/2
+			reduce [last-row row-xy last-child child-xy]
+		]
+	]
+		
 	;; /into required because /map cannot contain duplicates, but frame/rows can; plus this considers scaling
 	into: func [space [object!] xy [pair!] child [object! none!]] [
-		; ?? [xy child]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
 		rows:   space/frame/rows
 		margin: space/frame/margin
-		align:  space/frame/align
 		xy:     xy - margin
 		either child [
 			foreach [row-offset row-scale clip-start clip-end row] rows [
@@ -1004,19 +1033,10 @@ context [												;-- rich paragraph
 				]
 			]
 		][
-			irow: 0
-			foreach [row-offset row-scale clip-start clip-end row] rows [	;@@ use for-each
-				irow: irow + 1
-				xy': (xy/x * row-scale) by xy/y					;-- correct xy/x for scaling if it's applied
-				row-xy: xy' - row-offset
-				if clip-start +<= row-xy +< clip-end [
-					foreach [child child-offset _] row [
-						child-xy: row-xy - child-offset
-						if 0x0 +<= child-xy +< child/size [
-							return reduce [child child-xy]
-						]
-					]
-					break
+			if set [rows: row-xy: row: child-xy:] locate-child space xy [
+				child: row/1
+				if 0x0 +<= child-xy +< child/size [
+					return reduce [child child-xy]
 				]
 			]
 		]
@@ -1046,14 +1066,30 @@ context [												;-- rich content
 	
 	;@@ will need source editing facilities too
 	
-	linebreak-prototype: make-space 'break []
+	locate-point: function [space [object!] xy [pair!]] [
+		if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
+			child:  row/1
+			#assert [find/same space/ranges/spaces child]
+			crange: pick find/same space/ranges/spaces child -1
+			index: either crange/1 + 1 = crange/2 [
+				crange/2
+			][
+				crange/1 + offset-to-char child/layout child-xy
+			]
+			reduce [child child-xy index]				;@@ what to return?
+		]
+	]
+	
+	;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
+	linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
 	text-prototype:      make-space 'text []
 	link-prototype:      make-space 'link []
 	
 	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr char string obj2] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
-		clear ranges:  space/ranges
-		clear content: space/content
+		clear att-ranges: space/ranges/attributes
+		clear spc-ranges: space/ranges/spaces
+		clear content:    space/content
 		buffer: clear ""
 		offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
 		start: clear #()								;-- offset of each attr's opening
@@ -1065,13 +1101,12 @@ context [												;-- rich content
 				backdrop [[pair 'backdrop attrs/backdrop]]
 			][ [] ]
 		]
-		=flush=: [(do flush)]
 		flush: [
 			if 0 < text-len: length? buffer [
 				text-ofs: offset - text-len				;-- offset of the buffer
 				command: none
 				flags: clear []
-				parse ranges [collect after flags any [		;-- add closed ranges if they intersect with text
+				parse att-ranges [collect after flags any [	;-- add closed ranges if they intersect with text
 					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
 					[
 						set command block!						;-- command is RTD dialect extension
@@ -1080,7 +1115,7 @@ context [												;-- rich content
 					]
 				|	to pair!
 				]]
-				; ?? [offset text-ofs buffer ranges flags start]
+				; ?? [offset text-ofs buffer att-ranges flags start]
 				foreach [attr attr-ofs] start [			;-- add all open ranges
 					attr: to word! attr
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
@@ -1099,11 +1134,14 @@ context [												;-- rich content
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
 				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
 				;@@ only benchmark can tell when splitting should occur
+				;@@ also: perhaps I should get rid of 'link here, just use text
+				;@@ because links can contain code, images and stuff, and it should all be handled by rich-content itself
 				proto: either command [link-prototype][text-prototype]
 				append content obj: make proto [quietly cached: clone proto/cached cached]
 				quietly obj/text:  copy buffer
 				quietly obj/flags: copy flags
 				if command [quietly obj/command: command]
+				repend spc-ranges [text-ofs by offset obj]
 				; ?? obj
 				clear buffer
 			]
@@ -1112,7 +1150,7 @@ context [												;-- rich content
 			attr: to word! attr							;-- convert /ref & set-word: to words
 			if start/:attr [
 				pair: start/:attr by offset
-				if pair/2 > pair/1 [repend ranges do get-range-blueprint]
+				if pair/2 > pair/1 [repend att-ranges do get-range-blueprint]
 			]
 		]
 		=open-flag=:  [(unless start/:attr [start/:attr: offset  attrs/:attr: on])]
@@ -1127,14 +1165,14 @@ context [												;-- rich content
 			ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
 		|	ahead refinement! set attr [						;-- first closing closes the attribute
 				/bold | /italic | /underline | /strike
-			|	/color | /backdrop | /size | /font | [/command =flush=]
+			|	/color | /backdrop | /size | /font | [/command (do flush)]
 			] =close-attr=
 		|	ahead set-word! [
 				set attr quote color:    =open-attr= =color= (attrs/color:    value)
 			|	set attr quote backdrop: =open-attr= =color= (attrs/backdrop: value)
 			|	set attr quote size:     =open-attr= set value #expect integer! (attrs/size: value)
 			|	set attr quote font:     =open-attr= set value #expect string!  (attrs/font: value)
-			|	set attr quote command:  =open-attr= set value #expect block! =flush= (attrs/command: value)
+			|	set attr quote command:  =open-attr= set value #expect block! (do flush  attrs/command: value)
 			]
 		|	set string string! (
 				chunks: next split string #"^/"
@@ -1142,7 +1180,7 @@ context [												;-- rich content
 				offset: offset + length? chunks/-1
 				forall chunks [							;@@ use for-each
 					do flush
-					append content copy linebreak-prototype
+					append content copy linebreak-prototype	;@@ should break have it's range saved?
 					append buffer chunks/1
 					offset: offset + 1 + length? chunks/1
 				]
@@ -1158,12 +1196,13 @@ context [												;-- rich content
 			)
 		; |	paren! reserved
 		; |	block! TODO grouping
-		|	set obj2 object! (
+		|	set obj2 object! (							;-- flush will override 'obj', so 'obj2' here
 				do flush
 				#assert [space? obj2]
 				obj2: space/apply-attributes obj2 attrs
 				#assert [space? obj2  "apply-attributes must return the space object!"]
 				append content obj2
+				repend spc-ranges [offset by (offset + 1) obj2]
 				offset: offset + 1
 			)
 		|	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
@@ -1237,7 +1276,12 @@ context [												;-- rich content
 		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		ranges:    []			#type [block!]						;-- internal attribute range data
+		locate-point: func [xy [pair!]] [~/locate-point self xy]
+		
+		ranges: context [								;-- internal range data, generated on source change
+			attributes: []
+			spaces:     []
+		] #type [object!]
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
