@@ -1085,7 +1085,7 @@ context [												;-- rich content
 	text-prototype:      make-space 'text []
 	link-prototype:      make-space 'link []
 	
-	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr char string obj2] [
+	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr value char string obj2] [
 		if unset? :space/ranges [exit]					;-- not initialized yet
 		clear att-ranges: space/ranges/attributes
 		clear spc-ranges: space/ranges/spaces
