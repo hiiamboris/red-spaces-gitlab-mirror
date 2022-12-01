@@ -269,7 +269,6 @@ do with context [
 			/?	font @(font)		/if font
 			/?	pen @(color)		/if color
 			]
-			above: when selected [(draw-selection)]
 		]
 		
 		;@@ scrollbars should prefer host color

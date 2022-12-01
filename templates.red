@@ -1385,7 +1385,13 @@ rich-content-ctx: context [												;-- rich content
 			append/only breaks entry
 		]
 		; ?? breaks
-		space/rich-paragraph-draw/on canvas
+		drawn: space/rich-paragraph-draw/on canvas
+		either space/selected [
+			sdrawn: draw-selection space
+			compose/only [(sdrawn) (drawn)]
+		][
+			drawn
+		] 
 	]
 	
 	
@@ -1465,7 +1471,6 @@ rich-content-ctx: context [												;-- rich content
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
-		draw-selection: does [~/draw-selection self]	#type [function!]
 	]
 ]
 
