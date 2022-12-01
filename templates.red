@@ -1448,20 +1448,14 @@ rich-content-ctx: context [												;-- rich content
 		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		;@@ need to think more on the returned value format
-		; locate-point: func [
-			; "Locate child closest to XY point and return: [child child-xy index offset]"
-			; xy [pair!]
-		; ][
-			; ~/locate-point self xy
-		; ] #type [function!]
-		
 		point-to-caret: func [
 			"Get caret offset closest to the given point"
 			xy [pair!]
 		][
 			~/xy-to-caret self xy
-		]
+		] #type [function!]
+		;@@ should any other funcs be exported? caret-to-box, caret-to-row, row-to-box?
+		;@@ also cross-paragraph selection may need to know max caret offset for each one
 		
 		ranges: context [								;-- internal range data, generated on source change
 			attributes: []
