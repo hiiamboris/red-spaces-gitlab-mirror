@@ -75,8 +75,8 @@ do with context [
 	checkered-pen: reshape [							;-- used for focus indication
 		pattern 4x4 [
 			scale 0.5 0.5 pen off
-			fill-pen !(svmc/text)  box 0x0  8x8
-			fill-pen !(svmc/panel) box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
+			; fill-pen !(svmc/panel)  box 0x0  8x8
+			fill-pen !(svmc/text) box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
 		]
 	]
 	; serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
@@ -147,7 +147,8 @@ do with context [
 			; [pen off fill-pen !(contrast-with svmc/panel)]
 			below: [pen off fill-pen !(svmc/text)]
 		]
-		field/selection: [
+		field/selection: rich-content/selection: [
+			; below: [pen (checkered-pen) fill-pen !(opaque 'text 30%)]
 			below: [pen off fill-pen !(opaque 'text 30%)]
 			;@@ workaround for #5133 needed by workaround for #4901: clipping makes fill-pen black
 			#if linux? [
@@ -265,9 +266,10 @@ do with context [
 		
 		rich-content: /skip [
 			below: reshape-light [
-			/?	font @(font)	/if font
-			/?	pen @(color)	/if color
+			/?	font @(font)		/if font
+			/?	pen @(color)		/if color
 			]
+			above: when selected [(draw-selection)]
 		]
 		
 		;@@ scrollbars should prefer host color
