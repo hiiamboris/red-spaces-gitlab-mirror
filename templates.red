@@ -1443,8 +1443,7 @@ rich-content-ctx: context [												;-- rich content
 		breakable:   [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
 		color:       none												;-- color & font are accounted for in style
 		font:        none
-		selectable?: yes	#type    [logic!]							;-- allow user to select and copy text?
-		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (can always be set programmatically)
+		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)
 		
 		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
