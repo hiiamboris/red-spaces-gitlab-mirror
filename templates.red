@@ -997,6 +997,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		rows:   space/frame/rows
 		margin: space/frame/margin
 		xy:     xy - margin
+		;@@ use locate instead maybe?
 		for-each [prow: row-offset row-scale clip-start clip-end row] rows [
 			last-row: prow
 			xy': (xy/x * row-scale) by xy/y				;-- correct xy/x for scaling if it's applied
@@ -1061,31 +1062,151 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 ]
 
 
-context [												;-- rich content
+rich-content-ctx: context [												;-- rich content
 	~: self
 	
 	;@@ will need source editing facilities too
+	
+	
+	;@@ these functions below are tightly tied to row format - not something I like
+	;@@ but abstraction seems to only increase the code so far, or I haven't found a good abstraction yet
+	;@@ plus, I need /draw to be fast, which limits me (but these funcs can be slow, as they're for events mostly)
+	
+	xscale: func [xy [pair!] scale [number!]] [
+		xy/x: round/to xy/x * scale 1
+		xy
+	]
 	
 	locate-point: function [space [object!] xy [pair!]] [
 		if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
 			child:  row/1
 			#assert [find/same space/ranges/spaces child]
 			crange: pick find/same space/ranges/spaces child -1
-			index: either crange/1 + 1 = crange/2 [
-				crange/2
+			either crange/1 + 1 = crange/2 [
+				index: crange/2
+				caret: pick crange child-xy/x < (child/size/x / 2)
 			][
-				crange/1 + offset-to-char child/layout child-xy
+				index: crange/1     + offset-to-char  child/layout child-xy
+				caret: crange/1 - 1 + offset-to-caret child/layout child-xy
 			]
-			reduce [child child-xy index]				;@@ what to return?
+			reduce [child child-xy index caret]			;@@ what to return?
 		]
 	]
+	
+	xy-to-caret: function [space [object!] xy [pair!]] [
+		last locate-point space xy
+	]
+	
+	caret-to-row: function [space [object!] caret [integer!] (caret >= 0) side [word!] (find [left right] side)] [
+		if empty? space/frame/rows [return none]
+		caret: caret + pick [0.5 -0.5] side = 'right
+		row-ranges: fill-row-ranges space
+		row: 1
+		foreach [irow range] row-ranges [
+			if caret < range/1 [if side = 'left [break]]
+			row: irow
+			if caret < range/2 [break]
+		]
+		;; returns row number - to cycle across row range to draw multiline selection (or none if no rows)
+		;; some rows may only include a linebreak (ignored here), so visible row number <> real row number
+		row
+	]
+	
+	row-to-box: function [space [object!] row-number [integer!] (row-number >= 1)] [
+		set [row-offset: row-scale: clip-start: clip-end: row:] skip space/frame/rows row-number - 1 * 5
+		mrg: space/margin * 1x1
+		xy1: mrg + row-offset + (xscale clip-start row-scale)
+		xy2: xy1 + (xscale clip-end - clip-start row-scale)
+		reduce [xy1 xy2]
+	]
+	
+	caret-to-box: function [space [object!] caret [integer!] side [word!] (find [left right] side)] [
+		mrg: space/margin * 1x1
+		;@@ if no rows - no row heights - no caret height, so what to return? margin + 0x0-0x0?
+		unless irow: caret-to-row space caret side [return reduce [mrg mrg]]
+		prow: skip space/frame/rows irow - 1 * 5
+		set [row-offset: row-scale: clip-start: clip-end: row:] prow
+		
+		#assert [not empty? row]
+		caret': caret + pick [0.5 -0.5] side = 'right
+		pitem: row
+		for-each [p: item item-offset _] row [
+			range: pick find/same space/ranges/spaces item -1	;@@ maybe reorder these ranges for select usage
+			if caret' < range/1 [if side = 'left [break]]		;@@ can't use return in for-each :(
+			pitem: p
+			if caret' < range/2 [break]
+		]
+			
+		set [item: item-offset: _:] pitem
+		caret: clip caret range/1 range/2						;-- skip empty ranges that don't land on items
+		x: case [
+			caret = range/1 [item-offset/x]						;-- item height may not equal row height, so it's ignored
+			caret = range/2 [item-offset/x + item/size/x]
+			'within [item-offset/x + first caret-to-offset item/layout (caret - range/1 + 1)]
+		]
+		xy1: mrg + row-offset + xscale x by 0 row-scale
+		xy2: xy1 + (0 by clip-end/y)
+		reduce [xy1 xy2]
+	]
+	
+	;@@ should these be cached? they depend on canvas, can't be put into space/ranges
+	fill-row-ranges: function [space [object!]] [
+		ranges: clear []
+		caret-right: 0
+		for-each [/irow row-offset row-scale clip-start clip-end row] space/frame/rows [
+			;; empty rows (and those with a linebreak) are excluded, since we don't want zero-sized caret
+			if any [
+				empty? row
+				all [3 = length? row  row/1/type = 'break]
+			] [continue]
+			
+			;; leftmost caret
+			set [item: item-offset: _:] row
+			#assert [									;-- clipping margin should land on the first item
+				item-offset/x <= clip-start/x
+				clip-start/x < (item-offset/x + item/size/x)
+			]
+			item-range: pick find/same space/ranges/spaces item -1
+			either item-range/2 - item-range/1 <= 1 [
+				;@@ I don't do this, but user could provide breakpoints for a custom space so it gets split
+				;@@ in this case I guess I should just consider the whole space a separator and not include it in the ranges
+				;@@ I'm lazy to bother with this case for now, to hell with it
+				;; current algorithm treats 'single-index' space as belonging to only one row
+				caret-left: item-range/1
+			][
+				clipx: clip-start/x - item-offset/x
+				caret-left: item-range/1 - 1 + offset-to-caret item/layout clipx by 0
+			]
+			
+			;; rightmost caret
+			set [item: item-offset: _:] skip tail row -3
+			#assert [									;-- clipping margin should land on the first item
+				item-offset/x <= clip-end/x
+				clip-end/x <= (item-offset/x + item/size/x)
+			]
+			item-range: pick find/same space/ranges/spaces item -1
+			either item-range/2 - item-range/1 <= 1 [	;@@ same concern here as above
+				caret-right: item-range/2
+			][
+				clipx: clip-end/x - item-offset/x
+				caret-right: item-range/1 - 1 + offset-to-caret item/layout clipx by 0
+			]
+			
+			repend ranges [irow  caret-left by caret-right]
+		]
+		copy ranges
+	]
+	
 	
 	;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
 	linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
 	text-prototype:      make-space 'text []
 	link-prototype:      make-space 'link []
 	
-	on-source-change: function [space [object!] word [word!] value [any-type!] /local range attr value char string obj2] [
+	on-source-change: function [
+		space [object!] word [word!] new-source [block!]
+		/local range attr value char string obj2
+	][
 		if unset? :space/ranges [exit]					;-- not initialized yet
 		clear att-ranges: space/ranges/attributes
 		clear spc-ranges: space/ranges/spaces
@@ -1161,7 +1282,7 @@ context [												;-- rich content
 		|	set value #expect tuple!
 		]
 		
-		parse/case space/source [any [
+		parse/case new-source [any [
 			ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
 		|	ahead refinement! set attr [						;-- first closing closes the attribute
 				/bold | /italic | /underline | /strike
@@ -1180,7 +1301,8 @@ context [												;-- rich content
 				offset: offset + length? chunks/-1
 				forall chunks [							;@@ use for-each
 					do flush
-					append content copy linebreak-prototype	;@@ should break have it's range saved?
+					append content obj2: copy linebreak-prototype
+					repend spc-ranges [offset + 0x1 obj2]
 					append buffer chunks/1
 					offset: offset + 1 + length? chunks/1
 				]
@@ -1188,7 +1310,8 @@ context [												;-- rich content
 		|	set char char! (
 				either char = #"^/" [
 					do flush
-					append content copy linebreak-prototype
+					append content obj2: copy linebreak-prototype
+					repend spc-ranges [offset + 0x1 obj2]
 				][
 					append buffer char
 				]
@@ -1202,7 +1325,7 @@ context [												;-- rich content
 				obj2: space/apply-attributes obj2 attrs
 				#assert [space? obj2  "apply-attributes must return the space object!"]
 				append content obj2
-				repend spc-ranges [offset by (offset + 1) obj2]
+				repend spc-ranges [offset + 0x1 obj2]
 				offset: offset + 1
 			)
 		|	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
@@ -1268,15 +1391,23 @@ context [												;-- rich content
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
-		source:    []			#type [block!] :on-source-change	;-- holds high-level dialected data
-		breakable: [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
-		color:     none												;-- color & font are accounted for in style
-		font:      none
+		source:      []				#type [block!] :on-source-change	;-- holds high-level dialected data
+		breakable:   [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
+		color:       none												;-- color & font are accounted for in style
+		font:        none
+		selectable?: yes	#type    [logic!]							;-- allow user to select and copy text?
+		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (can always be set programmatically)
 		
 		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		locate-point: func [xy [pair!]] [~/locate-point self xy]
+		;@@ need to think more on the returned value format
+		locate-point: func [
+			"Locate child closest to XY point and return: [child child-xy index offset]"
+			xy [pair!]
+		][
+			~/locate-point self xy
+		] #type [function!]
 		
 		ranges: context [								;-- internal range data, generated on source change
 			attributes: []
