@@ -1388,6 +1388,48 @@ rich-content-ctx: context [												;-- rich content
 		space/rich-paragraph-draw/on canvas
 	]
 	
+	
+	;; can be styled but cannot be accessed (and in fact shared)
+	;; because there's a selection per every row - can be many in one rich-content
+	selection-prototype: make-space 'rectangle [
+		type: 'selection
+		cache: none										;-- this way I can avoid cloning /cached facet
+	]
+	
+	draw-box: function [xy1 [pair!] xy2 [pair!]] [
+		selection: copy selection-prototype
+		quietly selection/size: xy2 - xy1
+		compose/only [translate (xy1) (render selection)]
+	]
+	
+	draw-selection: function [space [object!]] [
+		unless sel: space/selected [return []]
+		if sel/1 > sel/2 [sel: reverse sel]
+		;@@ this calls fill-row-ranges so many times that it must be super slow
+		lrow: caret-to-row space sel/1 'left
+		rrow: caret-to-row space sel/2 'right
+		set [lcar1: lcar2:] caret-to-box space sel/1 'left
+		set [rcar1: rcar2:] caret-to-box space sel/2 'right
+		#assert [lrow <= rrow]
+		either lrow = rrow [
+			draw-box lcar1 rcar2
+		][
+			collect [
+				set [lrow1: lrow2:] row-to-box space lrow
+				keep draw-box lcar1 lrow2
+				for irow lrow + 1 rrow - 1 [
+					set [row1: row2:] row-to-box space irow
+					if row1/y < row2/y [				;-- ignore empty lines
+						keep draw-box row1 row2
+					]
+				] 
+				set [rrow1: rrow2:] row-to-box space rrow
+				keep draw-box rrow1 rcar2
+			]
+		]
+	]
+	
+		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
@@ -1402,12 +1444,19 @@ rich-content-ctx: context [												;-- rich content
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
 		;@@ need to think more on the returned value format
-		locate-point: func [
-			"Locate child closest to XY point and return: [child child-xy index offset]"
+		; locate-point: func [
+			; "Locate child closest to XY point and return: [child child-xy index offset]"
+			; xy [pair!]
+		; ][
+			; ~/locate-point self xy
+		; ] #type [function!]
+		
+		point-to-caret: func [
+			"Get caret offset closest to the given point"
 			xy [pair!]
 		][
-			~/locate-point self xy
-		] #type [function!]
+			~/xy-to-caret self xy
+		]
 		
 		ranges: context [								;-- internal range data, generated on source change
 			attributes: []
@@ -1416,6 +1465,7 @@ rich-content-ctx: context [												;-- rich content
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw-selection: does [~/draw-selection self]	#type [function!]
 	]
 ]
 
