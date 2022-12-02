@@ -102,9 +102,11 @@ if action? :mold [
 			
 		mold-stack: make hash! 100						;-- used to avoid cycles
 		mold*: function [value [any-type!] limit /extern deep flat] with :mold [
+			; print native-mold reduce [only all :value]
 			sp: " "
 			output: make string! 16
 			decor: select pick decor* all type: type?/word :value
+			if ~/all [decor only depth = 0] [decor: ["" ""] noindent?: yes]
 			~/all [decor  find/same/only mold-stack :value  return emit ["..."]]
 			unless deep [
 				if 0 < depth [
@@ -188,8 +190,10 @@ if action? :mold [
 						]
 					]
 					;; emit opening
-					if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for #5235
-						append/dup indent #" " 4
+					unless noindent? [
+						if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for #5235
+							append/dup indent #" " 4
+						]
 					]
 					lf: unless flat [rejoin ["^/" indent]]
 					emit [decor/1]
@@ -229,7 +233,7 @@ if action? :mold [
 						if limit <= 0 [break]
 					]
 					if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for a heisenbug
-						clear skip tail indent -4
+						unless noindent? [clear skip tail indent -4]
 						unless flat [
 							lf: rejoin ["^/" indent]
 							emit [lf]
