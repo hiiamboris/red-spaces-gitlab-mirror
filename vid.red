@@ -23,13 +23,19 @@ VID: context [
 		;; these help avoid repetition:
 		#macro [#spacious] func [s e] [[ margin: spacing: 10x10 ]]
 		#macro [#tight]    func [s e] [[ tight [margin: spacing: 0x0] ]]
-		#macro [#align]    func [s e] [[
+		#macro [#align]    func [s e] [[				;-- used by box and tube
 			left   [align/x: -1]
 			right  [align/x:  1]
 			center [align/x:  0]
 			top    [align/y: -1]
 			bottom [align/y:  1]
 			middle [align/y:  0]
+		]]
+		#macro [#text-align]  func [s e] [[				;-- used by rich-paragraph and co
+			left   [align: 'left]
+			center [align: 'center]
+			right  [align: 'right]
+			fill   [align: 'fill]
 		]]
 		#macro [#font-styles] func [s e] [[
 			bold      [flags: append flags 'bold]
@@ -72,6 +78,14 @@ VID: context [
 				template: list-view
 				spec:     [list/spacing: 5x5 list/axis: 'y]
 				facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
+			]
+			rich-paragraph [
+				template: rich-paragraph
+				facets:   [percent! baseline #text-align]
+			]
+			rich-content [
+				template: rich-content
+				facets:   [percent! baseline block! source #text-align]
 			]
 			label [
 				template: label
