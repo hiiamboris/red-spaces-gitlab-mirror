@@ -962,12 +962,12 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 			translate (row-offset * 0x1 + mrg) [
 				scale (row-scale) 1.0
 				translate (clip-start * -1x0)
-				clip 0x0 (clip-end) (copy row-drawn)
+				clip 0x0 (clip-end + 1x0) (copy row-drawn)		;@@ I'm adding +1x0 otherwise italic text gets clipped a bit
 			]
 		]
 		normal-row: [
 			translate (row-offset + mrg) [
-				clip (clip-start) (clip-end) (copy row-drawn)
+				clip (clip-start) (clip-end + 1x0) (copy row-drawn)
 			]
 		]
 		
