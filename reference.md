@@ -797,7 +797,7 @@ ARGUMENTS:
      settings     [block!] "Block of words referring to setting values."
 ```
 
-By default, three layouts are available out of the box: `list` (used in vlist/hlist), `tube` (used in row/column) and `ring` (used in ring menu popups).
+By default, three layouts are available out of the box: `list` (used in vlist/hlist), `tube` (used in row/column), `ring` (used in ring menu popups), and `paragraph` (used in rich-paragraph and derivatives).
 
 #### Settings for list layout
 
@@ -806,29 +806,41 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 | axis | word! | `x` or `y` | primary axis of list's extension |
 | margin |  integer! pair! | >= 0x0 | space between list's content and it's border |
 | spacing | integer! pair! | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
-| canvas | pair! none! | > 0x0 | area size on which list will be rendered |
-| limits | range! none! | /min <= /max | constraints on the size |
+| canvas | pair! none! | > 0x0 | area size on which list will be rendered (infinite by default) |
+| limits | range! none! | /min <= /max | constraints on the size (unlimited by default) |
 | origin | pair! | unrestricted | point at which list's coordinate system origin is located |
 
 #### Settings for tube layout
 
-| setting | types | constraints | description |
-|-|-|-|-|
-| axes | block! of 2 words | any of `[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]` (unicode arrows `←→↓↑` are also supported) | primary (first) and secondary (second) axes of tube extension (run [`tube-test`](tests/tube-test.red) to figure it out) |
-| align | block! none! | -1x-1 to 1x1 (9 variants) | alignment vector |
-| margin |  integer! pair! | >= 0x0 | space between tubr's content and it's border |
-| spacing | integer! pair! | >= 0x0 | space between adjacent tube's items (only primary axis of the pair is used) |
-| canvas | pair! none! | > 0x0 | area size on which tube will be rendered |
-| limits | range! none! | /min <= /max | constraints on the size |
+| setting | types | default | constraints | description |
+|-|-|-|-|-|
+| axes | block! of 2 words, none! | `[e s]` | any of `[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]` (unicode arrows `←→↓↑` are also supported) | primary (first) and secondary (second) axes of tube extension (run [`tube-test`](tests/tube-test.red) to figure it out) |
+| align | block! of 0-2 words, pair! none! | -1x-1 | -1x-1 to 1x1 = 9 pair variants, or axes-like block | alignment vector: with pair `x` is 'list within row' and `y` is 'item within list'; with block axes are fixed and missing axis centers along it |
+| margin |  integer! pair! | | >= 0x0 | space between tube's content and it's border |
+| spacing | integer! pair! | | >= 0x0 | space between adjacent tube's items (primary axis) and rows (secondary axis) |
+| canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
+| limits | range! none! | none | /min <= /max | constraints on the size |
 
 #### Settings for ring layout
 
 | setting | types | constraints | description |
 |-|-|-|-|
-| angle | integer! float! | unrestricted | clockwise angle from X axis to the first item |
+| angle | integer! float! none! | unrestricted | clockwise angle from X axis to the first item, defaults to zero |
 | radius | integer! float! | >= 0 | distance from the center to closest points of items |
 | round? | logic! | | false (default) - consider items rectangular, true - consider items round |
 
+#### Settings for paragraph layout
+
+| setting | types | default | constraints | description |
+|-|-|-|-|
+| align | word! none! | left | any of `[left center right fill]` | horizontal alignment |
+| baseline | percent! float! none! | 80% | any of `[left center right fill]` | horizontal alignment |
+| margin |  integer! pair! | | >= 0x0 | space between paragraph's content and it's border |
+| spacing | integer! pair! | | >= 0x0 | space between adjacent items (x) and rows (y) |
+| canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
+| limits | range! none! | none | /min <= /max | constraints on the size |
+
+See [rich-paragraph](#rich-paragraph) to better understand how it works.
 
 
 ## List
@@ -947,14 +959,14 @@ Adds new facets:
 | `margin` | pair! | horizontal and vertical space between the items and the bounding box |
 | `spacing` | pair! | horizontal or vertical space between adjacent items and rows/columns |
 | `axes`  | block! = `[word! word!]` | primary and secondary flow directions: each word is one of `n w s e` or `← → ↑ ↓`; default for `tube` and `row` = `[e s]` (extend to the east then split southwise) |
-| `align` | pair! or block! = `[word! word!]` | row and item alignment (see below), default = -1x-1 |
+| `align` | pair! or block! of 0 to 2 words | row and item alignment (see below), default = -1x-1 |
 
 Alignment specification is supported in two forms:
 - `pair!` -1x-1 to 1x1 - in this case pair/1 is alignment along primary axis (of extension), and pair/2 is alignment along secondary axis (of splitting):
   - `-1` aligns towards the negative side of the axis
   - `0` aligns close to the center along this axis
   - `-1` aligns towards the positive side of the axis
-- `block! = [word! word!]` where each word is one of `n w s e` or `← → ↑ ↓` - in this case alignment is specified independently of axes, and is screen-oriented (north always points up, east to the right, etc)
+- `block!` of 0 to 2 words, where each word is one of `n w s e` or `← → ↑ ↓` - in this case alignment is specified independently of axes, and is screen-oriented (north always points up, east to the right, etc)
   - there can be less than 2 words in the block: omitted alignments will be centered, e.g. `[n]` will center horizontally, but will align towards the top vertically
   - order of words is irrelevant, but alignments should obviously be orthogonal to each other
 
@@ -1105,6 +1117,105 @@ Default `data` just acts as a wrapper around `source`, picking from it and retur
 
 
 Pagination works as explained for [`inf-scrollable`](#inf-scrollable). The only thing to note is that pinned cells are displayed in the viewport regardless of the estimated content offset. 
+
+
+
+## Rich-paragraph
+
+A `container` specially designed to display mixed content (text, and other spaces including images). Arranges spaces using `paragraph` layout. Used by [`rich-content`](#rich-content).
+
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-paragraph.png) | <pre>rich-paragraph [<br>	text "some text "<br>	image data= draw 40x30 [<br>		triangle 3x25 37x25 20x5<br>		triangle 13x15 27x15 20x25<br>	]<br>	text " with an image"<br>]</pre> |
+|-|-|
+
+Like [`tube`](#tube), it is a flow layout, but with the following major differences:
+
+| Feature | `tube` | `rich-paragraph` |
+|-|-|-|
+| optimized for | UI rows and columns | rich text |
+| size fitting | will try to stretch it's content based on weight, which may require up to 3 rendering attempts | renders content once on an infinite canvas |
+| orientation | exposes 2 axes that control primary and secondary direction | always lays out left-to-right, arranges in top-down lines |
+| alignment | 9 fixed alignments along it's two axes | 4 fixed horizontal alignments (left, right, center, fill) and a continuous vertical alignment controlled by baseline location (0% to 100% of line height) |
+| splitting | content items cannot be split | content items can be split at provided horizontal breakpoints |
+| intervals | only fixed uniform `spacing` between items | breakpoints may denote parts of item as 'empty', and these are omitted from output at line boundaries |
+| special treatment | none | [`break`](#break) spaces are used to delimit lines and their width is set to that of the layout |
+
+
+Inherits all of `container` facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
+| `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+
+Adds new facets:
+
+| facet  | type | description |
+|-|-|-|
+| `margin` | pair! | horizontal and vertical space between the items and the bounding box |
+| `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
+| `align` | word! | horizontal alignment: one of `[left center right fill]`; default = left |
+| `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
+| `breakpoints` | block! of block!s | each block corresponds to an item in `content` at the same index; it is a list of increasing integer offsets at which that item can be split, and if a dash `-` occurs between 2 offsets this interval is considered 'empty' (can be omitted at line boundary); such list should always include zero and total width of the item |
+
+Alignments look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
+
+<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-paragraph-alignments.png></img>
+
+`fill` alignment can scale lines up to 10% to align to both left and right margins (which looks cool), but left-aligns if that fails.
+
+Note that `rich-paragraph` can split *any* space that appears in it into any number of lines (provided it's given breakpoints). It does so using Draw `clip` command. This allows spaces to keep their simple box geometry without any special treatment and complex drawing logic.
+
+
+## Rich-content
+
+A `rich-paragraph` conainer that automatically fills it's `content` from given `source` (dialect) and places breakpoints around whitespace.
+
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-content.png) | `rich-content ["normal " bold "bold" italic " italic " /bold size: 15 underline "big" /underline /size " text"]` |
+|-|-|
+
+Source dialect summary (not meant to be concise, meant to be easy to parse):
+
+| Feature | Syntax |
+|-|-|
+| text | string! or char! (concatenated) |
+| bold | starts with `bold`, ends with `/bold` |
+| italic | starts with `italic`, ends with `/italic` |
+| underline | starts with `underline`, ends with `/underline` |
+| font face | starts with `font: "Font name"`, ends with `/font` |
+| font size | starts with `size: integer!`, ends with `/size` |
+| font color | starts with `color: tuple!` or `color: name` (e.g. `blue`), ends with `/color` |
+| link target | starts with `command: [code to eval]`, ends with `/command`, assigns click action to part of the content (affects both text and spaces) |
+| arbitrary spaces | any space! object met in the `source` is passed into `content` |
+
+Note that every space object inserted constitutes a single item (caret cannot enter it), even if it's a text space. While strings and chars provide caret offsets between all chars.
+ 
+[comment]: # (perhaps I should split text spaces by chars for caret movement? undecided)
+
+Inherits all of `rich-paragraph` facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `content` | block! of space object!s | filled automatically when `source` is assigned |
+| `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+| `margin` | pair! | horizontal and vertical space between the items and the bounding box |
+| `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
+| `align` | word! | horizontal alignment: one of `[left center right fill]`, default = left |
+| `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
+| `breakpoints` | block! of block!s | filled automatically by `draw` |
+
+Adds new facets:
+
+| facet  | type | description |
+|-|-|-|
+| `source` | block! | dialected data explained above, used to fill `content` |
+| `breakable` | block! of template names | lists `text`-based templates for which to automatically infer breakpoints (default: `[text link]`); multiline text cannot be broken, so watch out for newline chars |
+| `font` | object! | an instance of `font!` object; sets default font to use; should be set in styles |
+| `color` | tuple! none! | if set, affects default text color |
+| `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); can only be set programmatically; will display boxes of`rich-content/selection` style |
+| `point-to-caret` | `func [xy [pair!]] -> integer!` | gets caret offset closest to given point |
+| `caret-to-box` | `func [caret [integer!] side [word!]] -> [xy1 xy2]` | gets caret box for chosen zero-based offset and side (left/right - matters on line split boundaries) |
+| `apply-attributes` | `func [space [object!] attrs [map!]] -> space` | may be overridden to carry attributes met in the source over into the space (e.g. RedMark uses it to apply blue color and underscoring to code spans); must return the space after modification |
+
 
 
 [comment]: # (not sure icon template is worth documenting / making available by default, we'll see)
