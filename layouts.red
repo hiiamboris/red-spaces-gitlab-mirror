@@ -578,7 +578,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	
 	ring: context [
 		;; settings for ring layout:
-		;;   angle       [integer! float!]   unrestricted, defaults to 0
+		;;   angle    [integer! float! none!]   unrestricted, defaults to 0
 		;;     in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
 		;;   radius      [integer! float!]   >= 0
 		;;     minimum distance (pixels) from the center to the nearest point of arranged items

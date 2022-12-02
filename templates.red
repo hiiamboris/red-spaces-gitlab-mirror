@@ -1344,6 +1344,7 @@ rich-content-ctx: context [												;-- rich content
 	;; custom draw fills /breakpoints, which requires preliminary content rendering
 	;; so it's done inside draw to avoid out of tree renders
 	;; however ranges and breakpoints do not depend on canvas, so no need put them into cache
+	;@@ anyway, I should cache breakpoints once they're set
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		breaks: clear space/breakpoints
 		
@@ -1457,7 +1458,16 @@ rich-content-ctx: context [												;-- rich content
 		][
 			~/xy-to-caret self xy
 		] #type [function!]
-		;@@ should any other funcs be exported? caret-to-box, caret-to-row, row-to-box?
+		
+		caret-to-box: func [
+			"Get [xy1 xy2] thin box coordinates of caret at given offset"
+			offset [integer!]
+			side [word!] "One of: [left right] - matters if row is split at this offset" (find [left right] side) 
+		][
+			~/caret-to-box self offset side
+		] #type [function!]
+		
+		;@@ should any other funcs be exported? caret-to-row, row-to-box?
 		;@@ also cross-paragraph selection may need to know max caret offset for each one
 		
 		ranges: context [								;-- internal range data, generated on source change
