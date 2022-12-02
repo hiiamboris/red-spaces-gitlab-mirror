@@ -1234,7 +1234,7 @@ rich-content-ctx: context [												;-- rich content
 					|	keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
 						keep to [pair! | end]
 					]
-				|	to pair!
+				|	skip to pair!
 				]]
 				; ?? [offset text-ofs buffer att-ranges flags start]
 				foreach [attr attr-ofs] start [			;-- add all open ranges
@@ -1289,11 +1289,13 @@ rich-content-ctx: context [												;-- rich content
 			|	/color | /backdrop | /size | /font | [/command (do flush)]
 			] =close-attr=
 		|	ahead set-word! [
-				set attr quote color:    =open-attr= =color= (attrs/color:    value)
-			|	set attr quote backdrop: =open-attr= =color= (attrs/backdrop: value)
-			|	set attr quote size:     =open-attr= set value #expect integer! (attrs/size: value)
-			|	set attr quote font:     =open-attr= set value #expect string!  (attrs/font: value)
-			|	set attr quote command:  =open-attr= set value #expect block! (do flush  attrs/command: value)
+				set attr quote color:    =color= =open-attr=
+			|	set attr quote backdrop: =color= =open-attr=
+				;; font and size split the result because otherwise a single big letter will make all rows distant
+			|	set attr quote size:     set value #expect integer! =open-attr= (do flush)
+			|	set attr quote font:     set value #expect string!  =open-attr= (do flush)
+				;; command splits it because only single command per space is supported
+			|	set attr quote command:  set value #expect block!   =open-attr= (do flush)
 			]
 		|	set string string! (
 				chunks: next split string #"^/"
