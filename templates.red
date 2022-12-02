@@ -942,7 +942,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		settings: with space [margin spacing align canvas limits breakpoints]
+		settings: with space [margin spacing align baseline canvas limits breakpoints]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:  map
@@ -1048,7 +1048,8 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	declare-template 'rich-paragraph/container [
 		margin:      0
 		spacing:     0
-		align:       'left	#type = [word!] :invalidates-look
+		align:       'left	#type = [word!] :invalidates-look				;-- horizontal alignment
+		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
 		breakpoints: []		#type  [block!] :invalidates
 		weight:      1									;-- non-zero default so tube can stretch it
 		

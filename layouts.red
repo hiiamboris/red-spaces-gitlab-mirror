@@ -386,6 +386,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	paragraph: context [
 		;; settings for paragraph layout:
 		;;   align          [none! word!]   one of: [left center right fill], default: left
+		;;   baseline      [float! percent!]  0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
 		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
@@ -399,7 +400,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [align margin spacing canvas limits breakpoints]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local align margin spacing canvas limits breakpoints
+			/local align baseline margin spacing canvas limits breakpoints
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -410,14 +411,16 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			#debug [typecheck [
 				align    [word! (find [left center right fill] align) none!]
+				baseline [percent! float!]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
 				limits   [object! (range? limits) none!]
 				breakpoints [block! none!]
 			]]
-			default align:  'left
-			default canvas: infxinf						;-- none to pair normalization
+			default align:    'left
+			default baseline: 80%
+			default canvas:   infxinf					;-- none to pair normalization
 			default breakpoints: []
 			set [|canvas|: fill:] decode-canvas canvas
 			margin:  margin  * 1x1						;-- integer to pair normalization
@@ -508,7 +511,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				pos: 0x0
 				forall row [							;@@ use for-each or map-each
 					space: row/1
-					row/2: row/2 by (row-clip-end/y - space/size/y)	;-- remember offset within the row (used by /draw and /into)
+					;; remember vertical offset within the row (used by /draw and /into):
+					row/2: row/2 by round/to row-clip-end/y - space/size/y * baseline 1	
 					unless space =? pick tail map -2 [	;-- do not duplicate items in the map
 						repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
 					]
