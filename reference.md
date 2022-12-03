@@ -1196,7 +1196,7 @@ Source dialect summary (not meant to be concise, meant to be easy to parse):
 | link target | starts with `command: [code to eval]`, ends with `/command`, assigns click action to part of the content (affects both text and spaces) |
 | arbitrary spaces | any space! object met in the `source` is passed into `content` |
 
-Note that every space object inserted constitutes a single item (caret cannot enter it), even if it's a text space. While strings and chars provide caret offsets between all chars.
+Note that every space object inserted constitutes a single item (caret cannot enter it), even if it's a text space, because each caret offset should correspond to a range of source offsets. While strings and chars provide caret offsets between all chars.
  
 [comment]: # (perhaps I should split text spaces by chars for caret movement? undecided)
 
