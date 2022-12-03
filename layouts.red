@@ -499,12 +499,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						row/1/type = 'break
 					][
 						width: first row-clip-end - row-clip-start
-						scale: allowed-row-width / (max 1 width)
 						limit: 90%
-						if all [limit <= scale scale <= (1 / limit)] [
-							total-width: max total-width allowed-row-width
-							rows/2: scale
-						]
+						scale: allowed-row-width / (max 1 width)
+						rows/2: scale: clip scale limit 1 / limit
+						total-width: max total-width round/ceiling/to width * scale 1
 					]
 				]
 				rows/1: row-offset + (shift by 0)
