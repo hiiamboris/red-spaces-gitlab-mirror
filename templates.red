@@ -1204,6 +1204,7 @@ rich-content-ctx: context [												;-- rich content
 	text-prototype:      make-space 'text []
 	link-prototype:      make-space 'link []
 	
+	;@@ should source support image! in it's content? url! ? anything else?
 	on-source-change: function [
 		space [object!] word [word!] new-source [block!]
 		/local range attr value char string obj2
