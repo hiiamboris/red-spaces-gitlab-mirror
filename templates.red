@@ -1459,7 +1459,7 @@ rich-content-ctx: context [												;-- rich content
 			~/xy-to-caret self xy
 		] #type [function!]
 		
-		caret-to-box: func [
+		caret-to-box: function [
 			"Get [xy1 xy2] thin box coordinates of caret at given offset"
 			offset [integer!]
 			side [word!] "One of: [left right] - matters if row is split at this offset" (find [left right] side) 
