@@ -237,9 +237,19 @@ Note: for timers to work, they have to be `render`ed by their owner's `draw` fun
 
 ## Stretch
 
-Just an elastic spacer between other UI items (see [example in VID/S](vids.md#constraining-the-size)). Another (more readable) name is `<->`, i.e. a double arrow.
+Just an elastic spacer between other UI items (see [example in VID/S](vids.md#constraining-the-size)). Another (more readable) name is `<->`, i.e. a double arrow (but it may cause problems when compiling - see [#5137](https://github.com/red/red/issues/5137)).
 
 Has weight of `1`, which makes it stretch. See [VID/S manual](vids.md#weight-effect) on how weight works.
+
+
+## Break
+
+Space that represents linebreaks in [`rich-paragraph`](#rich-paragraph) and it's derivatives. Can be styled to alter it's length or even draw some graphics on it.
+
+| facet  | type  | description |
+|-|-|-|
+| `length` | integer! | vertical height of the linebreak in pixels |
+| `size` | pair! | set automatically by `draw`, from `length` and container's width |
 
 
 ## Rectangle
@@ -271,7 +281,6 @@ Draws an [isosceles triangle](https://en.wikipedia.org/wiki/Isosceles_triangle).
 | `size` | pair! | size is fixed and should be defined |
 | `margin` | integer! or pair! | horizontal and vertical space between the bounding box [0x0 size] and to the triangle's points (at the stroke center) |
 | `dir` | word! | where it points to: `n`/`e`/`s`/`w` for north, east, south, west |
-
 
 
 ## Image
