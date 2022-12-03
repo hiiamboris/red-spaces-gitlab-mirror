@@ -170,3 +170,19 @@ Stress test. An infinitely zooming animation for `grid-view` that contains itsel
 Test for column [autofit algorithms](../design-cards/grid-autofit.md). Contains grids with edge cases of text and (commented) images content.
 
 
+## Rich content tests
+
+[**rich-test1.red**](rich-test1.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-rich-test1.png)
+
+A simplest rich content test which I'm using to debug whitespace handling, hittesting and caret location.
+
+---
+
+[**rich-test2.red**](rich-test2.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-rich-test2.gif)
+
+A more realistic rich content test which shows if alignment works as desired. Initial capital `L` is an image.
+
