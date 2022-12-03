@@ -1340,60 +1340,87 @@ rich-content-ctx: context [												;-- rich content
 		invalidate space
 	]
 	
-	space!: charset " ^-"
+	space!:     charset " ^-"
+	non-space!: negate space!
 	
+	get-breakpoints-for: function [types [block!] item [object!] (space? item)] [
+		;; this way I won't be able to distinguish produced text spaces from those coming from /source
+		;; but then, maybe it's fine to have them all breakable...
+		;@@ this code doesn't account for /limits though - need to support it
+		if all [
+			find types item/type
+			not empty? item/text
+			not find item/text #"^/"					;-- avoid breakpoints if text has multiple lines
+		][
+			vec: clear []
+			render/on item infxinf						;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
+			; h1: second size-text item/layout		not working - #5241
+			; h2: second caret-to-offset/lower item/layout 1
+			; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
+			;@@ not sure if I should account for margins here or in the layout, but here seems more general
+			mrg: item/margin along 'x
+			pos: item/text
+			if mrg > 0 [repend vec [0 '-]]				;-- treat margin as empty
+			unless find space! pos/1 [append vec mrg]	;-- avoid `0 0` at head if it starts with a space
+			while [pos: find/tail pos space!] [			;@@ use for-each
+				index: -1 + index? pos
+				left:  mrg + first caret-to-offset       item/layout index
+				index: index? any [find pos non-space!  tail pos]	;-- group multiple spaces 
+				right: mrg + first caret-to-offset/lower item/layout index
+				repend vec [left '- right]				;@@ need to group spaces for more performance
+			]
+			unless find space! last item/text [			;-- close last segment if it doesn't end with a space
+				width: first caret-to-offset/lower item/layout 1 + length? item/text
+				append vec mrg + width
+			]
+			if mrg > 0 [								;-- add right empty margin if it exists
+				end: mrg + last vec
+				repend vec ['- end]
+			]
+			if 2 < length? vec [return copy vec]
+		]
+		
+		;; split clickable using breakpoints of it's items
+		;@@ should all, or any other containers be treated like this too?
+		;@@ I don't like it that this uses margin/spacing to follow list's geometry
+		;@@ it shouldn't have this knowledge, not does it have knowledge of more complex containers
+		;@@ or maybe this functionality should be kept to redmark, on users' shoulders
+		;@@ or it should be exposed for external override, and may support a few templates out of the box
+		if all [
+			item/type = 'clickable						;-- special case for clickable as a wrapping containter for 'command'
+			space? list: item/content
+			list/type = 'list
+		][
+			breaks: clear []
+			base: (item/margin + list/margin) along 'x
+			spc: list/spacing along 'x 
+			repeat i list/items/size [
+				item: list/items/pick i
+				vec: get-breakpoints-for types item
+				forall vec [
+					append breaks either integer? vec/1 [vec/1 + base][vec/1]
+				]
+				base: base + item/size/x + spc
+			]
+			if 2 < length? breaks [return copy breaks]
+		]
+		
+		none
+	]
+		
 	;; custom draw fills /breakpoints, which requires preliminary content rendering
 	;; so it's done inside draw to avoid out of tree renders
 	;; however ranges and breakpoints do not depend on canvas, so no need put them into cache
 	;@@ anyway, I should cache breakpoints once they're set
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		breaks: clear space/breakpoints
-		
-		vec: clear []
 		foreach item space/content [
-			entry: none
-			
-			;; this way I won't be able to distinguish produced text spaces from those coming from /source
-			;; but then, maybe it's fine to have them all breakable...
-			;@@ this code doesn't account for /limits though - need to support it
-			; ?? [item/type item/text]
-			if all [
-				find space/breakable item/type
-				not empty? item/text
-			][
-				render/on item infxinf					;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
-				; h1: second size-text item/layout		not working - #5241
-				; h2: second caret-to-offset/lower item/layout 1
-				; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
-				unless find item/text #"^/" [			;-- avoid breakpoints if text has multiple lines
-					;@@ not sure if I should account for margins here or in the layout, but here seems more general
-					mrg: item/margin along 'x
-					pos: item/text
-					if any [mrg > 0  not find space! pos/1] [append vec 0]	;-- avoid `0 0` at head
-					while [pos: find/tail pos space!] [
-						index: -1 + index? pos
-						left:  mrg + first caret-to-offset       item/layout index
-						right: mrg + first caret-to-offset/lower item/layout index
-						repend vec [left '- right]
-					]
-					if any [
-						mrg > 0
-						not find space! last item/text
-					][
-						width: first caret-to-offset/lower item/layout 1 + length? item/text
-						append vec mrg * 2 + width
-					]
-					if 2 < length? vec [entry: copy vec]
-					clear vec
-				]
-			]
-			append/only breaks entry
+			append/only breaks get-breakpoints-for space/breakable item 
 		]
-		; ?? breaks
 		drawn: space/rich-paragraph-draw/on canvas
 		either space/selected [
 			sdrawn: draw-selection space
-			compose/only [(sdrawn) (drawn)]
+			reduce [sdrawn drawn]
 		][
 			drawn
 		] 
