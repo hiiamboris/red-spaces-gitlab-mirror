@@ -1022,7 +1022,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		settings: with space [margin spacing align baseline canvas limits breakpoints]
+		settings: with space [margin spacing align baseline canvas limits]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:  map
@@ -1130,7 +1130,6 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		spacing:     0
 		align:       'left	#type = [word!] :invalidates-look				;-- horizontal alignment
 		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
-		breakpoints: []		#type  [block!] :invalidates
 		weight:      1									;-- non-zero default so tube can stretch it
 		
 		frame:       []		#type  [block!]				;-- internal frame data used by /into
@@ -1420,52 +1419,6 @@ rich-content-ctx: context [												;-- rich content
 		invalidate space
 	]
 	
-	space!:     charset " ^-"
-	non-space!: negate space!
-	
-	get-breakpoints-for: function [types [block!] item [object!] (space? item)] [
-		;; this way I won't be able to distinguish produced text spaces from those coming from /source
-		;; but then, maybe it's fine to have them all breakable...
-		;@@ this code doesn't account for /limits though - need to support it
-		if all [
-			find types item/type
-			not empty? item/text
-			not find item/text #"^/"					;-- avoid breakpoints if text has multiple lines
-			; h1: second size-text item/layout		not working - #5241
-			; h2: second caret-to-offset/lower item/layout 1
-			; h1 = h2									;-- avoid breakpoints if text has multiple lines
-		][
-			render/on item infxinf						;-- infxinf must be in sync with paragraph layout, required to get sections
-			return item/sections
-		]
-		
-		if item/type = 'clickable [
-			render/on item infxinf
-			return item/sections
-		]
-		
-		none
-	]
-		
-	;; custom draw fills /breakpoints, which requires preliminary content rendering
-	;; so it's done inside draw to avoid out of tree renders
-	;; however ranges and breakpoints do not depend on canvas, so no need put them into cache
-	;@@ anyway, I should cache breakpoints once they're set
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		breaks: clear space/breakpoints
-		foreach item space/content [
-			append/only breaks get-breakpoints-for space/breakable item 
-		]
-		drawn: space/rich-paragraph-draw/on canvas
-		either space/selected [
-			sdrawn: draw-selection space
-			reduce [sdrawn drawn]
-		][
-			drawn
-		] 
-	]
-	
-	
 	;; can be styled but cannot be accessed (and in fact shared)
 	;; because there's a selection per every row - can be many in one rich-content
 	selection-prototype: make-space 'rectangle [
@@ -1506,12 +1459,21 @@ rich-content-ctx: context [												;-- rich content
 		]
 	]
 	
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- adds selection only
+		drawn: space/rich-paragraph-draw/on canvas
+		either space/selected [
+			sdrawn: draw-selection space
+			reduce [sdrawn drawn]
+		][
+			drawn
+		] 
+	]
+	
 		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
 		source:      []				#type [block!] :on-source-change	;-- holds high-level dialected data
-		breakable:   [text link]	#type [block!] :on-source-change	;-- list of template names to auto infer word breaks for
 		color:       none												;-- color & font are accounted for in style
 		font:        none
 		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)

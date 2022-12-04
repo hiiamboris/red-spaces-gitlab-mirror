@@ -379,7 +379,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	]
 	
 	;; unlike tube this allows the single space to span multiple lines, wrapping it accordingly
-	;; wrapping occurs between spaces and at breakpoints
+	;; wrapping occurs between spaces and between sections (if supported by each item)
 	;; it is able to wrap any space without that space knowing about it, letting it keep simple box-like rendering logic
 	;; has no support for axes or weight
 	;@@ maybe remove limits and apply them to canvas in advance?
@@ -391,16 +391,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
 		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
 		;;   limits        [none! object!]
-		;;   breakpoints   [none! block!]   block of vectors of integers:
-		;;       each vector corresponds to a space in spaces block
-		;;       each positive integer is offset from the left of that space where it can be wrapped (word or char margins usually)
-		;;       negative integers specify rendering offset of the new row if wrapping occurs there (used to suppress leading spaces)
 		create: function [
 			"Build a paragraph layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [align margin spacing canvas limits breakpoints]"
+			settings [block!] "Any subset of [align margin spacing canvas limits]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local align baseline margin spacing canvas limits breakpoints
+			/local align baseline margin spacing canvas limits
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -416,12 +412,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
 				limits   [object! (range? limits) none!]
-				breakpoints [block! none!]
 			]]
 			default align:    'left
 			default baseline: 80%
 			default canvas:   infxinf					;-- none to pair normalization
-			default breakpoints: []
 			set [|canvas|: fill:] decode-canvas canvas
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
@@ -436,7 +430,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
-				;; breaks will be rendered on finite canvas so they set their size (matters if they are made visible):
+				;; linebreaks will be rendered on finite canvas so they set their size (matters if they are made visible):
 				;@@ not sure, maybe they should stretch to total-width, but canvas/x seems more reasonable
 				;; using infxinf canvas for the rest to avoid wrapping and any canvas dependence (which also avoids extra renders)
 				;@@ I could make an extra render run to stretch items vertically to row height,
@@ -457,11 +451,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			;; next part relies on other functions from the context:
 			foreach [space: drawn:] info [				;@@ use for-each
-				breaks: first breakpoints
-				breakpoints: next breakpoints 
-				either breaks [
+				sections: if in space 'sections [space/sections]	;-- calls if a function
+				either sections [
 					offset: 0
-					foreach width breaks [
+					foreach width sections [
 						either width > 0 [
 							commit-part space drawn offset offset + width
 						][
