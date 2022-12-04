@@ -52,8 +52,6 @@ do/expand with spaces/ctx [
 	declare-template 'code/text []
 	declare-template 'thematic-break/stretch [limits: 0x20 .. (infxinf/x by 20)]
 	declare-template 'rich-content/rich-content [
-		;; automatically word-break code spans
-		append breakable 'code
 		;; code inside links should be painted blue
 		apply-attributes: function [space attrs] [
 			if space/type = 'code [
