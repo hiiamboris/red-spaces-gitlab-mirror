@@ -282,6 +282,22 @@ image-ctx: context [
 cell-ctx: context [
 	~: self
 
+	get-sections: function [space [object!]] [
+		sections: make [] 16
+		geom: select/same space/map item: space/content
+		mrg:  max 0 geom/offset/x
+		if mrg <> 0 [append sections negate mrg] 
+		append sections any [
+			if in item 'sections [item/sections]		;-- calls if a function, may return none
+			min geom/size/x space/size/x				;-- careful if item is bigger than the box
+		]
+		mrg:  max 0 space/size/x - geom/offset/x - geom/size/x
+		if mrg <> 0 [append sections negate mrg]
+		unless all [single? sections  sections/1 >= 0] [
+			return sections								;-- optimize unbreakable (single positive) case
+		]
+	]
+		
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
 		unless space/content [
@@ -721,8 +737,8 @@ paragraph-ctx: context [
 	
 	get-sections: function [space [object!]] [
 		;@@ this code doesn't account for /limits - need to support it
-		#assert [space/layout  "text must be rendered before dissecting it"]
 		if all [
+			space/layout								;-- must be rendered, else on this frame it cannot be dissected (and has zero size)
 			not empty? space/text
 			zero? second space/layout/extra - caret-to-offset/lower space/layout 1	;-- avoid breaking of multiline text
 		][
@@ -733,8 +749,8 @@ paragraph-ctx: context [
 			]]													;-- it often produces an empty interval at the tail (accounted for later)
 			
 			sections: clear []
-			mrg: space/margin along 'x
-			if mrg > 0 [append sections negate mrg]				;-- treat margin as empty
+			mrg: negate space/margin along 'x					;-- treat margin as empty
+			if mrg <> 0 [append sections mrg]
 			right: 0
 			foreach range spaces [
 				left:  first caret-to-offset space/layout range/1
@@ -745,7 +761,7 @@ paragraph-ctx: context [
 			; ?? space/text ?? spaces ?? sections
 			while [0 = first sections] [sections: next sections]	;-- remove the zero intervals
 			while [0 = last sections ] [take/last sections]
-			if mrg > 0 [append sections negate mrg]
+			if mrg <> 0 [append sections mrg]
 			unless all [single? sections  sections/1 >= 0] [
 				return copy sections							;-- don't spare a copy on items that can't be broken (single positive)
 			]
@@ -897,6 +913,28 @@ container-ctx: context [
 list-ctx: context [
 	~: self
 		
+	get-sections: function [list [object!]] [
+		if any [
+			list/size/x = 0								;-- nothing to dissect (not rendered?)
+			list/axis <> 'x								;-- can't dissect vertical list
+		] [return none]
+		
+		sections: make [] 16							;-- can't be shared (e.g.: item is a list and reenters this func)
+		mrg: negate list/margin  along 'x
+		spc: negate list/spacing along 'x 
+		if mrg <> 0 [append sections mrg]
+		repeat i n: list/items/size [
+			item:  list/items/pick i
+			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
+			append sections any [batch item/size/x]
+			all [i < n  spc <> 0  append sections spc]
+		]
+		if mrg <> 0 [append sections mrg]
+		unless all [single? sections  sections/1 >= 0] [
+			return sections								;-- optimize lists that can't be broken (single positive)
+		]
+	]
+		
 	declare-template 'list/container [
 		size:    0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
 		axis:    'x		#type =  :invalidates [word!] (find [x y] axis)
@@ -905,6 +943,7 @@ list-ctx: context [
 		spacing: 0
 		;@@ TODO: alignment?
 
+		sections: does [~/get-sections self]
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair!]] [
 			settings: [axis margin spacing canvas limits]
@@ -1395,34 +1434,13 @@ rich-content-ctx: context [												;-- rich content
 			; h2: second caret-to-offset/lower item/layout 1
 			; h1 = h2									;-- avoid breakpoints if text has multiple lines
 		][
-			render/on item infxinf						;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
+			render/on item infxinf						;-- infxinf must be in sync with paragraph layout, required to get sections
 			return item/sections
 		]
 		
-		;; split clickable using breakpoints of it's items
-		;@@ should all, or any other containers be treated like this too?
-		;@@ I don't like it that this uses margin/spacing to follow list's geometry
-		;@@ it shouldn't have this knowledge, not does it have knowledge of more complex containers
-		;@@ or maybe this functionality should be kept to redmark, on users' shoulders
-		;@@ or it should be exposed for external override, and may support a few templates out of the box
-		if all [
-			item/type = 'clickable						;-- special case for clickable as a wrapping containter for 'command'
-			space? list: item/content
-			list/type = 'list
-		][
-			breaks: clear []
-			mrg: (item/margin + list/margin) along 'x
-			if mrg > 0 [append breaks negate mrg]
-			spc: list/spacing along 'x 
-			repeat i n: list/items/size [
-				item: list/items/pick i
-				append breaks get-breakpoints-for types item
-				if i < n [append breaks negate spc]
-			]
-			if mrg > 0 [append breaks negate mrg]
-			unless all [single? breaks  breaks/1 >= 0] [
-				return copy breaks						;-- don't spare a copy on items that can't be broken (single positive)
-			]
+		if item/type = 'clickable [
+			render/on item infxinf
+			return item/sections
 		]
 		
 		none
