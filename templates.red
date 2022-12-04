@@ -50,6 +50,7 @@ modify-class 'space [
 	origin:  0x0	#type =? :invalidates-look [pair!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
+	sections: none	#type [function! block! none!]
 	on-invalidate: 	#type [function! none!]
 ]	
 
@@ -620,7 +621,7 @@ paragraph-ctx: context [
 	
 	size-text2: function [layout [object!]] [			;@@ it's a workaround for #4841
 		size1: size-text layout
-		size2: caret-to-offset/lower layout 1 + length? layout/text
+		size2: caret-to-offset/lower layout length? layout/text
 		max size1 size2
 	]
 	
@@ -715,6 +716,44 @@ paragraph-ctx: context [
 		quietly space/layout: layout					;-- must return layout
 	]
 
+	space!:     charset " ^-"
+	non-space!: negate space!
+	
+	get-sections: function [space [object!]] [
+		;@@ this code doesn't account for /limits - need to support it
+		#assert [space/layout  "text must be rendered before dissecting it"]
+		if all [
+			not empty? space/text
+			zero? second space/layout/extra - caret-to-offset/lower space/layout 1	;-- avoid breaking of multiline text
+		][
+			spaces: clear []
+			parse space/text [collect after spaces any [		;-- collect index interval pairs of all contiguous whitespace
+				any non-space! s: any space! e:
+				keep (as-pair index? s index? e)
+			]]													;-- it often produces an empty interval at the tail (accounted for later)
+			
+			sections: clear []
+			mrg: space/margin along 'x
+			if mrg > 0 [append sections negate mrg]				;-- treat margin as empty
+			right: 0
+			foreach range spaces [
+				left:  first caret-to-offset space/layout range/1
+				append sections left - right					;-- added as positive - chars up to the space
+				right: first caret-to-offset space/layout range/2
+				append sections left - right					;-- added as negative - space chars
+			]
+			; ?? space/text ?? spaces ?? sections
+			while [0 = first sections] [sections: next sections]	;-- remove the zero intervals
+			while [0 = last sections ] [take/last sections]
+			if mrg > 0 [append sections negate mrg]
+			unless all [single? sections  sections/1 >= 0] [
+				return copy sections							;-- don't spare a copy on items that can't be broken (single positive)
+			]
+		]
+		
+		none
+	]
+	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		if canvas [										;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
@@ -763,6 +802,7 @@ paragraph-ctx: context [
 		margin: 0
 		weight: 0										;-- no point in stretching single-line text as it won't change
 
+		sections: does [~/get-sections self]
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
 		quietly cache:  [size layout]
 		quietly draw: func [/on canvas [pair!]] [~/draw self canvas]
@@ -1351,35 +1391,12 @@ rich-content-ctx: context [												;-- rich content
 			find types item/type
 			not empty? item/text
 			not find item/text #"^/"					;-- avoid breakpoints if text has multiple lines
-		][
-			render/on item infxinf						;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
 			; h1: second size-text item/layout		not working - #5241
 			; h2: second caret-to-offset/lower item/layout 1
-			; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
-			spaces: clear []
-			parse item/text [collect after spaces any [			;-- collect index interval pairs of all contiguous whitespace
-				any non-space! s: any space! e:
-				keep (as-pair index? s index? e)
-			]]													;-- it often produces an empty interval at the tail (accounted for later)
-			
-			breaks: clear []
-			;@@ not sure if I should account for margins here or in the layout, but here seems more general
-			mrg: item/margin along 'x
-			if mrg > 0 [append breaks negate mrg]				;-- treat margin as empty
-			right: 0
-			foreach range spaces [
-				left:  first caret-to-offset item/layout range/1
-				append breaks left - right						;-- added as positive - chars up to the space
-				right: first caret-to-offset item/layout range/2
-				append breaks left - right						;-- added as negative - space chars
-			]
-			; ?? item/text ?? spaces ?? breaks
-			while [0 = first breaks] [breaks: next breaks]		;-- remove the zero intervals
-			while [0 = last breaks ] [take/last breaks]
-			if mrg > 0 [append breaks negate mrg]
-			unless all [single? breaks  breaks/1 >= 0] [
-				return copy breaks								;-- don't spare a copy on items that can't be broken (single positive)
-			]
+			; h1 = h2									;-- avoid breakpoints if text has multiple lines
+		][
+			render/on item infxinf						;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
+			return item/sections
 		]
 		
 		;; split clickable using breakpoints of it's items
