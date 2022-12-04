@@ -923,10 +923,11 @@ list-ctx: context [
 		mrg: negate list/margin  along 'x
 		spc: negate list/spacing along 'x 
 		if mrg <> 0 [append sections mrg]
-		repeat i n: list/items/size [
-			item:  list/items/pick i
+		n: (length? list/map) / 2
+		i: 0 foreach [item geom] list/map [				;@@ use for-each
+			i: i + 1
 			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
-			append sections any [batch item/size/x]
+			append sections any [batch geom/size/x]		;-- uses geom/size, not item/size, as latter might have changed
 			all [i < n  spc <> 0  append sections spc]
 		]
 		if mrg <> 0 [append sections mrg]
