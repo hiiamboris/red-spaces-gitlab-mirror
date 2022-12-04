@@ -162,6 +162,7 @@ Some other facets are not mandatory but have a **reserved** meaning (cannot be u
 | `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[child [offset: pair! size: pair!] child ...]`.<br> Used for hittesting and tree iteration. |
 | `into` | `func [xy [pair!]]`<br>`-> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
 | `weight` | `number!` | Used for relative scaling of items in containers like `tube`. `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
+| `sections` | `block!` `none!` `func [] -> block! or none!` | Used only by rich-paragraph and it's derivatives, to split their items. Documented [there](#rich-paragraph). |
 | `on-invalidate` | <pre>func [<br>	space [object!]<br>	cause [object! none!]<br>	scope [word! none!]<br>]</pre> | Custom invalidation function, if cache is managed by the space itself. |
 
 ---
@@ -1144,8 +1145,8 @@ Like [`tube`](#tube), it is a flow layout, but with the following major differen
 | size fitting | will try to stretch it's content based on weight, which may require up to 3 rendering attempts | renders content once on an infinite canvas |
 | orientation | exposes 2 axes that control primary and secondary direction | always lays out left-to-right, arranges in top-down lines |
 | alignment | 9 fixed alignments along it's two axes | 4 fixed horizontal alignments (left, right, center, fill) and a continuous vertical alignment controlled by baseline location (0% to 100% of line height) |
-| splitting | content items cannot be split | content items can be split at provided horizontal breakpoints |
-| intervals | only fixed uniform `spacing` between items | breakpoints may denote parts of item as 'empty', and these are omitted from output at line boundaries |
+| splitting | content items cannot be split | content items can be split at provided sections (see below) |
+| intervals | only fixed uniform `spacing` between items | sections may denote any part of item as 'empty', and these are omitted from output at line boundaries |
 | special treatment | none | [`break`](#break) spaces are used to delimit lines and their width is set to that of the layout |
 
 
@@ -1164,7 +1165,6 @@ Adds new facets:
 | `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
 | `align` | word! | horizontal alignment: one of `[left center right fill]`; default = left |
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
-| `breakpoints` | block! of block!s | each block corresponds to an item in `content` at the same index; it is a list of increasing integer offsets at which that item can be split, and if a dash `-` occurs between 2 offsets this interval is considered 'empty' (can be omitted at line boundary); such list should always include zero and total width of the item |
 
 Alignments look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
 
@@ -1172,12 +1172,23 @@ Alignments look like this (left, fill, then center, right - snapshot from [rich-
 
 `fill` alignment can scale lines up to 10% to align to both left and right margins (which looks cool), but left-aligns if that fails.
 
-Note that `rich-paragraph` can split *any* space that appears in it into any number of lines (provided it's given breakpoints). It does so using Draw `clip` command. This allows spaces to keep their simple box geometry without any special treatment and complex drawing logic.
+Note that `rich-paragraph` can split *any* space that appears in it into any number of lines (provided it supports `sections`). It does so using Draw `clip` command. This allows spaces to keep their simple box geometry without any special treatment and complex drawing logic.
+
+`sections` is a special facet reserved in all spaces for use in rich-paragraph. It can equal to:
+- `none` denoting that space cannot be split
+- `block!` of integers, representing a list of horizontal interval widths for this space on the last frame, where:
+  - positive integer denotes a mandatory inteval (always made visible)
+  - negative integer denotes an empty interval (whitespace, margin, spacing) which is excluded from output when computing breakpoints and alignment
+  - sum of absolute values of inteval widths must equal total space width!
+  - e.g.: for a `box margin= 10x5 [text "abc"]` sections may return: `[-10 19 -10]` where 19 is `text` width
+- `function!` returning `none` or `block!` (most common case)
+
+`sections` are defined for text-based and some other spaces out of the box. You can define it in your own space (including containers) to let it be split.
 
 
 ## Rich-content
 
-A `rich-paragraph` conainer that automatically fills it's `content` from given `source` (dialect) and places breakpoints around whitespace.
+A `rich-paragraph` conainer that automatically fills it's `content` from given `source` (dialect).
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-content.png) | `rich-content ["normal " bold "bold" italic " italic " /bold size: 15 underline "big" /underline /size " text"]` |
 |-|-|
@@ -1210,14 +1221,12 @@ Inherits all of `rich-paragraph` facets:
 | `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
 | `align` | word! | horizontal alignment: one of `[left center right fill]`, default = left |
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
-| `breakpoints` | block! of block!s | filled automatically by `draw` |
 
 Adds new facets:
 
 | facet  | type | description |
 |-|-|-|
 | `source` | block! | dialected data explained above, used to fill `content` |
-| `breakable` | block! of template names | lists `text`-based templates for which to automatically infer breakpoints (default: `[text link]`); multiline text cannot be broken, so watch out for newline chars |
 | `font` | object! | an instance of `font!` object; sets default font to use; should be set in styles |
 | `color` | tuple! none! | if set, affects default text color |
 | `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); can only be set programmatically; will display boxes of`rich-content/selection` style |
