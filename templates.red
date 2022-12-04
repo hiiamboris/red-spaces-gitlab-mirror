@@ -1352,32 +1352,34 @@ rich-content-ctx: context [												;-- rich content
 			not empty? item/text
 			not find item/text #"^/"					;-- avoid breakpoints if text has multiple lines
 		][
-			vec: clear []
 			render/on item infxinf						;-- produces /layout to measure text on, infxinf must be in sync with paragraph layout
 			; h1: second size-text item/layout		not working - #5241
 			; h2: second caret-to-offset/lower item/layout 1
 			; if h1 = h2 [							;-- avoid breakpoints if text has multiple lines
+			spaces: clear []
+			parse item/text [collect after spaces any [			;-- collect index interval pairs of all contiguous whitespace
+				any non-space! s: any space! e:
+				keep (as-pair index? s index? e)
+			]]													;-- it often produces an empty interval at the tail (accounted for later)
+			
+			breaks: clear []
 			;@@ not sure if I should account for margins here or in the layout, but here seems more general
 			mrg: item/margin along 'x
-			pos: item/text
-			if mrg > 0 [repend vec [0 '-]]				;-- treat margin as empty
-			unless find space! pos/1 [append vec mrg]	;-- avoid `0 0` at head if it starts with a space
-			while [pos: find/tail pos space!] [			;@@ use for-each
-				index: -1 + index? pos
-				left:  mrg + first caret-to-offset       item/layout index
-				index: index? any [find pos non-space!  tail pos]	;-- group multiple spaces 
-				right: mrg + first caret-to-offset/lower item/layout index
-				repend vec [left '- right]				;@@ need to group spaces for more performance
+			if mrg > 0 [append breaks negate mrg]				;-- treat margin as empty
+			right: 0
+			foreach range spaces [
+				left:  first caret-to-offset item/layout range/1
+				append breaks left - right						;-- added as positive - chars up to the space
+				right: first caret-to-offset item/layout range/2
+				append breaks left - right						;-- added as negative - space chars
 			]
-			unless find space! last item/text [			;-- close last segment if it doesn't end with a space
-				width: first caret-to-offset/lower item/layout 1 + length? item/text
-				append vec mrg + width
+			; ?? item/text ?? spaces ?? breaks
+			while [0 = first breaks] [breaks: next breaks]		;-- remove the zero intervals
+			while [0 = last breaks ] [take/last breaks]
+			if mrg > 0 [append breaks negate mrg]
+			unless all [single? breaks  breaks/1 >= 0] [
+				return copy breaks								;-- don't spare a copy on items that can't be broken (single positive)
 			]
-			if mrg > 0 [								;-- add right empty margin if it exists
-				end: mrg + last vec
-				repend vec ['- end]
-			]
-			if 2 < length? vec [return copy vec]
 		]
 		
 		;; split clickable using breakpoints of it's items
@@ -1392,17 +1394,18 @@ rich-content-ctx: context [												;-- rich content
 			list/type = 'list
 		][
 			breaks: clear []
-			base: (item/margin + list/margin) along 'x
+			mrg: (item/margin + list/margin) along 'x
+			if mrg > 0 [append breaks negate mrg]
 			spc: list/spacing along 'x 
-			repeat i list/items/size [
+			repeat i n: list/items/size [
 				item: list/items/pick i
-				vec: get-breakpoints-for types item
-				forall vec [
-					append breaks either integer? vec/1 [vec/1 + base][vec/1]
-				]
-				base: base + item/size/x + spc
+				append breaks get-breakpoints-for types item
+				if i < n [append breaks negate spc]
 			]
-			if 2 < length? breaks [return copy breaks]
+			if mrg > 0 [append breaks negate mrg]
+			unless all [single? breaks  breaks/1 >= 0] [
+				return copy breaks						;-- don't spare a copy on items that can't be broken (single positive)
+			]
 		]
 		
 		none

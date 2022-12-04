@@ -459,15 +459,16 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			foreach [space: drawn:] info [				;@@ use for-each
 				breaks: first breakpoints
 				breakpoints: next breakpoints 
-				either all [breaks 2 < length? breaks] [
-					parse breaks [any [
-						set offset1 skip [
-							'- ahead set offset2 skip	;-- soft break on empty region (space)
-							(commit-empty offset2 - offset1)
-						|	ahead set offset2 skip
-							(commit-part space drawn offset1 offset2)
+				either breaks [
+					offset: 0
+					foreach width breaks [
+						either width > 0 [
+							commit-part space drawn offset offset + width
+						][
+							commit-empty width: negate width	;-- soft break on empty region (whitespace)
 						]
-					]]
+						offset: offset + width
+					]
 				][
 					either space/type = 'break [		;-- ensure break is always on a separate line
 						new-row
@@ -538,12 +539,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			repend row [space row-width - space/size/x drawn]
 		]
 		commit-part: func [space drawn offset1 offset2] with :create [	;-- region of space (usually chars)
-			claim width: offset2 - offset1
-			unless space =? pick tail row -3 [
+			claim width: offset2 - offset1						;-- offsets carry the info on where this section is located
+			unless space =? pick tail row -3 [					;-- it's not the last added space? (was split or is a new one)
 				row-height: max row-height space/size/y
 				if empty? row [
 					row-hidden: offset1
-					row-width: offset2
+					row-width:  offset2
 				]
 				repend row [space row-width - offset2 drawn]
 			]
@@ -553,11 +554,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				not empty? row
 				row-width - row-hidden + width > allowed-row-width
 			] [new-row]
-			row-width: row-width + width
+			row-width:   row-width + width
 			row-visible: row-width - row-hidden
 		]
 		
-		;; hidden [ visible ] empty
+		;; hidden [ visible ] empty  (both edges are hidden but I only keep track of the 1st, so I call it 'hidden')
 		;; <-      row-width     ->
 		new-row: does with :create [
 			repend rows [
