@@ -735,7 +735,6 @@ paragraph-ctx: context [
 	]
 
 	get-sections: function [space [object!]] [
-		;@@ this code doesn't account for /limits - need to support it
 		if all [
 			space/layout								;-- must be rendered, else on this frame it cannot be dissected (and has zero size)
 			not empty? space/text
