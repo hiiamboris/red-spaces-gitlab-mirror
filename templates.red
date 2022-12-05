@@ -1335,13 +1335,11 @@ rich-content-ctx: context [												;-- rich content
 				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
 				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
 				;@@ only benchmark can tell when splitting should occur
-				;@@ also: perhaps I should get rid of 'link here, just use text
-				;@@ because links can contain code, images and stuff, and it should all be handled by rich-content itself
-				proto: either command [link-prototype][text-prototype]
-				append content obj: make proto [quietly cached: clone proto/cached cached]
+				append content obj: make text-prototype [
+					quietly cached: clone text-prototype/cached cached
+				]
 				quietly obj/text:  copy buffer
 				quietly obj/flags: copy flags
-				if command [quietly obj/command: command]
 				repend spc-ranges [text-ofs by offset obj]
 				; ?? obj
 				clear buffer
@@ -1351,14 +1349,15 @@ rich-content-ctx: context [												;-- rich content
 						obj: make-space 'clickable [
 							content: make-space 'list [
 								quietly axis:   'x
-								quietly margin:  0x0
-								quietly spacing: space/spacing
-								quietly content: copy command-limit
+								quietly margin: 0x0
 							]
 						]
+						quietly obj/content/spacing: space/spacing
+						quietly obj/content/content: copy command-limit
+						quietly obj/content/command: command
 						insert clear command-limit obj
 					]
-					command-limit: if main-attr == quote command: [tail content]	;-- offset in content, not in source (unlike `start`)
+					command-limit: if main-attr == quote command: [tail content]	;-- offset in content (unlike `start`)
 				]
 			]
 		]
