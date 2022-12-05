@@ -1316,6 +1316,7 @@ rich-content-ctx: context [												;-- rich content
 				|	skip to pair!
 				]]
 				; ?? [offset text-ofs buffer att-ranges flags start]
+				main-attr: attr							;-- keep it for command check later
 				foreach [attr attr-ofs] start [			;-- add all open ranges
 					attr: to word! attr
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
@@ -1344,6 +1345,21 @@ rich-content-ctx: context [												;-- rich content
 				repend spc-ranges [text-ofs by offset obj]
 				; ?? obj
 				clear buffer
+				
+				if main-attr = 'command [				;-- group multiple spaces into a clickable/hlist
+					if command-limit [
+						obj: make-space 'clickable [
+							content: make-space 'list [
+								quietly axis:   'x
+								quietly margin:  0x0
+								quietly spacing: space/spacing
+								quietly content: copy command-limit
+							]
+						]
+						insert clear command-limit obj
+					]
+					command-limit: if main-attr == quote command: [tail content]	;-- offset in content, not in source (unlike `start`)
+				]
 			]
 		]
 		commit-attr: [
