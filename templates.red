@@ -635,6 +635,9 @@ scrollable-space: context [
 paragraph-ctx: context [
 	~: self
 	
+	whitespace!: charset " ^-"							;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
+	non-space!: negate whitespace!
+	
 	size-text2: function [layout [object!]] [			;@@ it's a workaround for #4841
 		size1: size-text layout
 		size2: caret-to-offset/lower layout length? layout/text
@@ -687,7 +690,6 @@ paragraph-ctx: context [
 	;; wrap=off elli=on -> canvas=fixed, but wrapping should be off, i.e. layout/size=inf (don't use none! draw relies on this)
 	;; wrap=elli=on -> canvas=fixed
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
-	whitespace!: charset " ^-"								;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
 	lay-out: function [space [object!] canvas [pair!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
 		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
@@ -732,9 +734,6 @@ paragraph-ctx: context [
 		quietly space/layout: layout					;-- must return layout
 	]
 
-	space!:     charset " ^-"
-	non-space!: negate space!
-	
 	get-sections: function [space [object!]] [
 		;@@ this code doesn't account for /limits - need to support it
 		if all [
@@ -744,7 +743,7 @@ paragraph-ctx: context [
 		][
 			spaces: clear []
 			parse space/text [collect after spaces any [		;-- collect index interval pairs of all contiguous whitespace
-				any non-space! s: any space! e:
+				any non-space! s: any whitespace! e:
 				keep (as-pair index? s index? e)
 			]]													;-- it often produces an empty interval at the tail (accounted for later)
 			
