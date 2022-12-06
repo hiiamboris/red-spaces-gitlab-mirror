@@ -1316,7 +1316,7 @@ rich-content-ctx: context [												;-- rich content
 				|	skip to pair!
 				]]
 				; ?? [offset text-ofs buffer att-ranges flags start]
-				main-attr: attr							;-- keep it for command check later
+				main-attr: attr
 				foreach [attr attr-ofs] start [			;-- add all open ranges
 					attr: to word! attr
 					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
@@ -1344,8 +1344,28 @@ rich-content-ctx: context [												;-- rich content
 				; ?? obj
 				clear buffer
 				
+				?? [offset main-attr command-group]
 				if main-attr = 'command [				;-- group multiple spaces into a clickable/hlist
-					if command-limit [
+					unless empty? command-group [
+						clear back find/same spc-ranges first command-group		;-- remove ranges for subitems
+						;; collapse all ranges
+						;@@ this whole func needs a lot of refactoring, what a mess
+						?? offset
+						offset: command-offset + 1
+						range-limit: command-offset by offset
+						?? offset
+						?? att-ranges
+						?? start
+						forall att-ranges [				;@@ use map-each
+							att-ranges/1: min att-ranges/1 range-limit
+							att-ranges: next att-ranges
+						]
+						foreach [attr attr-ofs] start [
+							start/:attr: min attr-ofs command-offset
+						] 
+						?? att-ranges
+						?? start
+						
 						obj: make-space 'clickable [
 							content: make-space 'list [
 								quietly axis:   'x
@@ -1353,12 +1373,16 @@ rich-content-ctx: context [												;-- rich content
 							]
 						]
 						quietly obj/content/spacing: space/spacing
-						quietly obj/content/content: copy command-limit
-						quietly obj/content/command: command
-						insert clear command-limit obj
+						quietly obj/content/content: copy command-group
+						quietly obj/command: command
+						insert clear command-group obj
+						
+						repend spc-ranges [range-limit obj]
 					]
-					command-limit: if main-attr == quote command: [tail content]	;-- offset in content (unlike `start`)
+					command-group: unless main-attr == /command [tail content]	;-- offset in content (unlike `start`)
+					command-offset: offset
 				]
+				attr: main-attr
 			]
 		]
 		commit-attr: [
@@ -1380,8 +1404,8 @@ rich-content-ctx: context [												;-- rich content
 			ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
 		|	ahead refinement! set attr [						;-- first closing closes the attribute
 				/bold | /italic | /underline | /strike
-			|	/color | /backdrop | /size | /font | [/command (do flush)]
-			] =close-attr=
+			|	/color | /backdrop | /size | /font | /command
+			] (if attr = 'command flush) =close-attr=
 		|	ahead set-word! [
 				set attr quote color:    =color= =open-attr=
 			|	set attr quote backdrop: =color= =open-attr=
