@@ -79,7 +79,16 @@ view [host [
 Note that there's no VID/S style or template style defined for it yet, so VID/S won't be able to use [auto-facets](vids.md#auto-facets), and font and color won't work (because their application for `bold-text` template must defined by `bold-text` style akin to what `text` style does).
 
 
-#### 2. Creating a new `space!` object inside another template or as a child
+#### 2. Altering existing template
+
+```
+declare-template 'cell/cell [						;) new template has the same name as the existing one
+	margin: 10x10									;) new default for existing facet
+	user-data: "test data"							;) new facet that will exist in all cell spaces created after
+]
+```
+
+#### 3. Creating a new `space!` object inside another template or as a child
 
 Let's consider a simple template consisting of two others. For simplicity, all sizes are fixed:
 ```
