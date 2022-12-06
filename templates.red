@@ -1019,6 +1019,11 @@ tube-ctx: context [
 rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
+	xscale: func [xy [pair!] scale [number!]] [
+		xy/x: round/to xy/x * scale 1
+		xy
+	]
+	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		settings: with space [margin spacing align baseline canvas limits]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
@@ -1058,7 +1063,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 					translate (item-offset) (item-drawn)
 				] tail row-drawn
 			]
-			blueprint: either row-scale <> 1 [scaled-row][normal-row]
+			blueprint: either row-scale = 1 [normal-row][scaled-row]
 			compose/deep/only/into blueprint tail drawn
 		]
 		; space/origin: origin							;-- unused
@@ -1078,7 +1083,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		;@@ use locate instead maybe?
 		for-each [prow: row-offset row-scale clip-start clip-end row] rows [
 			last-row: prow
-			xy': (xy/x * row-scale) by xy/y				;-- correct xy/x for scaling if it's applied
+			xy': xscale xy 1 / row-scale				;-- correct xy/x for scaling if it's applied
 			row-xy: xy' - row-offset
 			if row-xy/y < clip-end/y [					;-- last line always accepts xy
 				row-xy: clip row-xy clip-start clip-end			;-- contain xy within row, so it doesn't get into hidden child areas
@@ -1107,7 +1112,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		either child [
 			foreach [row-offset row-scale clip-start clip-end row] rows [
 				if child-offset: select/skip/same row child 3 [	;-- relies on [space offset drawn] row layout
-					xy': (xy/x * row-scale) by xy/y				;-- correct xy/x for scaling if it's applied
+					xy': xscale xy 1 / row-scale				;-- correct xy/x for scaling if it's applied
 					return reduce [child xy' - row-offset - child-offset]
 				]
 			]
@@ -1150,10 +1155,7 @@ rich-content-ctx: context [												;-- rich content
 	;@@ but abstraction seems to only increase the code so far, or I haven't found a good abstraction yet
 	;@@ plus, I need /draw to be fast, which limits me (but these funcs can be slow, as they're for events mostly)
 	
-	xscale: func [xy [pair!] scale [number!]] [
-		xy/x: round/to xy/x * scale 1
-		xy
-	]
+	xscale: :rich-paragraph-ctx/xscale
 	
 	locate-point: function [space [object!] xy [pair!]] [
 		if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
