@@ -326,18 +326,12 @@ cell-ctx: context [
 		drawn
 	]
 	
-	allowed-alignments: make hash! [
-		-1x-1 -1x0 -1x1
-		 0x-1  0x0  0x1
-		 1x-1  1x0  1x1
-	]
-	
 	declare-template 'box/space [
 		;; margin is useful for drawing inner frame, which otherwise would be hidden by content
 		margin:  0
 		weight:  1										;@@ what default weight to use? what default alignment?
 		;@@ consider more high level VID-like specification of alignment
-		align:   0x0	#type =? :invalidates-look (find allowed-alignments align)
+		align:   0x0	#type =? :invalidates-look (-1x-1 +<= align +<= 1x1)
 		content: none	#type =? :invalidates [object! none!]
 		
 		map:     []
