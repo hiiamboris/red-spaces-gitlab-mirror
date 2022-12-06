@@ -50,7 +50,7 @@ modify-class 'space [
 	origin:  0x0	#type =? :invalidates-look [pair!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
-	sections: none	#type [function! block! none!]
+	sections: none	#type =? :invalidates [function! block! none!] 
 	on-invalidate: 	#type [function! none!]
 ]	
 
@@ -294,7 +294,7 @@ cell-ctx: context [
 		mrg:  max 0 space/size/x - geom/offset/x - geom/size/x
 		if mrg <> 0 [append sections negate mrg]
 		unless all [single? sections  sections/1 >= 0] [
-			return sections								;-- optimize unbreakable (single positive) case
+			sections									;-- optimize unbreakable (single positive) case
 		]
 	]
 		
@@ -342,6 +342,7 @@ cell-ctx: context [
 		
 		map:     []
 		cache:   [size map]
+		sections: does [~/get-sections self]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
@@ -930,7 +931,7 @@ list-ctx: context [
 		]
 		if mrg <> 0 [append sections mrg]
 		unless all [single? sections  sections/1 >= 0] [
-			return sections								;-- optimize lists that can't be broken (single positive)
+			sections									;-- optimize lists that can't be broken (single positive)
 		]
 	]
 		
