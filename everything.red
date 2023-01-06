@@ -84,6 +84,7 @@ do/expand [
 				#include %vid.red
 				#include %events.red
 				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
+				#include %source.red
 				#include %templates.red
 				#include %popups.red
 				#include %traversal.red
