@@ -364,6 +364,39 @@ set-after: function [
 	also get/any path set/any path :value 
 ]
 
+explode: function [										;@@ use split or map-each when fast
+	"Split string into a block of characters"
+	string [string!]
+][
+	parse string [collect keep pick to end]
+]
+
+delimit: function [
+	"Return copy of LIST with items separated by a DELIMITER"	;-- modifying version would be O(n^2) slow
+	list      [series!]
+	delimiter [any-type!]
+][
+	; if case [
+		; all [
+			; any-string? list
+			; any-string? :delimiter not tag? delimiter
+			; empty? delimiter
+		; ]
+		; all [
+			; any-block? list
+			; any-block? :delimiter
+			; empty? delimiter
+		; ]
+	; ] [return copy list]										;-- optimization
+	result: make list 2 * length? list					;-- hard to estimate delimiter size e.g. in block to string conversion :(
+	unless tail? list [									;@@ use map-each
+		append/only result :list/1
+		list: next list
+		forall list [append/only append result :delimiter :list/1]
+	]
+	result
+]
+
 ;@@ make a REP with this? (need use cases)
 ;@@ this is no good, because it treats paths as series
 native-swap: :system/words/swap
@@ -404,6 +437,7 @@ wrap: func [
 ]
 
 area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
+span?: func [xy [pair!]] [abs xy/y - xy/x]				;@@ or range? but range? tests for range! class
 
 skip?: func [series [series!]] [-1 + index? series]
 
@@ -1022,7 +1056,7 @@ context [
 	]
 	set 'new-rich-text does [make light-face! rtd-template]
 ]
-	
+
 ;@@ workaround for #5165! - remove me once it's fixed
 #if linux? [
 	native-caret-to-offset: :caret-to-offset
