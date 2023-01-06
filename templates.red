@@ -7,6 +7,7 @@ Red [
 ;-- requires `for` loop from auxi.red, layouts.red, export, `timers/on-rate-change` to enable it
 exports: [make-space declare-template space?]
 
+;@@ I need to move out the core functionality from here out, leave only templates
 
 space-object!: copy classy-object!
 
@@ -51,6 +52,10 @@ modify-class 'space [
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
 	sections: none	#type =? :invalidates [function! block! none!] 
+	measure: none	#type [function!] 
+	edit:    none	#type [function!] 
+	clone:   none	#type [function!] 
+	format:  none	#type [function!] 
 	on-invalidate: 	#type [function! none!]
 ]	
 
@@ -96,6 +101,24 @@ make-space: function [
 		if r/type = 'space [quietly r/type: class? r]
 	]
 	r
+]
+
+;; doesn't copy objects: font should be shared and child spaces can't be just copied like that ;@@ but /limits?
+;; used mainly for copy/paste functionality
+copied!: make typeset! [series! bitset! map!]
+clone-space: function [
+	"Make a space that is a copy of ORIGINAL, carrying data but not state"
+	original [object!] (space? original)
+	words    [block!] "Only these words are copied, rest is reset to defaults"
+][
+	clone: make-space original/type []
+	clone/size: original/size
+	clone/limits: if object? value: original/limits [copy value]	;-- the only object copied
+	foreach word words [
+		value: :original/:word							;-- no get/any or set-quiet by design, to maintain consistency via on-change
+		clone/:word: either find copied! type? :value [copy/deep :value][:value]
+	]
+	clone
 ]
 
 make-template: function [
@@ -189,6 +212,7 @@ context [
 		length: 0	#type [integer!]					;-- determines linebreak thickness (exposed for styling)
 		cache:  none
 		draw:   function [/on canvas [pair!]] [~/draw self canvas]
+		format: does [copy "^/"]
 	]		
 ]		
 
@@ -234,45 +258,53 @@ image-ctx: context [
 	~: self
 	
 	draw: function [image [object!] canvas: infxinf [pair! none!]] [
-		either image? image/data [
-			set [canvas: fill:] decode-canvas canvas
-			mrg2: 2 * mrg: image/margin * 1x1 
-			limits:        image/limits
-			isize:         image/data/size
-			;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
-			if all [limits  limits/min  low-lim:  max 0x0 limits/min - mrg2] [	;@@ REP #113 & 122
-				min-scale: max  low-lim/x / isize/x  low-lim/y / isize/y	;-- use bigger one to not let it go below low limit
+		mrg2: 2 * mrg: image/margin * 1x1 
+		switch type?/word image/data [
+			none! [
+				image/size: mrg2						;@@ can't be constrained further; or call constrain again?
+				[]
 			]
-			if all [limits  limits/max  high-lim: max 0x0 limits/max - mrg2] [	;@@ REP #113 & 122
-				max-scale: min  high-lim/x / isize/x  high-lim/y / isize/y	;-- use lower one to not let it go above high limit
+			block! [
+				set [canvas: fill:] decode-canvas canvas
+				image/size: constrain finite-canvas canvas image/limits
+				compose/only [translate (mrg) (image/data)]
 			]
-			if all [image/weight > 0  canvas <> infxinf] [		;-- if inf canvas, will be unscaled, otherwise uses finite dimension
-				set-pair [cx: cy:] subtract-canvas canvas mrg2
-				if cx = infxinf/x [cx: 1.#inf]
-				if cy = infxinf/x [cy: 1.#inf]
-				canvas-max-scale: min  cx / isize/x  cy / isize/y	;-- won't be bigger than the canvas
-				if fill/x <= 0 [cx: 1.#inf]						;-- don't stick to dimensions it's not supposed to fill
-				if fill/y <= 0 [cy: 1.#inf]  
-				canvas-scale: min  cx / isize/x  cy / isize/y	;-- optimal scale to fill the chosen canvas dimensions
-				canvas-scale: min canvas-scale canvas-max-scale
+			image! [
+				set [canvas: fill:] decode-canvas canvas
+				limits:        image/limits
+				isize:         image/data/size
+				;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
+				if all [limits  limits/min  low-lim:  max 0x0 limits/min - mrg2] [	;@@ REP #113 & 122
+					min-scale: max  low-lim/x / isize/x  low-lim/y / isize/y	;-- use bigger one to not let it go below low limit
+				]
+				if all [limits  limits/max  high-lim: max 0x0 limits/max - mrg2] [	;@@ REP #113 & 122
+					max-scale: min  high-lim/x / isize/x  high-lim/y / isize/y	;-- use lower one to not let it go above high limit
+				]
+				if all [image/weight > 0  canvas <> infxinf] [		;-- if inf canvas, will be unscaled, otherwise uses finite dimension
+					set-pair [cx: cy:] subtract-canvas canvas mrg2
+					if cx = infxinf/x [cx: 1.#inf]
+					if cy = infxinf/x [cy: 1.#inf]
+					canvas-max-scale: min  cx / isize/x  cy / isize/y	;-- won't be bigger than the canvas
+					if fill/x <= 0 [cx: 1.#inf]						;-- don't stick to dimensions it's not supposed to fill
+					if fill/y <= 0 [cy: 1.#inf]  
+					canvas-scale: min  cx / isize/x  cy / isize/y	;-- optimal scale to fill the chosen canvas dimensions
+					canvas-scale: min canvas-scale canvas-max-scale
+				]
+				default min-scale:    0.0
+				default max-scale:    1.#inf
+				default canvas-scale: 1.0
+				scale: clip canvas-scale min-scale max-scale 
+				; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
+				image/size: isize * scale + (2 * mrg)
+				reduce ['image image/data mrg image/size - mrg]
 			]
-			default min-scale:    0.0
-			default max-scale:    1.#inf
-			default canvas-scale: 1.0
-			scale: clip canvas-scale min-scale max-scale 
-			; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
-			image/size: isize * scale + (2 * mrg)
-			reduce ['image image/data mrg image/size - mrg]
-		][
-			image/size: 2x2 * image/margin				;@@ can't be constrained further; or call constrain again?
-			[]
 		]
 	]
 
 	declare-template 'image/space [
 		margin: 0
 		weight: 0
-		data:   none	#type =? :invalidates			;-- images are not recyclable, so `none` by default
+		data:   none	#type =? :invalidates [none! image! block!]		;-- images are not recyclable, so `none` by default
 		
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
@@ -326,6 +358,10 @@ cell-ctx: context [
 		drawn
 	]
 	
+	format: function [space [object!]] [
+		either all [space/content  in space/content 'format] [space/content/format][copy {}]	;@@ REP #113
+	]
+	
 	declare-template 'box/space [
 		;; margin is useful for drawing inner frame, which otherwise would be hidden by content
 		margin:  0
@@ -337,6 +373,7 @@ cell-ctx: context [
 		map:     []
 		cache:   [size map]
 		sections: does [~/get-sections self]
+		format:   does [~/format self]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
@@ -763,6 +800,19 @@ paragraph-ctx: context [
 		none
 	]
 	
+	;; can be styled but cannot be accessed (and in fact shared)
+	;; because there's a selection per every row - can be many in one rich-content
+	;@@ unify this with /clone and rich-content
+	selection-prototype: make-space 'rectangle [
+		type: 'selection
+		cache: none										;-- this way I can avoid cloning /cached facet
+	]
+	draw-box: function [xy1 [pair!] xy2 [pair!]] [
+		selection: copy selection-prototype
+		quietly selection/size: xy2 - xy1
+		compose/only [translate (xy1) (render selection)]		;@@ need to avoid allocation
+	]
+	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		if canvas [										;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
@@ -798,22 +848,126 @@ paragraph-ctx: context [
 		;; (and we can't stop it from updating)
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
-		compose [text (1x1 * space/margin) (layout)]
+		drawn: compose [text (1x1 * space/margin) (layout)]
+		
+		;; add caret if enabled
+		if all [caret: space/caret  not ellipsize?] [
+			box: space/measure [caret-to-box caret/offset caret/side]
+			quietly caret/size: box/2 - box/1 + (caret/width by 0)
+			invalidate/only caret
+			cdrawn: render caret
+			drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
+		]
+		;; add selection if enabled
+		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
+			boxes: space/measure [all-item-boxes sel/1 sel/2]
+			sdrawn: make [] 1.5 * length? boxes
+			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
+			drawn: compose/only [push (drawn) (sdrawn)]
+		]
+		drawn
+	]
+	
+	metrics: context [
+		measure: function [space [object!] plan [block!]] [
+			do with self plan
+		]
+		length: does with :measure [
+			;@@ space/text or space/layout/text here?
+			;@@ what isn't drawn doesn't exist and using space/text may lead to offsets > current /size
+			;@@ but space/layout/text is not where the edits take place and I want to be in sync with them
+			;@@ it also depends if 'length' can be a valid call before space is rendered or not
+			length? space/text
+		]
+		point-to-caret: function [xy [pair!]] with :measure [
+			caret: offset-to-caret space/layout xy
+			char:  offset-to-char  space/layout xy
+			side:  pick [left right] caret > char
+			compose [offset: (caret - 1) side: (side)]
+		]
+		;@@ maybe returned box should be the size of the char? to support overwrite mode eventually
+		caret-to-box:   function [offset [integer!] side [word!]] with :measure [
+			index: offset + pick [0 1] side = 'left
+			if any [
+				;; left caret at offset 0 doesn't exist, so switch to the right one:
+				index = 0
+				;; rich-text considers line feed char of zero width on the line that it terminates
+				;; so without this workaround the resulting box will be the same as for the previous char:
+				all [space/text/:index = #"^/" side = 'left]
+			][
+				side: 'right
+				index: index + 1
+			]
+			dy: 0x1 * rich-text/line-height? space/layout index
+			either side = 'left [
+				xy1: (xy2: caret-to-offset/lower space/layout index) - dy
+			][	xy2: (xy1: caret-to-offset       space/layout index) + dy
+			]
+			; ?? [offset side index xy1 xy2]
+			reduce [xy1 xy2]
+		]
+		all-item-boxes: function [start [integer!] end [integer!]] with :measure [
+			if start > end [swap 'start 'end]
+			if start = end [return copy []]
+			watch [start end]
+			boxes: clear []
+			xy1: caret-to-offset       space/layout start + 1
+			xy2: caret-to-offset/lower space/layout start + 1
+			for i start + 2 end [
+				xy1': caret-to-offset       space/layout i
+				xy2': caret-to-offset/lower space/layout i
+				either all [							;@@ should grouping be optional?
+					xy1'/x = xy2/x
+					xy1'/y = xy1/y
+					xy2'/y = xy2/y
+				][
+					xy2/x: xy2'/x
+				][
+					repend boxes [xy1 xy2]
+					xy1: xy1' xy2: xy2'
+				]
+				; repend boxes [
+					; caret-to-offset       space/layout i
+					; caret-to-offset/lower space/layout i
+				; ]
+			]
+			repend boxes [xy1 xy2]
+			copy boxes
+		]
+	]
+	
+	declare-template 'caret/rectangle [
+		cache:  none
+		;; size should be set by parent's /draw as (width x line-height)
+		size:   1x10
+		width:  1		#type =? :invalidates [integer!]
+		;; offset and side do not affect the caret itself, but serve for it's location descriptors within the parent
+		offset: 0		#type =? :invalidates [integer!]
+		side:  'left	#type =  :invalidates [word!] (find/case [left right] side)
 	]
 	
  	declare-template 'text/space [
 		text:   ""		#type    :invalidates [any-string!]	;-- every assignment counts as space doesn't know if string itself changed
-		flags:  []		#type    :invalidates [block!]	;-- [bold italic underline wrap] supported ;@@ typecheck that all flags are words
+		flags:  []		#type    :invalidates [block!]	;-- [bold italic underline strike wrap] supported ;@@ typecheck that all flags are words
 		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
 		;; styles may override `/font` with another font created in advance 
 		font:   none									;-- can be set in style, as well as margin
 		color:  none									;-- placeholder for user to control
 		margin: 0
 		weight: 0										;-- no point in stretching single-line text as it won't change
+		
+		;; caret disabled by default, can be set to a caret space
+		caret:  none	#type    :invalidates [object! (space? caret) none!]	
 
 		sections: does [~/get-sections self]
+		measure:  func [plan [block!]] [~/metrics/measure self plan]
+		selected: none	#type =? :invalidates [pair! none!]
+		
+		clone:    does [clone-space self [text flags color margin weight font]]
+		format:   does [copy text]
+		
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
-		quietly cache:  [size layout]
+		quietly cache: [size layout]
 		quietly draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 
@@ -828,6 +982,7 @@ paragraph-ctx: context [
 		quietly flags: [wrap underline]
 		quietly color: 50.80.255						;@@ color should be taken from the OS theme
 		command: [browse as url! text]					;-- can't use 'quietly' or no set-word = no facet
+		clone: does [clone-space self [text flags color margin weight font command]]
 	]
 ]
 
@@ -876,6 +1031,19 @@ container-ctx: context [
 		cont/origin: origin
 		compose/only [translate (negate origin) (drawn)]
 	]
+	
+	format-items: function [space [object!]] [
+		list: map-each i space/items/size [				;-- copy what is visible (items), not what is present (content)
+			item: space/items/pick i
+			when select item 'format (item/format)		;-- omit items that cannot be formatted
+		]
+	]
+	
+	format: function [space [object!] separator [string!]] [
+		list: format-items space
+		unless empty? separator [list: delimit list separator]
+		to {} list
+	]
 
 	declare-template 'container/space [
 		origin:  0x0									;-- used by ring layout to center itself around the pointer
@@ -890,6 +1058,8 @@ container-ctx: context [
 		into: func [xy [pair!] /force child [object! none!]] [
 			into-map map xy + origin child
 		]
+		
+		format: does [~/format self "^-"]
 
 		draw: function [
 			; /on canvas [pair! none!]					;-- not used: layout gets it in settings instead
@@ -928,6 +1098,15 @@ list-ctx: context [
 			sections									;-- optimize lists that can't be broken (single positive)
 		]
 	]
+
+	clone: function [space [object!]] [		
+		clone: clone-space space [axis margin spacing]	;-- no /origin since that is state
+		foreach item space/content [
+			;@@ is it ok to skip non cloneable items silently?
+			if select item 'clone [append clone/content item/clone]
+		]
+		clone
+	]
 		
 	declare-template 'list/container [
 		size:    0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
@@ -937,6 +1116,8 @@ list-ctx: context [
 		spacing: 0
 		;@@ TODO: alignment?
 
+		clone:    does [~/clone self]
+		format:   does [container-ctx/format self select [x "^-" y "^/"] axis]
 		sections: does [~/get-sections self]
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair!]] [
@@ -990,6 +1171,13 @@ icon-ctx: context [
 tube-ctx: context [
 	~: self
 
+	format: function [space [object!]] [
+		list: container-ctx/format-items space
+		if find [n w ↑ ←] space/axes/1 [list: reverse list]
+		list: delimit list either find [e w → ←] space/axes/1 ["^-"]["^/"]
+		to {} list
+	]
+
 	declare-template 'tube/container [
 		margin:  0
 		spacing: 0
@@ -999,6 +1187,8 @@ tube-ctx: context [
 							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
 							[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
 						] axes)
+		
+		format:   does [~/format self]
 		
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair!]] [
@@ -1020,7 +1210,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		settings: with space [margin spacing align baseline canvas limits]
+		settings: with space [margin spacing align baseline canvas limits indent]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:  map
@@ -1037,10 +1227,12 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		;; as wrapping margin doesn't have to align with total width
 		;; e.g. row may be visibly smaller than canvas but contain "hidden" parts duped on another row
 		scaled-row: [
-			translate (row-offset * 0x1 + mrg) [
+			translate (row-offset + clip-start + mrg) [
 				scale (row-scale) 1.0
-				translate (clip-start * -1x0)
-				clip 0x0 (clip-end + 1x0) (copy row-drawn)		;@@ I'm adding +1x0 otherwise italic text gets clipped a bit
+				clip 0x0 (clip-end - clip-start + 1x0) [		;@@ I'm adding +1x0 otherwise italic text gets clipped a bit - REP #136
+					translate (clip-start * -1x0)
+					(copy row-drawn)
+				]
 			]
 		]
 		normal-row: [
@@ -1129,10 +1321,12 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		align:       'left	#type = [word!] :invalidates-look				;-- horizontal alignment
 		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
 		weight:      1									;-- non-zero default so tube can stretch it
+		indent:      none	#type = [block! none!] :invalidates	;-- indent of the paragraph: [first: integer! rest: integer!]
 		
 		frame:       []		#type  [block!]				;-- internal frame data used by /into
 		cache:       [size map frame]
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
+		format: does [container-ctx/format self ""]
 		
 		;; container-draw is not used due to tricky geometry
 		draw: function [/on canvas [pair!]] [~/draw self canvas]
@@ -1145,7 +1339,6 @@ rich-content-ctx: context [												;-- rich content
 	
 	;@@ will need source editing facilities too
 	
-	
 	;@@ these functions below are tightly tied to row format - not something I like
 	;@@ but abstraction seems to only increase the code so far, or I haven't found a good abstraction yet
 	;@@ plus, I need /draw to be fast, which limits me (but these funcs can be slow, as they're for events mostly)
@@ -1155,8 +1348,8 @@ rich-content-ctx: context [												;-- rich content
 	locate-point: function [space [object!] xy [pair!]] [
 		if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
 			child:  row/1
-			#assert [find/same space/ranges/spaces child]
-			crange: pick find/same space/ranges/spaces child -1
+			#assert [find/same space/decoded/ranges child]
+			crange: pick find/same space/decoded/ranges child -1
 			either crange/1 + 1 = crange/2 [
 				index: crange/2
 				caret: pick crange child-xy/x < (child/size/x / 2)
@@ -1174,11 +1367,11 @@ rich-content-ctx: context [												;-- rich content
 	
 	caret-to-row: function [space [object!] caret [integer!] (caret >= 0) side [word!] (find [left right] side)] [
 		if empty? space/frame/rows [return none]
-		caret: caret + pick [0.5 -0.5] side = 'right
+		caret: caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
 		row-ranges: fill-row-ranges space
 		row: 1
 		foreach [irow range] row-ranges [
-			if caret < range/1 [if side = 'left [break]]
+			if caret < range/1 [if side = 'right [break]]		;-- this improves UX when crossing over 'break'
 			row: irow
 			if caret < range/2 [break]
 		]
@@ -1195,6 +1388,7 @@ rich-content-ctx: context [												;-- rich content
 		reduce [xy1 xy2]
 	]
 	
+	;@@ height returned should be not that of the row, but that of the highest adjacent item!!!
 	caret-to-box: function [space [object!] caret [integer!] side [word!] (find [left right] side)] [
 		mrg: space/margin * 1x1
 		;@@ if no rows - no row heights - no caret height, so what to return? margin + 0x0-0x0?
@@ -1203,10 +1397,10 @@ rich-content-ctx: context [												;-- rich content
 		set [row-offset: row-scale: clip-start: clip-end: row:] prow
 		
 		#assert [not empty? row]
-		caret': caret + pick [0.5 -0.5] side = 'right
+		caret': caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
 		pitem: row
 		for-each [p: item item-offset _] row [
-			range: pick find/same space/ranges/spaces item -1	;@@ maybe reorder these ranges for select usage
+			range: pick find/same space/decoded/ranges item -1	;@@ maybe reorder these ranges for select usage
 			if caret' < range/1 [if side = 'left [break]]		;@@ can't use return in for-each :(
 			pitem: p
 			if caret' < range/2 [break]
@@ -1220,9 +1414,13 @@ rich-content-ctx: context [												;-- rich content
 			'within [item-offset/x + first caret-to-offset item/layout (caret - range/1 + 1)]
 		]
 		xy1: mrg + row-offset + xscale x by 0 row-scale
+		xy1/x: clip xy1/x mrg/x space/size/x - mrg/x			;-- contain caret within the paragraph (trailing spaces)
 		xy2: xy1 + (0 by clip-end/y)
+		; ?? [x caret range xy1 xy2 clip-start clip-end]
 		reduce [xy1 xy2]
 	]
+	
+	non-white!: negate charset " ^-^/^M"
 	
 	;@@ should these be cached? they depend on canvas, can't be put into space/ranges
 	fill-row-ranges: function [space [object!]] [
@@ -1241,7 +1439,7 @@ rich-content-ctx: context [												;-- rich content
 				item-offset/x <= clip-start/x
 				clip-start/x < (item-offset/x + item/size/x)
 			]
-			item-range: pick find/same space/ranges/spaces item -1
+			item-range: pick find/same space/decoded/ranges item -1
 			either item-range/2 - item-range/1 <= 1 [
 				;@@ I don't do this, but user could provide breakpoints for a custom space so it gets split
 				;@@ in this case I guess I should just consider the whole space a separator and not include it in the ranges
@@ -1259,12 +1457,18 @@ rich-content-ctx: context [												;-- rich content
 				item-offset/x <= clip-end/x
 				clip-end/x <= (item-offset/x + item/size/x)
 			]
-			item-range: pick find/same space/ranges/spaces item -1
+			item-range: pick find/same space/decoded/ranges item -1
 			either item-range/2 - item-range/1 <= 1 [	;@@ same concern here as above
 				caret-right: item-range/2
 			][
+				text:  item/layout/text
 				clipx: clip-end/x - item-offset/x
-				caret-right: item-range/1 - 1 + offset-to-caret item/layout clipx by 0
+				index: offset-to-caret item/layout clipx by 0
+				index: index? any [
+					find at text index non-white!
+					tail text
+				]
+				caret-right: item-range/1 - 1 + index
 			]
 			
 			repend ranges [irow  caret-left by caret-right]
@@ -1272,6 +1476,30 @@ rich-content-ctx: context [												;-- rich content
 		copy ranges
 	]
 	
+	metrics: context [
+		measure: function [space [object!] plan [block!]] [
+			do with self plan
+		]
+		length: function [/local s] with :measure [
+			;@@ measure source or content? should be in sync but what is faster?
+			;@@ or cache it once source is processed and return? what if invalidated?
+			len: 0
+			parse space/source [any [
+				set-word! skip | word! | refinement!
+			|	set s string! (len: len + length? s)
+			|	[char! | object!] (len: len + 1)
+			]]
+			len
+		]
+		point-to-caret: function [xy [pair!]] with :measure [
+			set [_: _: index: offset:] ~/locate-point space xy
+			side: pick [right left] offset < index
+			compose [offset: (offset) side: (side)]
+		]
+		caret-to-box: function [offset [integer!] side [word!]] with :measure [
+			~/caret-to-box space offset side
+		]
+	]
 	
 	;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
 	linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
@@ -1280,177 +1508,17 @@ rich-content-ctx: context [												;-- rich content
 	
 	;@@ should source support image! in it's content? url! ? anything else?
 	on-source-change: function [
-		space [object!] word [word!] new-source [block!]
+		space [object!] word [word!] source [block!]
 		/local range attr value char string obj2
 	][
-		if unset? :space/ranges [exit]					;-- not initialized yet
-		clear att-ranges: space/ranges/attributes
-		clear spc-ranges: space/ranges/spaces
-		clear content:    space/content
-		buffer: clear ""
-		offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
-		start: clear #()								;-- offset of each attr's opening
-		attrs: clear #()								;-- last value of each attribute
-		get-range-blueprint: [
-			switch/default attr [						;-- transforms attributes into RTD low-level format
-				bold italic underline strike [[pair attr]]
-				color size font command [[pair attrs/:attr]]
-				backdrop [[pair 'backdrop attrs/backdrop]]
-			][ [] ]
-		]
-		flush: [
-			if 0 < text-len: length? buffer [
-				text-ofs: offset - text-len				;-- offset of the buffer
-				command: none
-				flags: clear []
-				parse att-ranges [collect after flags any [	;-- add closed ranges if they intersect with text
-					set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
-					[
-						set command block!						;-- command is RTD dialect extension
-					|	keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
-						keep to [pair! | end]
-					]
-				|	skip to pair!
-				]]
-				; ?? [offset text-ofs buffer att-ranges flags start]
-				main-attr: attr
-				foreach [attr attr-ofs] start [			;-- add all open ranges
-					attr: to word! attr
-					if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
-					either attr = 'command [
-						command: attrs/command
-					][									;-- rest goes into the /flags facet
-						flag-ofs: attr-ofs - text-ofs
-						pair: as-pair
-							1 + max 0 flag-ofs
-							max 0 text-len - flag-ofs
-						repend flags do get-range-blueprint
-					]
-					; ?? [attr pair flags]
-				]
-				
-				;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
-				;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
-				;@@ only benchmark can tell when splitting should occur
-				append content obj: make text-prototype [
-					quietly cached: clone text-prototype/cached cached
-				]
-				quietly obj/text:  copy buffer
-				quietly obj/flags: copy flags
-				repend spc-ranges [text-ofs by offset obj]
-				; ?? obj
-				clear buffer
-				
-				?? [offset main-attr command-group]
-				if main-attr = 'command [				;-- group multiple spaces into a clickable/hlist
-					unless empty? command-group [
-						clear back find/same spc-ranges first command-group		;-- remove ranges for subitems
-						;; collapse all ranges
-						;@@ this whole func needs a lot of refactoring, what a mess
-						?? offset
-						offset: command-offset + 1
-						range-limit: command-offset by offset
-						?? offset
-						?? att-ranges
-						?? start
-						forall att-ranges [				;@@ use map-each
-							att-ranges/1: min att-ranges/1 range-limit
-							att-ranges: next att-ranges
-						]
-						foreach [attr attr-ofs] start [
-							start/:attr: min attr-ofs command-offset
-						] 
-						?? att-ranges
-						?? start
-						
-						obj: make-space 'clickable [
-							content: make-space 'list [
-								quietly axis:   'x
-								quietly margin: 0x0
-							]
-						]
-						quietly obj/content/spacing: space/spacing
-						quietly obj/content/content: copy command-group
-						quietly obj/command: command
-						insert clear command-group obj
-						
-						repend spc-ranges [range-limit obj]
-					]
-					command-group: unless main-attr == /command [tail content]	;-- offset in content (unlike `start`)
-					command-offset: offset
-				]
-				attr: main-attr
-			]
-		]
-		commit-attr: [
-			attr: to word! attr							;-- convert /ref & set-word: to words
-			if start/:attr [
-				pair: start/:attr by offset
-				if pair/2 > pair/1 [repend att-ranges do get-range-blueprint]
-			]
-		]
-		=open-flag=:  [(unless start/:attr [start/:attr: offset  attrs/:attr: on])]
-		=open-attr=:  [(do commit-attr  start/:attr: offset  attrs/:attr: value)]
-		=close-attr=: [(do commit-attr  remove/key start attr  attrs/:attr: off)]
-		=color=: [
-			set value word! (value: get value #assert [tuple? value])
-		|	set value #expect tuple!
-		]
-		
-		parse/case new-source [any [
-			ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
-		|	ahead refinement! set attr [						;-- first closing closes the attribute
-				/bold | /italic | /underline | /strike
-			|	/color | /backdrop | /size | /font | /command
-			] (if attr = 'command flush) =close-attr=
-		|	ahead set-word! [
-				set attr quote color:    =color= =open-attr=
-			|	set attr quote backdrop: =color= =open-attr=
-				;; font and size split the result because otherwise a single big letter will make all rows distant
-			|	set attr quote size:     set value #expect integer! =open-attr= (do flush)
-			|	set attr quote font:     set value #expect string!  =open-attr= (do flush)
-				;; command splits it because only single command per space is supported
-			|	set attr quote command:  set value #expect block!   =open-attr= (do flush)
-			]
-		|	set string string! (
-				chunks: next split string #"^/"
-				append buffer chunks/-1
-				offset: offset + length? chunks/-1
-				forall chunks [							;@@ use for-each
-					do flush
-					append content obj2: copy linebreak-prototype
-					repend spc-ranges [offset + 0x1 obj2]
-					append buffer chunks/1
-					offset: offset + 1 + length? chunks/1
-				]
-			)
-		|	set char char! (
-				either char = #"^/" [
-					do flush
-					append content obj2: copy linebreak-prototype
-					repend spc-ranges [offset + 0x1 obj2]
-				][
-					append buffer char
-				]
-				offset: offset + 1
-			)
-		; |	paren! reserved
-		; |	block! TODO grouping
-		|	set obj2 object! (							;-- flush will override 'obj', so 'obj2' here
-				do flush
-				#assert [space? obj2]
-				obj2: space/apply-attributes obj2 attrs
-				#assert [space? obj2  "apply-attributes must return the space object!"]
-				append content obj2
-				repend spc-ranges [offset + 0x1 obj2]
-				offset: offset + 1
-			)
-		|	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
-		] end]
-		do flush										;-- commit last string
-		; ?? content ?? ranges		
-		
-		invalidate space
+		if unset? :space/decoded [exit]					;-- not initialized yet
+		set [items: attrs:] rich/source/deserialize source
+		space/decoded/items: items						;@@ use multiset here
+		space/decoded/attrs: attrs
+		set [content: ranges:] rich/source/to-spaces items attrs
+		space/decoded/ranges: ranges
+		space/content: content
+		; invalidate space
 	]
 	
 	;; can be styled but cannot be accessed (and in fact shared)
@@ -1467,13 +1535,17 @@ rich-content-ctx: context [												;-- rich content
 	]
 	
 	draw-selection: function [space [object!]] [
-		unless sel: space/selected [return []]
+		if any [
+			not sel: space/selected
+			empty? space/decoded/items
+		] [return []]
 		if sel/1 > sel/2 [sel: reverse sel]
 		;@@ this calls fill-row-ranges so many times that it must be super slow
-		lrow: caret-to-row space sel/1 'left
-		rrow: caret-to-row space sel/2 'right
+		lrow: caret-to-row space sel/1 'left  1
+		rrow: caret-to-row space sel/2 'right 1
 		set [lcar1: lcar2:] caret-to-box space sel/1 'left
 		set [rcar1: rcar2:] caret-to-box space sel/2 'right
+		; ?? [sel lrow rrow lcar1 lcar2 rcar1 rcar2]
 		#assert [lrow <= rrow]
 		either lrow = rrow [
 			draw-box lcar1 rcar2
@@ -1493,49 +1565,127 @@ rich-content-ctx: context [												;-- rich content
 		]
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- adds selection only
+	draw-caret: function [space [object!]] [
+		unless caret: space/caret [return []]
+		box: space/measure [caret-to-box caret/offset caret/side]
+		quietly caret/size: box/2 - box/1 + (caret/width by 0)
+		invalidate/only caret
+		drawn: render caret
+		compose/only [translate (box/1) (drawn)]
+	]
+		
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- adds selection and caret
 		drawn: space/rich-paragraph-draw/on canvas
-		either space/selected [
+		if space/selected [
 			sdrawn: draw-selection space
-			reduce [sdrawn drawn]
-		][
-			drawn
+			drawn: reduce [sdrawn drawn]
+		]
+		if space/caret [
+			cdrawn: draw-caret space
+			drawn: reduce ['push drawn cdrawn]
 		] 
+		drawn
+	]
+	
+	clone: function [space [object!]] [		
+		clone: clone-space space [margin spacing align baseline weight color font indent]
+		;; clone objects in the /source, /content will be regenerated automatically:
+		clone/source: map-each [item [object!]] space/source [
+			when select item 'clone (item/clone)
+		]
+		clone
+	]
+		
+	;@@ can this be unified with metrics?
+	edit: context [
+		edit: function [target [object!] plan [block!] /local changed?] [
+			also do with self plan
+				if changed? [							;-- regens content & decoded
+					target/source: rich/source/serialize target/decoded/items target/decoded/attrs
+				]
+		]
+		copy: remove: insert: none
+	]
+	edit/copy: function [range [pair!] /keep /text] with :edit/edit [
+		if range/2 < range/1 [range: reverse range]
+		range: clip range 0 length? target/decoded/items		;@@ workaround for #5263 here as well
+		attrs: rich/attributes/copy target/decoded/attrs range
+		items: copy/part target/decoded/items range + 1
+		if keep [
+			target/decoded/attrs: attrs
+			target/decoded/items: items
+			set 'changed? yes
+		]
+		either text [
+			to string! map-each/drop item items [
+				case [
+					char? :item [item]
+					all [space? :item  select item 'edit] [
+						item/edit [copy/text]
+					]
+					'else [continue]
+				]
+			]
+		][
+			reduce [items attrs]
+		]
+	]
+	edit/remove: function [range [pair!]] with :edit/edit [
+		if range/2 < range/1 [range: reverse range]
+		range: clip range 0 length? target/decoded/items
+		target/decoded/attrs: rich/attributes/remove target/decoded/attrs range
+		remove/part (skip target/decoded/items range/1) (range/2 - range/1)
+		set 'changed? yes
+	]
+	edit/insert: function [
+		offset [integer!]
+		items [object! (space? items) string! block!]
+		/with attrs: #() [map!]
+	] with :edit/edit [
+		offset: clip offset 0 length? target/decoded/items
+		case [
+			object? items [
+				attrs: items/decoded/attrs
+				items: items/decoded/items
+			]
+			string? items [items: explode items]
+		]
+		range: offset + (0x1 * length? items)
+		target/decoded/attrs: rich/attributes/insert target/decoded/attrs range attrs
+		insert skip target/decoded/items offset items
+		; ?? offset ?? items ?? target/decoded/items
+		set 'changed? yes
 	]
 	
 		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
 		;; data flow: source -> breakpoints & (content -> items) -> make-layout
-		source:      []				#type [block!] :on-source-change	;-- holds high-level dialected data
-		color:       none												;-- color & font are accounted for in style
+		source:      []		#type [block!] :on-source-change			;-- holds high-level dialected data
+		color:       none												;-- color & font defaults are accounted for in style
 		font:        none
 		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)
 		
+		;; caret disabled by default, can be set to a caret space
+		caret:       none	#type [object! (space? caret) none!] :invalidates	
+		
 		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
+		;@@ need to think more on this one
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		point-to-caret: func [
-			"Get caret offset closest to the given point"
-			xy [pair!]
-		][
-			~/xy-to-caret self xy
-		] #type [function!]
+		;@@ measure [length] can just use decoded/items now
+		measure: func [plan [block!]] [~/metrics/measure self plan]		#type [function!]
+		edit:    func [plan [block!]] [~/edit/edit       self plan]		#type [function!]
+		clone: does [~/clone self]
 		
-		caret-to-box: function [
-			"Get [xy1 xy2] thin box coordinates of caret at given offset"
-			offset [integer!]
-			side [word!] "One of: [left right] - matters if row is split at this offset" (find [left right] side) 
-		][
-			~/caret-to-box self offset side
-		] #type [function!]
-		
-		;@@ should any other funcs be exported? caret-to-row, row-to-box?
-		;@@ also cross-paragraph selection may need to know max caret offset for each one
-		
-		ranges: context [								;-- internal range data, generated on source change
-			attributes: []
-			spaces:     []
+		decoded: context [								;-- internal data, generated on source change
+			;; items is the list of all things caret can skip: chars and spaces
+			items:  []
+			;; attrs describes attribute mapping onto items: #(name [value mask ...] ...) 
+			attrs:  #()									;-- okay to have literal map (that's not copied) - will be overridden
+			;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
+			;; so caret can skip the single ones but dive into the created ones
+			ranges: []
 		] #type [object!]
 		
 		rich-paragraph-draw: :draw	#type [function!]
@@ -1632,10 +1782,18 @@ data-view-ctx: context [
 	~: self
 
 	push-font: function [space [object!]] [
-		if space/content [
-			if all [in space/content 'font  not space/content/font =? space/font] [
-				space/content/font: space/font					;-- should trigger invalidation
-			]
+		all [
+			space/content
+			in space/content 'font
+			maybe/same space/content/font: space/font	;-- should trigger invalidation when changed
+		]
+	]
+	
+	push-flags: function [space [object!]] [
+		all [
+			space/content
+			in space/content 'flags
+			maybe space/content/flags: space/flags		;-- should trigger invalidation when changed
 		]
 	]
 	
@@ -1656,6 +1814,9 @@ data-view-ctx: context [
 		;; font can be set in style, unfortunately required here to override font of rich-text face
 		;; (because font for rich-text layout cannot be set with a draw command - we need to measure size)
 		font: none	#on-change [space word value] [push-font space]
+		
+		;; used by button to expose text styles
+		flags: []	#on-change [space word value] [push-flags space]
 		
 		wrap?: off	#type =? [logic!]							;-- controls choice between text (off) and paragraph (on)
 		#on-change [space word value] [
@@ -2748,6 +2909,19 @@ grid-ctx: context [
 		]
 	]
 	
+	format: function [grid [object!]] [
+		if grid/infinite? [return copy {}]
+		bounds: grid/cells/size
+		rows: map-each/only irow bounds/y [
+			cells: map-each/only icol bounds/x [		;-- /only so even empty cells are separated by tabs
+				cell: grid/cells/pick icol by irow
+				when all [cell in cell 'format] (cell/format)
+			]
+			delimit cells "^-"
+		]
+		to {} delimit rows "^/"
+	]
+	
 	;@@ add simple proportional algorithm?
 	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
 	
@@ -2810,6 +2984,8 @@ grid-ctx: context [
 		;@@ so when and how to invalidate ccache? makes most sense on content change and when it gets out of the viewport
 		; cache: [size map hcache fitcache size-cache]
 		cache: []
+		
+		format: does [~/format self]
 
 		wrap-space: function [xy [pair!] space [object! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			unless cell: frame/cells/:xy [
@@ -3040,7 +3216,8 @@ button-ctx: context [
 		]
 		;@@ should command be also a function (actor)? if so, where to take event info from?
 	]
-	
+
+	;; main point of this being separate from button is to keep it not focusable (and so without a focus frame)
 	declare-template 'data-clickable/data-view [		;@@ any better name?
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
@@ -3058,6 +3235,7 @@ button-ctx: context [
 		weight:   0										;-- button should not be stretched by tubes
 		margin:   10x5
 		rounding: 5	#type [integer!] (rounding >= 0)	;-- box rounding radius in px
+		; edge:     on	#type =? [logic!]				;-- enables border decor ;@@ more edge styles?
 	]
 ]
 
@@ -3131,24 +3309,26 @@ declare-template 'rotor/space [
 ]
 
 
-caret-ctx: context [
-	~: self
+;@@ need to unify this with the generic caret!
+;@@ maybe name it field-caret and set /type to 'caret
+; caret-ctx: context [
+	; ~: self
 	
-	declare-template 'caret/rectangle [					;-- caret has to be a separate space so it can be styled
-		visible?:    no		#type =? :invalidates-look [logic!]	;-- controlled by focus
-		look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
+	; declare-template 'caret/rectangle [					;-- caret has to be a separate space so it can be styled
+		; visible?:    no		#type =? :invalidates-look [logic!]	;-- controlled by focus
+		; look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
 		
-		width:       1		#type =? [integer!] (width > 0)		;-- width in pixels
-			#on-change [space word value] [space/size: value by space/size/y]
+		; width:       1		#type =? [integer!] (width > 0)		;-- width in pixels
+			; #on-change [space word value] [space/size: value by space/size/y]
 			
-		;; [0..length] should be kept even when not focused, so tabbing in leaves us where we were
-		offset:      0		#type =? [integer!] (offset >= 0)
-			#on-change [space word value] [if space/visible? [invalidate space]]
+		; ;; [0..length] should be kept even when not focused, so tabbing in leaves us where we were
+		; offset:      0		#type =? [integer!] (offset >= 0)
+			; #on-change [space word value] [if space/visible? [invalidate space]]
 		
-		rectangle-draw: :draw	#type [function!]
-		draw: does [when visible? (rectangle-draw)]
-	]
-]
+		; rectangle-draw: :draw	#type [function!]
+		; draw: does [when visible? (rectangle-draw)]
+	; ]
+; ]
 
 ;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go (margin can also become a kind of frame)
 ;@@ if embedded, map composition should be a reverse of hittest: if something is drawn first then it's at the bottom of z-order
@@ -3393,7 +3573,7 @@ field-ctx: context [
 		
 		;; these mirror spaces/text facets:
 		margin: 0					#type =? :on-change	;-- default = no margin
-		flags:  []					#type    :on-change	;-- [bold italic underline] supported ;@@ TODO: check for absence of `wrap`
+		flags:  []					#type    :on-change	;-- [bold italic underline strike] supported ;@@ TODO: check for absence of `wrap`
 		text:   spaces/text/text	#type    :on-change
 		font:   spaces/text/font	#type =? :on-change
 		color:  none				#type =? :on-change	;-- placeholder for user to control
