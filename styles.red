@@ -143,11 +143,11 @@ do with context [
 			margin: 3x3									;-- better default when having a frame (and frame comes from style, not template)
 			below: [(make-box size 1 select self 'color none)]
 		]
-		field/caret: [
+		caret: [
 			; [pen off fill-pen !(contrast-with svmc/panel)]
 			below: [pen off fill-pen !(svmc/text)]
 		]
-		field/selection: rich-content/selection: [
+		selection: [
 			; below: [pen (checkered-pen) fill-pen !(opaque 'text 30%)]
 			below: [pen off fill-pen !(opaque 'text 30%)]
 			;@@ workaround for #5133 needed by workaround for #4901: clipping makes fill-pen black
@@ -213,6 +213,9 @@ do with context [
 		label/text-box/body/text:    [font: fonts/label  ]
 		label/text-box/body/comment: [font: fonts/comment]
 
+		clickable: data-clickable: [
+			below: when select self 'color [(make-box size 0 'off color)]
+		]
 		button: using [fill overlay focus? inner-radius] [
 			fill:    either pushed? [opaque 'text 50%]['off]
 			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
@@ -270,7 +273,10 @@ do with context [
 			/?	pen @(color)		/if color
 			]
 		]
-		
+		rich-content/text: rich-content/paragraph: [	;-- these override font with their own, so [font] draw command isn't enough
+			default font: any [parent/font fonts/text]
+			below: when select self 'color [pen (color)]
+		]
 		;@@ scrollbars should prefer host color
 	]
 ]
