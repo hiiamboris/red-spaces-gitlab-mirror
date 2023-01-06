@@ -21,8 +21,9 @@ capital: draw bgnd compose [
 
 source: does [compose [
 	(make-space 'image [data: capital])
-	font: (svf/serif) size: 20 {o} size: 17 {r} size: 15 {e} size: 14 {m} size: 11
+	font: (svf/serif) size: 20 {o} size: 17 {r} size: 15 {e} size: 13 {m} size: 9
 	{ ipsum dolor sit amet, consectetur adipiscing elit, }
+	command: [print "test"] "♥ command " bold "test" /bold " ♥ " /command
 	italic {sed do eiusmod tempor incididunt ut labore et dolore magna } underline {aliqua.} /underline
 	{ Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.}
 	{ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.}
@@ -33,14 +34,15 @@ view/no-wait/options/flags [
 	below
 	b: host 500x500 [
 		style rich-content2: rich-content source= source
+		style cell2: cell margin= 3
 		row tight [
 			column tight weight= 1 [
-				cell left   [rich-content2 align= 'left]
-				cell center [rich-content2 align= 'center]
+				cell2 left   [rich-content2 align= 'left]
+				cell2 center [rich-content2 align= 'center]
 			]
 			column tight weight= 1 [
-				cell left   [rich-content2 align= 'fill]
-				cell right  [rich-content2 align= 'right]
+				cell2 left   [rich-content2 align= 'fill]
+				cell2 right  [rich-content2 align= 'right]
 			]
 		]
 	] react [
