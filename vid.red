@@ -41,6 +41,7 @@ VID: context [
 			bold      [flags: append flags 'bold]
 			italic    [flags: append flags 'italic]
 			underline [flags: append flags 'underline]
+			strike    [flags: append flags 'strike]
 			ellipsize [flags: append flags 'ellipsize]
 			; wrap      [flags: append flags 'wrap]		;-- no wrap flag by design, choose text vs paragraph instead 
 		]]
@@ -100,7 +101,8 @@ VID: context [
 			paragraph [template: paragraph facets: [string! text #font-styles]]
 			text   [template: text   facets: [string! text #font-styles]]
 			link   [template: link   facets: [string! text url! text block! command]]
-			button [template: button facets: [string! data image! data block! command] spec: [limits: 40 .. none]]
+			button [template: button facets: [string! data image! data block! command #font-styles] spec: [limits: 40 .. none]]
+			data-clickable [template: data-clickable facets: [string! data image! data block! command #font-styles] spec: [limits: 40 .. none]]
 			field  [
 				template: field
 				facets: [string! text #font-styles]
@@ -489,10 +491,7 @@ VID: context [
 			(repend def/facets ['color x])
 		]
 		
-		=pane=:       [set b block! (
-			if def/styling? [ERROR "Panes are not supported in style definitions yet"]
-			def/pane: b
-		)]
+		=pane=:       [set b block! (def/pane: b)]
 		
 		=size=:       [
 			[	ahead [skip ahead word! '.. skip]
