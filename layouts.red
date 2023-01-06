@@ -391,6 +391,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
 		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
 		;;   limits        [none! object!]
+		;;   indent        [none! block!]   [first: integer! rest: integer!], first and rest are independent of each other 
 		create: function [
 			"Build a paragraph layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
@@ -412,11 +413,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
 				canvas   [none! pair!]
 				limits   [object! (range? limits) none!]
+				indent   [block! (valid-indent? indent) none!]
 			]]
 			default align:    'left
 			default baseline: 80%
 			default canvas:   infxinf					;-- none to pair normalization
 			set [|canvas|: fill:] decode-canvas canvas
+			default indent:   []
+			indent1: any [indent/first 0]
+			indent2: any [indent/rest  0]
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
 			info: obtain block! count * 2
@@ -445,9 +450,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
 			#leaving [foreach [_ _ _ _ row] rows [stash row]  stash rows]
 			
-			allowed-row-width: ccanvas/x				;-- how wide rows to allow (splitting margin)
+			allowed-row-width: max 0 ccanvas/x			;-- how wide rows to allow (splitting margin)
 			total-length: total-width: 0				;-- total final extent of non-empty area
-			row-hidden: row-visible: row-width: row-height: 0	;-- per-row counters
+			row-width: row-hidden: row-visible: row-height: 0	;-- per-row counters
+			row-indent: indent1
 			
 			;; next part relies on other functions from the context:
 			foreach [space: drawn:] info [				;@@ use for-each
@@ -455,8 +461,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				either sections [
 					offset: 0
 					foreach width sections [
-						either width > 0 [
-							commit-part space drawn offset offset + width
+						either any [width > 0 offset = 0] [		;-- empty part is significant at head - for code indentation
+							commit-part space drawn offset offset + abs width
 						][
 							commit-empty width: negate width	;-- soft break on empty region (whitespace)
 						]
@@ -484,19 +490,22 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
 			map: clear []
 			forall rows [								;@@ use for-each or map-each
-				set [row-offset: _: row-clip-start: row-clip-end: row:] rows
-				left:  total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
+				set [row-offset: row-indent: row-clip-start: row-clip-end: row:] rows
+				rows/2: 1.0								;-- replace indent by scale 
+				left:  total-width - row-indent - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
 				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
 				if align = 'fill [						;-- set the scale
 					unless any [
 						empty? row
-						row/1/type = 'break
+						row/1/type = 'break				;-- don't scale linebreak row
+						tail? skip rows 5				;-- don't scale the last row or it's always scaled
 					][
+						;@@ ideally I should also stretch empty parts but it's tricky to implement
 						width: first row-clip-end - row-clip-start
 						limit: 90%
-						scale: allowed-row-width / (max 1 width)
+						scale: allowed-row-width - row-indent / (max 1 width)
 						rows/2: scale: clip scale limit 1 / limit
-						total-width: max total-width round/ceiling/to width * scale 1
+						total-width: max total-width row-indent + round/ceiling/to width * scale 1
 					]
 				]
 				rows/1: row-offset + (shift by 0)
@@ -545,7 +554,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		claim: func [width] with :create [
 			if all [
 				not empty? row
-				row-width - row-hidden + width > allowed-row-width
+				row-indent + row-width - row-hidden + width > allowed-row-width
 			] [new-row]
 			row-width:   row-width + width
 			row-visible: row-width - row-hidden
@@ -555,16 +564,26 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; <-      row-width     ->
 		new-row: does with :create [
 			repend rows [
-				(negate row-hidden) by total-length		;-- row size
-				1.0										;-- row scale
+				(row-indent - row-hidden) by total-length	;-- row offset
+				row-indent								;-- row indent at first, then replaced by row-scale
 				row-hidden by 0							;-- clip start
 				row-hidden + row-visible by row-height	;-- clip end
 				copy row
 			]
 			clear row
 			total-length: total-length + row-height + spacing/y
-			total-width:  max total-width row-visible
-			row-hidden: row-visible: row-width: row-height: 0
+			total-width:  max total-width row-indent + row-visible
+			row-hidden: row-width: row-visible: row-height: 0
+			row-indent: indent2
+		]
+		
+		#debug [
+			valid-indent?: function [indent [block!]] [
+				all [
+					find [none! integer!] indent/first
+					find [none! integer!] indent/rest
+				]
+			]
 		]
 	]
 	
