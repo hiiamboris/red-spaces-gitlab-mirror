@@ -1604,7 +1604,7 @@ rich-content-ctx: context [												;-- rich content
 					target/source: rich/source/serialize target/decoded/items target/decoded/attrs
 				]
 		]
-		copy: remove: insert: none
+		copy: remove: insert: mark: none
 	]
 	edit/copy: function [range [pair!] /keep /text] with :edit/edit [
 		if range/2 < range/1 [range: reverse range]
@@ -1654,6 +1654,19 @@ rich-content-ctx: context [												;-- rich content
 		target/decoded/attrs: rich/attributes/insert target/decoded/attrs range attrs
 		insert skip target/decoded/items offset items
 		; ?? offset ?? items ?? target/decoded/items
+		set 'changed? yes
+	]
+	edit/mark: function [
+		range [pair!]
+		attr  [word!]
+		value "If falsey, attribute is cleared"
+	] with :edit/edit [
+		either :value [
+			#assert [(max range/1 range/2) <= length? target/decoded/items]
+			rich/attributes/mark  target/decoded/attrs attr :value range on
+		][
+			rich/attributes/clear target/decoded/attrs attr range
+		]
 		set 'changed? yes
 	]
 	
