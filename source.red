@@ -41,8 +41,10 @@ rich: context [	;@@ how to name it?
 		from-range:
 		to-ranges:
 		normalize:
+		pick:
 		shift:
 		clip:
+		include:
 		exclude:
 		remove:
 			none
@@ -51,13 +53,22 @@ rich: context [	;@@ how to name it?
 	
 	masks/from-range: function [range [pair!]] [
 		if range/2 < range/1 [range: reverse range]
-		to #{} charset when range/2 <> range/1 (
-			reduce [range/1 '- range/2 - 1]
-		)
+		range: max 0 range
+		#assert [range/2 < infxinf/x]
+		either positive? range/2 [
+			to #{} charset when range/2 <> range/1 (
+				reduce [range/1 '- range/2 - 1]
+			)
+		][
+			copy #{}
+		]
 	]
 	#assert [
+		#{}       = masks/from-range -50x-100
+		#{}       = masks/from-range 0x0
 		#{FFFF}   = masks/from-range 0x16
 		#{7FFFC0} = masks/from-range 1x18
+		#{0FFC}   = masks/from-range 4x14
 	]
 	
 	zero!:          charset [0]
@@ -89,6 +100,10 @@ rich: context [	;@@ how to name it?
 	]
 	#assert [#{FF80} = masks/normalize #{FF800000}]
 	
+	masks/pick: function [mask [binary!] index [integer!]] [
+		pick to bitset! mask index - 1
+	]
+	
 	masks/shift: function [mask [binary!] offset [integer!]] [
 		if zero? offset [return copy mask]
 		mask: enbase/base mask 2
@@ -113,12 +128,21 @@ rich: context [	;@@ how to name it?
 		#{0FFFF0} = masks/clip #{FFFFF0} 4 by infxinf/x
 	]
 	
+	masks/include: function [mask [binary!] other [pair! binary!]] [
+		if pair? other [other: masks/from-range other]
+		mask or other									;-- both are expected to be normalized already
+	]
 	masks/exclude: function [mask [binary!] other [pair! binary!]] [
 		if pair? other [other: masks/from-range min other 8 * length? mask]
 		append/dup other #{00} (length? mask) - length? other
 		masks/normalize mask and complement other
 	]
 	#assert [
+		#{0FFC}   = masks/include #{}       4x14
+		#{FFFFF0} = masks/include #{F003F0} 4x14
+		#{FFFFF0} = masks/include #{F00FF0} #{0FF0}
+		#{FFFFFF} = masks/include #{F0}     #{0FFFFF}
+		
 		#{F003F0} = masks/exclude #{FFFFF0} 4x14
 		#{FFF0}   = masks/exclude #{FFFFF0} 12 by infxinf/x
 		#{F00FF0} = masks/exclude #{FFFFF0} #{0FF0}
@@ -141,6 +165,7 @@ rich: context [	;@@ how to name it?
 		map-each:
 		copy:
 		remove:
+		exclude:
 		clip:
 		shift:
 		union:
@@ -178,6 +203,10 @@ rich: context [	;@@ how to name it?
 	
 	values/remove: function [vlist [block!] range [pair!] /local value mask] [
 		values/normalize values/map-each [value mask] vlist [masks/remove mask range]
+	]
+	
+	values/exclude: function [vlist [block!] range [pair!] /local value mask] [
+		values/normalize values/map-each [value mask] vlist [masks/exclude mask range]
 	]
 	
 	values/clip: function [vlist [block!] range [pair!] /local value mask] [
@@ -226,6 +255,9 @@ rich: context [	;@@ how to name it?
 		to-rtd-flag:
 		make-rtd-flags:
 		find-value:
+		mark:		;@@ or 'set'?
+		clear:
+		pick:
 		map-each:
 		clip:
 		copy:
@@ -233,7 +265,6 @@ rich: context [	;@@ how to name it?
 		shift:
 		union:
 		insert:
-		mark:
 			none
 	]
 	
@@ -280,12 +311,48 @@ rich: context [	;@@ how to name it?
 		]
 		pos
 	]
-	attributes/mark: function [attrs [map!] attr [word!] value range [pair!] state [logic!]] [
+	
+	;@@ modify or not? currently it's a mess
+	
+	;@@ maybe move range before attr in the spec?
+	attributes/mark: function ["modifies" attrs [map!] attr [word!] value range [pair!] state [logic!]] [
 		pos: attributes/find-value attrs attr :value
-		pos/2: either state [pos/2 or masks/from-range range][masks/exclude pos/2 range]
+		pos/2: either state [masks/include pos/2 range][masks/exclude pos/2 range]
 		attrs
 	]
-	#assert [#(bold [#[true] #{0FF0}]) = attributes/mark #(bold [#[true] #{0000}]) 'bold on 4x12 on]
+	#assert [
+		#(bold [#[true] #{0FF0}]) = attributes/mark #(bold [#[true] #{}])     'bold on 4x12 on
+		#(bold [#[true] #{0FF0}]) = attributes/mark #(bold [#[true] #{0000}]) 'bold on 4x12 on
+		#(bold [#[true] #{F00F}]) = attributes/mark #(bold [#[true] #{FFFF}]) 'bold on 4x12 off
+	]
+	
+	;; unlike /mark, clears all values in the range
+	attributes/clear: function ["modifies" attrs [map!] attr [word!] range [pair!]] [
+		if values: attrs/:attr [
+			values: ~/values/exclude values range
+			either empty? values [remove/key attrs attr][attrs/:attr: values]
+		]
+		attrs
+	]
+	#assert [#(bold [#[true] #{F001}]) = attributes/clear #(bold [#[true] #{FFF1}]) 'bold 4x12]
+	
+	;; problem with this one is not having a way to determine if attr is `none` or absent
+	;; but I haven't designed attributes to carry 'none' value anyway
+	attributes/pick: function [attrs [map!] attr [word!] index [integer!]] [
+		if values: attrs/:attr [
+			foreach [value mask] values [
+				if masks/pick mask index [return :value]
+			]
+		]
+		none
+	]
+	#assert [
+		on =  attributes/pick #(bold [#[true] #{F001}]) 'bold 1
+		on =  attributes/pick #(bold [#[true] #{F001}]) 'bold 4
+		on =  attributes/pick #(bold [#[true] #{F001}]) 'bold 16
+		none? attributes/pick #(bold [#[true] #{F001}]) 'bold 0
+		none? attributes/pick #(bold [#[true] #{F001}]) 'bold 5
+	]
 	
 	attributes/map-each: function [spec [block!] "[attr values]" attrs [map!] code [block!]] [
 		make map! map-each/eval (spec) attrs compose/only [		;-- have to compose for code to be bound to the spec
