@@ -41,7 +41,10 @@ context [
 	][
 		case [
 			not host/space   [exit]						;-- not initialized - no hittesting
-			events/dragging? [exit]						;-- during dragging away condition is registered routinely
+			all [
+				events/dragging?						;-- during dragging away condition is registered routinely
+				event/type <> 'time						;-- but it still may have moved on the frame
+			] [exit]
 			not pos: find/same last-paths host [		;-- first over for this host?
 				repend last-paths [host make [] 20]
 				exit
