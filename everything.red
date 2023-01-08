@@ -89,10 +89,11 @@ do/expand [
 				#include %popups.red
 				#include %traversal.red
 				#include %focus.red
+				#include %hittest.red
 				#include %tabbing.red
 				#include %single-click.red
 				#include %standard-handlers.red
-				#include %hittest.red
+				#include %hovering.red
 				#include %actors.red
 			]
 	

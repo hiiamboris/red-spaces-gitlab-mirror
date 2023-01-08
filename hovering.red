@@ -1,32 +1,67 @@
 Red [
-	title:   "Hovering support for Draw-based widgets"
-	author:  @hiiamboris
-	license: BSD-3
+	title:       "On-hover highlight support for Spaces"
+	description: "Provides extra OVER events when pointer leaves the space or it is moved on the frame without actual pointer movement"
+	author:      @hiiamboris
+	license:     BSD-3
 ]
 
-;-- requires events.red & focus.red
+;-- no load requirements
 
 
-;-- provides early detection of the moment pointer leaves the space it last hovered above
-register-previewer [
-	time over											;@@ assumes only timer renders the host
-														;@@ although previewer gets called on next frame only (may be a good thing)
-] function [space [object!] path [block!] event [event!]] [
-	last-path:  []
-	last-wpath: []
-	extract/into path 2 wpath: clear []
-	unless same-paths? wpath last-wpath [
-		unless empty? last-wpath [
-			hittest/into
-				last-path
-				event/offset
-				away-path: clear []
-			#assert [not empty? away-path]
-			event/away?: yes
-			events/process-event away-path event [] no
-			event/away?: no
+context [
+	last-offsets: make hash! 2							;@@ suffers from REP #129
+	insert-event-func function [face event] [
+		if host? face [
+			switch event/type [
+				over [									;-- pointer may have left a space it was in
+					pos: any [find/same last-offsets face  tail last-offsets]
+					change change pos face event/offset
+					detect-away face event event/offset
+				]
+				time [									;-- space may have been moved on the last frame
+					if offset: select/same last-offsets face [
+						detect-away face event offset
+					]
+				]
+			]
 		]
-		append clear last-wpath wpath
-		append clear last-path path
+		none											;-- let other event funcs process it
+	]
+	
+	;; virtual forged 'over' event template
+	false-event: construct map-each word system/catalog/accessors/event! [to set-word! word]
+	
+	;; logic here is to repeat hittest and see if any space in the new path differs from the last path
+	;; last path should be updated by every host's 'over' and 'time' event
+	last-paths: make hash! 2							;@@ suffers from REP #129
+	detect-away: function [
+		host [object!]
+		event [event!]
+		host-offset [pair!]
+	][
+		case [
+			not host/space   [exit]						;-- not initialized - no hittesting
+			events/dragging? [exit]						;-- during dragging away condition is registered routinely
+			not pos: find/same last-paths host [		;-- first over for this host?
+				repend last-paths [host make [] 20]
+				exit
+			]
+		]
+		
+		old-path: pos/2
+		hittest/into host/space host-offset clear new-path: []
+		foreach [space offset] new-path [
+			unless space =? old-path/1 [
+				if event/type = 'time [					;@@ can't write event/offset, have to provide virtual event
+					foreach word [type face window] [false-event/:word: event/:word]
+					event: false-event
+					event/offset: host-offset
+				]
+				events/with-stop [events/process-event new-path event [] no]
+				break
+			]
+			old-path: skip old-path 2
+		]
+		append clear head old-path new-path				;-- stash the new path
 	]
 ]
