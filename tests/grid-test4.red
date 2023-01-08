@@ -46,7 +46,7 @@ view/no-wait/options/flags [
 	actors: object [
 		on-resize: on-resizing: function [window event] [
 			host/size: window/size - 20x60
-			invalidate-tree host/space
+			if host/space [invalidate-tree host]
 		]
 	]
 ] 'resize
