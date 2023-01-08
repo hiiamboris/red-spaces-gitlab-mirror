@@ -35,14 +35,14 @@ context [
 	;; last path should be updated by every host's 'over' and 'time' event
 	last-paths: make hash! 2							;@@ suffers from REP #129
 	detect-away: function [
-		host [object!]
-		event [event!]
-		host-offset [pair!]
+		host        [object!]
+		event       [event!]
+		host-offset [pair!]								;-- no event/offset for 'time' event, have to use the old one
 	][
 		case [
 			not host/space   [exit]						;-- not initialized - no hittesting
 			all [
-				events/dragging?						;-- during dragging away condition is registered routinely
+				drag?: events/dragging?					;-- during dragging away condition is registered routinely
 				event/type <> 'time						;-- but it still may have moved on the frame
 			] [exit]
 			not pos: find/same last-paths host [		;-- first over for this host?
@@ -51,20 +51,24 @@ context [
 			]
 		]
 		
+		#debug profile [prof/manual/start 'hovering]
 		old-path: pos/2
-		hittest/into host/space host-offset clear new-path: []
-		foreach [space offset] new-path [
-			unless space =? old-path/1 [
-				if event/type = 'time [					;@@ can't write event/offset, have to provide virtual event
-					foreach word [type face window] [false-event/:word: event/:word]
-					event: false-event
-					event/offset: host-offset
-				]
-				events/with-stop [events/process-event new-path event [] no]
-				break
+		template: either drag? [old-path][host/space]
+		hittest/into template host-offset clear new-path: []
+		
+		if moved?: not same-paths? old-path new-path [
+			if event/type = 'time [						;@@ can't write event/offset, have to provide virtual event:
+				false-event/type:   'over
+				false-event/face:   event/face
+				false-event/window: event/window
+				false-event/offset: host-offset
+				event: false-event
 			]
-			old-path: skip old-path 2
+			;; while 'over' now lands into another space, we need to send the event into the old one, as 'away notice'
+			hittest/into old-path host-offset clear path: []	;-- update coordinates along the old-path
+			events/with-stop [events/process-event path event [] no]
 		]
-		append clear head old-path new-path				;-- stash the new path
+		append clear old-path new-path					;-- stash the new path
+		#debug profile [prof/manual/end 'hovering]
 	]
 ]
