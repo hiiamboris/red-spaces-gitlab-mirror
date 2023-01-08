@@ -265,7 +265,7 @@ context [
 		none
 	]	
 	
-	reset-hint: func [event [event!]] [
+	reset-hint: func [event [event! object!]] [
 		if hint-text [
 			hint-text: none
 			anchor: face-to-window event/offset event/face
@@ -278,14 +278,14 @@ context [
 		]
 	]
 	
-	travel: func [event [event!]] [
+	travel: func [event [event! object!]] [
 		distance? anchor face-to-window event/offset event/face
 	]
 	
 	last-offset: none
 	;; over event should be tied to spaces and is guaranteed to fire even if no space below
 	register-previewer [over] function [
-		space [object! none!] path [block!] event [event!]
+		space [object! none!] path [block!] event [event! object!]
 		/extern hint-text show-time anchor last-offset
 	][
 		; #assert [event/window/type = 'window]
@@ -322,7 +322,7 @@ context [
 	
 	;; context menu display support
 	register-finalizer [alt-up] function [				;-- finalizer so other spaces can eat the event
-		space [object! none!] path [block!] event [event!]
+		space [object! none!] path [block!] event [event! object!]
 	][
 		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
 		if all [

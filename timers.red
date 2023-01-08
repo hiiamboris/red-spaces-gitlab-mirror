@@ -13,7 +13,7 @@ timers: context [
 	rated-spaces: make hash! 32
 
 	rate-types!: make typeset! [integer! float! time!]
-	on-rate-change: function [space [object!] word [word!] value [any-type!]][
+	on-rate-change: function [space [object!] word [word!] value [any-type!]] [
 		#debug events [#print "rate changes to (value) for (space/size) (skip mold/flat/part space 80 13)"]
 		pos: find/same rated-spaces space
 		either all [
@@ -82,7 +82,7 @@ timers: context [
 	process-timers: function [face [object!] event [event!] /extern time] [
 		;; timer has no target (as is the case with focused space or pointed at)
 		;; and scanning of the whole tree for `rate` facets, all the time, is out of question - or this code will take 99% CPU time
-		;; path-from-space helps win performance at the cost of having to explicitly render each timer
+		;; to win performance I maintain a list of all 'armed' timers at the cost of having to explicitly render each timer
 		handlers: events/handlers
 		hpath: as path! []
 		foreach [space rate] rated-spaces [

@@ -40,7 +40,7 @@ events: context [
 	on-time: none										;-- set by timers.red
 
 	;-- previewers and finalizers are called before/after handlers
-	;-- both have the same args format: [space [object!] path [block!] event [event!]]
+	;-- both have the same args format: [space [object!] path [block!] event [event! object! none!]]
 	;-- stop? command indicates that event was "eaten" and becomes true after:
 	;-- any previewer or finalizer calls `stop`
 	;-- any normal event handler does not call `pass`

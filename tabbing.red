@@ -8,7 +8,7 @@ Red [
 
 
 ;-- has to be `key` event (if it's key-down, the following `key` event after refocus goes into the wrong space)
-register-finalizer [key] function [space [object!] path [block!] event [event!]] [
+register-finalizer [key] function [space [object!] path [block!] event [event! object!]] [
 	if all [
 		event/key = #"^-"								;-- tab key
 		not stop?										;-- was not eaten by any control

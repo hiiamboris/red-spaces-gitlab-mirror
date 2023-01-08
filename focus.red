@@ -152,7 +152,7 @@ focus-space: function [
 
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks may change focus
-	function [space [object!] path [block!] event [event!]] [
+	function [space [object!] path [block!] event [event! object!]] [
 		path: keep-type head path object!				;-- for focus path we want style names only
 
 		f: event/face									;-- list also all face parents in the path
