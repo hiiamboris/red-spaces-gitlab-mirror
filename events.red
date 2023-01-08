@@ -50,7 +50,7 @@ events: context [
 	finalizers: #()
 
 	;-- we want extensibility so this is a map of maps:
-	;-- format: space-name [word!] -> on-event-type [word!] -> list of functions [path [block!] event [event! none!] ...]
+	;-- format: space-name [word!] -> on-event-type [word!] -> list of event functions
 	;--         space-name [word!] -> sub-space-name [word!] -> ... (reentrant, supports paths)
 	handlers: #()
 
@@ -338,39 +338,40 @@ events: context [
 		cache/put path
 	]
 
+	;; this needs reentrancy (events may generate other events), so all blocks must not be static
+	;; e.g.: up event closes the menu face, over event slips in and changes template
 	do-handlers: function [
 		"Evaluate normal event handlers applicable to PATH"
 		path [block!] event [event! object!] args [block!] focused? [logic!]
+		/local word _
 	][
 		if commands/stop? [exit]
-		hnd-name: to word! head clear change skip "on-" 3 event/type	;-- don't allocate
-		wpath: copy path  unit: 1										;-- word-only path
-		if pair? second path [
-			hodl: obtain block! (length? path) / unit: 2		;-- need reentrancy because some events generate others
-			wpath: extract/into path unit hodl					;-- remove pairs ;@@ should be `map` - extract is slow
-		]
-		forall wpath [wpath/1: wpath/1/type]					;-- words needed to locate handler ;@@ use map-each
-		#leaving [if hodl [stash hodl]]
+		hnd-name: select system/view/evt-names event/type		;-- prepend "on-"
+		#assert [hnd-name  "Unsupported event type detected"]
+		
+		spec:  pick [ [word _] word ] pair? second path			;-- remove pairs
+		unit:  pick [2 1] pair? second path
+		wpath: clear copy path									;-- word-only path needed to locate handler
+		foreach (spec) path [append wpath word/type]			;@@ use `map-each` - manual fill is slow
 		#assert [not find wpath pair!]
+		
 		len: length? wpath
+		template: change make path! len + 3 [_ _]				;-- at index=3 (tiny optimization)
+		
 		i2: either focused? [len][1]							;-- keyboard events should only go into the focused space
-		;; this also needs reentrancy or e.g. up event closes the menu face, over event slips in and changes template
-		template: change obtain path! 8 'handlers 
-		#leaving [stash template] 
-		;@@ TODO: this is O(len^2) and should be optimized...
 		while [i2 <= len] [										;-- walk from the outermost spaces to the innermost
 			;; last space is usually the one handler is intereted in, not `screen`
 			;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
-			target: skip head path i2 - 1 * unit				;-- position path at the space that receives event
+			target: skip path i2 - 1 * unit						;-- position path at the space that receives event
 			do-previewers target event args
 			
 			unless commands/stop? [
-				repeat i1 i2 [									;-- walk from the longest path to the shortest
-					hpath:										;-- construct full path to the handler
-						append append/part
-						clear template 
-						at wpath i1  skip wpath i2				;-- add slice [i1,i2] of path
-						hnd-name
+				hpath: append append/part						;-- construct full path to the handler
+					clear template 
+					wpath  skip wpath i2						;-- slice [1,i2] of wpath
+					hnd-name
+				repeat i1 i2 [									;-- walk from the longest (specific) path to the shortest (generic)
+					change hpath: next hpath 'handlers
 					unless block? try [list: get hpath] [continue]	;@@ REP #113
 					commands/stop								;-- stop after current stack unless `pass` gets called
 					foreach handler list [						;-- whole list is called regardless of stop flag change
