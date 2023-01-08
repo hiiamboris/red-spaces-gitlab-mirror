@@ -708,7 +708,7 @@ paragraph-ctx: context [
 			;@@ more complex logic could account for ellipsis itself spanning 2-3 lines, but is it worth it?
 			ellipsis-location: (max 0 canvas/x - ellipsis-width) by last-line-dy
 			last-visible-char: -1 + offset-to-char layout ellipsis-location
-			unless buffer [buffer: make string! last-visible-char + 3]		;@@ use `obtain` or rely on allocator?
+			unless buffer [buffer: make string! last-visible-char + 3]
 			quietly layout/text: append append/part clear buffer text last-visible-char "..."
 			; system/view/platform/update-view layout
 			text-size: size-text layout
@@ -2517,8 +2517,7 @@ grid-ctx: context [
 		bounds: grid/calc-bounds
 		xlim: bounds/x
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
-		hmin: obtain block! xlim + 1					;-- can't be static because has to be reentrant!
-		#leaving [stash hmin]
+		hmin: make block! xlim + 1						;-- can't be static because has to be reentrant!
 		append hmin any [grid/heights/min 0]
 		for x: 1 xlim [
 			canvas: encode-canvas (as-pair grid/col-width? x infxinf/y) 1x1		;-- fill the cell
@@ -2595,9 +2594,8 @@ grid-ctx: context [
 	][
 		size:  cell2 - cell1 + 1
 		drawn: make [] size: area? size
-		map:   obtain block! size * 2					;-- draw appends it, so it can be obtained
-		done:  obtain map! size							;-- local to this range of cells
-		#leaving [stash done]
+		map:   make block! size * 2						;-- draw appends it, so it can be obtained
+		done:  make map! size							;-- local to this range of cells
 														;-- sometimes the same mcell may appear in pinned & normal part
 		for cell: cell1 cell2 [
 			cell1-to-cell: either cell/x = cell1/x [	;-- pixels from cell1 to this cell
@@ -2672,24 +2670,24 @@ grid-ctx: context [
 		#assert [any [grid/infinite? grid/size]]		;-- must be set by calc-size or carried over from the previous render
 
 		quietly grid/map: make block! 2 * area? cell2 - cell1 + 1
-		if map [append grid/map map  stash map]
+		if map [append grid/map map]
 		
 		;@@ create a grid layout?
 		if pinned/x > 0 [
 			set [map: drawn-row-header:] draw-range grid
 				(1 by cell1/y) (pinned/x by cell2/y)
 				xy0/x by (xy1/y - offs1/y)
-			append grid/map map  stash map
+			append grid/map map
 		]
 		if pinned/y > 0 [
 			set [map: drawn-col-header:] draw-range grid
 				(cell1/x by 1) (cell2/x by pinned/y)
 				(xy1/x - offs1/x) by xy0/y
-			append grid/map map  stash map
+			append grid/map map
 		]
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
-		append grid/map map  stash map
+		append grid/map map
 		;; note: draw order (common -> headers -> normal) is important
 		;; because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;; as such, map doesn't need clipping, but draw code does
