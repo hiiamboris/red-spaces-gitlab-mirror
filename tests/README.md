@@ -59,6 +59,16 @@ Tests `label` template and popups: hints and right-click menus.
 
 Tests resizing of a relatively complex layout.
 
+---
+
+[**hover-test.red**](hover-test.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-hover-test.gif)
+
+Tests whether space receives `over` events:
+- when mouse pointer stays in place but the space itself moves
+- when pointer leaves it (the 'away' event)
+
 
 ## Text tests
 
