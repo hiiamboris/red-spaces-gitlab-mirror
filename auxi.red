@@ -109,6 +109,13 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ;+>:  make op! func [a b] [a = max a b + 1]
 ;+>=: make op! func [a b] [a = max a b]
 
+inside?: make op! function [
+	"Test if POINT is inside the SPACE"
+	point [pair!] space [object!]
+][
+	within? point 0x0 space/size
+]
+
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
@@ -204,6 +211,7 @@ interpolate: function [
 ;; need this to be able to call event functions recursively with minimum allocations
 ;; can't use a static block but can use one block per recursion level
 ;; also used in the layout functions (which can be recursive easily)
+;@@ this is too complex and ~10x slower than the GC itself, so only should be used when GC is off
 obtain: stash: none
 context [
 	;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
