@@ -31,6 +31,8 @@ svf:  system/view/fonts
 svm:  system/view/metrics
 svmc: system/view/metrics/colors
 
+half: func [x] [x / 2]
+
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
 	pair [pair! (0x0 +<= pair) integer! (0 <= pair)]
@@ -489,93 +491,20 @@ mix: function [
 	50.25.5 = mix 100.50.10 0.0.0.128
 ]
 
-;; https://www.rapidtables.com/convert/color/rgb-to-hsl.html
-;@@ actually these formulas are simplistic and not statisticaly neutral, need improvement
-;@@ when improved, consider inclusion into /common
-RGB2HSL: function [rgb [tuple!]] [
-	R: rgb/1  G: rgb/2  B: rgb/3
-	C+: max max R G B
-	C-: min min R G B
-	D: C+ - C-
-	L: C+ + C- / 510
-	S: either D = 0 [0][D / 255 / (1 - abs L * 2 - 1)]
-	H: 60 * case [
-		D  = 0 [0]
-		C+ = R [G - B / D // 6]
-		C+ = G [B - R / D + 2]
-		"C+=B" [R - G / D + 4]
+
+quantize: function [
+	"Quantize a float sequence into integers, minimizing the overall bias"
+	vector [vector! block!]
+][
+	r: make vector! n: length? vector
+	error: 0											;-- accumulated rounding error is added to next value
+	repeat i n [
+		r/:i: hit: round/to aim: vector/:i + error 1
+		error: aim - hit
 	]
-	reduce [H 100% * S 100% * L]
+	r
 ]
 
-;; https://www.rapidtables.com/convert/color/hsl-to-rgb.html
-HSL2RGB: function [hsl [block!]] [
-	set [H: S: L:] hsl
-	C: (1 - abs L * 2 - 1) * S * 255
-	X: (1 - abs H / 60 // 2 - 1) * C
-	m: 255 * L - (C / 2)
-	n: to integer! H / 60
-	triple: pick [[C X 0] [X C 0] [0 C X] [0 X C] [X 0 C] [C 0 X] [C X 0]] n + 1
-	rgb: 0.0.0
-	repeat i 3 [rgb/:i: clip 0 255 to integer! m + do triple/:i]
-	rgb
-]
-
-;; these mostly fail due to rounding
-; #assert [
-  	; [  0   0%   0%] = RGB2HSL 0.0.0
-  	; [  0   0% 100%] = RGB2HSL 255.255.255
-  	; [  0 100%  50%] = RGB2HSL 255.0.0
-  	; [120 100%  50%] = RGB2HSL 0.255.0
-  	; [240 100%  50%] = RGB2HSL 0.0.255
-  	; [ 60 100%  50%] = RGB2HSL 255.255.0
-  	; [180 100%  50%] = RGB2HSL 0.255.255
-  	; [300 100%  50%] = RGB2HSL 255.0.255
-  	; [  0   0%  75%] = RGB2HSL 191.191.191
-  	; [  0   0%  50%] = RGB2HSL 128.128.128
-  	; [  0 100%  25%] = RGB2HSL 128.0.0
-  	; [ 60 100%  25%] = RGB2HSL 128.128.0
-  	; [120 100%  25%] = RGB2HSL 0.128.0
-  	; [300 100%  25%] = RGB2HSL 128.0.128
-  	; [180 100%  25%] = RGB2HSL 0.128.128
-  	; [240 100%  25%] = RGB2HSL 0.0.128
-; ]
-; #assert [
-  	; (HSL2RGB [  0   0%   0%]) = 0.0.0
-  	; (HSL2RGB [  0   0% 100%]) = 255.255.255
-  	; (HSL2RGB [  0 100%  50%]) = 255.0.0
-  	; (HSL2RGB [120 100%  50%]) = 0.255.0
-  	; (HSL2RGB [240 100%  50%]) = 0.0.255
-  	; (HSL2RGB [ 60 100%  50%]) = 255.255.0
-  	; (HSL2RGB [180 100%  50%]) = 0.255.255
-  	; (HSL2RGB [300 100%  50%]) = 255.0.255
-  	; (HSL2RGB [  0   0%  75%]) = 191.191.191
-  	; (HSL2RGB [  0   0%  50%]) = 128.128.128
-  	; (HSL2RGB [  0 100%  25%]) = 128.0.0
-  	; (HSL2RGB [ 60 100%  25%]) = 128.128.0
-  	; (HSL2RGB [120 100%  25%]) = 0.128.0
-  	; (HSL2RGB [300 100%  25%]) = 128.0.128
-  	; (HSL2RGB [180 100%  25%]) = 0.128.128
-  	; (HSL2RGB [240 100%  25%]) = 0.0.128
-; ]
-#assert [
-  	(HSL2RGB RGB2HSL 0.0.0      ) = 0.0.0      
-  	(HSL2RGB RGB2HSL 255.255.255) = 255.255.255
-  	(HSL2RGB RGB2HSL 255.0.0    ) = 255.0.0    
-  	(HSL2RGB RGB2HSL 0.255.0    ) = 0.255.0    
-  	(HSL2RGB RGB2HSL 0.0.255    ) = 0.0.255    
-  	(HSL2RGB RGB2HSL 255.255.0  ) = 255.255.0  
-  	(HSL2RGB RGB2HSL 0.255.255  ) = 0.255.255  
-  	(HSL2RGB RGB2HSL 255.0.255  ) = 255.0.255  
-  	(HSL2RGB RGB2HSL 191.191.191) = 191.191.191
-  	(HSL2RGB RGB2HSL 128.128.128) = 128.128.128
-  	(HSL2RGB RGB2HSL 128.0.0    ) = 128.0.0    
-  	(HSL2RGB RGB2HSL 128.128.0  ) = 128.128.0  
-  	(HSL2RGB RGB2HSL 0.128.0    ) = 0.128.0    
-  	(HSL2RGB RGB2HSL 128.0.128  ) = 128.0.128  
-  	(HSL2RGB RGB2HSL 0.128.128  ) = 0.128.128  
-  	(HSL2RGB RGB2HSL 0.0.128    ) = 0.0.128    
-]
 
 enhance: function [
 	"Push COLOR further from BGND (alpha channels ignored)"
@@ -612,21 +541,6 @@ min-safe: function [a [scalar! none!] b [scalar! none!]] [
 
 max-safe: function [a [scalar! none!] b [scalar! none!]] [
 	any [all [a b max a b] a b]
-]
-
-half: func [x] [x / 2]
-
-quantize: function [
-	"Quantize a float sequence into integers, minimizing the overall bias"
-	vector [vector! block!]
-][
-	r: make vector! n: length? vector
-	error: 0											;-- accumulated rounding error is added to next value
-	repeat i n [
-		r/:i: hit: round/to aim: vector/:i + error 1
-		error: aim - hit
-	]
-	r
 ]
 
 context [
