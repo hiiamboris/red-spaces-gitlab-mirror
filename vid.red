@@ -421,7 +421,14 @@ VID: context [
 			set w #expect word! [
 				[
 					if (x: sheet/:w) (def/template: w: x/1)
-					p: insert (copy/deep x/2) :p		;-- literally insert copy of the style definition
+					p: insert (
+						;; literally insert copy of the style definition
+						;; bound to anonymous context to avoid set-words collision
+						;; when a style with set-words inside is instantiated multiple times:
+						data: copy/deep x/2
+						ctx: construct collect-set-words data
+						with ctx data
+					) :p
 				|	(def/template: w)
 				] (
 					case [
@@ -525,7 +532,7 @@ VID: context [
 ]
 
 #assert [
-	lay-out-vids [
+	lay-out-vids [										;-- new style names should be recognized
 		style text1: text 20
 		text1 "text"
 	]
@@ -534,4 +541,11 @@ VID: context [
 		style text: text
 		text
 	]
+	ys: []
+	lay-out-vids [
+		style x: box [y: text do [append ys y]]
+		x x
+	]
+	2 = length? ys
+	not same? :ys/1 :ys/2								;-- 'y' should stay inside 'x's context, not shared
 ]
