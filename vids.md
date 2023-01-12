@@ -15,7 +15,7 @@ VID/S is different from [VID](https://github.com/red/docs/blob/master/en/vid.ado
 | Geometry | All faces are boxes sized in (virtual) pixels. | Each space can rotate/scale/bend it's children if it can express that in Draw. For interactivity support, it should provide coordinate transformation. |
 | Rendering | Faces are rendered by the OS, triggering redraw when a facet changes | Spaces are rendered using [Draw dialect](https://github.com/red/docs/blob/master/en/draw.adoc), redrawn continuously over time³. |
 | Naming | `name:` can prefix a face definition. | `name:` can prefix a space definition. |
-| VID styles | `style` keyword allows to define a new style with new defaults. | `style` keyword allows to define a new style with new defaults. |
+| VID styles | `style` keyword allows to define a new style with new defaults⁴. | `style` keyword allows to define a new style with new defaults. |
 | Stylesheets | No support. Faces look is mostly cast in stone. | Whole classes of spaces can be styled using a single style block or function. Styling is affected by the hierarchy. Spaces look can be fully customized, animated, effects applied (no limits). |
 | Coloring | Faces support both foreground and background colors. | Spaces support only one color, which will be e.g. text color for `text` and fill color for `box`. |
 | Font styles | Faces support `font` facet as well as `bold/italic/underline/font-size` shortcuts. | Text spaces support `bold/italic/underline` shortcuts, while font and size can only be set by stylesheet. |
@@ -23,15 +23,16 @@ VID/S is different from [VID](https://github.com/red/docs/blob/master/en/vid.ado
 | Event handlers | Events are handled by the OS. Some little customization can be done using a stack of [event functions](https://github.com/red/docs/blob/master/en/view.adoc#insert-event-func). | Events are handled by [standard event handlers](standard-handlers.red). Each space can have a stack of event handlers defining different levels of behavior from basic to custom. |
 | Facets | Each face has exactly the same set of facets that cannot be extended from VID. Mapping of VID datatypes to facets is hardcoded. | Each space defines it's own set of facets (only a few are shared), which can be extended by user with the `facet=` notation. Mapping of datatypes to facets is defined by [`spaces/styles` map](vid.red) which can be altered at any time. |
 | Sizing | Each face has a fixed size that has to be changed manually when required. | Most spaces automatically adjust their sizes, virtually eliminating the need for manual intervention. `limits` facet controls the range in which the size can vary. |
-| Positioning | VID allows for quite tricky static layouts with rows, columns, alignment. Every pane is pre-arranged using the same powerful algorithm. | VID/S uses [layout functions](layouts.red) to position spaces (some support alignment). They are more limited⁴ and predictable but able to adapt to size changes. Some spaces can only contain a single child. |
-| Reactivity | Faces are deeply reactive. | Spaces are not reactive⁵, but VID/S adds (shallow) reactivity to spaces with a name or reaction defined. |
+| Positioning | VID allows for quite tricky static layouts with rows, columns, alignment. Every pane is pre-arranged using the same powerful algorithm. | VID/S uses [layout functions](layouts.red) to position spaces (some support alignment). They are more limited⁵ and predictable but able to adapt to size changes. Some spaces can only contain a single child. |
+| Reactivity | Faces are deeply reactive. | Spaces are not reactive⁶, but VID/S adds (shallow) reactivity to spaces with a name or reaction defined. |
 
 **Footnotes**:\
 ¹ Space tree uses /content or /items facet to fetch children. /map and /parent facets get auto-populated during render and are only valid for the last frame. They should be considered changing with each new frame.\
 ² It's illegal but techincally allowed (with a warning) to render the same space in multiple places on the tree (as do some self-containing grid tests). These spaces will not support timer events, invalidation (because they don't know all of their parents), and must have the same size and map everywhere.\
 ³ Draw block and map are cached internally, so space's `draw` function is only called when it's invalid. Invalidation is triggered by a change of it's facet (not a deep change!), and results in next timer event rendering changed parts of the tree.\
-⁴ It's possible to write a VID-like layout function, but most likely it won't be able to react to resizes in a meaningful way.\
-⁵ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time. Spaces however employ their own reactivity implementation to track facet changes.
+⁴ VID/S remembers style definition *literally* and then re-inserts it every time style is instantiated. This is more similar to how macros work than how VID works. All data after `style: name` and up to the end of the style definition is copied deeply before reinsertion, ensuring no pane or reactive relation sharing.\
+⁵ It's possible to write a VID-like layout function, but most likely it won't be able to react to resizes in a meaningful way.\
+⁶ Making all spaces reactive would immensely slow down their operation as there can easily be tens to hundreds of thousands present at the same time. Spaces however employ their own reactivity implementation to track facet changes.
 
 
 ## Predefined styles
@@ -129,7 +130,7 @@ Important quote from [Quickstart](quickstart.md):
 
 #### Style definition
 
-This creates new *VID/S styles*, that are valid until return of `lay-out-vids`. VID/S style is a collection of facets that will be automatically applied upon it's instantiation, thus helping avoid repetition.
+This creates new *VID/S styles*, that are valid until return of `lay-out-vids`. VID/S style is a deep copy of a part of VID/S layout and is inserted literally on every instantiation, thus helping avoid repetition.
 
 Syntax: `style <new-style-name>: <style-name> <modifiers...>`
 - `style-instantiation` is described [above](#style-instantiation)
@@ -144,6 +145,34 @@ view [host [
 ]]
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-definition.png)
+
+All set-words within the style definition are bound to an anonymous context, so complex styles can be defined with their own local widget names, and their instances will not interfere with each other.
+
+A trickier example of a composite style with it's own actors:
+```
+hlist [
+	style roller: vlist [
+		hlist tight [
+			style button: button 30x30					;) inside hlist, button is redefined
+			button "⏴" [c/i: max 1 c/i - 1]
+			c: scrollable 40 with [						;) 'c' will be local to each roller, not shared
+				i: 1
+				hscroll/size: vscroll/size: 0x0			;) hide scrollbars
+			] react [origin: 35x0 - (c/i * 30x0)] [
+				hlist tight [
+					style b: button						;) style as a shortcut for compactness
+					b "1" b "2" b "3" b "4"
+					b "5" b "6" b "7" b "8"
+				]
+			]
+			button "⏵" [c/i: min 8 c/i + 1]
+		]
+		button 100 "Roll" [c/i: random 8]				;) outside hlist, button is the default one again
+	]
+	roller roller roller 
+]
+```
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-complex-style-definition.gif)
 
 | **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in the manual](manual.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
 |-|-|
