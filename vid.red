@@ -304,12 +304,12 @@ VID: context [
 		/extern with									;-- gets collected from `def`
 	][
 		pane: make block! 8
-		sheet: any [sheet make map! 4] 
+		sheet: any [sheet #()] 
 		def: construct [								;-- accumulated single style definition
 			styling?:										;-- used when defining a new style in VID
 			template: 										;-- should not end in `=` (but not checked)
 			with:											;-- used to build space, before all other modifiers applied
-			link: 											;-- will be set to the instantiated space object
+			link: 											;-- prefix set-word, will be set to the instantiated space object
 			style: 											;-- style spec fetched from VID/styles
 			reactions:										;-- bound to space
 			actors:											;-- unlike event handlers, affects individual space only
@@ -340,7 +340,10 @@ VID: context [
 			]
 			
 			either def/styling? [						;-- new style defined
-				put sheet def/link copy/deep/part style-bgn style-end
+				put sheet def/link reduce [
+					def/template						;-- save original template name, for `style x: x` cases
+					copy/deep/part style-bgn style-end
+				]
 			][
 				space: make-space def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
@@ -353,9 +356,9 @@ VID: context [
 					either def/style/layout [
 						layout: get def/style/layout
 						#assert [function? :layout]
-						do with space layout/styles def/pane sheet
+						do with space layout/styles  def/pane copy sheet	;-- copy sheet so inner styles don't modify parent's
 					][
-						content: lay-out-vids/styles def/pane sheet
+						content: lay-out-vids/styles def/pane copy sheet	;-- copy sheet so inner styles don't modify parent's
 						space/content: case [			;-- always trigger on-change just in case
 							any-list? :space/content [content]
 							immediate? :space/content [
@@ -412,15 +415,16 @@ VID: context [
 			=style-declaration=
 		]
 		=instantiating=:     [not end opt =space-name= =style-declaration=]
-		=style-declaration=: [style-bgn: =style-name= any =modifier= style-end: (do commit-style)]
+		=style-declaration=: [=style-name= style-bgn: any =modifier= style-end: (do commit-style)]
 		=space-name=:        [set w set-word! (def/link: to word! w)]
 		=style-name=:        [
 			set w #expect word! [
-				if (x: sheet/:w) p: insert (x) :p =style-name=	;-- reprocess with the replaced style name
-			|	(
-					def/template: w
+				[
+					if (x: sheet/:w) (def/template: w: x/1)
+					p: insert (copy/deep x/2) :p		;-- literally insert copy of the style definition
+				|	(def/template: w)
+				] (
 					case [
-						x: sheet/:w [def/style: x]
 						x: VID/styles/:w [def/style: x]
 						templates/:w [def/style: reduce ['template w]]
 						'else [ERROR "Unsupported VID/S style: (w)"]
@@ -520,3 +524,14 @@ VID: context [
 	export [lay-out-vids host?]
 ]
 
+#assert [
+	lay-out-vids [
+		style text1: text 20
+		text1 "text"
+	]
+	lay-out-vids [										;-- ensure it doesn't deadlock
+		style text: text
+		style text: text
+		text
+	]
+]

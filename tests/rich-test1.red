@@ -30,7 +30,7 @@ source: [
 view/no-wait/options/flags [
 	below
 	b: host 200x500 [
-		style rich-content2: rich-content
+		style rich-content: rich-content
 		; on-over [
 			; caret: spaces/ctx/rich-content-ctx/xy-to-caret space offset: path/2
 			; lrow:  spaces/ctx/rich-content-ctx/caret-to-row space caret 'left
@@ -42,12 +42,12 @@ view/no-wait/options/flags [
 		; ]
 		row tight [
 			column tight weight= 1 [
-				box left forest [rich-content2 source= compose source align= 'left]
-				box right blue  [rich-content2 source= compose source align= 'right]
+				box left forest [rich-content source= compose source align= 'left]
+				box right blue  [rich-content source= compose source align= 'right]
 			]
 			column tight weight= 1 [
-				box center blue [rich-content2 source= compose source align= 'center]
-				box left forest [rich-content2 source= compose source align= 'fill]
+				box center blue [rich-content source= compose source align= 'center]
+				box left forest [rich-content source= compose source align= 'fill]
 			]
 		]
 	] react [

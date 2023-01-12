@@ -33,16 +33,16 @@ source: does [compose [
 view/no-wait/options/flags [
 	below
 	b: host 500x500 [
-		style rich-content2: rich-content source= source
-		style cell2: cell margin= 3
+		style rich-content: rich-content source= source
+		style cell: cell margin= 3
 		row tight [
 			column tight weight= 1 [
-				cell2 left   [rich-content2 align= 'left]
-				cell2 center [rich-content2 align= 'center]
+				cell left   [rich-content align= 'left]
+				cell center [rich-content align= 'center]
 			]
 			column tight weight= 1 [
-				cell2 left   [rich-content2 align= 'fill]
-				cell2 right  [rich-content2 align= 'right]
+				cell left   [rich-content align= 'fill]
+				cell right  [rich-content align= 'right]
 			]
 		]
 	] react [
