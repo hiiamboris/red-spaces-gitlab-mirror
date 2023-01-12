@@ -304,7 +304,7 @@ VID: context [
 		/extern with									;-- gets collected from `def`
 	][
 		pane: make block! 8
-		sheet: any [sheet #()] 
+		sheet: any [sheet make map! 4]					;-- new sheet should not persist after leaving lay-out-vids 
 		def: construct [								;-- accumulated single style definition
 			styling?:										;-- used when defining a new style in VID
 			template: 										;-- should not end in `=` (but not checked)
@@ -420,7 +420,10 @@ VID: context [
 		=style-name=:        [
 			set w #expect word! [
 				[
-					if (x: sheet/:w) (def/template: w: x/1)
+					if (x: sheet/:w) (
+						#assert [parse x [word! block!]]		;-- style must be valid
+						def/template: w: x/1
+					)
 					p: insert (
 						;; literally insert copy of the style definition
 						;; bound to anonymous context to avoid set-words collision
@@ -431,6 +434,7 @@ VID: context [
 					) :p
 				|	(def/template: w)
 				] (
+					if def/styling? [put sheet def/link reduce []]	;-- from now on, this word ends the definition and instantiates
 					case [
 						x: VID/styles/:w [def/style: x]
 						templates/:w [def/style: reduce ['template w]]
@@ -441,7 +445,12 @@ VID: context [
 		]
 		
 		=modifier=:   [
-			not [ahead word! 'style]					;-- style is a keyword and can't be faceted
+			not [
+				end
+			|	ahead word! 'style						;-- style is a keyword and can't be faceted
+			|	set-word!								;-- set-words are reserved for space names
+			|	set w word! if (any [sheet/:w templates/:w])	;-- style names mark the end of modifiers
+			]; p: (#print "modifier at: (mold/part p 80)")
 			[=with= | =reaction= | =action= | =focus= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
 		]
 		
@@ -531,21 +540,30 @@ VID: context [
 	export [lay-out-vids host?]
 ]
 
-#assert [
+#localize [#assert [
 	lay-out-vids [										;-- new style names should be recognized
 		style text1: text 20
 		text1 "text"
 	]
-	lay-out-vids [										;-- ensure it doesn't deadlock
+	
+	lt: lay-out-vids [									;-- ensure it doesn't deadlock
 		style text: text
 		style text: text
 		text
 	]
+	single? lt											;-- last text should be recognized as instantiation
+	
 	ys: []
 	lay-out-vids [
 		style x: box [y: text do [append ys y]]
-		x x
+		x x												;-- should recognize 'x' here as instantiation (definition ended)
 	]
 	2 = length? ys
 	not same? :ys/1 :ys/2								;-- 'y' should stay inside 'x's context, not shared
-]
+	
+	button: text: 1
+	lt: lay-out-vids [button "ok" text "text"]
+	2 = length? lt										;-- style names should not be broken by word values
+	lt/1/type = 'button
+	lt/2/type = 'text
+]]
