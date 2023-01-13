@@ -113,7 +113,7 @@ context expand-directives with spaces/ctx [
 	; view [host [picker: color-picker 200x200]]
 ]
 
-request-color: function [] [
+request-color: function [] [							;@@ suffers from #5214 unfortunately
 	view/flags [
 		title "Pick a color..."
 		host [

@@ -92,7 +92,7 @@ make-space: function [
 	r: append copy/deep base spec
 	unless block [
 		;; without trapping it's impossible to tell where the error happens during creation if it's caused e.g. by on-change
-		trap/catch [r: make space-object! r] [			;@@ slower than `try` by 5% on make-space 'space []
+		e: trap/catch [r: make space-object! r] [			;@@ slower than `try` by 5% on make-space 'space []
 			#print "*** Unable to make space of type (type):"
 			do thrown
 		]
@@ -369,6 +369,7 @@ cell-ctx: context [
 		;@@ consider more high level VID-like specification of alignment
 		align:   0x0	#type =? :invalidates-look (-1x-1 +<= align +<= 1x1)
 		content: none	#type =? :invalidates [object! none!]
+		;@@ should /color be always present?
 		
 		map:     []
 		cache:   [size map]
@@ -837,7 +838,7 @@ paragraph-ctx: context [
 		;; but if canvas is huge e.g. 2e9, then it's not so useful,
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
-		mrg2: space/margin * 2x2
+		mrg2: 2 * mrg: space/margin * 1x1
 		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
 		space/size: mrg2 + text-size					;@@ full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
@@ -848,15 +849,15 @@ paragraph-ctx: context [
 		;; (and we can't stop it from updating)
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
-		drawn: compose [text (1x1 * space/margin) (layout)]
+		drawn: compose [text (mrg) (layout)]
 		
-		;; add caret if enabled
 		if all [caret: space/caret  not ellipsize?] [
+		; if all [caret: space/caret  not ellipsize?] [
 			box: space/measure [caret-to-box caret/offset caret/side]
-			quietly caret/size: box/2 - box/1 + (caret/width by 0)
+			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
 			invalidate/only caret
 			cdrawn: render caret
-			drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
+			drawn: compose/only [push (drawn) translate (mrg + box/1) (cdrawn)]
 		]
 		;; add selection if enabled
 		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
@@ -936,11 +937,14 @@ paragraph-ctx: context [
 		]
 	]
 	
+	;@@ in the current design it is rendered by text, so can only be styled as field/text/caret, not field/caret
+	;@@ should I move rendering into field? (need to consider document as well)
 	declare-template 'caret/rectangle [
 		cache:  none
-		;; size should be set by parent's /draw as (width x line-height)
+		;; size/y should be set by parent's /draw to line-height
 		size:   1x10
-		width:  1		#type =? :invalidates [integer!]
+		width:  1		#type =? :invalidates [integer!] (width > 0)
+						#on-change [space word value] [space/size/x: width]
 		;; offset and side do not affect the caret itself, but serve for it's location descriptors within the parent
 		offset: 0		#type =? :invalidates [integer!]
 		side:  'left	#type =  :invalidates [word!] (find/case [left right] side)
@@ -3320,31 +3324,16 @@ declare-template 'rotor/space [
 ]
 
 
-;@@ need to unify this with the generic caret!
-;@@ maybe name it field-caret and set /type to 'caret
-; caret-ctx: context [
-	; ~: self
-	
-	; declare-template 'caret/rectangle [					;-- caret has to be a separate space so it can be styled
-		; visible?:    no		#type =? :invalidates-look [logic!]	;-- controlled by focus
-		; look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
-		
-		; width:       1		#type =? [integer!] (width > 0)		;-- width in pixels
-			; #on-change [space word value] [space/size: value by space/size/y]
-			
-		; ;; [0..length] should be kept even when not focused, so tabbing in leaves us where we were
-		; offset:      0		#type =? [integer!] (offset >= 0)
-			; #on-change [space word value] [if space/visible? [invalidate space]]
-		
-		; rectangle-draw: :draw	#type [function!]
-		; draw: does [when visible? (rectangle-draw)]
-	; ]
-; ]
-
 ;@@ TODO: can I make `frame` some kind of embedded space into where applicable? or a container? so I can change frames globally in one go (margin can also become a kind of frame)
 ;@@ if embedded, map composition should be a reverse of hittest: if something is drawn first then it's at the bottom of z-order
 field-ctx: context [
 	~: self
+	
+	;; caret is separate space so it can be styled, but no `field-caret` template is needed, so it's just a class
+	caret-template: declare-class 'field-caret/caret [
+		type: 'caret
+		look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
+	]
 	
 	non-ws: negate ws: charset " ^-"
 		
@@ -3507,6 +3496,7 @@ field-ctx: context [
 
 	draw: function [field [object!] canvas: infxinf [pair! none!]] [
 		ctext: field/spaces/text						;-- text content
+		quietly ctext/caret: if focused? [field/caret]
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
 		drawn: render/on field/spaces/text infxinf		;-- this sets the size
 		set [canvas: fill:] decode-canvas canvas
@@ -3515,15 +3505,7 @@ field-ctx: context [
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
 		width: first either fill/x = 1 [canvas][min ctext/size + cmargin canvas]	
 		field/size: constrain width by ctext/size/y field/limits
-		viewport: field/size - (2 * mrg: field/margin * 1x1)
-		co: field/caret/offset + 1
-		cxy1: caret-to-offset       ctext/layout co
-		cxy2: caret-to-offset/lower ctext/layout co
-		csize: field/caret/width by (cxy2/y - cxy1/y)
-		unless field/caret/size = csize [
-			quietly field/caret/size: csize
-			invalidate/only field/caret
-		]
+		mrg: field/margin * 1x1
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		if sel: field/selected [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
@@ -3531,20 +3513,17 @@ field-ctx: context [
 			field/selection/size: ssize: sxy2 - sxy1
 			sdrawn: render field/selection
 		]
-		cdrawn: render field/caret
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
 		ofs: field/origin by 0
 		quietly field/map: reshape-light [
 			@[field/spaces/text]      [offset: @(ofs) size: @(ctext/size)]
 		/?	@[field/spaces/selection] [offset: @(ofs + mrg + sxy1) size: @(ssize)]		/if sel
-			@[field/spaces/caret]     [offset: @(ofs + mrg + cxy1) size: @(csize)]
 		]
 		reshape-light [									;@@ can compose-map be used without re-rendering?
 			clip @(mrg) @(field/size - mrg) [
 				translate @(ofs) [
 				/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
 					translate 0x0 @[drawn]
-					translate @(mrg + cxy1) @[cdrawn]
 					;@@ workaround for #4901 which draws white background under text over the selection:
 					#if linux? [
 					/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
@@ -3574,12 +3553,12 @@ field-ctx: context [
 
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
-			caret:     make-space 'caret     []
+			caret:     make-space 'caret     caret-template		;-- shared between text and field, put into text only when focused
 			selection: make-space 'rectangle [type: 'selection]	;-- can be styled
 		] #type [object!]
 		
 		;; shortcuts
-		caret:     spaces/caret		#type (space? caret)
+		caret:     spaces/caret		#type (space? caret)		;@@ maybe keep it as text/caret not spaces/caret?
 		selection: spaces/selection	#type (space? selection)
 		
 		;; these mirror spaces/text facets:
