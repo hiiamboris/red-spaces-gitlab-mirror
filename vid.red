@@ -457,9 +457,9 @@ VID: context [
 		=do=:         [ahead word! 'do    set b #expect block! (do b)]
 		
 		=reaction=:   [ahead word! 'react set late? opt [ahead word! 'later] set b #expect block! (
-			;@@ this would likely require reactions run before pane is created, but needs more data for decision
-			if def/styling? [ERROR "Reactions are not supported in style definitions yet"]
-			repend def/reactions [late? b]
+			unless def/styling? [						;-- will be created during instantiation
+				repend def/reactions [late? b]
+			]
 		)]
 		
 		=action=:     [=actor-name= =actor-body=]
@@ -510,7 +510,7 @@ VID: context [
 			(repend def/facets ['color x])
 		]
 		
-		=pane=:       [set b block! (def/pane: b)]
+		=pane=:       [set b block! (def/pane: b)]		;-- will only be expanded during instantiation
 		
 		=size=:       [
 			[	ahead [skip ahead word! '.. skip]
