@@ -30,7 +30,7 @@ context expand-directives with spaces/ctx [
 	
 	declare-template 'color-picker/tube [
 		axes:       [s e]
-		margin:     10
+		margin:     0
 		spacing:    10
 		hue:        0		#type =? [number!] :on-HSL-change	;-- not constrained here, but internally during conversions
 		saturation: 0%		#type =? [number!] :on-HSL-change
@@ -111,4 +111,21 @@ context expand-directives with spaces/ctx [
 	]
 	
 	; view [host [picker: color-picker 200x200]]
+]
+
+request-color: function [] [
+	view/flags [
+		title "Pick a color..."
+		host [
+			vlist [
+				cp: color-picker 200x200
+				box 200x20 white react [color: cp/color]
+				hlist [
+					button 80 "OK" focus [unview set 'color cp/color]
+					button 80 "Cancel"   [unview]
+				]
+			]
+		] on-key [if event/key = #"^[" [unview]]
+	] 'modal
+	color
 ]
