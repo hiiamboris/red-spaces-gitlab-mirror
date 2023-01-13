@@ -504,8 +504,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						width: first row-clip-end - row-clip-start
 						limit: 90%
 						scale: allowed-row-width - row-indent / (max 1 width)
-						rows/2: scale: clip scale limit 1 / limit
-						total-width: max total-width row-indent + round/ceiling/to width * scale 1
+						scale: clip scale limit 1 / limit
+						;; reduce scale to align it to pixels, else width may become 1px bigger than the canvas:
+						rows/2: scale: min scale (to integer! scale * width) / width
+						total-width: max total-width row-indent + round/to width * scale 1
 					]
 				]
 				rows/1: row-offset + (shift by 0)
