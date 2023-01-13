@@ -174,6 +174,22 @@ hlist [
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-complex-style-definition.gif)
 
+#### Customizing the stylesheet
+
+Global stylesheet can be accessed as `spaces/VID/styles`. `lay-out-vids` accepts a `/styles sheet [map!]` parameter - a stylesheet that is used together with the global one.
+
+Both are maps of `style-name [word!] -> style-spec [block!]`.
+
+Style specification is a block of `key: value` format with the following keys currently supported:
+- `template` (word, mandatory) - name of template (in spaces/templates map) used to construct a space object during style instantiation
+- `spec` (block) - initialization code evaluated during space object construction (bound to space)
+- `facets` (block) - block of the following pairs:
+  - `datatype-name [word!] auto-facet-name [word!]` - maps specific datatypes to relevant facets of the space ([auto-facets](#auto-facets))
+  - `datatype-name [word!] function [value] [...]` - more flexible, when encounters this datatype, calls the function with the value, appending it's result to the `spec` (this form expects literal `function!` value, not the word `function`)
+  - `facet-name [word!] code [block!]` - given any word that is not a datatype name, appends `code` to the `spec` (used e.g. for alignment facets)
+- `layout` (word) - bound name of the layout function used in place of `lay-out-vids`, must support `/styles` refinement
+- `payload` (block) - data to be literally inserted during style instantiation before any other processing (this is how `style` keyword works)
+
 | **NOTE** | For a more radical change of look than facets allow, a new *template style* should be defined instead. See [Styling chapter in the manual](manual.md#styling). Template style is more profound and affects every space of built upon that template, globally. |
 |-|-|
 
