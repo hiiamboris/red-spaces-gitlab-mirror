@@ -340,10 +340,10 @@ VID: context [
 			]
 			
 			either def/styling? [						;-- new style defined
-				put sheet def/link reduce [
-					def/template						;-- save original template name, for `style x: x` cases
-					copy/deep/part style-bgn style-end
+				repend def/style [						;-- already copied and in the sheet
+					quote payload: copy/deep/part style-bgn style-end
 				]
+				; #print "saved payload (mold def/style/payload) in (def/link) style based on (def/style/template)"
 			][
 				space: make-space def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
@@ -396,6 +396,7 @@ VID: context [
 					reaction: bind copy/deep reaction space		;@@ should bind to commands too?
 					either late? [react/later reaction][react reaction] 
 				]
+				; #print "finished instantiation of (def/template) -> (space/type):(space/size)"
 				
 				append pane space
 			]
@@ -418,30 +419,27 @@ VID: context [
 		=style-declaration=: [=style-name= style-bgn: any =modifier= style-end: (do commit-style)]
 		=space-name=:        [set w set-word! (def/link: to word! w)]
 		=style-name=:        [
-			set w #expect word! [
-				[
-					if (x: sheet/:w) (
-						#assert [parse x [word! block!]]		;-- style must be valid
-						def/template: w: x/1
-					)
-					p: insert (
-						;; literally insert copy of the style definition
-						;; bound to anonymous context to avoid set-words collision
-						;; when a style with set-words inside is instantiated multiple times:
-						data: copy/deep x/2
-						ctx: construct collect-set-words data
-						with ctx data
-					) :p
-				|	(def/template: w)
-				] (
-					if def/styling? [put sheet def/link reduce []]	;-- from now on, this word ends the definition and instantiates
-					case [
-						x: VID/styles/:w [def/style: x]
-						templates/:w [def/style: reduce ['template w]]
-						'else [ERROR "Unsupported VID/S style: (w)"]
-					]
-				)
-			]
+			set w #expect word! p: (
+				; #print "found style (w)..."
+				def/template: w
+				def/style: case [
+					x: sheet/:w      [x]
+					x: VID/styles/:w [x]
+					templates/:w     [compose/only [template: (w)]]
+					'else            [ERROR "Unsupported VID/S style: (w)"]
+				]
+				#assert [not empty? def/style]
+				if def/styling? [
+					put sheet def/link def/style: copy/deep def/style	;-- from now on, linked word ends the definition and instantiates
+				]
+				if payload: def/style/payload [					;-- style has literal data to insert
+					;; literally insert anonymized copy of the payload
+					;; to avoid set-words collision when a style with set-words inside is instantiated multiple times:
+					ctx: construct collect-set-words payload
+					insert p with ctx copy/deep payload
+					; #print "inserted payload at: (mold/part p 80)"
+				]
+			)
 		]
 		
 		=modifier=:   [
@@ -449,9 +447,10 @@ VID: context [
 				end
 			|	ahead word! 'style						;-- style is a keyword and can't be faceted
 			|	set-word!								;-- set-words are reserved for space names
-			|	set w word! if (any [sheet/:w templates/:w])	;-- style names mark the end of modifiers
+			|	set w word! if (any [sheet/:w VID/styles/:w templates/:w])	;-- style names mark the end of modifiers
 			]; p: (#print "modifier at: (mold/part p 80)")
 			[=with= | =reaction= | =action= | =focus= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
+			; p: (#print "modifier finished at: (mold/part p 80)")
 		]
 		
 		=with=:       [ahead word! 'with  set b #expect block! (append def/with b)]	;-- collects multiple `with` blocks
