@@ -135,18 +135,19 @@ rich: context [	;@@ how to name it?
 	masks/exclude: function [mask [binary!] other [pair! binary!]] [
 		if pair? other [other: masks/from-range min other 8 * length? mask]
 		append/dup other #{00} (length? mask) - length? other
-		masks/normalize mask and complement other
+		masks/normalize mask and complement copy other
 	]
 	#assert [
-		#{0FFC}   = masks/include #{}       4x14
-		#{FFFFF0} = masks/include #{F003F0} 4x14
-		#{FFFFF0} = masks/include #{F00FF0} #{0FF0}
-		#{FFFFFF} = masks/include #{F0}     #{0FFFFF}
+		#{0FFC}      = masks/include #{}       4x14
+		#{FFFFF0}    = masks/include #{F003F0} 4x14
+		#{FFFFF0}    = masks/include #{F00FF0} #{0FF0}
+		#{FFFFFF}    = masks/include #{F0}     #{0FFFFF}
 		
-		#{F003F0} = masks/exclude #{FFFFF0} 4x14
-		#{FFF0}   = masks/exclude #{FFFFF0} 12 by infxinf/x
-		#{F00FF0} = masks/exclude #{FFFFF0} #{0FF0}
-		#{F0}     = masks/exclude #{FFFFF0} #{0FFFFF}
+		#{F003F0}    = masks/exclude #{FFFFF0} 4x14
+		#{FFF0}      = masks/exclude #{FFFFF0} 12 by infxinf/x
+		#{F00FF0}    = masks/exclude #{FFFFF0} #{0FF0}
+		#{F0}        = masks/exclude #{FFFFF0} #{0FFFFF}
+		2#{10101000} = masks/exclude 2#{11111100} 2#{01010100}
 	]
 	
 	masks/remove: function [mask [binary!] range [pair!]] [
@@ -178,7 +179,7 @@ rich: context [	;@@ how to name it?
 		vlist [block!] "Latter values take priority"
 	][
 		vlist: skip tail copy vlist -2
-		coverage: vlist/2								;-- maintaining coverage allows it to be O(number of values)
+		coverage: copy vlist/2							;-- maintaining coverage allows it to be O(number of values)
 		while [not head? vlist] [						;@@ use for-each/reverse
 			vlist: skip vlist -2
 			vlist/2: masks/exclude vlist/2 coverage
@@ -186,6 +187,10 @@ rich: context [	;@@ how to name it?
 			if empty? vlist/2 [remove/part vlist 2]		;-- empty? works because masks/exclude trims it
 		]
 		vlist
+	]
+	#assert [
+		[1 2#{10101000} 2 2#{01010100}]                = values/normalize [1 2#{11111100} 2 2#{01010100}]
+		[1 2#{11000000} 2 2#{00011000} 3 2#{00000011}] = values/normalize [1 2#{11000000} 2 2#{00011000} 3 2#{00000011}]
 	]
 	
 	values/map-each: function [							;@@ use normal map-each when it's native
@@ -254,7 +259,6 @@ rich: context [	;@@ how to name it?
 	attributes: context [
 		to-rtd-flag:
 		make-rtd-flags:
-		find-value:
 		mark:		;@@ or 'set'?
 		clear:
 		pick:
@@ -304,26 +308,24 @@ rich: context [	;@@ how to name it?
 		[5x16 bold] = attributes/make-rtd-flags #(bold [#[true] #{0FFFF0}]) 0x20
 	]
 	
-	attributes/find-value: function [attrs [map!] attr [word!] value] [
-		values: any [attrs/:attr  attrs/:attr: make [] 2]
-		unless pos: find/same/only/skip values :value 2 [
-			repend pos: tail values [:value copy masks/empty]
-		]
-		pos
-	]
-	
 	;@@ modify or not? currently it's a mess
 	
 	;@@ maybe move range before attr in the spec?
 	attributes/mark: function ["modifies" attrs [map!] attr [word!] value range [pair!] state [logic!]] [
-		pos: attributes/find-value attrs attr :value
+		values: any [attrs/:attr  attrs/:attr: make [] 2]
+		unless pos: find/same/only/skip values :value 2 [
+			repend pos: tail values [:value copy masks/empty]
+		]
 		pos/2: either state [masks/include pos/2 range][masks/exclude pos/2 range]
+		attrs/:attr: ~/values/normalize values
 		attrs
 	]
 	#assert [
 		#(bold [#[true] #{0FF0}]) = attributes/mark #(bold [#[true] #{}])     'bold on 4x12 on
 		#(bold [#[true] #{0FF0}]) = attributes/mark #(bold [#[true] #{0000}]) 'bold on 4x12 on
 		#(bold [#[true] #{F00F}]) = attributes/mark #(bold [#[true] #{FFFF}]) 'bold on 4x12 off
+		#(x [1 2#{01100110} 2 2#{00011000}]) = attributes/mark #(x [1 2#{01111110}]) 'x 2 3x5 on
+		#(x [1 2#{01100000} 2 2#{00001100} 3 2#{00000001}]) = attributes/mark #(x [1 2#{01100000} 2 2#{00001100}]) 'x 3 7x8 on
 	]
 	
 	;; unlike /mark, clears all values in the range
@@ -468,18 +470,22 @@ rich: context [	;@@ how to name it?
 		][
 			queue: clear []
 			foreach [attr values] attrs [
+				values: ~/values/normalize values
 				foreach [value mask] values [
-					opening: either true = :value [to word! attr][[to set-word! attr :value]]
+					opening: either true = :value [to word! attr][reduce [to set-word! attr :value]]
 					closing: to refinement! attr
 					foreach range masks/to-ranges mask [
-						repend queue [range/1 opening range/2 closing]
+						;; order is important: close then open, that's why I add 0.1
+						;; e.g. to avoid output like `color: 1 "x" color: 2 /color "x" /color`
+						;; when it should have been  `color: 1 "x" /color color: 2 "x" /color`
+						repend queue [range/1 + 0.1 opening range/2 closing]
 					]
 				]
 			]
-			sort/skip queue 2
+			sort/stable/skip queue 2
 			result: clear []
 			foreach [offset marker] queue [
-				append/part result items items: skip head items offset
+				append/part result items items: skip head items to integer! offset
 				append result marker
 			]
 			append result items
@@ -494,6 +500,7 @@ rich: context [	;@@ how to name it?
 			["x"] = serialize [#"x"] #()
 			["12" bold "3456" /bold "7"] == serialize [#"1" #"2" #"3" #"4" #"5" #"6" #"7"] #(bold [#[true] #{3C}])
 			["12" bold underline "3" /bold /underline] = serialize [#"1" #"2" #"3"] #(bold [#[true] #{20}] underline [#[true] #{20}])
+			["1" x: 1 "2" /x x: 2 "3" /x "4"] = serialize [#"1" #"2" #"3" #"4"] #(x [1 #{40} 2 #{20}])
 		]
 		
 		;@@ leverage prototypes for this
