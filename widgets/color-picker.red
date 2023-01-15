@@ -113,12 +113,15 @@ context expand-directives with spaces/ctx [
 	; view [host [picker: color-picker 200x200]]
 ]
 
-request-color: function [] [							;@@ suffers from #5214 unfortunately
+request-color: function [								;@@ suffers from #5214 unfortunately
+	"Show a dialog to request color input"
+	/from color [tuple! none!] "Initial (default) result"
+][
 	view/flags [
 		title "Pick a color..."
 		host [
 			vlist [
-				cp: color-picker 200x200
+				cp: color-picker 200x200 color= any [color gray]
 				box 200x20 white react [color: cp/color]
 				hlist [
 					button 80 "OK" focus [unview set 'color cp/color]
