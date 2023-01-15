@@ -461,7 +461,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				either sections [
 					offset: 0
 					foreach width sections [
-						either any [width > 0 offset = 0] [		;-- empty part is significant at head - for code indentation
+						;; empty part is significant at head - for code indentation
+						;; and at tail - for sub-paragraphs (e.g. in urls) to not eat spaces (handled later)
+						either any [width > 0 offset = 0] [
 							commit-part space drawn offset offset + abs width
 						][
 							commit-empty width: negate width	;-- soft break on empty region (whitespace)
@@ -479,6 +481,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					]
 				]
 			]
+			row-visible: row-width - row-hidden			;-- force trailing space to become significant
 			unless empty? row [new-row]					;-- count last row's size
 			#assert [any [empty? rows  not empty? last rows]]	;-- can be empty if all spaces are whitespace
 			if total-length > 0 [total-length: total-length - spacing/y]
