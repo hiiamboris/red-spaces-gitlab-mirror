@@ -318,13 +318,13 @@ cell-ctx: context [
 		sections: make [] 16
 		geom: select/same space/map item: space/content
 		mrg:  max 0 geom/offset/x
-		if mrg <> 0 [append sections negate mrg] 
+		if mrg > 0 [append sections negate mrg] 
 		append sections any [
 			if in item 'sections [item/sections]		;-- calls if a function, may return none
 			min geom/size/x space/size/x				;-- careful if item is bigger than the box
 		]
 		mrg:  max 0 space/size/x - geom/offset/x - geom/size/x
-		if mrg <> 0 [append sections negate mrg]
+		if mrg > 0 [append sections negate mrg]
 		unless all [single? sections  sections/1 >= 0] [
 			sections									;-- optimize unbreakable (single positive) case
 		]
@@ -781,7 +781,7 @@ paragraph-ctx: context [
 			
 			sections: clear []
 			mrg: negate space/margin along 'x					;-- treat margin as empty
-			if mrg <> 0 [append sections mrg]
+			if mrg < 0 [append sections mrg]
 			right: 0
 			foreach range spaces [
 				left:  first caret-to-offset space/layout range/1
@@ -792,7 +792,7 @@ paragraph-ctx: context [
 			; ?? space/text ?? spaces ?? sections
 			while [0 = first sections] [sections: next sections]	;-- remove the zero intervals
 			while [0 = last sections ] [take/last sections]
-			if mrg <> 0 [append sections mrg]
+			if mrg < 0 [append sections mrg]
 			unless all [single? sections  sections/1 >= 0] [
 				return copy sections							;-- don't spare a copy on items that can't be broken (single positive)
 			]
@@ -1089,15 +1089,15 @@ list-ctx: context [
 		sections: make [] 16							;-- can't be shared (e.g.: item is a list and reenters this func)
 		mrg: negate list/margin  along 'x
 		spc: negate list/spacing along 'x 
-		if mrg <> 0 [append sections mrg]
+		if mrg < 0 [append sections mrg]
 		n: (length? list/map) / 2
 		i: 0 foreach [item geom] list/map [				;@@ use for-each
 			i: i + 1
 			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
 			append sections any [batch geom/size/x]		;-- uses geom/size, not item/size, as latter might have changed
-			all [i < n  spc <> 0  append sections spc]
+			all [i < n  spc < 0  append sections spc]
 		]
-		if mrg <> 0 [append sections mrg]
+		if mrg < 0 [append sections mrg]
 		unless all [single? sections  sections/1 >= 0] [
 			sections									;-- optimize lists that can't be broken (single positive)
 		]
@@ -1318,6 +1318,32 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		none
 	]
 		
+	get-sections: function [space [object!]] [
+		if any [
+			5 <> length? rows: space/frame/rows			;-- avoid breaking of multiline text (/rows can be none)
+			empty? row: rows/5
+		][
+			return reduce [space/margin along 'x * -2]	;-- double margin as optional region
+		]
+		#assert [rows/2 = 1  "single row should not be scaled"]	;-- so no need to bother with proper offset/size rounding
+		
+		sections: make [] 16							;-- can't be shared (e.g.: item is a list and reenters this func)
+		mrg: negate space/frame/margin along 'x
+		spc: negate space/spacing along 'x				;@@ put spacing into /frame ?
+		if mrg < 0 [append sections mrg]
+		n: (length? row) / 3
+		i: 0 foreach [item offset _] row [				;@@ use for-each
+			i: i + 1
+			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
+			append sections any [batch item/size/x]		;@@ uses geom/size, not item/size, as latter might have changed
+			all [i < n  spc < 0  append sections spc]
+		]
+		if mrg < 0 [append sections mrg]
+		unless all [single? sections  sections/1 >= 0] [
+			sections									;-- optimize lists that can't be broken (single positive)
+		]
+	]
+	
 	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
 	declare-template 'rich-paragraph/container [
 		margin:      0
@@ -1331,6 +1357,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		cache:       [size map frame]
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		format: does [container-ctx/format self ""]
+		sections: does [~/get-sections self]
 		
 		;; container-draw is not used due to tricky geometry
 		draw: function [/on canvas [pair!]] [~/draw self canvas]
