@@ -771,7 +771,7 @@ paragraph-ctx: context [
 		if all [
 			space/layout								;-- must be rendered, else on this frame it cannot be dissected (and has zero size)
 			not empty? space/text
-			zero? second space/layout/extra - caret-to-offset/lower space/layout 1	;-- avoid breaking of multiline text
+			1 = rich-text/line-count? space/layout		;-- avoid breaking of multiline text
 		][
 			spaces: clear []
 			parse space/text [collect after spaces any [		;-- collect index interval pairs of all contiguous whitespace
@@ -1432,7 +1432,7 @@ rich-content-ctx: context [												;-- rich content
 		pitem: row
 		for-each [p: item item-offset _] row [
 			range: pick find/same space/decoded/ranges item -1	;@@ maybe reorder these ranges for select usage
-			if caret' < range/1 [if side = 'left [break]]		;@@ can't use return in for-each :(
+			if caret' < range/1 [if side = 'left [break]]		;@@ can't use break/return in for-each :(
 			pitem: p
 			if caret' < range/2 [break]
 		]
