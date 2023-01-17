@@ -5,5 +5,6 @@ This area will contain in-depth explanations of some non-obvious algorithms Spac
 - [Spaces tree structure: words or objects?](words-or-objects.md)
 - [Spaces tree structure: single or multiple parents?](single-vs-multiple-parents.md)
 - [Algorithms for automatic grid column width estimation](grid-autofit.md)
+- [Caching mechanics](caching.md)
 
 

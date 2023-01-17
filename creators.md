@@ -243,7 +243,14 @@ Is controlled by the `/cache` facet, which is a block listing what other facets 
 
 What caching system does is for each given canvas it remembers the outcome: result of `/draw`, as well as any other facets listed in the `/cache` block (usually it's `[size map]`). Then if the same canvas value is provided, it fetches and sets the cached facets and returns the recalled `/draw` result.
 
-Most facets use the [class system](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red) to define equality type (e.g. `=?` for numbers and `==` for strings) and a function that gets called when facet change is detected by equality test. One way or another, this function eventually calls `invalidate` on the space in question. `invalidate` bubbles up the tree to clear this space's cache and cache of all of it's parents. So important facet change eventually leads to a redraw.
+Most facets use the [class system](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red) to define equality type and a function that gets called when facet change is detected by equality test. One way or another, this function eventually calls `invalidate` on the space in question. `invalidate` bubbles up the tree to clear this space's cache and cache of all of it's parents. So important facet change eventually leads to a redraw.
+
+Equality type considerations:
+- `=?` is the fastest operator and should be used e.g. for integer or pair facets
+- `=` is good for word facets, as we don't usually care about their case
+- `==` is good for (short) string facets, as we do care about their case; for long string facets it's inefficient and it's better to invalidate it than to lose time in comparison (e.g. in a big text some character changes during an edit)
+- no criterion: invalidation always happens on facet assignment, even if the value is the same; good for bigger facets, internal ones and those not supposed to be changed (like functions)
+
 
 Meet:
 ```
