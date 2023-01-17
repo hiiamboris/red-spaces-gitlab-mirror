@@ -78,16 +78,16 @@ cache: context [
 			if cache: space/cache [period: 3 + length? space/cache]
 			either slot [
 				n: (length? space/cached) / period
-				#print "Found cache for (name):(space/size) on canvas=(canvas) out of (n): (mold/flat/only/part slot 40)"
+				#print "Found cache for (name):(space/size) on canvas=(mold canvas) out of (n): (mold/flat/only/part slot 40)"
 			][
 				reason: case [
-					cache [rejoin ["cache=" mold extract cache period]]
+					cache [rejoin ["cache=" mold extract space/cached period]]
 					not space/parent ["never drawn"]
 					not space/cache ["cache disabled"]
 					empty? space/cached ["invalidated"]
 					'else ["unknown reason"]
 				]
-				#print "Not found cache for (name):(space/size) on canvas=(canvas), reason: (reason)"
+				#print "Not found cache for (name):(space/size) on canvas=(mold canvas), reason: (reason)"
 			]
 		]
 		#debug profile [prof/manual/end 'cache]
