@@ -115,8 +115,8 @@ cache: context [
 			forall slots [								;@@ use for-each
 				if all [
 					slots/2 < old-gen					;-- slot is old
-					slots/1 <> infxinf					;-- keep infinite and zero canvases anyway
-					slots/1 <> 0x0						;-- since they are always relevant, unlike 0x319 or smth
+					slots/1 % infxinf = 0x0				;-- keep [infxinf infx0 0xinf 0x0] canvases (always relevant, unlike 0x319 or smth)
+					;@@ maybe fetch should also ignore old finite slots?
 				][
 					slot: slots
 					break
@@ -167,6 +167,7 @@ invalidate: function [
 	/local custom										;-- can be unset during construction
 ][
 	#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
+	#assert [3 = index? space/cached]
 	unless space/cached/-1 [exit]						;-- space was never rendered; early exit (for faster tree construction)
 	#debug profile [prof/manual/start 'invalidation]
 	default scope: 'size
