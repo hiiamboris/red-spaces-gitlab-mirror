@@ -314,24 +314,9 @@ image-ctx: context [
 cell-ctx: context [
 	~: self
 
-	get-sections: function [space [object!]] [
-		sections: make [] 16
-		geom: select/same space/map item: space/content
-		mrg:  max 0 geom/offset/x
-		if mrg > 0 [append sections negate mrg] 
-		append sections any [
-			if in item 'sections [item/sections]		;-- calls if a function, may return none
-			min geom/size/x space/size/x				;-- careful if item is bigger than the box
-		]
-		mrg:  max 0 space/size/x - geom/offset/x - geom/size/x
-		if mrg > 0 [append sections negate mrg]
-		unless all [single? sections  sections/1 >= 0] [
-			sections									;-- optimize unbreakable (single positive) case
-		]
-	]
-		
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
+		space/sec-cache: copy []						;-- alloc new (minimal) sections block for new canvas
 		unless space/content [
 			set-empty-size space canvas
 			return quietly space/map: []
@@ -372,8 +357,9 @@ cell-ctx: context [
 		;@@ should /color be always present?
 		
 		map:     []
-		cache:   [size map]
-		sections: does [~/get-sections self]
+		cache:   [size map sec-cache]
+		sections: does [generate-sections map size/x sec-cache]
+		sec-cache: []									;-- holds last valid sections block if computed
 		format:   does [~/format self]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
@@ -768,37 +754,36 @@ paragraph-ctx: context [
 	]
 
 	get-sections: function [space [object!]] [
-		if all [
-			space/layout								;-- must be rendered, else on this frame it cannot be dissected (and has zero size)
-			not empty? space/text
-			1 = rich-text/line-count? space/layout		;-- avoid breaking of multiline text
-		][
-			spaces: clear []
-			parse space/text [collect after spaces any [		;-- collect index interval pairs of all contiguous whitespace
-				any non-space! s: any whitespace! e:
-				keep (as-pair index? s index? e)
-			]]													;-- it often produces an empty interval at the tail (accounted for later)
-			
-			sections: clear []
-			mrg: negate space/margin along 'x					;-- treat margin as empty
-			if mrg < 0 [append sections mrg]
-			right: 0
-			foreach range spaces [
-				left:  first caret-to-offset space/layout range/1
-				append sections left - right					;-- added as positive - chars up to the space
-				right: first caret-to-offset space/layout range/2
-				append sections left - right					;-- added as negative - space chars
+		#assert [space/layout  "text must be rendered to get sections"]
+		mrg: negate space/margin along 'x
+		case [
+			not empty? sections: space/sec-cache ['done]		;-- already computed
+			empty? space/text [
+				append sections mrg * 2
 			]
-			; ?? space/text ?? spaces ?? sections
-			while [0 = first sections] [sections: next sections]	;-- remove the zero intervals
-			while [0 = last sections ] [take/last sections]
-			if mrg < 0 [append sections mrg]
-			unless all [single? sections  sections/1 >= 0] [
-				return copy sections							;-- don't spare a copy on items that can't be broken (single positive)
+			1 <> rich-text/line-count? space/layout [			;-- avoid breaking multiline text
+				#assert [not negative? space/size/x + (mrg * 2)]
+				repend sections [mrg space/size/x + (mrg * 2) mrg]	;-- /draw clips the text size to canvas, tricky formula
+			]
+			'else [
+				spaces: clear []
+				parse space/text [collect after spaces any [	;-- collect index interval pairs of all contiguous whitespace
+					any non-space! s: any whitespace! e:
+					keep (as-pair index? s index? e)
+				]]												;-- it often produces an empty interval at the tail (accounted for later)
+				
+				if mrg < 0 [append sections mrg]
+				right: 0
+				foreach range spaces [
+					left:  first caret-to-offset space/layout range/1
+					if left <> right [append sections left - right]		;-- added as positive - chars up to the space
+					right: first caret-to-offset space/layout range/2
+					if left <> right [append sections left - right]		;-- added as negative - space chars
+				]
+				if mrg < 0 [append sections mrg]
 			]
 		]
-		
-		none
+		sections
 	]
 	
 	;; can be styled but cannot be accessed (and in fact shared)
@@ -815,11 +800,12 @@ paragraph-ctx: context [
 	]
 	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		space/sec-cache: copy []						;-- reset computed sections
 		if canvas [										;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
 			wrap?:      find space/flags 'wrap
 		]
-		layout:     space/layout
+		layout:   space/layout
 		|canvas|: either any [wrap? ellipsize?][
 			constrain abs canvas space/limits			;-- could care less about fill flag for text
 		][
@@ -827,7 +813,7 @@ paragraph-ctx: context [
 		]
 		reuse?: all [not wrap?  not ellipsize?  space/layout  space/layout/size =? canvas]	;@@ REP #113
 		layout: any [
-			if reuse? [space/layout]					;-- text can reuse it's layout on any canvas
+			if reuse? [space/layout]					;-- text can reuse its layout on any canvas
 			lay-out space |canvas| to logic! ellipsize? to logic! wrap?
 		]
 
@@ -963,15 +949,16 @@ paragraph-ctx: context [
 		;; caret disabled by default, can be set to a caret space
 		caret:  none	#type    :invalidates [object! (space? caret) none!]	
 
-		sections: does [~/get-sections self]
-		measure:  func [plan [block!]] [~/metrics/measure self plan]
-		selected: none	#type =? :invalidates [pair! none!]
+		sections:  does [~/get-sections self]
+		sec-cache: []
+		measure:   func [plan [block!]] [~/metrics/measure self plan]
+		selected:  none	#type =? :invalidates [pair! none!]
 		
-		clone:    does [clone-space self [text flags color margin weight font]]
-		format:   does [copy text]
+		clone:     does [clone-space self [text flags color margin weight font]]
+		format:    does [copy text]
 		
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
-		quietly cache: [size layout]
+		quietly cache: [size layout sec-cache]
 		quietly draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 
@@ -1081,26 +1068,15 @@ list-ctx: context [
 	~: self
 		
 	get-sections: function [list [object!]] [
-		if any [
-			list/size/x = 0								;-- nothing to dissect (not rendered?)
-			list/axis <> 'x								;-- can't dissect vertical list
-		] [return none]
-		
-		sections: make [] 16							;-- can't be shared (e.g.: item is a list and reenters this func)
-		mrg: negate list/margin  along 'x
-		spc: negate list/spacing along 'x 
-		if mrg < 0 [append sections mrg]
-		n: (length? list/map) / 2
-		i: 0 foreach [item geom] list/map [				;@@ use for-each
-			i: i + 1
-			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
-			append sections any [batch geom/size/x]		;-- uses geom/size, not item/size, as latter might have changed
-			all [i < n  spc < 0  append sections spc]
+		case [
+			not empty? cache: list/sec-cache ['done]
+			list/size/x = 0 ['done]						;-- nothing to dissect (not rendered?)
+			list/axis <> 'x	[							;-- can't dissect vertical list
+				if 0 <> mrg: list/margin along 'x [append cache mrg * -2]
+			]
+			'else [generate-sections list/map list/size/x cache]
 		]
-		if mrg < 0 [append sections mrg]
-		unless all [single? sections  sections/1 >= 0] [
-			sections									;-- optimize lists that can't be broken (single positive)
-		]
+		cache
 	]
 
 	clone: function [space [object!]] [		
@@ -1120,11 +1096,15 @@ list-ctx: context [
 		spacing: 0
 		;@@ TODO: alignment?
 
-		clone:    does [~/clone self]
-		format:   does [container-ctx/format self select [x "^-" y "^/"] axis]
-		sections: does [~/get-sections self]
+		clone:     does [~/clone self]
+		format:    does [container-ctx/format self select [x "^-" y "^/"] axis]
+		sections:  does [~/get-sections self]
+		sec-cache: []
+		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
+		
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair!]] [
+			self/sec-cache: copy []								;-- reset computed sections
 			settings: [axis margin spacing canvas limits]
 			container-draw/layout 'list settings
 		]
@@ -1214,6 +1194,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		space/sec-cache: copy []						;-- reset computed sections
 		settings: with space [margin spacing align baseline canvas limits indent]
 		set [size: map: rows:] make-layout 'paragraph :space/items settings
 		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
@@ -1319,29 +1300,27 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 		
 	get-sections: function [space [object!]] [
-		if any [
-			5 <> length? rows: space/frame/rows			;-- avoid breaking of multiline text (/rows can be none)
-			empty? row: rows/5
-		][
-			return reduce [space/margin along 'x * -2]	;-- double margin as optional region
+		case [
+			not empty? cache: space/sec-cache ['done]
+			any [
+				5 <> length? rows: space/frame/rows		;-- avoid breaking multiline text (/rows can be none)
+				empty? rows/5
+			][
+				if 0 <> mrg: space/margin along 'x [append cache mrg * -2]
+			]
+			'else [
+			; false [
+				#assert [rows/2 = 1  "single row should not be scaled"]	;-- so no need to bother with proper offset/size rounding
+				;@@ temporary!!
+				mrg: space/margin
+				row-offset: rows/1
+				map: map-each/eval [item offset _] rows/5 [
+					[item compose [offset: (offset + row-offset + mrg) size: (item/size)]]
+				]
+				generate-sections map space/size/x cache
+			]
 		]
-		#assert [rows/2 = 1  "single row should not be scaled"]	;-- so no need to bother with proper offset/size rounding
-		
-		sections: make [] 16							;-- can't be shared (e.g.: item is a list and reenters this func)
-		mrg: negate space/frame/margin along 'x
-		spc: negate space/spacing along 'x				;@@ put spacing into /frame ?
-		if mrg < 0 [append sections mrg]
-		n: (length? row) / 3
-		i: 0 foreach [item offset _] row [				;@@ use for-each
-			i: i + 1
-			batch: if in item 'sections [item/sections]	;-- calls if a function, may return none
-			append sections any [batch item/size/x]		;@@ uses geom/size, not item/size, as latter might have changed
-			all [i < n  spc < 0  append sections spc]
-		]
-		if mrg < 0 [append sections mrg]
-		unless all [single? sections  sections/1 >= 0] [
-			sections									;-- optimize lists that can't be broken (single positive)
-		]
+		cache
 	]
 	
 	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
@@ -1354,10 +1333,11 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		indent:      none	#type = [block! none!] :invalidates	;-- indent of the paragraph: [first: integer! rest: integer!]
 		
 		frame:       []		#type  [block!]				;-- internal frame data used by /into
-		cache:       [size map frame]
+		sections:    does [~/get-sections self]
+		sec-cache:   []
+		cache:       [size map frame sec-cache]
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		format: does [container-ctx/format self ""]
-		sections: does [~/get-sections self]
 		
 		;; container-draw is not used due to tricky geometry
 		draw: function [/on canvas [pair!]] [~/draw self canvas]

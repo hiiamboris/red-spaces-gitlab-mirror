@@ -890,9 +890,41 @@ find-same-path: function [block [block!] path [path!]] [
 ]
 
 
+;; this function assumes no scaling or anything fishy, plain map
+;; uses geom/size/x, not space/size/x because parent's map may have been fetched from the cache,
+;; while children sizes may not have been updated
+;; it's not totally error-proof but I haven't come up with a better plan
+generate-sections: function [
+	"Generate sections block out of list of spaces; returns none if nothing to dissect"
+	map     [block!]   "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
+	width   [integer!] "Total width" (width >= 0)
+	buffer  [block!]
+][
+	case [
+		not tail? buffer [return buffer]				;-- already computed
+		tail? map [										;-- optimization
+			if width > 0 [append buffer negate width]
+			return buffer
+		]
+	]
+	offset: 0
+	foreach [space geom] map [
+		if negative? skipped: offset - geom/offset/x [
+			append buffer skipped
+		]
+		batch: if in space 'sections [space/sections]	;-- calls if a function, may return none
+		append buffer any [batch geom/size/x]
+		offset: offset - skipped + geom/size/x
+	]
+	if offset < width [append buffer offset - width]
+	buffer
+]
+#assert [[-10] = generate-sections [] 10 copy []]
+	
+	
 ;; this function is used by tube layout to expand items in a row (which should be blazingly fast)
 ;; it is quite tricky, because limits (constraints) of each item affect all others in a row
-;; goal here is to make Red level code linear of complexity, while R/S part can be quadratic
+;; goal here is to make Red level code linear of complexity, while R/S part can be quadratic or nlogn
 ;; implementation sorts items by the available extension size normalized to weight
 ;; then it eliminates slices from the shortest to the longest,
 ;; subtracting each item's extension size multiplied by number of items left
