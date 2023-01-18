@@ -27,12 +27,13 @@ Each space must have:
    These two values must always be present in order to avoid extra checks in performance-critical cache code.
    
 A `render` call tries to fetch cached data and only does rendering on cache misses, or if `/cache` is disabled (set to `none`).
+Consequently, if no changes are made to the layout, top-level `render` call returns the cached draw block almost immediately, not visiting any of the child nodes. However, `draw` operation is by itself very expensive for complex layouts, so host does not perform it until its immediate `/space` gets invalidated. 
 
 **Invalidation.**
 
-A set of invalidation rules is determined by space's *template* (see [Creators guide](../creators.md#caching)). Invalidation, that is both triggered by facet changes and manually called where necessary, propagates the info about the change up the tree to inform parents that they have to re-render themselves.
+A set of invalidation rules is determined by space's *template* (see [Creators guide](../creators.md#caching)). Invalidation, that is both triggered by facet changes and manually called where necessary, propagates the info about the change up the tree to inform parents (until `host/space`) that they have to re-render themselves.
 
-Invalidation is fast, and is used a lot. Its hook to on-change saves the user from manually calling it on every facet update, which I consider just syntactic noise anyway, and it's easy to forget.
+Invalidation is fast, and is used a lot. Its hook to `on-change` saves the user from manually calling it on every facet update, which I consider just syntactic noise anyway, and it's easy to forget.
 
 One danger of invalidation is it can by accident happen during a render. As a result, after the render the host face will still be marked as invalid, triggering another render on the next timer event, and so the upper part of the tree never gets cached, wasting the resources. In debug mode a check is performed to detect this issue and warn about it. Most likely cause of it is a facet assignment somewhere in a space's style that is never checked for equality (`maybe` or `maybe/same` may solve it).
 
