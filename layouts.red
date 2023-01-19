@@ -42,11 +42,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [0x0 []]]	;-- empty list optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
 				#assert [:self/create =? context? bind word 'local]
 				set bind word 'local get word
 			]
+			if count <= 0 [return reduce [margin * 2x2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
