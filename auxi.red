@@ -561,7 +561,7 @@ context [
 		repeat n 1e3 [
 			df: abs f2 - f1
 			dx: abs x2 - x1
-			if error >= max abs f2 - f1 abs x2 - x1 [break]		;-- found it already; segment is too narrow
+			if error >= max df dx [break]				;-- found it already; segment is too narrow
 			y: call-f x: x1 + x2 / 2
 			;; in / case: y < fopt < y2 means x is new x1; in \ case: x is new x2
 			either positive? fopt - y * sign [x1: x f1: y][x2: x f2: y]		;-- use new low or high boundary
@@ -852,7 +852,7 @@ fast-remove: function [block [any-block!] length [integer!]] [
 	clear other
 ]
 
-;; extend & expand are taken already
+;; extend & expand are taken already ;@@ prolong?
 enlarge: function [
 	"Ensure certain SIZE of the BLOCK, fill empty space with VALUE"
 	block [any-block!] size [integer!] value [any-type!]
