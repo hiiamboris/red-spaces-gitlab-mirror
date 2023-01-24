@@ -160,26 +160,6 @@ box-distance?: function [
 ; test for it:
 ; view [a: base 100x20 loose b: base 20x100 loose return t: text 100 react [t/text: form box-distance? a/offset a/offset + a/size b/offset b/offset + b/size]]
 
-interpolate: function [
-	"Interpolate a value between V1 and V2"
-	v1 [number!]
-	v2 [number!]
-	t  [number!] "[0..1] corresponds to [V1..V2]"
-	/clip        "Force T within [0..1], making outside regions constant"
-	/reverse     "Treat T as a point on [V1..V2], return a point on [0..1]"
-][
-	case/all [
-		reverse     [t: t - v1 / (v2 - v1)]
-		clip        [t: max 0.0 min 1.0 t]
-		not reverse [t: add  v1 * (1.0 - t)  v2 * t]
-	]
-	t
-]
-
-#assert [
-	50% = interpolate -100% 200% 0.5
-]
-
 ~=: make op! function [a [number!] b [number!]] [
 	to logic! any [
 		a = b
@@ -543,6 +523,26 @@ max-safe: function [a [scalar! none!] b [scalar! none!]] [
 	any [all [a b max a b] a b]
 ]
 
+interpolate: function [
+	"Interpolate a value between V1 and V2"
+	v1 [number!]
+	v2 [number!]
+	t  [number!] "[0..1] corresponds to [V1..V2]"
+	/clip        "Force T within [0..1], making outside regions constant"
+	/reverse     "Treat T as a point on [V1..V2], return a point on [0..1]"
+][
+	case/all [
+		reverse     [t: t - v1 / (v2 - v1)]
+		clip        [t: max 0.0 min 1.0 t]
+		not reverse [t: add  v1 * (1.0 - t)  v2 * t]
+	]
+	t
+]
+
+#assert [
+	50% = interpolate -100% 200% 0.5
+]
+
 context [
 	set 'binary-search function [
 		"Look for optimum F(x)=Fopt on a segment [X1..X2] using binary search, return [X1 F1 X2 F2]"
@@ -572,6 +572,135 @@ context [
 	]
 	
 	call-f: func [x] with :binary-search [set word x do f]
+]
+
+build-index: reproject: reproject-range: none			;-- don't make these global, keep in spaces/ctx
+context [
+	;@@ can parts of this context be generalized and put into /common?
+	
+	set 'build-index function [
+		"Build an index of given length for fast search over points"
+		points [block! vector!] (4 <= length? points)
+		length [integer!] (length >= 1)
+	][
+		#assert [all [points/1 = 0 points/2 = 0]]		;@@ I may want to generalize it later, but no need yet
+		yindex: copy xindex: make vector! length
+		clear xindex  clear yindex
+		top:    skip tail points -2
+		xrange: top/1 - points/1
+		yrange: top/2 - points/2
+		dx: xrange * 1.000001 / length					;-- stretch a bit to ensure never picking at the tail
+		dy: yrange * 1.000001 / length
+		ix: iy: 1
+		ipoint: -1  foreach [xi yi] next next points [	;@@ use for-each/reverse?
+			ipoint: ipoint + 2
+			ix: 1 + to integer! xi / dx
+			iy: 1 + to integer! yi / dy
+			append/dup xindex ipoint     ix - length? xindex
+			append/dup yindex ipoint + 1 iy - length? yindex
+		]
+		obj: construct [points: xstep: ystep: xindex: yindex:]
+		set obj reduce [points  dx     dy     xindex  yindex]
+		obj
+	]
+	#assert [
+		[1]     = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 1 'xindex
+		[2]     = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 1 'yindex
+		[1 3]   = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 2 'xindex
+		[2 4]   = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 2 'yindex
+		[1 3 5] = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 3 'xindex
+		[2 4 6] = to [] select build-index [0 0 2 2 6 6 8 8 10 10] 3 'yindex
+		[1 3 5] = to [] select build-index [0 0 2 2 6 6 10 10] 3     'xindex
+		[2 4 6] = to [] select build-index [0 0 2 2 6 6 10 10] 3     'yindex
+		[1 1 5] = to [] select build-index [0 0 4 4 6 6 10 10] 3     'xindex
+		[2 2 6] = to [] select build-index [0 0 4 4 6 6 10 10] 3     'yindex
+		[1 1 3] = to [] select build-index [0 0 5 5 10 10] 3         'xindex
+		[2 2 4] = to [] select build-index [0 0 5 5 10 10] 3         'yindex
+	]
+	
+	locate: function [
+		points [block!]
+		index  [vector!]
+		step   [number!]
+		value  [number!]
+	][
+		#assert [value / step < length? index  "value out of the function's domain"]
+		pos: at points pick index 1 + to integer! value / step
+		;; find *first* segment that contains the value
+		while [all [pos/5 value > pos/3]] [pos: skip pos 2]		;@@ use general locate when fast
+		#assert [all [pos/1 <= value  value <= pos/3]]
+		pos
+	]
+	find-x: function [fun [object!] x [number!]] [
+		locate fun/points fun/xindex fun/xstep x
+	]
+	find-y: function [fun [object!] y [number!]] [
+		locate fun/points fun/yindex fun/ystep y
+	]
+	#assert [
+		f: build-index [0 0 1 2 2 4 2 5 4 8] 3
+		[1 1 3 3 7 7 7] = map-each x [0 1 1.1 2 2.1 3.9 4] [index? find-x f x]
+		[2 2 4 4 6 8 8] = map-each y [0 2 2.1 4 4.1 5.1 8] [index? find-y f y]
+	]
+	
+	;; 'reproject' meaning get inverse projection from X to function line and then project into Y
+	;@@ maybe there's a better name I don't see yet... X2Y and Y2X func pair?
+	set 'reproject function [
+		"Find value Y=F(X) given X on a non-decreasing function"
+		fun [object!] "Indexed function as a sequence of points [X1 Y1 ... Xn Yn]"
+		x   [number!] "X value"
+		/up      "If Y is not unique, return highest corresponding value (default: lowest)"
+		/inverse "Given Y find an X"
+	][
+		xs: either inverse [find-y fun y][find-x fun x]
+		;; find *last* segment that contains the value
+		if up [while [all [xs/5  xs/3 <= x]] [xs: skip xs 2]]	;@@ use for-each
+		ys: either inverse [back xs][next xs]
+		interpolate ys/1 ys/3 x - xs/1 / (xs/3 - xs/1)
+	]
+	comment [											;-- interactive test
+		f: build-index [0 0 1 2 2 4 2 5 4 5 7 8]
+		sc: 400 / 8
+		view [
+			base white 400x400 all-over on-over [try [
+				trace: map-each [x y] f/points [as-pair sc * x sc * y]
+				x: event/offset/x / sc
+				y: event/offset/y / sc
+				y1: sc * reproject    f x
+				y2: sc * reproject/up f x
+				x1: sc * reproject/inverse    f y
+				x2: sc * reproject/inverse/up f y
+				face/draw: compose/deep [
+					pen magenta line (trace)
+					pen cyan
+					shape [
+						move (event/offset) vline (y1)
+						move (event/offset) hline (x1)
+						move (0 by y1) 'hline (event/offset/x)
+						move (0 by y2) 'hline (event/offset/x)
+						move (x1 by 0) 'vline (event/offset/y)
+						move (x2 by 0) 'vline (event/offset/y)
+					]
+				]
+			]]
+		]
+	]
+	
+	set 'reproject-range function [
+		"Return segment [Y1 Y2] projected by function FUN from segment [X1 X2]"
+		fun [object!] "Indexed function as a sequence of points [X1 Y1 ... Xn Yn]"
+		x1  [number!]
+		x2  [number!] (x2 >= x1)
+		/inverse "Given Ys find Xs"
+	][
+		reduce either inverse [[								;@@ use apply!
+			reproject/inverse    fun x1
+			reproject/inverse/up fun x2
+		]] [[
+			reproject    fun x1
+			reproject/up fun x2
+		]]
+	]
 ]
 
 ;; constraining is used by `render` to impose soft limits on space sizes
