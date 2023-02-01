@@ -20,6 +20,12 @@ make-layout: function [
 ]
 
 layouts: make map! to block! context [					;-- map can be extended at runtime
+	import-settings: function [settings [block!] ctx [word!]] [
+		foreach word settings [
+			#assert [(context? ctx) =? context? bind word ctx]
+			set bind word 'local get word
+		]
+	]
 
 	list: context [
 		;; settings for list layout:
@@ -42,10 +48,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			foreach word settings [						;-- free settings block so it can be reused by the caller
-				#assert [:self/create =? context? bind word 'local]
-				set bind word 'local get word
-			]
+			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			if count <= 0 [return reduce [margin * 2x2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
@@ -131,10 +134,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [0x0 []]]
-			foreach word settings [						;-- free settings block so it can be reused by the caller
-				#assert [:self/create =? context? bind word 'local]
-				set bind word 'local get word
-			]
+			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#debug [typecheck [
 				axes     [
 					block! (
@@ -196,8 +196,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; obtain constraints info
 			;; `info` can't be static since render may call another layout/create; same for other arrays here
 			;; info format: [space-object draw-block available-extension weight]
-			info: obtain block! count * 4
-			#leaving [stash info]
+			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
 			ccanvas: subtract-canvas constrain canvas limits 2 * margin
@@ -240,8 +239,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			;; split info into rows according to found min widths
 			;; rows coordinate system is always [x=e y=s] for simplicity; results are later normalized
-			rows: obtain block! 30
-			row:  obtain block! count * 4
+			rows: make [] 30
+			row:  make [] count * 4
 			row-size: -1x0 * spacing					;-- works because no row is empty, so spacing will be added (count=0 handled above)
 			allowed-row-width: ccanvas/:x				;-- how wide rows to allow (splitting margin)
 			peak-row-width: 0							;-- used to determine full layout size when some row is bigger than the canvas
@@ -258,7 +257,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					row-size:   new-row-size
 					row-weight: max row-weight weight
 				][										;-- else move this item to next row
-					append (new-row: obtain block! length? row) row
+					append (new-row: make [] length? row) row
 					repend rows [row-size row-weight new-row]
 					total-length: total-length + row-size/y		;-- add before resetting row-size
 					clear row
@@ -270,7 +269,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			repend rows [row-size row-weight row]
 			total-length: total-length + row-size/y
-			#leaving [foreach [_ _ row] rows [stash row]  stash rows]
 
 			;; expand row items - facilitates a second render cycle of the row
 			;; this collects row heights (canvas/:y is still infinite)
@@ -384,213 +382,409 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	;; has no support for axes or weight
 	;@@ maybe remove limits and apply them to canvas in advance?
 	paragraph: context [
-		;; settings for paragraph layout:
-		;;   align          [none! word!]   one of: [left center right fill], default: left
-		;;   baseline      [float! percent!]  0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
-		;;   margin        [integer! pair!]   >= 0x0
-		;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
-		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
-		;;   limits        [none! object!]
-		;;   indent        [none! block!]   [first: integer! rest: integer!], first and rest are independent of each other 
-		create: function [
-			"Build a paragraph layout out of given spaces and settings as bound words"
-			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [align margin spacing canvas limits]"
-			;; settings - imported locally to speed up and simplify access to them:
-			/local align baseline margin spacing canvas limits
-		][
+		;; paragraph has 3 coordinate spaces (CS):
+		;; - 1D CS ("original") - all spaces form a single tight row, vertically aligned along the baseline
+		;;   this is the CS /map is expressed in
+		;; - 1D' CS (aka "unrolled 2D") - Y is the same as in 1D CS, X usually bigger, sometimes smaller
+		;;   it may have words scaled, padded with spaces, etc.
+		;;   it consists of whole rows of fixed width, so row number = x / total-width
+		;;   this CS is used by mapping function from 1D CS (since mapping has to be monotonic)
+		;; - 2D CS ("rolled 2D") - 1D' CS split into chunks, so x here = 1D'x % total-width
+		;;   Y depends on each rows height
+		;;   this is what user actually sees, where clicks land, etc
+		;; coordinates usually include the CS name to avoid confusion
+		
+		;; builds a tight (no spacing/margin) map in 1D space, vertically aligned
+		;@@ must be rebuilt on spacing or baseline change (or content or any item's size change)
+		;@@ it shares a lot with list layout (1st phase) - can I unify them?
+	    build-map: function [spaces [block! function!] baseline [float! percent!]] [
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [0x0 [] []]]
-			foreach word settings [						;-- free settings block so it can be reused by the caller
-				#assert [:self/create =? context? bind word 'local]
-				set bind word 'local get word
-			]
-			#debug [typecheck [
-				align    [word! (find [left center right fill] align) none!]
-				baseline [percent! float!]
-				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
-				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
-				canvas   [none! pair!]
-				limits   [object! (range? limits) none!]
-				indent   [block! (valid-indent? indent) none!]
-			]]
-			default align:    'left
-			default baseline: 80%
-			default canvas:   infxinf					;-- none to pair normalization
-			set [|canvas|: fill:] decode-canvas canvas
-			default indent:   []
-			indent1: any [indent/first 0]
-			indent2: any [indent/rest  0]
-			margin:  margin  * 1x1						;-- integer to pair normalization
-			spacing: spacing * 1x1
-			info: obtain block! count * 2
-			#leaving [stash info]
-			
-			;; clipped canvas - used for allowed width fitting
-			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
-			#debug sizing [#print "paragraph canvas=(canvas) ccanvas=(ccanvas)"]
-			
-			;; render everything
+	    	map:   make [] count * 2
+	    	if empty? map [return reduce [map 0x0]]
+	    	
+	    	offset: total: 0x0							;-- margin is not accounted for in the map, so it's easier to change
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
-				;; linebreaks will be rendered on finite canvas so they set their size (matters if they are made visible):
-				;@@ not sure, maybe they should stretch to total-width, but canvas/x seems more reasonable
-				;; using infxinf canvas for the rest to avoid wrapping and any canvas dependence (which also avoids extra renders)
-				;@@ I could make an extra render run to stretch items vertically to row height,
-				;@@ but that won't work for spaces that get wrapped to the next row: row sizes may differ
-				;@@ I could use min of all of them, but so far I see no clear need in this slowdown
-				drawn: render/on space either space/type = 'break [canvas][infxinf]
-				repend info [space drawn]
+				drawn: render space						;-- for subparagraphs and lists canvas is infinite
+				compose/deep/only/into [
+					(space) [offset: (offset) size: (space/size) drawn: (drawn)]
+				] tail map
+				offset/x: offset/x + space/size/x
+				total: max total space/size				;-- need row height for aligning items
+			]
+			foreach [space geom] map [					;-- align vertically along a common baseline
+				geom/offset/y: round/to total/y - space/size/y * baseline 1	
+			]
+	    	reduce [map total]
+	    ]
+
+		;; builds a mapping 1Dx -> offset-in-map, to locate relevant spaces quickly
+		index-map: function [map [block!]] [
+			points: clear []
+			x: o: 0
+			repend points [x o]
+			foreach [space geom] map [					;@@ use map-each
+				repend points [x: x + geom/size/x  o: o + 1]
+			]
+			build-index copy points n: x >> 5 + 1		;-- 1 point per 32 px
+		]
+		
+		;; lists all sections of all child spaces
+		;@@ use sec-cache for the buffer?
+		list-sections: function [map [block!] total [integer!]] [
+	    	generate-sections map total sections: clear []
+	    	;@@ make leading spaces significant?
+	    	copy sections
+		]
+	    
+		words-period: 4								;-- helpful constant
+			
+	    ;; groups sections by their sign into 'words', and returns them in this format:
+	    ;; [word-x1-1D by word-x2-1D   word-width(int)   white?(logic)   sections-slice(pair)]
+	    list-words: function [sections [block!]] [
+	    	words: clear []
+	    	unless empty? sections [
+		    	offset: width: sec-end: sec-bgn: 0
+				white?: sections/1 > 0
+		    	foreach w sections [					;@@ use for-each
+		    		#assert [w <> 0]					;-- zero reserved for tabs
+		    		sec-end: sec-end + 1
+		    		next-white?: if next-sec: sections/(sec-end + 1) [next-sec > 0]
+					width: width + abs w
+		    		if white? <> next-white? [
+			    		repend words [
+			    			0 by width + offset			;-- word's x1..x2 in 1D
+			    			width						;-- word's 1D' width (= 1D width now, may be scaled later)
+			    			white?						;-- whether word's empty or not
+			    			sec-bgn by sec-end			;-- sections slice used by the word
+			    		]
+			    		white?: next-white?
+			    		sec-bgn: sec-end
+		    		]
+		    	]
+	    	]
+	    	copy words
+	    ]
+	    #assert [
+	    	[] = list-words []
+	    	[0x6 6 #[false] 0x3] = list-words [1 2 3]
+	    	[0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] = list-words [-1 -2 1 2 3 -4]
+	    ]
+	    
+	    ;@@ ensure this is not called with /force-wrap 
+	    ;; estimates minimum total width of the paragraph (without margin) given indents and words
+	    get-min-total-width-2D: function [words [block!] indent1 [integer!] indent2 [integer!]] [
+			;; tricky algorithm to account for the case where indent1 < indent2:
+			;; indent1-> w1 w2 long-word
+			;; indent2          -> long-word
+			;; i.e. it's more optimal to keep long-word in the 1st row than the 2nd
+			;; after a few iterations only indent2+width matters then
+	    	total: indent1 + any [words/2 0]
+	    	foreach [wordx width white? _] skip words 4 [		;@@ use accumulate
+	    		unless white? [
+		    		total: max total min (indent1 + wordx/2) (indent2 + wordx/2 - wordx/1)
+	    		]
+	    	]
+	    	total
+	    ]
+	    #assert [
+	    	10 = get-min-total-width-2D [] 10 20
+	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
+	    	23 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 30
+	    	13 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
+	    	8  = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 2
+	    ]
+	    
+		;; copy words into buffer, until it fits row-width (or until scaling factor worsens in 'scale mode)
+		fill-row: function [buffer [block!] words [block!] sections [block!] row-avail-width [integer!] align [word!] wrap? [logic!]] [
+			accept-word?: pick [
+				[new-used-width <= row-avail-width]
+				[										;-- 'scale mode may exceed row-avail-width
+					new-scale: new-used-width / row-avail-width
+					old-scale: row-used-width / row-avail-width
+					(max new-scale 1 / new-scale) > (max old-scale 1 / old-scale)	;-- may succeed once when crosses row-avail-width
+				]
+			] align <> 'scale 
+			
+			set [word-x-1D: word-width: white?: word-sections:] words-end: words	;-- always add at least one word
+			row-used-width: either white? [word-width][0]
+			while [not tail? words-end: skip words-end words-period] [
+				if white?: words-end/3 [continue]				;-- add as many empty words as possible
+				new-used-width: words-end/1/2 - word-x-1D/1
+				unless do accept-word? [break]
+				row-used-width: new-used-width
 			]
 			
-			;; split info into rows according to found widths
-			rows: obtain block! 50						;-- [row-offset row-scale clip-start clip-end row ...]
-			row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
-			#leaving [foreach [_ _ _ _ row] rows [stash row]  stash rows]
-			
-			allowed-row-width: max 0 ccanvas/x			;-- how wide rows to allow (splitting margin)
-			total-length: total-width: 0				;-- total final extent of non-empty area
-			row-width: row-hidden: row-visible: row-height: 0	;-- per-row counters
-			row-indent: indent1
-			
-			;; next part relies on other functions from the context:
-			foreach [space: drawn:] info [				;@@ use for-each
-				sections: if in space 'sections [space/sections]	;-- calls if a function
-				either sections [
-					offset: 0
-					foreach width sections [
-						;; empty part is significant at head - for code indentation
-						;; and at tail - for sub-paragraphs (e.g. in urls) to not eat spaces (handled later)
-						either any [width > 0 offset = 0] [
-							commit-part space drawn offset offset + abs width
-						][
-							commit-empty width: negate width	;-- soft break on empty region (whitespace)
-						]
-						offset: offset + width
-					]
+			append/part row-words: tail buffer words words-end
+			if all [									;-- split the word itself if it's bigger than the canvas
+				align <> 'scale
+				row-used-width > row-avail-width
+			][
+				#assert [words-period = offset? words words-end]	;-- single word in the row
+				#assert [force-wrap?]					;-- no-wrap mode must have adjusted the row-avail-width
+				#assert [0 < span? word-sections]
+				#assert [not white?]					;-- whitespace does not increase used width
+				
+				;; try adding part of the word section by section
+				unless block? sec-slice: word-sections [		;-- it's only block after a word gets split
+					sec-slice: copy/part sections 1 + word-sections
+				]
+				sec-width: 0
+				sec-added: 0
+				foreach w sec-slice [					;@@ use for-each
+					sec-width: sec-width + abs w
+					if new-width > row-avail-width [break]
+					sec-width: new-width
+					sec-added: sec-added + 1
+				]
+				either sec-added = 0 [					;-- add only a part of the section
+					#assert [new-width > row-avail-width]
+					sec-width: row-avail-width
+					;; modify the sections themselves for next iteration to work
+					sec-slice/1: (abs w) - sec-width * (sign? w)
+					word-sections: sec-slice
 				][
-					either space/type = 'break [		;-- ensure break is always on a separate line
-						new-row
-						commit-space space drawn
-						new-row
-					][									;-- normal space
-						commit-space space drawn
-						commit-empty spacing/x
-					]
+					word-sections: sec-added by 0 + word-sections
 				]
+				word1: 0 by sec-width + word-x-1D/1		;-- commit only part the the word
+				word2: sec-width by 0 + word-x-1D
+				rechange row-words [word1 sec-width white? none]	;-- sections are unused in row-words (can be none)
+				rechange words [									;-- subtract the committed part from the next word
+					word2 (word-width - sec-width) white? word-sections
+				]
+				row-used-width: sec-width
+				words-end: words						;-- no word was added
 			]
-			row-visible: row-width - row-hidden			;-- force trailing space to become significant
-			unless empty? row [new-row]					;-- count last row's size
-			#assert [any [empty? rows  not empty? last rows]]	;-- can be empty if all spaces are whitespace
-			if total-length > 0 [total-length: total-length - spacing/y]
 			
-			;; build the map & fix alignment
-			;; vertical alignment requires final row height
-			;; horizontal alignment requires final total width (known after all rows are finished)
-			;; map cannot have doubled (wrapped) items, because focus should be set on the whole item
-			;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
-			map: clear []
-			forall rows [								;@@ use for-each or map-each
-				set [row-offset: row-indent: row-clip-start: row-clip-end: row:] rows
-				rows/2: 1.0								;-- replace indent by scale 
-				left:  total-width - row-indent - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
-				shift: left * select #(left 0 fill 0 right 1 center 0.5) align
-				if align = 'fill [						;-- set the scale
-					unless any [
-						empty? row
-						row/1/type = 'break				;-- don't scale linebreak row
-						tail? skip rows 5				;-- don't scale the last row or it's always scaled
+			reduce [row-used-width words-end]
+		]
+		
+		float-vector: make vector! [float! 64 10]
+		;; evenly distributes remaining whitespace in fill mode
+		distribute-whitespace: function [words [block!] size [integer!]] [
+			n-white: 0
+			foreach [_ _ white? _] words [if white? [n-white: n-white + 1]]
+			if n-white = 0 [exit]						;-- no empty words in the row, have to leave it left-aligned
+			append/dup clear float-vector size / n-white n-white
+			white: quantize float-vector
+			while [not tail? words] [					;@@ use for-each
+				words/2: words/2 + white/1				;-- modifies word-width-1D
+				words: skip words words-period
+				white: next white
+			]
+		]
+		
+		;; unifies all words except trailing whitespace into one (for faster drawing)
+		;, also groups trailing whitespace
+		group-words: function [words [block!]] [
+			-skip: negate words-period
+			group-end: tail words
+			while [group-end/-2 = yes] [				;@@ due to #5119 find/last/skip cannot be used 
+				group-end: skip group-end -skip
+			]
+			; if words-period < length? group-end [  		;-- group whitespace
+				; words-end: tail group-end
+				; range-1D: group-end/1/1 by words-end/-4/2 
+				; clear rechange group-end [range-1D span? range-1D yes none]
+			; ]
+			if words-period < offset? words group-end [	;-- group words
+				range-1D: words/1/1 by group-end/-4/2 
+				remove/part
+					rechange words [range-1D span? range-1D no none]
+					group-end
+			]
+		]
+		
+		;; measures y1 (upper) and y2 (lower) of spaces spanned by the row
+		get-row-y1y2: function [map [block!] map-offset1 [integer!] map-offset2 [integer!]] [
+			map: skip map map-offset1 * 2
+			y1: y2: 0
+			for i: map-offset1 map-offset2 [
+				geom: pick map i * 2
+				y1: min y1 geom/offset/y
+				y2: max y2 geom/offset/y + geom/size/y
+			]
+			reduce [y1 y2]
+		]
+				
+		;; settings for paragraph layout:
+		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
+		;;   baseline      [float! percent!]  0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
+		;;   margin        [integer! pair!]   >= 0x0
+		;;   spacing         [integer!]       >= 0 - vertical distance between rows
+		;;   canvas            [pair!]        if infinite, produces a single row
+		;;   limits        [none! object!]
+		;;   indent        [none! block!]     [first: integer! rest: integer!], first and rest are independent of each other
+		;;   force-wrap?      [logic!]        prioritize canvas width and allow splitting words at *any pixel, even inside a character*
+		;@@ ensure spacing is used for vertical distancing (may forget it :)
+		;@@ move canvas constraining into render, remove limits?
+		create: function [
+			"Build a paragraph layout out of given spaces and settings as bound words"
+			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+			settings [block!] "Any subset of [align baseline margin spacing canvas limits indent force-wrap?]"
+			;; settings - imported locally to speed up and simplify access to them:
+			/local align baseline margin spacing canvas limits indent force-wrap?
+		][
+			import-settings settings 'local				;-- free settings block so it can be reused by the caller
+			#debug [typecheck [
+				align    [word! (find [left center right fill scale upscale] align) none!]
+				baseline [percent! float!]
+				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+				spacing  [integer! (0 <= spacing)]		;-- vertical only!
+				canvas   [pair!]
+				limits   [object! (range? limits) none!]
+				indent   [block! (valid-indent? indent) none!]
+			]]
+			set [map: total-1D:] build-map spaces baseline
+			if empty? map [return copy/deep reduce [margin * 2x2 [] []]]	;@@ return value needs correction
+			
+			default align:  'left
+			default canvas: infxinf						;-- none to pair normalization
+			set [|canvas|: fill:] decode-canvas canvas
+			default indent: []
+			indent1: any [indent/first 0]
+			indent2: any [indent/rest  0]
+			margin:  margin * 1x1						;-- integer to pair normalization
+			
+			;; clipped canvas - used to find desired paragraph width
+			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
+			#debug sizing [#print "paragraph canvas=(canvas) ccanvas=(ccanvas)"]
+			
+			x-1D-to-map-offset: index-map map
+			sections: list-sections map total-1D/x
+			words: list-words sections
+			total-2D: 1x0 * ccanvas						;-- without margins
+			unless force-wrap? [						;-- extend width to the longest predicted row
+				total-2D/x: max total-2D/x get-min-total-width-2D words indent1 indent2
+			]
+			
+			;; lay out rows...
+			
+			indent:            indent1
+			nrows:             0
+			row-y1-2D:         0
+			x-1D-1D'-points:   clear []
+			y-irow-points:     clear []
+			y-levels:          clear []
+			layout-drawn:      clear []
+			get-in-row-indent: switch/default align [
+				right [[row-left-width]]
+				center [[round/ceiling/to half row-left-width 1]]
+			] [0]
+			while [not tail? words] [
+				;; consume some words (or part of a single word)
+				row-words: clear []
+				row-avail-width: max 1 total-2D/x - indent		;-- disallow rows of 0 pixels ;@@ 1px may still be rather slow!
+				set [row-used-width: words:] fill-row row-words words sections row-avail-width align force-wrap?
+				last-word:  skip tail row-words -4
+				row-left-width: max 0 row-avail-width - row-used-width
+				
+				row-x1-1D:  words/1/1
+				row-x2-1D:  last-word/1/2				;-- row x1-x2 includes the trailing whitespace, unlike used-width
+				row-x1-1D': nrows     * total-2D/x
+				row-x2-1D': nrows + 1 * total-2D/x
+				#assert [row-x2-1D > row-x1-1D]
+				
+				;; unify, pad, scale words
+				#assert [not empty? row-words]
+				if 1 < nwords: length? row-words [
+					either align <> 'fill [
+						group-words row-words			;-- leaves row-words/2 unset (zero)
 					][
-						;@@ ideally I should also stretch empty parts but it's tricky to implement
-						width: first row-clip-end - row-clip-start
-						limit: 90%
-						scale: allowed-row-width - row-indent / (max 1 width)
-						scale: clip scale limit 1 / limit
-						;; reduce scale to align it to pixels, else width may become 1px bigger than the canvas:
-						rows/2: scale: min scale (to integer! scale * width) / width
-						total-width: max total-width row-indent + round/to width * scale 1
+						if row-left-width > 0 [
+							distribute-whitespace row-words row-left-width / (nwords - 1)
+						]
 					]
 				]
-				rows/1: row-offset + (shift by 0)
-				pos: 0x0
-				forall row [							;@@ use for-each or map-each
-					space: row/1
-					;; remember vertical offset within the row (used by /draw and /into):
-					row/2: row/2 by round/to row-clip-end/y - space/size/y * baseline 1	
-					unless space =? pick tail map -2 [	;-- do not duplicate items in the map
-						repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
-					]
-					row: skip row 2
+				if align <> 'fill [
+					row-words/2: either find [scale upscale] align
+						[row-avail-width][row-used-width]
 				]
-				rows: skip rows 4
-			]
-			size: 2 * margin + (total-width by total-length)
-			#debug sizing [#print "paragraph c=(canvas) cc=(ccanvas) >> size=(size)"]
-			#assert [size +< infxinf]
 			
-			;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
-			;; so return format is different too ;@@ any way to unify return format with the others?
-			reduce [size copy map copy/deep rows]		;@@ should rows include margin offset? currently they do not
-		]
-		
-		;; these are externalized from the /create function to avoid spawning new functions all the time
-		commit-empty: func [width] with :create [				;-- soft break (usually whitespace)
-			if empty? row [row-hidden: row-hidden + width]
-			row-width: row-width + width
-		]
-		commit-space: func [space drawn] with :create [			;-- whole space object (indivisible)
-			claim space/size/x
-			row-height: max row-height space/size/y
-			repend row [space row-width - space/size/x drawn]
-		]
-		commit-part: func [space drawn offset1 offset2] with :create [	;-- region of space (usually chars)
-			claim width: offset2 - offset1						;-- offsets carry the info on where this section is located
-			unless space =? pick tail row -3 [					;-- it's not the last added space? (was split or is a new one)
-				row-height: max row-height space/size/y
-				if empty? row [
-					row-hidden: offset1
-					row-width:  offset2
+				;; collect x mapping points
+				in-row-indent: do get-in-row-indent
+				words-offset-1D': row-x1-1D' + indent + in-row-indent
+				repend x-1D-1D'-points [
+					row-x1-1D row-x1-1D'				;-- left visible row margin (before indenting)
+					row-x1-1D words-offset-1D'			;-- indent's end = word's start
 				]
-				repend row [space row-width - offset2 drawn]
-			]
-		]
-		claim: func [width] with :create [
-			if all [
-				not empty? row
-				row-indent + row-width - row-hidden + width > allowed-row-width
-			] [new-row]
-			row-width:   row-width + width
-			row-visible: row-width - row-hidden
-		]
-		
-		;; hidden [ visible ] empty  (both edges are hidden but I only keep track of the 1st, so I call it 'hidden')
-		;; <-      row-width     ->
-		new-row: does with :create [
-			repend rows [
-				(row-indent - row-hidden) by total-length	;-- row offset
-				row-indent								;-- row indent at first, then replaced by row-scale
-				row-hidden by 0							;-- clip start
-				row-hidden + row-visible by row-height	;-- clip end
-				copy row
-			]
-			clear row
-			total-length: total-length + row-height + spacing/y
-			total-width:  max total-width row-indent + row-visible
-			row-hidden: row-width: row-visible: row-height: 0
-			row-indent: indent2
-		]
-		
-		#debug [
-			valid-indent?: function [indent [block!]] [
-				all [
-					find [none! integer!] indent/first
-					find [none! integer!] indent/rest
+				offset-1D': words-offset-1D'
+				foreach [word-x-1D word-width-1D' white? _] row-words [		;-- add all words' end
+					offset-1D': min row-x2-1D' offset-1D' + word-width-1D'	;-- clip x at row's end
+					repend x-1D-1D'-points [word-x-1D/2 offset-1D']
 				]
+				
+				;; measure the row vertically
+				set [map-ofs1: map-ofs2:] reproject-range x-1D-to-map-offset row-x1-1D row-x2-1D - 1
+				set [row-y1-1D: row-y2-1D:] get-row-y1y2 map map-ofs1 map-ofs2
+				row-y2-2D:  row-y1-2D + (row-y2-1D - row-y1-1D)
+				row-y0-2D:  row-y2-2D - row-y2-1D
+				row-height: row-y2-1D - row-y1-1D
+				repend y-levels [row-y0-2D row-y1-2D row-y2-2D]
+				repend y-irow-points [row-y1-2D nrows row-y2-2D nrows]	;-- zero-based row number
+				
+				;; draw the row
+				row-drawn: clear []
+				word-offset: 0
+				repend row-drawn ['translate word-x1-2D by row-y0-2D]
+				foreach [word-x-1D word-width-1D' white? _] row-words [
+					#assert [0 < span? word-x-1D]
+					word-scale: word-width-1D' / span? word-x-1D
+					set [map-ofs1: map-ofs2:] reproject-range x-1D-to-map-offset word-x-1D/1 word-x-1D/2 - 1
+					#assert [map-ofs2 >= map-ofs1]
+					
+					geom1: pick map map-ofs1 * 2
+					spaces-drawn: clear []
+					for i: map-ofs1 map-ofs2 [
+						geom: pick map i * 2
+						compose/only/into [
+							translate (geom/offset - (geom1/offset * 1x0)) (geom/drawn)
+						] tail spaces-drawn
+					]
+					
+					offset1: geom1/offset/x - word-x-1D/1		;-- negative x offset of 1st space within the word
+					#assert [offset1 <= 0]
+					word-span: span? word-x2-1D word-x1-1D
+					word-drawn: compose/only [
+				  		translate (word-offset by 0)			;-- move to the 2D point
+				  		scale (word-scale) 1.0
+				  		clip 0x0 (word-span by row-height)
+				  		translate (offset1 by 0)				;-- account for word's offset within geom/size/x
+				  		(copy spaces-drawn)
+					]
+					repend row-drawn ['push word-drawn]
+					word-offset: word-offset + word-span
+				]
+				word-x1-2D: indent + in-row-indent
+				compose/only/into [
+					translate (indent + in-row-indent by row-y0-2D)
+					(copy row-drawn)
+				] tail layout-drawn
+			
+				
+				;@@ indent: indent2
+				;@@ words: skip..
+				row-y1-2D: row-y2-2D
+				nrows: nrows + 1
 			]
+			total-2D/y: row-y1-2D
+			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
+			
+			frame: construct compose/only [
+				size-1D:     (total-1D)
+				size-2D:     (total-2D)
+				map:         (map)
+				drawn:       (drawn)
+				y-levels:    (copy y-levels)
+				x1D-to-x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5)
+				y1D-to-row:  (build-index copy y-irow-points   total-2D/y >> 2)
+			]
+			
+			frame
 		]
-	]
+	]		
 	
 	ring: context [
 		;; settings for ring layout:
@@ -653,8 +847,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 						
 				;; initially arrange box centers uniformly around the 0x0 point
-				items: obtain block! count * period: 7
-				#leaving [stash items]
+				items: make [] count * period: 7
 				
 				repeat i count [
 					space: either func? [spaces/pick i][spaces/:i]
