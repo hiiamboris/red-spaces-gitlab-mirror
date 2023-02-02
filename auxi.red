@@ -32,6 +32,8 @@ svm:  system/view/metrics
 svmc: system/view/metrics/colors
 
 half: func [x] [x / 2]
+round-down: func [x] [to integer! x]
+round-up:   func [x] [round/to/ceiling x 1]
 
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
@@ -649,14 +651,17 @@ context [
 		"Find value Y=F(X) given X on a non-decreasing function"
 		fun [object!] "Indexed function as a sequence of points [X1 Y1 ... Xn Yn]"
 		x   [number!] "X value"
-		/up      "If Y is not unique, return highest corresponding value (default: lowest)"
-		/inverse "Given Y find an X"
+		/up       "If Y is not unique, return highest corresponding value (default: lowest)"
+		/inverse  "Given Y find an X"
+		/truncate "Convert result to integer"
 	][
 		xs: either inverse [find-y fun y][find-x fun x]
 		;; find *last* segment that contains the value
 		if up [while [all [xs/5  xs/3 <= x]] [xs: skip xs 2]]	;@@ use for-each
 		ys: either inverse [back xs][next xs]
-		interpolate ys/1 ys/3 x - xs/1 / (xs/3 - xs/1)
+		y: interpolate ys/1 ys/3 x - xs/1 / (xs/3 - xs/1)
+		if truncate [y: to integer! y]
+		y
 	]
 	comment [											;-- interactive test
 		f: build-index [0 0 1 2 2 4 2 5 4 5 7 8]
@@ -691,15 +696,26 @@ context [
 		fun [object!] "Indexed function as a sequence of points [X1 Y1 ... Xn Yn]"
 		x1  [number!]
 		x2  [number!] (x2 >= x1)
-		/inverse "Given Ys find Xs"
+		/inverse  "Given Ys find Xs"
+		/truncate "Convert result to integers"
 	][
-		reduce either inverse [[								;@@ use apply!
-			reproject/inverse    fun x1
-			reproject/inverse/up fun x2
-		]] [[
-			reproject    fun x1
-			reproject/up fun x2
-		]]
+		reduce either inverse [
+			either truncate [[								;@@ badly need apply!
+				reproject/inverse/truncate    fun x1
+				reproject/inverse/truncate/up fun x2
+			]] [[
+				reproject/inverse    fun x1
+				reproject/inverse/up fun x2
+			]]
+		] [
+			either truncate [[
+				reproject/truncate    fun x1
+				reproject/truncate/up fun x2
+			]] [[
+				reproject    fun x1
+				reproject/up fun x2
+			]]
+		]
 	]
 ]
 
@@ -724,6 +740,7 @@ constrain: function [
 
 #assert [infxinf = constrain infxinf none]
 
+;@@ rewrite this using inoutfunc?
 for: function ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] (same? type? i1 type? i2) code [block!]] [
 	either integer? i1 [
 		if i2 < i1 [exit]			;@@ return none or unset? `while` return value is buggy anyway
@@ -1041,11 +1058,15 @@ generate-sections: function [
 		if negative? skipped: offset - geom/offset/x [
 			append buffer skipped
 		]
-		batch: if in space 'sections [space/sections]	;-- calls if a function, may return none
-		append buffer any [batch geom/size/x]
+		case [
+			in space 'sections [append buffer space/sections]	;-- calls if a function, may return none
+			geom/size/x > 0    [append buffer geom/size/x]		;-- don't add empty (0) spaces
+		]
 		offset: offset - skipped + geom/size/x
 	]
-	if offset < width [append buffer offset - width]
+	if all [buffer/1 buffer/1 < 0] [buffer/1: abs buffer/1]		;-- treat margins as significant
+	if offset < width [append buffer width - offset]
+	#assert [not find/same buffer 0]
 	buffer
 ]
 #assert [[-10] = generate-sections [] 10 copy []]
