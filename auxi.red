@@ -659,7 +659,8 @@ context [
 		;; find *last* segment that contains the value
 		if up [while [all [xs/5  xs/3 <= x]] [xs: skip xs 2]]	;@@ use for-each
 		ys: either inverse [back xs][next xs]
-		y: interpolate ys/1 ys/3 x - xs/1 / (xs/3 - xs/1)
+		t: either xs/1 == xs/3 [either up [1][0]][x - xs/1 / (xs/3 - xs/1)]	;-- avoid zero-division
+		y: interpolate ys/1 ys/3 t
 		if truncate [y: to integer! y]
 		y
 	]
