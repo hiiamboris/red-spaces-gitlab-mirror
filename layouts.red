@@ -23,7 +23,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	import-settings: function [settings [block!] ctx [word!]] [
 		foreach word settings [
 			#assert [(context? ctx) =? context? bind word ctx]
-			set bind word 'local get word
+			set bind word ctx get word
 		]
 	]
 
@@ -401,7 +401,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
 	    	map:   make [] count * 2
-	    	if empty? map [return reduce [map 0x0]]
+	    	if count <= 0 [return reduce [map 0x0]]
 	    	
 	    	offset: total: 0x0							;-- margin is not accounted for in the map, so it's easier to change
 			repeat i count [
@@ -423,8 +423,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; builds a mapping 1Dx -> offset-in-map, to locate relevant spaces quickly
 		index-map: function [map [block!]] [
 			points: clear []
-			x: o: 0
-			repend points [x o]
+			repend points [x: 0 o: 0]					;@@ need 1-based offsets, more convenient to use with pick
 			foreach [space geom] map [					;@@ use map-each
 				repend points [x: x + geom/size/x  o: o + 1]
 			]
@@ -447,11 +446,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    	words: clear []
 	    	unless empty? sections [
 		    	offset: width: sec-end: sec-bgn: 0
-				white?: sections/1 > 0
+				white?: sections/1 < 0
 		    	foreach w sections [					;@@ use for-each
 		    		#assert [w <> 0]					;-- zero reserved for tabs
 		    		sec-end: sec-end + 1
-		    		next-white?: if next-sec: sections/(sec-end + 1) [next-sec > 0]
+		    		next-white?: if next-sec: sections/(sec-end + 1) [next-sec < 0]
 					width: width + abs w
 		    		if white? <> next-white? [
 			    		repend words [
@@ -462,6 +461,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			    		]
 			    		white?: next-white?
 			    		sec-bgn: sec-end
+			    		offset: offset + width
+			    		width: 0
 		    		]
 		    	]
 	    	]
@@ -481,8 +482,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; indent2          -> long-word
 			;; i.e. it's more optimal to keep long-word in the 1st row than the 2nd
 			;; after a few iterations only indent2+width matters then
-	    	total: indent1 + any [words/2 0]
-	    	foreach [wordx width white? _] skip words 4 [		;@@ use accumulate
+	    	total: indent1
+	    	foreach [wordx width white? _] words [		;@@ use accumulate
 	    		unless white? [
 		    		total: max total min (indent1 + wordx/2) (indent2 + wordx/2 - wordx/1)
 	    		]
@@ -491,10 +492,13 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    ]
 	    #assert [
 	    	10 = get-min-total-width-2D [] 10 20
-	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
-	    	23 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 30
-	    	13 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
-	    	8  = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 2
+	    	30 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
+	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 35
+	    	23 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 30
+	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 30
+	    	18 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 12
+	    	18 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
+	    	10 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 2
 	    ]
 	    
 		;; copy words into buffer, until it fits row-width (or until scaling factor worsens in 'scale mode)
@@ -504,7 +508,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				[										;-- 'scale mode may exceed row-avail-width
 					new-scale: new-used-width / row-avail-width
 					old-scale: row-used-width / row-avail-width
-					(max new-scale 1 / new-scale) > (max old-scale 1 / old-scale)	;-- may succeed once when crosses row-avail-width
+					;; plot of best scale func: https://i.gyazo.com/87bf83b060f2a6c6a12a12cbb4e29164.png
+					(max new-scale 1.0 / new-scale) < (max old-scale 1.0 / old-scale)	;-- may succeed once when crosses row-avail-width
 				]
 			] align <> 'scale 
 			
@@ -567,12 +572,14 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			n-white: 0
 			foreach [_ _ white? _] words [if white? [n-white: n-white + 1]]
 			if n-white = 0 [exit]						;-- no empty words in the row, have to leave it left-aligned
-			append/dup clear float-vector size / n-white n-white
+			append/dup clear float-vector 1.0 * size / n-white n-white
 			white: quantize float-vector
-			while [not tail? words] [					;@@ use for-each
-				words/2: words/2 + white/1				;-- modifies word-width-1D
+			while [not tail? words] [					;-- skip 1st word ;@@ use for-each
+				if words/3 [
+					words/2: words/2 + white/1			;-- modifies word-width-1D
+					white: next white
+				]
 				words: skip words words-period
-				white: next white
 			]
 		]
 		
@@ -598,10 +605,13 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		]
 		
 		;; measures y1 (upper) and y2 (lower) of spaces spanned by the row
-		get-row-y1y2: function [map [block!] map-offset1 [integer!] map-offset2 [integer!]] [
-			map: skip map map-offset1 * 2
-			y1: y2: 0
-			for i: map-offset1 map-offset2 [
+		get-row-y1y2: function [
+			map [block!]
+			map-offset1 [integer!] (map-offset1 >= 0)
+			map-offset2 [integer!] (map-offset2 >= map-offset1)
+		][
+			y1: 2e9  y2: 0
+			for i: map-offset1 + 1 map-offset2 + 1 [
 				geom: pick map i * 2
 				y1: min y1 geom/offset/y
 				y2: max y2 geom/offset/y + geom/size/y
@@ -611,7 +621,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				
 		;; settings for paragraph layout:
 		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
-		;;   baseline      [float! percent!]  0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
+		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing         [integer!]       >= 0 - vertical distance between rows
 		;;   canvas            [pair!]        if infinite, produces a single row
@@ -630,15 +640,25 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#debug [typecheck [
 				align    [word! (find [left center right fill scale upscale] align) none!]
-				baseline [percent! float!]
+				baseline [number!]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing)]		;-- vertical only!
 				canvas   [pair!]
 				limits   [object! (range? limits) none!]
 				indent   [block! (valid-indent? indent) none!]
 			]]
-			set [map: total-1D:] build-map spaces baseline
-			if empty? map [return copy/deep reduce [margin * 2x2 [] []]]	;@@ return value needs correction
+			set [map: total-1D:] build-map :spaces 1.0 * baseline
+			if empty? map [								;@@ return value needs optimization
+				return frame: construct compose/only [
+					size-1D:     0x0
+					size-2D:     (margin * 2x2)
+					map:         (map)
+					drawn:       (copy [])
+					y-levels:    (copy [])
+					x1D-to-x1D': (build-index copy [0 0 0 0] 1)
+					y1D-to-row:  (build-index copy [0 0 0 0] 1)
+				]
+			]
 			
 			default align:  'left
 			default canvas: infxinf						;-- none to pair normalization
@@ -678,10 +698,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				row-words: clear []
 				row-avail-width: max 1 total-2D/x - indent		;-- disallow rows of 0 pixels ;@@ 1px may still be rather slow!
 				set [row-used-width: words:] fill-row row-words words sections row-avail-width align force-wrap?
+				#assert [not empty? row-words]
 				last-word:  skip tail row-words -4
 				row-left-width: max 0 row-avail-width - row-used-width
 				
-				row-x1-1D:  words/1/1
+				row-x1-1D:  row-words/1/1
 				row-x2-1D:  last-word/1/2				;-- row x1-x2 includes the trailing whitespace, unlike used-width
 				row-x1-1D': nrows     * total-2D/x
 				row-x2-1D': nrows + 1 * total-2D/x
@@ -689,12 +710,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				
 				;; unify, pad, scale words
 				#assert [not empty? row-words]
-				if 1 < nwords: length? row-words [
+				if 1 < length? row-words [
 					either align <> 'fill [
 						group-words row-words			;-- leaves row-words/2 unset (zero)
 					][
-						if row-left-width > 0 [
-							distribute-whitespace row-words row-left-width / (nwords - 1)
+						if all [
+							row-left-width > 0
+							not tail? words				;-- don't fill the last row
+						][
+							distribute-whitespace row-words row-left-width
 						]
 					]
 				]
@@ -717,45 +741,51 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				
 				;; measure the row vertically
-				set [map-ofs1: map-ofs2:] reproject-range x-1D-to-map-offset row-x1-1D row-x2-1D - 1
+				set [map-ofs1: map-ofs2:] reproject-range/truncate x-1D-to-map-offset row-x1-1D row-x2-1D - 1
 				set [row-y1-1D: row-y2-1D:] get-row-y1y2 map map-ofs1 map-ofs2
 				row-y2-2D:  row-y1-2D + (row-y2-1D - row-y1-1D)
 				row-y0-2D:  row-y2-2D - row-y2-1D
 				row-height: row-y2-1D - row-y1-1D
 				repend y-levels [row-y0-2D row-y1-2D row-y2-2D]
 				repend y-irow-points [row-y1-2D nrows row-y2-2D nrows]	;-- zero-based row number
+				; ?? [row-y1-1D row-y2-1D row-y0-2D row-y1-2D row-y2-2D]
 				
 				;; draw the row
 				row-drawn: clear []
 				word-offset: 0
-				repend row-drawn ['translate word-x1-2D by row-y0-2D]
 				foreach [word-x-1D word-width-1D' white? _] row-words [
 					#assert [0 < span? word-x-1D]
 					word-scale: word-width-1D' / span? word-x-1D
-					set [map-ofs1: map-ofs2:] reproject-range x-1D-to-map-offset word-x-1D/1 word-x-1D/2 - 1
+					set [map-ofs1: map-ofs2:] reproject-range/truncate x-1D-to-map-offset word-x-1D/1 word-x-1D/2 - 1
 					#assert [map-ofs2 >= map-ofs1]
 					
-					geom1: pick map map-ofs1 * 2
+					geom1: pick map map-ofs1 + 1 * 2
+					row-origin-1D: geom1/offset * 1x0
 					spaces-drawn: clear []
-					for i: map-ofs1 map-ofs2 [
+					for i: map-ofs1 + 1 map-ofs2 + 1 [
 						geom: pick map i * 2
 						compose/only/into [
-							translate (geom/offset - (geom1/offset * 1x0)) (geom/drawn)
+							translate (geom/offset - row-origin-1D) (geom/drawn)
 						] tail spaces-drawn
 					]
 					
 					offset1: geom1/offset/x - word-x-1D/1		;-- negative x offset of 1st space within the word
 					#assert [offset1 <= 0]
-					word-span: span? word-x2-1D word-x1-1D
-					word-drawn: compose/only [
+					word-span: span? word-x-1D
+					word-drawn: compose/deep/only [
 				  		translate (word-offset by 0)			;-- move to the 2D point
+						#debug paragraph [push [
+							translate (0 by row-y1-1D)
+							fill-pen off pen magenta line-width 1
+							box 0x0 (word-width-1D' by row-height)
+						]]
 				  		scale (word-scale) 1.0
-				  		clip 0x0 (word-span by row-height)
+				  		clip 0x0 (word-span by total-1D/y)
 				  		translate (offset1 by 0)				;-- account for word's offset within geom/size/x
 				  		(copy spaces-drawn)
 					]
 					repend row-drawn ['push word-drawn]
-					word-offset: word-offset + word-span
+					word-offset: word-offset + word-width-1D'
 				]
 				word-x1-2D: indent + in-row-indent
 				compose/only/into [
@@ -763,13 +793,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					(copy row-drawn)
 				] tail layout-drawn
 			
-				
-				;@@ indent: indent2
-				;@@ words: skip..
-				row-y1-2D: row-y2-2D
+				indent: indent2
+				row-y1-2D: row-y2-2D + spacing
 				nrows: nrows + 1
 			]
-			total-2D/y: row-y1-2D
+			total-2D/y: row-y2-2D
 			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
 			
 			frame: construct compose/only [
