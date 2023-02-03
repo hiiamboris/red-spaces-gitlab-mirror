@@ -655,7 +655,7 @@ context [
 		/inverse  "Given Y find an X"
 		/truncate "Convert result to integer"
 	][
-		xs: either inverse [find-y fun y][find-x fun x]
+		xs: either inverse [find-y fun x][find-x fun x]
 		;; find *last* segment that contains the value
 		if up [while [all [xs/5  xs/3 <= x]] [xs: skip xs 2]]	;@@ use for-each
 		ys: either inverse [back xs][next xs]
