@@ -414,6 +414,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				offset/x: offset/x + space/size/x
 				total: max total space/size				;-- need row height for aligning items
 			]
+			total/x: offset/x
+			
 			foreach [space geom] map [					;-- align vertically along a common baseline
 				geom/offset/y: round/to total/y - space/size/y * baseline 1	
 			]
@@ -430,8 +432,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			build-index copy points n: x >> 5 + 1		;-- 1 point per 32 px
 		]
 		
-		;; lists all sections of all child spaces
-		;@@ use sec-cache for the buffer?
+		;; lists all sections of all child spaces in 1D space! - so not the same as space/sections
 		list-sections: function [map [block!] total [integer!]] [
 	    	generate-sections map total sections: clear []
 	    	;@@ make leading spaces significant?
@@ -799,15 +800,22 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			total-2D/y: row-y2-2D
 			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
+			total-1D': (last x-1D-1D'-points) by total-1D/y
 			
 			frame: construct compose/only [
-				size-1D:     (total-1D)
-				size-2D:     (total-2D)
-				map:         (map)
-				drawn:       (drawn)
-				y-levels:    (copy y-levels)
-				x1D-to-x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5)
-				y1D-to-row:  (build-index copy y-irow-points   total-2D/y >> 2)
+				size-1D:   (total-1D)
+				size-1D':  (total-1D')
+				size-2D:   (total-2D)					;-- size without margins
+				margin:    (margin)
+				spacing:   (spacing)
+				map:       (map)
+				sections:  (sections)
+				drawn:     (drawn)
+				nrows:     (nrows)
+				y-levels:  (copy y-levels)
+				x1D->x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5)
+				x1D->map:  (x-1D-to-map-offset)
+				y2D->row:  (build-index copy y-irow-points   total-2D/y >> 2)
 			]
 			
 			frame
