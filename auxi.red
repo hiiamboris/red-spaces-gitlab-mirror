@@ -792,11 +792,19 @@ ortho: func [
 set-pair: function [
 	"Set words to components of a pair value"
 	words [block!]
-	pair  [pair!]
+	pair  [pair! block!] "Can be a block (works same as set native then)"
 ][
-	set words/1 pair/x
-	set words/2 pair/y
+	set words/1 pair/1
+	set words/2 pair/2
 ]
+#localize [#assert [
+	set-pair [a b] 2x3
+	a = 2
+	b = 3
+	set-pair [a b] [4 5]
+	a = 4
+	b = 5
+]]
 
 make-pair: function [
 	"Construct a pair out of default value and possible axis replacements"
