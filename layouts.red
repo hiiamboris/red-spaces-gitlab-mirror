@@ -429,6 +429,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			foreach [space geom] map [					;@@ use map-each
 				repend points [x: x + geom/size/x  o: o + 1]
 			]
+			#assert [x < infxinf/x]
 			build-index copy points n: x >> 5 + 1		;-- 1 point per 32 px
 		]
 		
@@ -620,6 +621,25 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			reduce [y1 y2]
 		]
 				
+		;; return format skeleton for paragraph layout
+		frame!: object [
+			size-1D:     0x0
+			size-1D':    0x0
+			size-2D:     0x0
+			margin:      0x0
+			spacing:     0
+			map:         []
+			sections:    []
+			drawn:       []
+			nrows:       0
+			y-levels:    []
+			x1D->x1D':   none
+			x1D->map:    none
+			y2D->row:    none
+			caret-boxes: none							;-- not filled by layout/create - only on demand
+			;@@ need to decide what's part of a frame and what - of space itself, based on lifespan
+		]
+				
 		;; settings for paragraph layout:
 		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
 		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
@@ -646,28 +666,27 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				spacing  [integer! (0 <= spacing)]		;-- vertical only!
 				canvas   [pair!]
 				limits   [object! (range? limits) none!]
-				indent   [block! (valid-indent? indent) none!]
+				indent   [block! (parse indent [2 [integer! | none!]]) none!]
 			]]
+			margin:  margin * 1x1						;-- integer to pair normalization
 			set [map: total-1D:] build-map :spaces 1.0 * baseline
 			if empty? map [								;@@ return value needs optimization
-				return frame: construct compose/only [
-					size-1D:     0x0
-					size-2D:     (margin * 2x2)
-					map:         (map)
-					drawn:       (copy [])
-					y-levels:    (copy [])
-					x1D-to-x1D': (build-index copy [0 0 0 0] 1)
-					y1D-to-row:  (build-index copy [0 0 0 0] 1)
+				return make frame! compose/only [
+					margin:    (margin)
+					spacing:   (spacing)
+					map:       (map)
+					sections:  (reduce [margin/x margin/x])
+					x1D->x1D': (build-index copy [0 0 0 0] 1)
+					x1D->map:  (build-index copy [0 0 0 0] 1)
+					y2D->row:  (build-index copy [0 0 0 0] 1)
 				]
 			]
-			
 			default align:  'left
 			default canvas: infxinf						;-- none to pair normalization
 			set [|canvas|: fill:] decode-canvas canvas
 			default indent: []
 			indent1: any [indent/first 0]
 			indent2: any [indent/rest  0]
-			margin:  margin * 1x1						;-- integer to pair normalization
 			
 			;; clipped canvas - used to find desired paragraph width
 			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
@@ -677,9 +696,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			sections: list-sections map total-1D/x
 			words: list-words sections
 			total-2D: 1x0 * ccanvas						;-- without margins
+			total-2D/x: min total-2D/x total-1D/x		;-- convert infinite canvas into single-row canvas
 			unless force-wrap? [						;-- extend width to the longest predicted row
 				total-2D/x: max total-2D/x get-min-total-width-2D words indent1 indent2
 			]
+			#assert [total-2D/x < infxinf/x]
 			
 			;; lay out rows...
 			
@@ -802,7 +823,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
 			total-1D': (last x-1D-1D'-points) by total-1D/y
 			
-			frame: construct compose/only [
+			frame: make frame! compose/only [
 				size-1D:   (total-1D)
 				size-1D':  (total-1D')
 				size-2D:   (total-2D)					;-- size without margins
@@ -813,9 +834,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				drawn:     (drawn)
 				nrows:     (nrows)
 				y-levels:  (copy y-levels)
-				x1D->x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5)
+				x1D->x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5 + 1)
 				x1D->map:  (x-1D-to-map-offset)
-				y2D->row:  (build-index copy y-irow-points   total-2D/y >> 2)
+				y2D->row:  (build-index copy y-irow-points   total-2D/y >> 2 + 1)
 			]
 			
 			frame
