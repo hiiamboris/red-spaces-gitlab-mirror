@@ -1052,13 +1052,13 @@ find-same-path: function [block [block!] path [path!]] [
 generate-sections: function [
 	"Generate sections block out of list of spaces; returns none if nothing to dissect"
 	map     [block!]   "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
-	width   [integer!] "Total width" (width >= 0)
+	width   [integer!] "Total width (may be affected by limits/min)" (width >= 0)
 	buffer  [block!]
 ][
 	case [
 		not tail? buffer [return buffer]				;-- already computed
 		tail? map [										;-- optimization
-			if width > 0 [append buffer negate width]
+			if width > 0 [append buffer width]			;-- treat margins as significant
 			return buffer
 		]
 	]
@@ -1078,7 +1078,7 @@ generate-sections: function [
 	#assert [not find/same buffer 0]
 	buffer
 ]
-#assert [[-10] = generate-sections [] 10 copy []]
+#assert [[10] = generate-sections [] 10 copy []]
 	
 	
 ;; this function is used by tube layout to expand items in a row (which should be blazingly fast)
