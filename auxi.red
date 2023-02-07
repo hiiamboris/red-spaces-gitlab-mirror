@@ -589,8 +589,8 @@ context [
 		yindex: copy xindex: make vector! length
 		clear xindex  clear yindex
 		top:    skip tail points -2
-		xrange: top/1 - points/1
-		yrange: top/2 - points/2
+		xrange: max 1e-10 top/1 - points/1				;-- 1e-10 to avoid zero division by step
+		yrange: max 1e-10 top/2 - points/2
 		dx: xrange * 1.000001 / length					;-- stretch a bit to ensure never picking at the tail
 		dy: yrange * 1.000001 / length
 		ix: iy: 1
@@ -623,7 +623,7 @@ context [
 	locate: function [
 		points [block!]
 		index  [vector!]
-		step   [number!]
+		step   [number!] (step > 0)
 		value  [number!]
 	][
 		#assert [value / step < length? index  "value out of the function's domain"]
