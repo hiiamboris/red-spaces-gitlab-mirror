@@ -755,15 +755,18 @@ paragraph-ctx: context [
 
 	get-sections: function [space [object!]] [
 		#assert [space/layout  "text must be rendered to get sections"]
-		mrg: negate space/margin along 'x
+		mrg: space/margin along 'x
 		case [
 			not empty? sections: space/sec-cache ['done]		;-- already computed
 			empty? space/text [
-				append sections mrg * 2
+				if space/size/x > 0 [append sections space/size/x]
 			]
 			1 <> rich-text/line-count? space/layout [			;-- avoid breaking multiline text
-				#assert [not negative? space/size/x + (mrg * 2)]
-				repend sections [mrg space/size/x + (mrg * 2) mrg]	;-- /draw clips the text size to canvas, tricky formula
+				#assert [not negative? space/size/x - (mrg * 2)]
+				repend sections pick [
+					[mrg space/size/x - (mrg * 2) mrg]
+					[space/size/x]
+				] mrg > 0
 			]
 			'else [
 				spaces: clear []
@@ -772,7 +775,7 @@ paragraph-ctx: context [
 					keep (as-pair index? s index? e)
 				]]												;-- it often produces an empty interval at the tail (accounted for later)
 				
-				if mrg < 0 [append sections mrg]
+				if mrg > 0 [append sections mrg]
 				right: 0
 				foreach range spaces [
 					left:  first caret-to-offset space/layout range/1
@@ -780,7 +783,9 @@ paragraph-ctx: context [
 					right: first caret-to-offset space/layout range/2
 					if left <> right [append sections left - right]		;-- added as negative - space chars
 				]
-				if mrg < 0 [append sections mrg]
+				if mrg > 0 [append sections mrg]
+				width: mrg * 2 + first size-text2 space/layout
+				if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
 			]
 		]
 		sections
@@ -1072,7 +1077,7 @@ list-ctx: context [
 			not empty? cache: list/sec-cache ['done]
 			list/size/x = 0 ['done]						;-- nothing to dissect (not rendered?)
 			list/axis <> 'x	[							;-- can't dissect vertical list
-				if 0 <> mrg: list/margin along 'x [append cache mrg * -2]
+				if 0 <> mrg: list/margin along 'x [repend cache [mrg mrg]]
 			]
 			'else [generate-sections list/map list/size/x cache]
 		]
@@ -1188,137 +1193,190 @@ tube-ctx: context [
 rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
-	xscale: func [xy [pair!] scale [number!]] [
-		xy/x: round/to xy/x * scale 1
-		xy
-	]
-	
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		space/sec-cache: copy []						;-- reset computed sections
-		settings: with space [margin spacing align baseline canvas limits indent]
-		set [size: map: rows:] make-layout 'paragraph :space/items settings
-		quietly space/size: constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
-		quietly space/map:  map
-		quietly space/frame: compose/only [				;-- store data about the last frame for /into to use
-			margin: (space/margin)
-			align:  (space/align)
-			rows:   (rows)
-		]
-		
-		count: space/items/size
-		#assert [count]
-		
-		;; I clip every row separately from the hanging out parts,
-		;; as wrapping margin doesn't have to align with total width
-		;; e.g. row may be visibly smaller than canvas but contain "hidden" parts duped on another row
-		scaled-row: [
-			translate (row-offset + clip-start + mrg) [
-				scale (row-scale) 1.0
-				clip 0x0 (clip-end - clip-start + 1x0) [		;@@ I'm adding +1x0 otherwise italic text gets clipped a bit - REP #136
-					translate (clip-start * -1x0)
-					(copy row-drawn)
-				]
-			]
-		]
-		normal-row: [
-			translate (row-offset + mrg) [
-				clip (clip-start) (clip-end + 1x0) (copy row-drawn)
-			]
-		]
-		
-		mrg:   space/margin * 1x1
-		drawn: make [] (length? rows) / 5 * 3
-		foreach [row-offset row-scale clip-start clip-end row] rows [
-			row-drawn: clear []
-			foreach [item item-offset item-drawn] row [
-				compose/only/into [
-					translate (item-offset) (item-drawn)
-				] tail row-drawn
-			]
-			blueprint: either row-scale = 1 [normal-row][scaled-row]
-			compose/deep/only/into blueprint tail drawn
-		]
-		; space/origin: origin							;-- unused
-		compose/only [clip (mrg) (size - mrg) (drawn)]	;-- clip the hanging out parts; uses unconstrained 'size'
+		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
+		frame: make-layout 'paragraph :space/items settings
+		size: space/margin * 2x2 + frame/size-2D
+		quietly space/frame: frame
+		quietly space/size:  constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
+		quietly space/map:   frame/map
+		frame/drawn
 	]
 	
-	;; unlike /into, this has to consider empty (space) itervals between items and rows, and never fails except on empty layout
-	;; "closest" is implemented so that y<0 returns first child, y>size/y returns last child
-	;@@ another way would be to project y<0 to y=0 and y>size/y to y=size/y - need to think what's better UX-wise
-	locate-child: function [
-		"Find a child closest to XY and return corresponding row and child pointers and offsets"
-		space [object!] xy [pair!]
+	;; returned point always belongs to the nearest space
+	;; 2D: x<0 and x>size/x: projected onto x=0 and x=size/x
+	;;     y<0 and y>size/y: these points cannot be meaningfully "unrolled" into x, since height of non-existing rows is unset
+	;;       so mapping projects y<0 to y=0 and y>size/y to y=size/y
+	;;     y between rows is projected onto the upper row
+	;; 1D: x is clipped within [0 size-1D/x]
+	;@@ another way is to project y<0 to 0x0 and y>size/y to size - need to think what's better UX-wise
+	map-2D->1D: function [
+		"Translate a point in 2D (rolled) space into a point in 1D (map) space"
+		frame [object!]      "Rendered frame data"
+		xy    [pair! block!] "Margin must be subtracted already"
 	][
-		rows:   space/frame/rows
-		margin: space/frame/margin
-		xy:     xy - margin
-		;@@ use locate instead maybe?
-		for-each [prow: row-offset row-scale clip-start clip-end row] rows [
-			last-row: prow
-			xy': xscale xy 1 / row-scale				;-- correct xy/x for scaling if it's applied
-			row-xy: xy' - row-offset
-			if row-xy/y < clip-end/y [					;-- last line always accepts xy
-				row-xy: clip row-xy clip-start clip-end			;-- contain xy within row, so it doesn't get into hidden child areas
-				for-each [pchild: child child-offset _] row [
-					last-child: pchild
-					child-xy: row-xy - child-offset
-					if child-xy/x < child/size/x [break]
-				]
-				break
-			]
-			unless empty? row [last-child: skip tail row -3]	;-- if for-each terminates, last child in a row is "closest" to xy
+		if empty? frame/map [return copy [0 0]]
+		set-pair [x: y:] xy
+		x-2D: clip x 0 frame/size-2D/x
+		y-2D: clip y 0 frame/size-2D/y
+		rows-above: reproject/truncate frame/y2D->row y-2D
+		x-1D': rows-above * frame/size-2D/x + x-2D
+		x-1D': clip x-1D' 0 frame/size-1D'/x
+		x-1D:  reproject/inverse frame/x1D->x1D' x-1D'
+		y0-2D: pick frame/y-levels rows-above * 3 + 1
+		y-1D:  clip (y-2D - y0-2D) 0 frame/size-1D/y
+		reduce [x-1D y-1D]								;-- pairs will round it (not always desired)
+	]
+	
+	map-x1D->x1D': function [
+		frame [object!] "Rendered frame data"
+		x-1D  [integer! float!]
+		side  [word!] (find [left right] side) "Skip indentation to left or to right"
+	][
+		#assert [all [0 <= x-1D x-1D <= frame/size-1D/x]  "Map point must be within total size"]
+		either side = 'left								;@@ use apply 
+			[reproject    frame/x1D->x1D' x-1D]
+			[reproject/up frame/x1D->x1D' x-1D]
+	]
+	
+	map-x1D'->row: function [
+		"Translate an X offset (without margin) in 1D' (unrolled) space into a closest row number"
+		frame [object!]      "Rendered frame data"
+		x-1D' [integer! float!]
+		side  [word!] (find [left right] side) "Map contested points to previous or next row"
+	][
+		rows-above: to integer! rows-above': x-1D' / frame/size-2D/x
+		if rows-above = rows-above' [					;-- contested pixel
+			rows-above: either side = 'left
+				[max rows-above - 1 0]
+				[min rows-above + 1 frame/nrows - 1]
 		]
-		if last-child [
-			child-xy: row-xy - last-child/2
-			reduce [last-row row-xy last-child child-xy]
-		]
+		1 + rows-above
+	]
+	
+	map-x1D->row: function [
+		"Translate an X offset (without margin) in 1D (map) space into a closest row number"
+		frame [object!]      "Rendered frame data"
+		x     [integer! float!]
+		side  [word!] (find [left right] side) "Map contested points to previous or next row"
+	][
+		#assert [all [0 <= x x <= frame/size-1D/x]  "Map point must be within total size"]
+		x-1D': map-x1D->x1D' frame x-1D side
+		map-x1D'->row frame x-1D' side
+	]
+	
+	;@@ move these funcs into layout/paragraph?
+	;; returned point's Y is projected into the 2D row (which is generally smaller than size-1D/y)
+	map-1D->2D: function [
+		"Translate a point in 1D (map) space into a point in 2D (rolled) space (without margin)"
+		frame [object!]      "Rendered frame data"
+		xy    [pair! block!]
+		side  [word!] (find [left right] side) "Map contested points to previous or next row"
+	][
+		if empty? frame/map [return copy [0 0]]
+		set-pair [x-1D: y-1D:] xy
+		#assert [all [0 <= x-1D x-1D <= frame/size-1D/x]  "Map point must be within total size"]
+		x-1D': map-x1D->x1D' frame x-1D side
+		rows-above: -1 + map-x1D'->row frame x-1D' side
+		x-2D: x-1D' - (frame/size-2D/x * rows-above)	;-- modulo doesn't work due to left/right duality
+		set [y0-2D: y1-2D: y2-2D:] skip frame/y-levels rows-above * 3
+		#assert [y0-2D]
+		y-2D:  clip y1-2D y2-2D (y0-2D + y-1D)			;-- do not let it step into other rows
+		reduce [x-2D y-2D]
+	]
+	
+	;; return row number for the row that is closest to a 2D point
+	;@@ or return none if outside the row?
+	map-2D->row: function [
+		"Translate a point (without margin) in 2D (rolled) space into a closest row number"
+		frame [object!]      "Rendered frame data"
+		xy    [pair! block!]
+	][
+		set-pair [x-2D: y-2D:] xy
+		y-2D: clip y-2D 0 frame/size-2D/y
+		1 + reproject/truncate frame/y2D->row y-2D
+	]
+	
+	map-row->box: function [
+		"Get a box [XY1 XY2] in 2D (rolled) space (without margin and skipping indent) bounding the given row number"
+		frame [object!]  "Rendered frame data"
+		row   [integer!] (row >= 1)
+		;@@ need a refinement for indent inclusion? it should be as easy as setting xy1/x: 0 though
+	][
+		frame: space/frame
+		#assert [not empty? frame/map  "no rows available"]
+		set [y0: y1: y2:] skip frame/y-levels row - 1 * 3
+		offset-1D': row - 1 * width: frame/size-2D/x
+		;; simplest thing would be to locate row in 2D and map it to 1D and back, but that's ambiguous for zero-height rows
+		;; so I need to use 1D'->1D->1D' mapping to detect and skip indentation
+		x1-1D:  reproject/inverse frame/x1D->x1D' x1-1D': offset-1D'
+		x2-1D:  reproject/inverse frame/x1D->x1D' x2-1D': offset-1D' + width
+		x1-1D': reproject/up      frame/x1D->x1D' x1-1D
+		x2-1D': reproject         frame/x1D->x1D' x2-1D
+		xy1: x1-1D' - offset-1D' by y1
+		xy2: x2-1D' - offset-1D' by y2
+		reduce [xy1 xy2]
+	]
+	
+	;; unlike /into this always succeeds if there's a child
+	;@@ base /into on this
+	locate-child: function [
+		"Find a child closest to XY and return: [child child-xy child-2D-origin]"
+		space [object!] xy [pair!] "Margin must be subtracted already"
+	][
+		frame: space/frame
+		if empty? frame/map [return none]
+		xy: xy - frame/margin
+		xy-1D: map-2D->1D frame xy
+		map: skip frame/map 2 * reproject/truncate frame/x1D->map xy-1D/1
+		if tail? map [map: skip map -2]					;-- map last x1D to last child
+		set [child: geom:] map
+		#assert [child]
+		oxy-2D: to pair! map-1D->2D frame geom/offset 'right
+		child-xy: (to pair! xy-1D) - geom/offset		;-- point in the child is in 1D space (it can be wrapped!)
+		reduce [child child-xy oxy-2D + frame/margin]
 	]
 		
-	;; /into required because /map cannot contain duplicates, but frame/rows can; plus this considers scaling
+	;; /map is kept in 1D space, so /into is required for translation from 2D
 	into: func [space [object!] xy [pair!] child [object! none!]] [
+		unless frame: space/frame [return none]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
-		rows:   space/frame/rows
-		margin: space/frame/margin
-		xy:     xy - margin
+		xy-2D: xy - frame/margin
 		either child [
-			foreach [row-offset row-scale clip-start clip-end row] rows [
-				if child-offset: select/skip/same row child 3 [	;-- relies on [space offset drawn] row layout
-					xy': xscale xy 1 / row-scale				;-- correct xy/x for scaling if it's applied
-					return reduce [child xy' - row-offset - child-offset]
-				]
-			]
+			geom: select/same frame/map child
+			#assert [geom]
+			oxy-2D: to pair! map-1D->2D frame geom/offset 'right
+			child-xy: xy-2D - oxy-2D
+			reduce [child child-xy]
 		][
-			if set [rows: row-xy: row: child-xy:] locate-child space xy [
-				child: row/1
-				if 0x0 +<= child-xy +< child/size [
-					return reduce [child child-xy]
-				]
-			]
+			xy-1D:  map-2D->1D frame xy-2D
+			xy'-2D: map-1D->2D frame xy-1D 'right		;@@ what side argument to use? doesn't matter?
+			; ?? [xy-1D xy-2D xy'-2D]
+			if all [									;-- if xy is within 1D range, it back-projects into itself
+				xy-2D/1 ~= xy'-2D/1						;-- neglect the rounding error from double conversion
+				xy-2D/2 ~= xy'-2D/2
+			][
+				set-pair [x-1D: y-1D:] xy-1D
+				map: skip frame/map 2 * reproject/truncate frame/x1D->map x-1D
+				set [child: geom:] map
+				if child [								;-- x-1D = size-1D/x leads to the tail
+					child-xy: (to pair! xy-1D) - geom/offset
+					if 0x0 +<= child-xy +< geom/size [reduce [child child-xy]]
+				] 
+			] 
 		]
-		none
 	]
 		
 	get-sections: function [space [object!]] [
-		case [
-			not empty? cache: space/sec-cache ['done]
-			any [
-				5 <> length? rows: space/frame/rows		;-- avoid breaking multiline text (/rows can be none)
-				empty? rows/5
-			][
-				if 0 <> mrg: space/margin along 'x [append cache mrg * -2]
+		if empty? cache: space/sec-cache [
+			mrg: space/margin along 'x					;-- make margin significant
+			if 0 <> mrg [append cache mrg]
+			if space/frame/nrows = 1 [					;-- not empty or multiline text (/nrows can be none if not rendered)
+				append cache space/frame/sections
 			]
-			'else [
-			; false [
-				#assert [rows/2 = 1  "single row should not be scaled"]	;-- so no need to bother with proper offset/size rounding
-				;@@ temporary!!
-				mrg: space/margin
-				row-offset: rows/1
-				map: map-each/eval [item offset _] rows/5 [
-					[item compose [offset: (offset + row-offset + mrg) size: (item/size)]]
-				]
-				generate-sections map space/size/x cache
-			]
+			if 0 <> mrg [append cache mrg]
 		]
 		cache
 	]
@@ -1326,13 +1384,14 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
 	declare-template 'rich-paragraph/container [
 		margin:      0
-		spacing:     0
-		align:       'left	#type = [word!] :invalidates-look				;-- horizontal alignment
+		spacing:     0		#type =? [integer!] :invalidates	;-- has only vertical row spacing
+		align:       'left	#type = [word!] :invalidates		;-- horizontal alignment
 		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
 		weight:      1									;-- non-zero default so tube can stretch it
 		indent:      none	#type = [block! none!] :invalidates	;-- indent of the paragraph: [first: integer! rest: integer!]
+		force-wrap?: no		#type =? [logic!] :invalidates		;-- allow splitting words at *any pixel* to ensure canvas is not exceeded
 		
-		frame:       []		#type  [block!]				;-- internal frame data used by /into
+		frame:       []		#type  [object! block!]				;-- internal frame data used by /into
 		sections:    does [~/get-sections self]
 		sec-cache:   []
 		cache:       [size map frame sec-cache]
@@ -1345,23 +1404,82 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 ]
 
 
-rich-content-ctx: context [												;-- rich content
+rich-content-ctx: context [								;-- rich content
 	~: self
 	
-	;@@ will need source editing facilities too
+	;@@ will need source editing facilities too - but in the document? or partly here?
+	
+	;; returns all xy1-xy2 boxes of carets on 1D space - only empty if no spaces / caret locations, otherwise 2+ boxes
+	;@@ or should it just put them into frame?
+	;@@ can this be part of the layout? probably not, since uses source data
+	list-carets: function [map [block!] ranges [hash!]] [
+		boxes: clear []
+		foreach [child geom] map [
+			range: select/same ranges child
+			xy2: geom/size * 0x1 + xy1: geom/offset
+			either 1 >= n: span? range [
+				#assert [1 = span? range]
+				repend boxes [xy1 xy2]
+			][
+				#assert [object? select child 'layout]
+				#assert [1 = rich-text/line-count? child/layout]
+				xy2: xy1 + (0 by rich-text/line-height? child/layout 1)		;-- caret of line size, ignoring margin
+				repeat i n [
+					offset: caret-to-offset child/layout i 
+					repend boxes [xy1 + offset xy2 + offset]
+				]
+			]
+		]
+		if geom [
+			offset: 1x0 * geom/size
+			repend boxes [xy1 + offset xy2 + offset]	;-- n+1 carets for n items
+		]
+		copy boxes
+	]
+	    
 	
 	;@@ these functions below are tightly tied to row format - not something I like
 	;@@ but abstraction seems to only increase the code so far, or I haven't found a good abstraction yet
 	;@@ plus, I need /draw to be fast, which limits me (but these funcs can be slow, as they're for events mostly)
 	
-	xscale: :rich-paragraph-ctx/xscale
+	; xscale: func [xy [pair!] scale [number!]] [
+		; xy/x: round/to xy/x * scale 1
+		; xy
+	; ]
 	
-	locate-point: function [space [object!] xy [pair!]] [
-		if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
-			child:  row/1
+	caret->box-1D: function [
+		"Get [XY1 XY2] box in 1D space for caret at given offset"
+		space [object!] caret [integer!]
+	][
+		boxes: any [
+			space/frame/caret-boxes
+			space/frame/caret-boxes: list-carets space/map space/decoded/ranges	;@@ remove ranges after this?
+		]
+		if set [xy1: xy2:] skip boxes caret * 2 [		;-- returns none when outside of range or no carets allowed
+			reduce [xy1 xy2]
+		]
+	]
+	
+	caret->box-2D: function [
+		"Get [XY1 XY2] box in 2D space (with margin) for caret at given offset"	;@@ or not add margin?
+		space [object!] caret [integer!] side [word!] (find [left right] side)
+	][
+		if box-1D: caret->box-1D space caret [
+			repeat i 2 [								;@@ use map-each
+				xy: to pair! rich-paragraph-ctx/map-1D->2D space/frame box-1D/:i side
+				box-1D/:i: space/frame/margin + xy
+			]
+			box-1D										;@@ result is pixel-rounded, need more precision?
+		]
+	]
+	
+	;@@ consider removing/splitting this func
+	locate-point: function [space [object!] xy [pair!] "with margin"] [
+		xy: xy - space/frame/margin
+		if set [child: child-xy:] rich-paragraph-ctx/locate-child space xy [
 			#assert [find/same space/decoded/ranges child]
-			crange: pick find/same space/decoded/ranges child -1
-			either crange/1 + 1 = crange/2 [
+			crange: select/same space/decoded/ranges child
+			either 1 = span? crange [
 				index: crange/2
 				caret: pick crange child-xy/x < (child/size/x / 2)
 			][
@@ -1372,119 +1490,31 @@ rich-content-ctx: context [												;-- rich content
 		]
 	]
 	
-	xy-to-caret: function [space [object!] xy [pair!]] [
+	xy->caret: function [space [object!] xy [pair!] "with margin"] [
 		last locate-point space xy
 	]
 	
-	caret-to-row: function [space [object!] caret [integer!] (caret >= 0) side [word!] (find [left right] side)] [
-		if empty? space/frame/rows [return none]
-		caret: caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
-		row-ranges: fill-row-ranges space
-		row: 1
-		foreach [irow range] row-ranges [
-			if caret < range/1 [if side = 'right [break]]		;-- this improves UX when crossing over 'break'
-			row: irow
-			if caret < range/2 [break]
+	;@@ to be used to cycle across row range to draw multiline selection
+	caret->row: function [
+		"Get row number for specified caret offset (or none if no rows)" 
+		space [object!]
+		caret [integer!] (caret >= 0)
+		side  [word!] (find [left right] side)
+	][
+		if empty? space/map [return none]
+		;; tricky part is zero-height rows - cannot work in 2D space, only in 1D
+		if box: caret->box-1D space caret [
+			rich-paragraph-ctx/map-x1D->row space/frame box/1/x side	;@@ move mapping into space?
 		]
-		;; returns row number - to cycle across row range to draw multiline selection (or none if no rows)
-		;; some rows may only include a linebreak (ignored here), so visible row number <> real row number
-		row
 	]
 	
-	row-to-box: function [space [object!] row-number [integer!] (row-number >= 1)] [
-		set [row-offset: row-scale: clip-start: clip-end: row:] skip space/frame/rows row-number - 1 * 5
-		mrg: space/margin * 1x1
-		xy1: mrg + row-offset + (xscale clip-start row-scale)
-		xy2: xy1 + (xscale clip-end - clip-start row-scale)
-		reduce [xy1 xy2]
-	]
-	
-	;@@ height returned should be not that of the row, but that of the highest adjacent item!!!
-	caret-to-box: function [space [object!] caret [integer!] side [word!] (find [left right] side)] [
-		mrg: space/margin * 1x1
-		;@@ if no rows - no row heights - no caret height, so what to return? margin + 0x0-0x0?
-		unless irow: caret-to-row space caret side [return reduce [mrg mrg]]
-		prow: skip space/frame/rows irow - 1 * 5
-		set [row-offset: row-scale: clip-start: clip-end: row:] prow
-		
-		#assert [not empty? row]
-		caret': caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
-		pitem: row
-		for-each [p: item item-offset _] row [
-			range: pick find/same space/decoded/ranges item -1	;@@ maybe reorder these ranges for select usage
-			if caret' < range/1 [if side = 'left [break]]		;@@ can't use break/return in for-each :(
-			pitem: p
-			if caret' < range/2 [break]
-		]
-			
-		set [item: item-offset: _:] pitem
-		caret: clip caret range/1 range/2						;-- skip empty ranges that don't land on items
-		x: case [
-			caret = range/1 [item-offset/x]						;-- item height may not equal row height, so it's ignored
-			caret = range/2 [item-offset/x + item/size/x]
-			'within [item-offset/x + first caret-to-offset item/layout (caret - range/1 + 1)]
-		]
-		xy1: mrg + row-offset + xscale x by 0 row-scale
-		xy1/x: clip xy1/x mrg/x space/size/x - mrg/x			;-- contain caret within the paragraph (trailing spaces)
-		xy2: xy1 + (0 by clip-end/y)
-		; ?? [x caret range xy1 xy2 clip-start clip-end]
-		reduce [xy1 xy2]
-	]
-	
-	non-white!: negate charset " ^-^/^M"
-	
-	;@@ should these be cached? they depend on canvas, can't be put into space/ranges
-	fill-row-ranges: function [space [object!]] [
-		ranges: clear []
-		caret-right: 0
-		for-each [/irow row-offset row-scale clip-start clip-end row] space/frame/rows [
-			;; empty rows (and those with a linebreak) are excluded, since we don't want zero-sized caret
-			if any [
-				empty? row
-				all [3 = length? row  row/1/type = 'break]
-			] [continue]
-			
-			;; leftmost caret
-			set [item: item-offset: _:] row
-			#assert [									;-- clipping margin should land on the first item
-				item-offset/x <= clip-start/x
-				clip-start/x < (item-offset/x + item/size/x)
-			]
-			item-range: pick find/same space/decoded/ranges item -1
-			either item-range/2 - item-range/1 <= 1 [
-				;@@ I don't do this, but user could provide breakpoints for a custom space so it gets split
-				;@@ in this case I guess I should just consider the whole space a separator and not include it in the ranges
-				;@@ I'm lazy to bother with this case for now, to hell with it
-				;; current algorithm treats 'single-index' space as belonging to only one row
-				caret-left: item-range/1
-			][
-				clipx: clip-start/x - item-offset/x
-				caret-left: item-range/1 - 1 + offset-to-caret item/layout clipx by 0
-			]
-			
-			;; rightmost caret
-			set [item: item-offset: _:] skip tail row -3
-			#assert [									;-- clipping margin should land on the first item
-				item-offset/x <= clip-end/x
-				clip-end/x <= (item-offset/x + item/size/x)
-			]
-			item-range: pick find/same space/decoded/ranges item -1
-			either item-range/2 - item-range/1 <= 1 [	;@@ same concern here as above
-				caret-right: item-range/2
-			][
-				text:  item/layout/text
-				clipx: clip-end/x - item-offset/x
-				index: offset-to-caret item/layout clipx by 0
-				index: index? any [
-					find at text index non-white!
-					tail text
-				]
-				caret-right: item-range/1 - 1 + index
-			]
-			
-			repend ranges [irow  caret-left by caret-right]
-		]
-		copy ranges
+	row->box: function [
+		"Get bounding box of row's content (offset by margin)"
+		space [object!] row-number [integer!]
+	][
+		box: rich-paragraph-ctx/map-row->box space/frame row-number
+		forall box [box/1: box/1 + space/frame/margin]	;@@ use map-each
+		box
 	]
 	
 	metrics: context [
@@ -1508,14 +1538,14 @@ rich-content-ctx: context [												;-- rich content
 			compose [offset: (offset) side: (side)]
 		]
 		caret-to-box: function [offset [integer!] side [word!]] with :measure [
-			~/caret-to-box space offset side
+			~/caret->box-2D space offset side
 		]
 	]
 	
-	;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
-	linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
-	text-prototype:      make-space 'text []
-	link-prototype:      make-space 'link []
+	; ;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
+	; linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
+	; text-prototype:      make-space 'text []
+	; link-prototype:      make-space 'link []
 	
 	;@@ should source support image! in it's content? url! ? anything else?
 	on-source-change: function [
@@ -1552,10 +1582,10 @@ rich-content-ctx: context [												;-- rich content
 		] [return []]
 		if sel/1 > sel/2 [sel: reverse sel]
 		;@@ this calls fill-row-ranges so many times that it must be super slow
-		lrow: caret-to-row space sel/1 'left  1
-		rrow: caret-to-row space sel/2 'right 1
-		set [lcar1: lcar2:] caret-to-box space sel/1 'left
-		set [rcar1: rcar2:] caret-to-box space sel/2 'right
+		lrow: caret->row space sel/1 'left  1
+		rrow: caret->row space sel/2 'right 1
+		set [lcar1: lcar2:] caret->box-2D space sel/1 'left
+		set [rcar1: rcar2:] caret->box-2D space sel/2 'right
 		; ?? [sel lrow rrow lcar1 lcar2 rcar1 rcar2]
 		#assert [lrow <= rrow]
 		either lrow = rrow [
