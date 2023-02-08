@@ -137,6 +137,8 @@ maybe a text-length? func that will measure size of any space's text as if it wa
 	aesthetically optimal paragraph size estimation may use sqrt of that for it's width	
 use 'look to optimize list invalidation as well (maybe box too? any other space?) (grid is optimized)	
 need to document sizing policy of all spaces (but it's not finally set in stone yet)
+incorporate focus-space into set-focus
+markdown viewer high-level widget with cross-paragraph selection capability and copying to clipboard
 
 
 key aspects: draggable columns, rearrange by styles
@@ -2352,6 +2354,8 @@ I guess no way around measuring each row...
 	- paren reserved for now
 	- block groups things into single item for caret, automatically providing stack of attributes
 	  though I may implement this later
+	  ;@@ add url! to syntax?
+	  ;@@ DOCUMENT SYNTAX AND RICH-CONTENT ITSELF
 	ranges may be created either for the whole, and then split into individual faces (easily, by subtracting caret from them)
 		then whole set of ranges changes with content change but not with canvas
 	or can be created per every text sequence, but then sequences will change with canvas, and require reparsing
@@ -2403,8 +2407,1453 @@ design issue/question in paragraph layout:
 	5. center-aligned, smaller than canvas, fine - centered around real center 
 	6. right-aligned, smaller than canvas, no so great unless container itself also right-aligns it
 	   ok that's the key then, container alignment should be the same as paragraph alignment for good result
-	   
-	  
+linebreaks are giving me real headache
+	paragraph layout is space-oriented, it doesn't know anything about text
+	rich-content is what parses text and fills linebreaks, inside /draw to avoid out-of-tree renders
+	however spaces are created before /draw, when /source changes (otherwise every /draw will have to parse the source)
+	and those spaces must already be free of linebreaks
+	because each space is thought of as a band, and each break is it's width so far consumed, which cannot just reset on linebreak
+	so the only option left is to have linebreak space which gets special handling in /draw (needs it's size set)
+	but then it leads nowhere too, because if linebreak width is set canvas width,
+	some line can be huge, bigger than canvas, and linebreaks will accumulate on a single line
+	another issue: 'fill has to ignore lines before linebreak space
+	I just hate making so many special cases - is there a better way?
+	perhaps I should consider linebreaks on a lower level
+	or using block of blocks for content
+	or instead of linebreak I just spawn a few layouts, one per text line, from a single draw call
+	hard because /items won't work with that, and /content needs a model change
+	easier to make a special case for 'linebreak (or just 'break ? from rich-paragraph/break it's use will be clear)
+	also rendering multiple lines as multiple layouts is a performance waste
+	maybe special <break> marker instead of linebreak space? lighter and foolproof
+	on the bad side: tag cannot be a result of lay-out, so cannot be added inside VIDS
+;@@ need to doc breakpoints format, rich-paragraph and rich-content, and break too
+;@@ add rich test gif to tests?
+rich-content and selection:
+	selection cannot be a box, like in field, because it may span multiple lines
+	I can only visualize it using /backdrop color (which is what everyone else is doing anyway)
+	it will be up to the user to use backdrop attribute in his own spaces, as only generated text is supported out of the box
+	I can't also turn item index into a box - only into two separate vertical lines (because they may be on different rows)
+	OTOH maybe I could make selection a box, just it won't know... hmm.. it must simply be painted alongside the other spaces
+	but how do I draw it? if it has a size it will shift the other spaces, if it doesn't how will it itself know it's own drawing box?
+	I will need to get caret box of left and right selection margins and set selection size to the rest of the last row + start of next
+	both caret boxes and corresponding rows
+	a bit of an issue is that rows have differing height, but selection is a box
+	in this case should I scale it vertically? should I set it's own height to that of 1st or highest row?
+	most likely selection will have a frame decoration
+	what browser does is simple text backdrop + overlay on images (there are even visible gaps where there's margin)
+	but box may just be better looking and more customizable, esp with advanced styles
+	using lowest row and no scaling seems safest from weird artifacts
+	(e.g. big image makes the row high, selection scales 10x and frame makes text illegible)
+	or, I could use highest row and no scaling - for frame-less selection, with some texture on it
+	(lower rows will just have it clipped)
+	or selection could be just a pen, but that'll work like highest-row/no-scale, just more limited
+	I'll take the lowest row as default, and maybe later an option for highest row
+	or there could be multiple selections rendered (one per row) at draw time, not reflected on the map
+	but then they could not be accessed via path like rich-area/selection
+	so I will have to move any facets out (if any)
+	perhaps it is the best choice?
+	why I might want to reflect selection on the map is drag-n-drop content moving (common shit, need to start drag on selection)
+	OK maybe it should be on the map (each selection separately), or anywhere as long as /into dispatches into it
+	but how should it dispatch if selection is overlaid on the other spaces?
+	maybe /into should prioritize selection? then I won't be able to click on it to set caret there
+	or maybe /into should ignore it, and rich-content should just match clicks against /selected range
+	;@@ will need a flag for start-drag to not lock the path, so drop may land into another space (e.g. other rich-area)
+	api:
+	- map xy to offset in rows/row (may be on an empty row or it's tail easily - so depending on selection direction one can go back or forth)
+	  (simpler to do backward scanning here using for-each/reverse)
+	- map offset in rows/row to caret offset (left or right)
+	  these both will be useful for click selection
+	  such selection should be 2D: only converted into range based on it's direction, which is inferred from rowspan and dx
+	- map caret offset to rows/row offset ?
+	- map caret offset (left or right) to a vertical line in a row (it's 2D visible coordinates already scaled)
+	  left or right because row split can occur between two spaces, or аfter a hyphen
+	- map row start/end to vertical line in a row (2D visible already scaled)
+	  or better full row to it's visible box (scaled compared to it's raw clip region)
+	  these will be used to draw selections, to know where each row's selection begins and ends
+	- map RxC into row item, R into row data, get rows count - to abstract from the block format ?
+	  draw should be as fast as possible, using the raw format, but other functions may be abstracted
+	shit I'm drowning in index trickery
+	really need quality abstraction there
+	maybe make a linear array of each item, it's box in space's coordinates and row/col and index and caret range, then navigate over that?
+	then I can foreach-scan it until I find where xy fits best to get caret offset?
+	need to prototype these before implementing
+	tasks:
+	- translate xy point to:
+	  - child xy point (for hittesting)
+	  - caret integer offset (for source selection)
+	- translate caret integer offset to left or right caret box (for caret display)
+	- figure out visual bounds of multiline selection
+	  which can be done knowing the caret boxes above (or only x coordinate and row number)
+	  and each row's visible box (may be inferred from caret boxes and knowledge on which caret positions rows start/end)
+	  (selection should know it's real clipped size, should not stick out of the clipped region, or it's frame may get clipped out)
+	- so, caret ranges for rows (excluding split separators)
+	  except it's hard to obtain these, shit
+	interestingly, if rows are split on 2 or more spaces:
+	  left/right keys will skip all spaces at once but del/bksp will remove them one by one?
+	  what browsers do is they allow to navigate over visible spaces, but hidden spaces converge into a single caret box
+	  and they allow both left and right caret box even if there's only one delimiter space
+	  well, not an important feature anyway
+found a problem with textual VID styles expansion!
+	style text: text won't work - will deadlock!
+	hmm.. even if I kept the original template name with the style
+	then I would not be able to create substyles like that,
+	e.g. `style text: text  style wtf: text` - would expect last 'text' to be a real VID/S style then
+	and if it starts expanding, it deadlocks
+	so a different model must be used:
+	`style new: old ...` will keep the 'old' name if it's a real style, and rest as text
+	but if it's sheet style, it will use the name from that style and join the text with new attrs
+	;@@ fix it!
+	it has a benefit though: if some facet is a result of an expression, it gets evaluated anew for every widget instance
+	(+ first time for the style itself to know where expression ends)
+	but main reason I did it is to support /content - it has to be laid out anew every time, as I forbid multiple parents
+	;@@ maybe I should eventually document how it really works and why
+selection and invalidation
+	currently rich-content when placed inside a tube, when selected will draw selection on all of it's intermediate layouts in the tube
+	;@@ perhaps I should utilize invalidate-look to optimize the tube to avoid these redraws
+it just occurred to me that in the browser text is not focusable, yet it ctrl+c copies the selection
+	how can I copy it on rich-content if it's not meant to receive focus?
+	should it always be a program's duty to provide copying? (I tend to think so, or I will enforce too much of the UX)
+	or selectable should also make it focusable?
+	should it have a /hint by default for right-click menu with copy option? (unlikely)
+also, such browser should provide cross-paragraph selections
+	obviously this will make selections appear on them all, and has to clear the rest (if any)
+	so making rich-content selectable is bad idea, as it's too limited
+	browser should control all the selections on it's own discretion (but I'm lazy to implement that)
+	eventually it must be some markdown viewer widget with high level capabilities including selection and copying etc
+	which will also be focusable anyway, as any other scrollable
+usage of my own (generalized) wrapping also leads to unwanted row sizes:
+	? (draw size-text r: rtd-layout [font 30 "lorem ipsum^/" /font font 20 "dolor sit amet^/" /font "consectetur^/adipiscing elit"] compose [text 0x0 (r)])
+	small-font rows should be small
+	but in rich-content, this is a single space split across multiple rows
+	since it's height is that of it's biggest letter, it applies to all rows, and they look very spacious
+	I decided to hold on splitting into multiple spaces
+	I could then split by words, one word one space
+	although, is it going to be worth it? likely performance loss for an unlikely text layout
+	but it will create problems in rich-edit: if user adds a single big letter, all rows will become spacious
+	perhaps I will expose a way to control splitting and make the setting more conservative for rich-edit..
+	or.. omg it's ez: I should force split on font and font-size changes
+mixed-font-size text does not look aligned, since I'm aligning it by the bottom line (and images too)
+	but what can be done? there's nothing in Red to tell me where the text's baseline is
+	best I can do for now is controllable /baseline facet
+links in rich-content
+	I have this idea: since links can contain anything - I should wrap them into clickable
+	clickable could have it's breakpoints set from those of it's content
+	either many clickables (one per item) or one clickable with many items (needs a list then)
+	but breakpoints are only known at draw time, while content is set before that
+	and draw won't be able (out of the box anyway) to distinguish my clickable from user-provided clickable
+	so should it then now look into every clickable or filter them? or should it spawn them?
+	it makes sense for static paragraphs to have static clickables so they can be focused, tabbed over, etc
+	and from tabbing perspective whole link should be one, not split into many clickables
+	so I decided each space must provide a way to split it, if it's possible
+	and current breakpoints format is wrong, too complex to create and parse, even if minimal
+	I need a more machine friendly format, e.g. [int logic ... int false] where logic is "mandatory?" (false if empty)
+	trailing false may be used to glue multiple items together (spacing is empty) (though still needs offsetting)
+	then another idea: ints will not be offsets, but interval widths, then it can be glued easily
+	also it removes the problem of duplicate offsets (e.g. 0 0) or whether it should end with total width, etc
+	and it removes the problem of whether it's strictly increasing, just all widths have to be nonnegative
+	seems data format is everything...
+	another more compact option would be to have negative widths for empties, positive for mandatory - great!
+	and much faster since it doesn't need repend anymore, and it's not sensitive to head offset, so no need to subtract it
+	and it's consistent around zero: it can be treated as both empty or full, doesn't matter
+	benchmark of find vs parse on space splitting:
+		lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
+		gather1: does [clear buf p: lorem while [p: find/tail p space!] [append buf  -1 + index? p p: any [find p non-space! tail p] append buf index? p]]
+		gather2: does [clear buf parse lorem [collect after buf any [any non-space! p: keep (index? p) any space! p: keep (index? p)]]]
+		>> clock/times [gather1] 1e4
+		131 μs	[gather1]
+		>> clock/times [gather2] 1e4
+		96.3 μs	[gather2]
+		there we go, parse		
+	should rich-content itself be breakable? does it make sense to put one rich-content into another?
+	I suppose it may be worth it from the POV of generality, e.g. some space is based rich-content, but may appear then in another
+	should pose no problem since rich-content will unroll it's children by rendering on inf canvas
+	so it's breakable if it's unrolled, and non-breakable if it's wrapped - breaks are canvas dependent, so must be cached there
+	do I even want to cache them though? I guess I won't until I see the need... for now just reserve the `breakpoints` facet
+	it can be a function now, and a cached block later - both should be supported/expected
+	maybe a better name than `breakpoints` or `breaks`? since it's intervals now..
+	chunks? parts? slices (good one)? regions pieces segments sections (good one - both hints at process and data format)
+	what of list? if text requires a render to get it's sections, how can list be sure it's items are rendered?
+	it's fine as long as only rich-content uses /sections but for more generality...
+	technically if item is not rendered, then that's it's current frame, so it's okay for it to return no sections
+	so silent none return is fine for text without layout - user of /sections must ensure previous render
+	for rich-content it's a bit trickier - it needs to render it's items before getting their sections
+	then render itself and provide sections for itself
+	I may be able to move this functionality into rich-paragraph? layout itself? it has no connection to /source anyway
+with sections, will I still need to split text on words to figure out it's min width?
+	sections seem to do more work than space-splitting
+	I though about unifying but I can't assume that sum of widths of each line will equal unwrapped text's width.. rounding... 
+grouping multiple rich-content items into a clickable has a problem!
+	each of those spaces could have spanned multiple caret offsets
+	now how can I translate clicks into caret offset if internal layout is so complex?
+	I think I should make clickable a single item for caret instead of complicating it
+	and document that "command" attribute groups items
+	the only drawback I see is that in rich-edit links will be either clickable or editable but not both
+	(or I could remove first/last item of the link but could not position the caret inside)
+	another option is to remember all items' logical caret ranges and use /into to obtain the final item
+	but how will I know where to look for my saves item in /into-returned path? always last item = text?
+	since no other space supports mulitple carets, might work
+	but caret-to-box iterates over plan rows, it will have to do deep iteration, which is no good
+	I could like with sections, make a function that enumerates caret locations of a space
+	but hardest thing will be to make edits: such space would have to support some positional edit mini-DSL
+	let it be single item for now at least
+	but what to do with text offset and already committed ranges? they are all wrong after the substitution
+	how badly I need to expose attr ranges to the space itself? it was never used yet
+	simplest way I go over all ranges and collapse them
+	all starts inside the collapsed range become it's beginning (command:), ends - it's ending (/command)
+	so final item includes all ranges where it participated
+rich-edit caret offsets
+	I think it should split all strings into chars, so caret can be just an integer, without a need for deep addressing
+	it may import/export strings then for convenience, but should not use them inside?
+	or really make some caret API?
+	- get caret range
+	- get caret box for i-th offset
+	- get caret offset nearest to xy
+	- remove item before/after i-th offset
+	- add given item before/after i-th offset
+	same field or area space could then be a wrapper around text or rich-content or anything that supports this api
+	it will be possible to e.g. place a caret between list items, and delete chars of an item and then the item itself if it's empty
+	a bit of an issue will be to transform these lists/items back into source that produced them (source is needed for exchange)
+and one key problem is copy/paste: clipboard is textual
+	although I can't possibly encode spaces that appear in the source into text
+	so it will be dual: internally hold a block, also save for the other programs as text
+	but how to know if internal block is invalidated by a text copy from another program? when to prefer text over block?
+	simplest check is for strict equality of last copied text with text on the clipboard..
+	one could then clip smth else, then clip last text again, return to my program, and paste the block - no harm in this
+	I can imagine selection that is partially text and partially a region of a grid, that is a document-wide caret addressing
+	which is ctrl+a/ctrl+c/ctrl-v friendly in that it copies all content that it is able to
+	although one can't paste part of a grid back, except as text, even into the same program
+	another grid selection model is xy1-xy2-like, 2D
+	I can also imagine partial selection from clickable links like in browsers, which also needs document-wide addressing
+	keys: left key should make caret 'right', right key should make caret 'left', to stay on the same row
+	caret size (height): imagine a row with small font and a single big item on it
+	caret in this case may be big near the item, but small everywhere else (or it'll be weird)
+selection
+	ideally should also adhere to caret's height, but it'll make it near impossible to have a frame
+	also with document-wide addressing, how to draw selection?
+	ideally if left and right caret is the same, selection is continuous, if not then it's split
+	so selection ideally is a huge lot of blocks between right caret and next left caret
+	also it woule be nice if space would not have to provide any support for selection to work
+	it should somehow work everywhere by itself
+	but perhaps document container might take that role, to draw it, as long as it has caret boxes provided by it's children
+	like this: document has a selected range, and creates a bunch of 'selection' boxes for this range and draws them  
+custom caret
+	can be implemented also e.g. in time/date entry (can be list-based), which may even appear in text
+	e.g. a printable document form composer that allows embedding of such spaces right into the text
+	carets are not a generalization of sections, because sections treat whole space as a band,
+	while carets can work fine in a multiline complex space
+	(though often they share underlying algorithms)
+ok so what's the caret API ?
+	need to:
+	- know how many caret places there are (so "length" in caret units is known)
+	- all left and right caret boxes for these places (or a range of, if not all are needed, or a single one)
+	  or ideally just offset->box which should cache what's needed for retrieving whole box ranges fast
+	- caret offset that is near XY
+	no copy/paste needed at this level - can do that in the source
+	so content may have e.g. a single list space, but source must contain all chars separately or expose insert/remove api
+	source insert/remove/copy will also be side-sensitive
+I'm thinking source dialect should be extensible
+	e.g. I may add a grid representation into it, if I ever want to select/copy/insert only parts of a grid vs whole
+	there's no direct conflict between flow-like selection and 2D selection:
+	- flow-like will work on source level, provided by document
+	- 2D will work on grid level, changing it's selected range of pairs or even multiselection
+rich-edit UX copy/paste-wise
+	one option is copy/paste text together with it's applied attributes (preserves everything, but needs mess cleanup)
+	for that, and for text generation itself, a range extraction routine is warranted
+	another option: copy/paste only text, on paste apply attributes that are there in place (simpler, discard formatting)
+	third: only copy/paste attributes that both opened and closed within the selected range (preserves inner ranges)
+	example: what if I select part of normal text with part of code span and copy/paste it?
+	ideally, pasted upon itself it should maintain identity
+	and pasted anywhere else, keep the code part as code (same with links)
+	means option 1 is preferable, the rest doesn't work like that
+	but what if I copy normal text and insert into the code span? should it wrap the code span? I don't think so
+	so it's an inconsistency of sorts, though I can say that normal text has no attribute so it doesn't carry "nothing" with it
+	then insertion of normal text into bold makes bold, but bold into normal also makes bold
+	so I need copy/paste API (unrelated to selection itself and carets, only works with the source):
+	- return a ranged copy
+	- remove a range
+	- insert stuff at offset
+	what ensures consistency of these ranges and selection/caret ranges if caret offsets are up to spaces?
+	only my effort I guess (and assertions at source-to-content transform)
+	for spaces to handle copy/paste themselves document format has to be the foundation and they should know it
+	it may be a layer between VID/S and actual spaces object tree
+	but do I wanna go that far? not yet anyway
+	or I could create a bunch of templates based on existing ones that accept their data in document format
+	then to copy the data is just to access it
+	but access will have to be deep or what? e.g. clickable/list/text/data - how does it relate to clickable/data?
+	doesn't seem easier than just using rich-content alone
+	but widgets that know how to source themselves is still an option to consider
+	what's a better word? distill? refine? rectify? purify? vaporize? refine seems best fit, even though unrelated to /refinements
+	disassemble? dismantle? breakup? deconstruct?
+	these will be created by rich-content only and used within
+	caret api may still be general, as it's widely applicable, while /refine will be a special feature
+	although then there will be refine-able lists and unrefine-able (not produced by rich-content)
+	with the same caret range, but copied differently (if at all)
+	just as some user-provided space could have a selectable caret range but I won't be able to tell to copy part of itself
+	looks like the only sane solution is to make refinement part of the caret api, and format should be known to every space
+	I guess for now let rich-content have it's own refinement per template and later I'll probably inject it into templates?
+	in line with copy/paste usage scenarios, refine will work on a range and support insertion/removal
+how to name the API?
+	should caret and copy/paste even be a single thing? what of sections?
+	it's doing:
+	- point-to-caret, caret-to-box, length - 1D/2D conversion
+	- remove, insert, copy of item or many - conversion between source format and output
+	sections are best left alone, due to them being band sections, while caret locations can have many lines
+	in principle this all relates to editing, even item enumeration, so maybe edit-api? editable? modifiable? alteration?
+	structure? access (too broad)?
+	/editable or /edit makes most sense, both as a flag that it can be edited and as an interface provider
+	problem is, if it's an object/map then it's too heavy for text template
+	I could just link it to a generic object, but then extra arg requirement: space/edit/remove space args meh
+	could be a function though, with each refinement taking it's arguments...
+	editable: [/remove range /insert where stuff /copy range] or
+	editable: [/remove where length /insert where stuff /copy where length]
+	[/length /point-to-caret xy /caret-to-box where side]
+	actually insert needs side too, though remove and copy should be smart
+	(and point-to-caret may return side together with the offset)
+	side could be encoded into offset as sign: - for left, + for right, with abs AxB normalizing it
+	rationale is to make 'where' argument alone and 'side' specification optional (as sign, defaulting to right/+)
+	right or left caret should be the default?
+	suppose I made my text bold and I'm typing at the tail of it - I want bold to continue, so left it should be, to insert before /bold
+	dammit, but that means using - for right, + for left? nowai, perhaps rather event handlers should use negative caret for insertion?
+	also /caret itself should carry where it is shown, so must include the side and sign change on movement will make it weird
+	but making caret a block [offset side] is weirder
+	I could make it a float with -0.1/+0.1 shifts for side, then round to get real offset
+	another option: double the offset for chars, 1 left 2 right 3 left etc
+	https://gitter.im/red/help?at=6391d73f3daaa326ba75839f
+	I tend to favor [offset: N side: word] but creation of these to pass an argument to editable api is baaad
+started a function for editable api, but it scares me.. perhaps a DSL is better?
+	editable: function [
+		space [object!]
+		remove [logic!] insert [logic!] copy [logic!]
+		length [logic!] point-to-caret [logic!] caret-to-box [logic!]
+		offset [integer! none!] side [word! none!] length [integer! none!] data [block! none!] xy [pair! none!] 
+	][
+	]
+	editable: function [/refinements values] [~/editable ...all this mess omg...]
+DSL: but I'd like to avoid compose usage, would rather bind it and evaluate elsewhere
+	editable [
+		remove offset length
+		copy offset length -> data
+		insert offset side data
+		length -> integer
+		point-to-caret xy -> offset side
+		caret-to-box offset side -> block
+	]
+editing ranges is problematic: need to offset them (easy), extract (okay) and unify (hard)
+	unification can be on simple flags block like in text, or it can have command block ranges which must use /same comparison
+	another way is to convert ranges into source, optimize source, and expand source again into ranges and text
+	but all that is rather tricky to implement
+	simplest perhaps is to use item-by-item final attributes list as an intermediate form
+	but then there may be multiple attributes per item and their ordering comes up.. omg
+	I could enumerate them and lists of numbers are easy to order properly and compare
+	but what do I do if I join two ranges with some command attr? how do I know the command is the same? need /same block - then it's fine
+	but how to distinguish backdrop tuple from color tuple? it can't be a block, paren is reserved
+	perhaps each attribute will have it's both name and value, in this case color/backdrop and value is tuple
+	perhaps attributes comparison op should depend on attribute itself, sameness for command only for now
+	too bad I can't use `union` with /same
+	command: [same block]
+	color: tuple
+	backdrop: tuple
+	flags: [bold italic underline - set] ?
+	bold: true  etc? - will be easier to work with - they need no value, and I can this way avoid union on the block
+perhaps to generalize the source dialect
+	I need to declare every attribute as an object, how it compares, whether applies to text, decode/encode, etc.
+	maybe each attr should have it's own stream decoder/encoder (for source conversion - refinement and expansion)
+	(although how to efficiently parse it then mixed with other attrs? should attr expose opening as parse rule?)
+	aim here is to:
+	- make it general enough to separate combinatorics from the templates
+	- keep source processing into low-level rtd flags fast (rendering speed is top priority, not editing)
+	- allow future dialect extension, even by the user
+also need simple ranges format?
+	if `copy` copies refined source, then insertion of it somewhere may make inefficiencies e.g. closed then opened right away attribute
+	otoh, if it copies simple data map or smth, then inserting an item (char) is tedious:
+	need to find all attributes that will apply to this char and mark them for new index, also offset following indices
+	OK so source format is great for insertion, just need a simple way to optimize it
+	oops, not so great if I insert bold chunk into other bold chunk: how do I know to remove the /bold ?
+	only by converting into raw format and back
+	words, set-words, refinements, make a simple ruleset, which can be respected generally
+	should I expect any deviations?
+	what about e.g. grid representation in the source?
+	grid .. | .. return .. | .. /grid ?  more reddish vid-like but doesn't follow attr on/off model nor decodeable
+	grid row .. /row /grid ?  less reddish more html-like crappy
+	grid row: 1 .. /row row: 2 .. /row /grid ?  friendly to attr decoder and `/row row` won't be optimized away
+	OK here's the thing: attributes are property of text, they are copied and inserted together with it
+	but structure, like row delimiter, is not property of text, it cannot be copied from one place and inserted into another
+	so it cannot possibly follow the same rules, and I currently don't see a better approach to it than html-like
+	(because it needs to be flat for caret to have an index, and ability to ascend from children into parents with key presses)
+	(another option is using blocks and path-like caret, but doesn't look any better and cannot use flat pointer into source for insertion)
+	(but blocks cannot represent e.g. "a <b> b <i> c </b> d </i> e", so they're unfit for the purpose in the end)
+	(at least now I understand why html was made like this, but mixup of attributes and structure looks like a mistake)
+	also, grids will have both:
+	- textual copy/paste which while can copy contents of multiple cells, can only insert it as text into single cell
+	- cell-level copy/paste which only copies full cells, contains info about copy dimensions
+	so I better design internal clipboard format for such possibilities (use tab for next cell denotation in the copied data? csv-like?)
+for ease of copy/paste processing must be stack-like: bold bold /bold /bold should work
+	same for color: x color: y /color /color
+	color spans need not specify which one of them ends - it's always the latter one
+	although then if I select text that is part red part blue, and make it green, I will have to shift previous color: & /color marks
+	e.g. I may remove the text first together with all attrs except color, then mark it green then insert at removal point
+	so this still will need processing of input, else I must specify attr closure like: `/color x`
+	but it's not stack-like anymore and confusing to the reader
+binary looks like a good format for expanded attributes
+	it can be ored (enable attr), anded (disable it) easily
+	it is easy to insert/remove in (bitset is a no go since can't be addressed at bit level)
+	it's compact enough (1MB per attr per million items)
+	[attr-name #{mask}]
+	another option is byte vector: also supports logic ops but also addition/subtraction
+	attrs: [
+		bold: [true #{mask}]
+		color: [
+			green #{mask}
+			red #{mask}
+		]
+		command: [
+			[code] #{mask}
+			[other] #{mask}
+		]
+	]
+	easy to clash attrs: e.g. colors or what command applies to this or that item
+	the only issue is leading zeroes: find mask 1 may take long, so maybe masks head should be at first nonzero
+	index? still will tell the real offset, then it'll be easy enough to convert into pair and back
+	trim could be used to remove trailing zeroes after clashing multiple masks
+	although single mask may include multiple ranges.. can it? makes sense, otherwise no point in vectors at all
+	so no trim, and find is gonna slow it down - ~9ms per single 1MB find!! wow! not gonna work
+	only option then is (preferably sorted) list of pair ranges for each attr+value
+	what if I use vectors [start end start end] in place of lists of pairs?
+	offsetting will be real fast - what is needed by on-source-change.. on the other hand I hardly will find that as bottleneck
+still don't know whether to allow strings in the source or not
+	using strings means direct pointers to source are not possible, only logical caret offset provided to the api
+	not using strings means splitting them all into chars which will be unreadable
+	although, source may contain spaces which may have length, so pointers into those are also not possible
+	so then strings are not special either
+	hmm.. since attributes cannot begin or end within a string or space, I could have assigned indexes based on items count, not caret
+	but then how am I going to convert them into caret indexes? I'll be working with caret indexes most of the time
+	maybe forbid spaces inside source? let there only be data? then I'll have a chance for source offsets
+I need to finally decide whether I need structure (tags) in the source or not
+	why do I need it anyway? why can't I work on widgets directly via editable API?
+	on document scale, eg. 1MB of text, reparsing whole source and rebuilding whole tree on keypress is insane
+	from this POV, I should edit widgets directly with API
+	but whole reason I bother with ranges is because applying left/right insertion logic to RTD flag blocks is hard
+	(at least all text faces will have to be serialized then deserialized on each edit, but the cost should be small)
+	and I would need to apply edit differently to all the other supported widgets
+	final point of insertion is not always a text space - e.g. can't insert image into it
+	so e.g. for grid: such grid cell will each contain either a rich-content or a list?
+	this also returns to the question of whether rich-content contains other rich-contents (e.g as paragraphs)
+	option 1: source is not updated, only used to build a widget tree, and can be requested to be rebuilt
+		each insertion goes into a widget - into text (chars) and rich-paragraphs/content and list/content (within command lists)
+		(cannot insert into the grid or cell directly - only into children)
+		insertion not crosses cells and selected data has no structure markers, so no cell info
+		whole grid can be selected as one item and inserted into such list
+		can only happen if selection starts and ends outside of the grid itself, so grid is a single item
+		text within grid can be selected/copied but can't cross grid's boundary
+		cells can be selected and pasted as cells - not handled here
+		copy of multiple cells then inserted into single cell
+		ctrl+a (select all) can be caught on document level - everything, or on grid level (if focusable) - to select only grid data
+	option 2: copied data has structure 
+		either contains widgets as they are (and pastes some smart copies - but that's hard to generalize)
+		or it has to serialize each widget so it can be deserialized back into a similar widget (preferable)
+		copy of multiple cells may be inserted only as multiple cells (unless explicitly processed to remove the structure)
+		ofc if pasted outside of grid, structure gets removed
+need to first think about structure of the document
+	document contains only text and images, that's all
+	it is organized into a complex tree
+	option 1: paragraph cannot include anything more complex than text and images
+		this rules out link spans then - bad idea
+		but grids and lists become alternate leaves - either them or paragraph, but not mixed
+	option 2: paragraph can include all these tricky structures, subtrees
+		then each grid is also part of some paragraph
+		I think this is more general and more common model these days
+		leaves are only text and images, rest is branches
+		top level document is a vlist of mostly paragraphs, but also grids and lists
+		and maybe even includes page splitters (rows) with multiple paragraphs (like in magazines)
+		it maybe even organized as a page itself, with footer, header, sidenotes etc
+		it may contain also code spans (multiline ones - which are not rich-paragraphs)
+		and even various game-like interactive elements (but these are not copyable/serializeable)
+		so importantly I admit that not everything have to be serialized that can be displayed (or appears in the source)
+		this means I either cannot (or want not to) reconstruct the source, or I insert such items into it as is, unserialized
+		this is the way to go
+	copy/paste on link span and code span:
+		part of the link may be copied as a link or as text
+		whole link should also be copied as link
+		part of code should be copied as code, and formatting matters there (newlines tabs etc)
+		although it's acceptable if it's inserted as text outside of code span too
+		(e.g. I copy some word - don't want to make a new code span when I copy it)
+		whole span should always be copied as span
+		this returns to question of inside/outside selection and whether selection can cross limits of a span
+		browsers let it cross but there's no wysiwyg editor with code spans I can recall..
+		word processors do not let even cross-cell selection: such selection expands to full cells on an attempt
+		nor they allow selection started on a grid to get out of it
+		selection started outside only selects grid as a whole
+		may select part of the grid and insert outside - into text - as new grid
+		or into grid cell - either as new inner grid or replacing current cells (it asks what to do)
+	copy/paste on grids
+		on my idea of encoding grid cells with tabs and newlines for structure:
+		- this will make it easy to copy from grid and insert into some spreadsheet or csv file or even as text
+		- this will make it impossible to have newlines and tabs inside grid cell's text???
+		  what we input as enter vs shift+enter will need to be represented in the source somehow
+		  same question I have for lists, whether it's just a paragraph flag or some source notation that makes a list's item
+		  perhaps use <break> to spawn a linebreak space in paragraphs, start new list items, and new grid rows?
+		  may also add <br> as alias for <break> for html lovers
+I liked the idea of using words as template names in the source, but if I do that I can't use words for attributes..
+	still have #issues but not sure if it's better than tags (which are by their design structure markers)
+images in the source may appear as image!
+	but wrapping them into image space lets control their facets, like /limits
+when copying only closing or only opening part of the source, mirror part should be added automatically
+	(and it will work fine inside any number of other containers - as long as they are not crossed, they need not to be reinserted)
+	then even part of the list item will become a new list item (that is copy must cross the item paragraph boundary)
+	even part of the grid will become a new grid
+	(though grid will need special logic to always include grid start and end markers,
+	else if selection doesn't cross the grid, it won't be inserted as one)
+	if code is crossed, it becomes inserted as code
+	fine
+to avoid rebuilding the whole tree when source changes I have this idea
+	once parsed, each source structure (data region) will get replaced with single widget
+	and further modification of that data region happens within the widget, only affecting it (usually single paragraph or grid)
+	applied text attributes like bold command etc will have to be copied into this new widget so they still apply inside it
+	(they will also still reside outside of it in the original source?)
+	or maybe it's stupid because this way I will turn whole source into widgets and that's what /content is
+ok then these are the options:
+	1. I make changes to the source, let them be reflected on the tree
+	   then I need to maintain ranges of each widget in the source, and each edit updates these
+	   will make these ranges as widths so they need not constant modification but a little bit slower indexing
+	   biggest slowdown here may come from insertion/removal time of the source itself,
+	   and maybe caret mapping (though space ranges help with that)
+	   worst case scenario - single 1MB paragraph as a single string... well, quite unlikely and easy to work around by splitting the string
+	   same thing for 1M items of any kind, but chars can be grouped, and so many images are just expected to cause trouble
+	2. I make changes to widgets
+	   source is not getting updated, and may even be not a facet but an argument that is loaded to make the tree
+	   each copy is serialized, and then deserialization needs to figure out how to map it into existing widgets
+	   this options is scarier than the other, too hard to imagine how it works exactly in detail 
+on proper UX upon insertion of grid structure into grid cell.. e.g. ["abc" <|> "def"]
+	I can't insert it into "z|x" and obtain ["zabcx" <|> "def"], that is I can't just meeting a marker jump to the other cell
+	I have to obtain ["zabc" <|> "defx"], and that involves moving all the subsequent cells by one
+	for this to work properly I should not have any grid row separators, only grid width (number of columns)
+	copying/insertion of columns though needs special handling from the grid itself...
+	in any case, or at best I will be bound to row-like treatment of grid
+	(btw I could encode spans as <||> <|||> etc perhaps, applying to previous content? - but this only encodes X spans, no Y)
+	ideally though grid should fully handle copying and pasting in 2D mode, so row UX is not important
+I just realized that structure tags in html cannot intersect: they have to be closed in LIFO order
+	while tags like bold italic can easily intersect
+	which again proves that mixing them was a bad idea, they are just different categories from the start
+	and this means that just like strings, I can have blocks inside source instead of the ugly closing tags!
+	BLOCKS: #item ["text" #item ["subitem"]] are the solution!
+	only need to think how to represent grid, whether I need #grid itself or just #row [#cell [...]]
+	#cell[] is not super compact/readable but it fits the model,
+	other ways:
+	- to enhance #row with special parsing rules for | marker (perhaps a good idea? each #widget having it's own format)
+	- let tab char be the separator, but if it appears within other container that doesn't count (but paragraph is implicit so no go)
+	  even if I wrap tabbed text into nameless block, it still looks vulnerable/unpredictable
+	- use Red block-level new-line marker for cell separation - but this will destroy compactness and dangerous around code formatters
+	  not to mention newline would more expected to make new rows
+	need also to encode span pair somehow.. since any grid should be copyable in this format.. well, pair datatype may do but where?
+	it may also be useful to encode some parameters e.g. #item #(param: value) [..] but I'm not sure what will these be
+	#heading #(level: N) ? vs #h1 - #hN ? .. but this is way too high level
+	instead I should have [font: 20 ... /font] smth
+	although heading might have decorative underline under it and paddings, so it's most likely a widget in itself
+	so it makes sense to make such template and (de)serialize it
+	#item #(type: bullet) ? that is likely to map well to templates, unlike #bullet vs #numbered-item smth which are more like vids styles
+	main issue with #item is that I call items in the list this way, but they're different than items in text list
+	such text #item internally is a hlist with number/bullet marker and vlist of paragraphs to the right (which is a document)
+	so one of the questions is how low level the source should be - should it contain #document, #lists etc. or just #item
+	it boils down to how it (de)serializes, whether I can support it easily or not
+	and maybe path-like caret offset will be better than integer eventually, much much faster and no need for space range bookkeeping
+new day new thoughts:
+	this source dsl and vid/s come closer to each other more and more, so why there's two?
+		I'll leave only source dsl for text formatting (possibly extendable) - no structure within it
+		when part of structural space gets copied, it's simply cloned with only part of the data
+	do I really need to (de)serialize spaces or may just teach them to clone themselves (copy data but not state)?
+		now I decided it's too much complexity for naught
+	caret vs focus how they interact
+	  * caret always resides within a rich-paragraph - always!
+		though being within it, it can also be within a subitem (eg list used for link spans)
+			I have this idea: instead of a list, use another inner rich-paragraph for spans
+		if caret is within a grid, this grid is located within some othre rich-content,
+		but grid has a cell with inner rich-content that has the caret
+		caret is only shown if rich-content is the last space in focus path (focused = yes)
+		it can also be in a field or other caret-enabled space though
+		but!
+	  * pointer selection needs the ability to locate caret offset that is closest to the point in a document - how?
+		I guess it will have to scan the tree (or map) deeply until it finds rich-paragraph with closest Y
+		then locate caret in it with closest X
+		such caret offset result is a path (like focused) but with added integer offset
+		(even though rich-paragraph may be within another rich-paragraph, parent paragraph doesn't put offset into path - but a space instead)
+		caret left/right movement is trivial tree navigation from this deep path
+		caret up/down movement is trickier - perhaps will rely on the same algo that finds closest Y/X
+		just need constraints for this algo, e.g. "don't look above or below given Y",
+		or "don't look before/past this given space (currently focused one)"
+		(difference is whether Z-order is always left-to-right or I allow it to be the opposite and scan whole map)
+		(but if Z-order is backward I don't see how I can make a meaningful cross-space selection anyway so..)
+		spatial navigation will likely share this algo - need to consider it when implementing 
+	  * cross-space selection spans between such two paths (which may be of different lengths)
+		and consists of selection boxes which all reside within rich-paragraphs and texts/fields
+		i.e. only explicit space can be drawn as selected, not /spacing nor any decoration outside of text areas
+		(images as well as any other widgets can be put into rich-paragraph so can be selected as a whole)
+		(and this omission of non-copyable things is a good thing UX-wise)
+	  * will be very inconvenient to work with selection that is 2 paths, so I will have to provide pair/path mapping after all
+	  * spaces will not be put into clipboard as is, only their clones, because by the time of paste original may be removed/changed
+	    i.e. I need to "freeze" the copy once it's made
+	    spaces that don't support /cloning won't be put into clipboard at all, just skipped
+	    upon each insertion, again a copy is made, so new space can be modified but won't affect the one inside clipboard
+	    clipboard will be a context with /data block freely readable and appendable (will auto clone spaces using on-deep-change)
+	    (such cloning should consider that I may need to only replicate selected part of the data, not all of it)
+	    kept in sync with system clipboard text by comparing last written text to the last read
+	  * cloning is deep (just has to remove all single roots)
+	    e.g. rich-paragraph rp1 within rich-paragarph rp2 when requested clone/part axb
+	    not only clones only part of rp2, but also may clone only part of rp1 within
+	    or e.g. selection of tail of one list item l1 and beginning of next item li2:
+	    will copy [li1 [with part of it's rich-content] and li2 [with it's own part]] - 2 top level list items inside clipboard
+	  * whether to have general cloning or per-template depends on whether I want to automatically apply cloning logic to template derivatives
+	    I think I do, even though without specific knowledge about changes in derived template, clone may omit some features
+	    I'll follow hybrid approach: each space lists a list of cloneable facets and how to clone them
+	    and clone-space function will use that list, or return none if list is undefined
+	  * document will be the thing that enables cross space selection and caret movement
+		as well as it will be the thing that maps clicks to nearest rich-paragraphs
+		(internally a vlist-based container; on VID/S level it will work fine accepting rich-paragraphs etc)
+	  * document will eventually have /save/as 'html (and other formats) so it can be sent as an email or saved as a document
+	    maybe /load too
+	  * perhaps rich-paragraph won't draw any caret itself, only will return box of requested caret offset
+	    and only document will draw the caret
+	    same for selections - document's task
+	    so children are likely not focusable, and don't use focused state - only document is in focus when it draws the caret
+	  * how does paste work? e.g. if cross-list-item selection is pasted upon itself?
+	    insertion will only try to unwrap the first clipped item, all subsequent items are inserted as is
+	    rest of the text after caret gets added into the last clipped paragraph?
+	    not good if I paste these items into plain text - whole text will become part of the item
+	    actually, wrong, only rest of the paragraph becomes part of the item, and it's fine
+	    but if I paste items into paragraph, I can't unwrap the item itself since paragraph is standalone, so there it's not even an issue
+	    rich-content will handle insertion then by splitting it's text into 2 parts and adding them where appropriate?
+	    selection unwrapping means that the insertion handler is often not the paragraph itself but one of it's parent (item or cell or grid)
+	  X removal and insertion is where all this operate-on-the-tree model fails miserably!
+	    how can I possibly define unambiguous rules of removal and insertion for complex scaffolding?
+	    e.g. on ends of a list item, or grid cell, or code span
+	    there may be multiple levels of decoration, very context-specific and providing rules for each will be hell
+	    and these rules will be non-transparent and tricky, hard to understand and maintain
+	    on a source representation OTOH such rules should be relatively easy to define, what gets removed/inserted, what doesn't
+	    and this is the answer to the question of how many details source format should or should not include
+	    and how it is different from VID/S: one contains logical elements, other - real spaces
+best source format I have come up with so far:
+	document = #vlist [
+		#paragraph [rich text here images and inline spans]
+		#code [just text here nothing else]
+		#vlist #(marks: 'numbers) [						;-- single list item is also vlist, like the document!
+			#paragraph [...]
+			#code [...]
+			#grid [
+			]
+			#vlist #(marks: 'bullets) [...]
+		]
+	]
+	that is, structure is minimalistic but there's clear distinction between in-line and top-level items
+	#paragraph #code #grid #vlist are all top-level and not supported by paragraph itself (each item defines it's own vocabulary)
+	removal at the edge of a #paragraph may glue together adjacent paragraphs, but other items by default will be removed as one
+	one option is to have grid and code as just top-level objects, another - expose their data to the source
+	whether selection can cross between paragraph and e.g. grid depends on that
+	but since I would like to insert grid as grid and code as code, perhaps it should not cross?
+	because they're incompatible formats, and selecting only a few cells in the grid can only copy text, not 2D structure!
+	YES this is the key! that flow selection on grid cannot be copy-pasted as grid!
+	I may still (de)serialize it for convenience, but ideally it should be modular/extendable and configured so #grid is not for peeking
+	fuck! if I have this:
+		text text rich text
+		1. vlist here as item
+		   other paragraph in teh item
+	and if I select from "rich text" until "vlist here" inclusive, and copy and paste selection upon itself
+	it will mess the structure! most likely I will have "vlist here" as a new numbered item!
+	if source was flat though, pasting stuff into itself would be safe... hello tags again?
+	[
+		<p> rich text here images and inline spans </p>
+		#code [just text here nothing else]
+		<ol>
+			<li> <p> ... </p> </li>
+			<li> #code [...indivisible...] </li>
+			<li> #grid [
+			] </li>
+			<li> <ul> ... </ul> </li>
+		</ol>
+	]
+	[
+		<p> text text rich text </p>
+		<ol>
+		<li> <p> vlist here as item </p>
+		     <p> other paragraph in teh item </p>
+		</li> </ol>
+	]
+	selection in this case includes tags, just need to figure out how to paste them somewhere else without making a mess
+	core difference between tags and blocks model is the order how removal+insertion gets done
+	in block model I considered that I remove, fix, insert, fix, and get different structure
+		I could still auto-unify adjacent ordered lists in this case and preserve structure
+		in fact, what about unification on paste of any kind of structure for the first and last copied item?
+		or reusing any container that appears on the way, but inserting if it's not? - best idea so far? SHOULD WORK!
+	in tag model I considered that remove, insert, fix - the lack of fix between the two keeps structure intact
+		but the hard question is how to fix the structure after
+interestingly, rich-text doesn't allow ["ab" u "cd" b "ef" /u "gh" /b "ij"], works like stack
+	but low-level allows that
+in paragraph [b /b] - where is left and right insertion?
+	I guess [b "" /b] is one way to introduce it, but it's still all a single caret offset
+	besides, technically there's no bold in there since there's no text, so no left no right
+final source format then (top level container #page is a vlist with no marks):
+	#paragraph [paragraph syntax]						;-- may have #p shortcut
+	#list #(params: values) [							;-- may have #ol/#ul shortcuts
+		#item [
+			#paragraph [...]
+			#paragraph [...]
+		]
+	]
+	#code [anything except text is ignored/removed]		;-- rich text can be pasted here, but will be stripped
+	(code may appear both in paragraph and in list - but it's not an attribute!)
+	(attributes are not carried from one paragraph into the other, UI should do that if it wants)
+	undecided if #grid is worth including (inclusion provides crossing selection):
+	#grid #(params: values) [
+		#row [
+			#cell [
+				#paragraph [...]
+				#paragraph [...]
+			]
+		]
+	]
+	will need to make it extendable/modular so one can refit it (but that's for later)
+how to encode a spoiler?
+	it's theoretically there, but shouldn't be selected or allow caret until it's shown
+	#spoiler [
+		#title [#paragraph [..]]	- title is a vlist
+		#content [#paragraph [..]]	- also a vlist
+	]
+	so it then only produces a space for #title and reports 0 length for content, so caret skips it
+	selection should also ignore it, so I'll need caret-to-source handled by each scope separately
+	as document doesn't support translation or zoom, 'content' space should not be created until made visible
+or can it support translation/zoom? and where I need it?
+	I can imagine grids inside scrollables, but grid I will make a single item ?
+	code will be put into a scrollable too, and it's not a single item, don't want that
+	so how to translate caret box from code into document?
+	I don't have the means.. so maybe caret should be drawn by code itself then
+	meaning, I have to put it into rich-content or it's derivative, as well as paragraph itself
+	no translation will be needed but need to control who has the caret, or if nobody has
+	I suppose document itself will have to track it and set for each rich-content/paragraph
+	how will it know if it supports caret or not?
+	length > 1 is one indicator, but it excludes paragraphs with single letter (bad e.g. when typing)
+	so I suppose editable or caret facets should tell that, or else hardcoded
+lessons I learned from briefly playing with the caret around one or more spaces where line wraps:
+	- when user types text in, there will be moments when this text ends with a space
+	  and this space should be significant so user knows he entered it (visual feedback)
+	  so it's unacceptable to clip caret to only text in the row
+	  another argument is selection boxes: spaces must be visibly selected
+	- on the other hand it's also unacceptable to let caret roam free
+	  because spaces are not considered in width estimation, so they may get out of the paragraph into other UI elements
+	  so caret should be clipped within the rich-paragraph itself
+	  then it both provides enough visual feedback and prevents caret overstepping
+	  this still will lead to whitespace collapse in fill mode (when it succeeds)
+	  and in case there are too many spaces in the line
+	  but that's acceptable, and I don't see a better option
+	- I need a special case when to the left of the caret is a space, but to the right is a visible char
+	  here, left caret (after the terminal space) should be turned into right caret (before the next line)
+	  simply as this feels more human
+	  but in case of multiple spaces, those that don't have a char to the right, caret should still be located on the previous line
+	- same concerns newline char: locations before and after it both map to the same place in the previous line
+	  so a better UX is to move the location after it to the next line
+	  (in this case doesn't matter what char follows it)
+	  but whose responsibility is that?
+	  not text or paragraph since these are not wrapped within rich-content
+	  rich-paragraph knows nothing of caret or chars, operates on whole spaces only
+	  rich-content has access to text and provides caret facilities, so there it goes
+	  turns out it's quite tricky to implement!
+		  fill-row-ranges only uses clip-end for last caret offset, since it doesn't know any other "right" margin
+		  this results in whitespace being excluded from caret ranges
+		  is this desired? at first it seems so, but this will lead to:
+		  clicking on after the row will position caret before the whitespace,
+		  while manually it will be possible to position it inside the whitespace
+		  clearly not consistent..
+		  so now fill-row-ranges counts all whitespace
+the more I bother with document source format the more I'm thinking of scratching it
+	involves so much effort, probably much more than direct widget copying, now that I have an idea how it might work generally enough
+	and the idea is: define rules not only for insert/remove, but also for change (for better paste into selection)
+	in the worst case, I'll have to specialize list and other widgets to usage in the document
+	but ideally document itself should be able to handle it
+have this idea about caret
+	instead of a block, let caret be a space object in the document!
+	document will move this existing object from one child into another when it wants to display it there!
+	(also will help to build multi-caret mode when one wants to)
+	then as a space it will be styled as rich-content/caret or text/caret or anything, out of the box
+	(otherwise, to style it I would have to create the caret space all the time for every child) 
+and this idea how to simplify everything
+	get rid of paragraph/text - have only rich-content in the document
+	it will then be a plain list of rich-contents with no deeper lists, no tree
+	each rich-content may have a numbering attribute - bullet or number, and has an indent value which can be tuned on the editor level
+	each grid/cell, spoiler - have their own document, and are opaque from this one's POV, so no selection across borders
+	document won't need a source but VID could accept it once to create the proper layout, and discard the source
+	indeed this is so much simpler
+	source format could simply use block for paragraph, with optional marker for numbering
+how to organize paragraph indentation?
+	one indent isn't enough, since there's indent from the left of the page, and that of the first line only (number, bullet)
+	critical in lists that are by themselves indented
+	/indent and /first-line-indent?
+	/indent as a pair firstxrest?
+	/indent as a block [first: .. base: ..]? though wikipedia names 'block indent'
+		in this case negative first also effectively increases base?
+	/indent as a block [first: .. rest: ..]?
+		base makes more sense as it's known, but in this model rest > first > 0, which is easier to grok
+	also, first line is one thing, but indenting to a number is another, as number in this case changes it's width
+	but it can be done by making number a space, not text
+	but then some upper level will have to control indentation's consistency
+	and this high-level logic will have to work even on read-only documents
+	also, number should never collide with the text, so number indent is a minimum but not maximum value (/limits/min a good fit for this)
+	so let indents themselves be either fixed or rather measured based on font size? 
+intersections of attribute ranges
+	hard thing here is to maintain consistency across multiple removals/insertions/unions etc
+	consider color: it overrides the previous value
+	when used as a stack it's fine, but what if I unify two ranges of different color
+	I could just map colors one upon the other, but if they start at the same offset I need extra effort to guarantee nesting
+	and effort becomes bigger with more intersections
+	OTOH I could subtract ranges from each other to ensure no intersections, though it's also an effort
+	unification then is asymmetric: one takes priority over the other (primary/secondary)
+	intersection exclusion naively is O(n^2) where n - number of values an attribute takes, but I have an idea
+	dammn I hate the amount of code needed to support pair ranges compared to bitsets/vectors
+	vectors' main issue is serialization: slow to find the change index
+	but how important is it? 1MB paragraph is not a likely case, and serialization of multiple paragraphs happens when?
+	on copying only, which is not going to happen often anyway, for the whole document
+	possibly on removal/insertion - if I want to update the source (usually I do) - but it's for one paragraph only
+	bitsets may help since 8x faster find on them, but how to shift them? enbase+debase?
+	and how to serialize?
+	- enbase then find (1 comparison per bit)
+	- to binary then find (1 cmp per 8 bits) - perhaps the most efficient solution all things considered
+	  or rather parse: funny but it's 2x faster than find binary binary: parse binary [any charset]
+	- create masks e.g. of 256 bits length, and it with them, test for emptiness (= charset []) (1 cmp per 256 bits but allocations)
+	after some work with bitset I'm thinking just binary will be faster
+should I keep ranges in the rich-content when I can call 'measure length'?
+	ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
+	so caret can skip the single ones but dive into the created ones
+	but I also could dive into all of them
+	or I could just add a flag (/dive or smth) and avoid this data
+	for document it's enough to know the length of each paragraph to be performant
+	(might just cache them, piece of cake)
+	or I can make caret two-layered: paragraph-number x item-number
+	(but it's more awkward to use than normal caret, so no)
+	what happens when caret is in the sub-document? focus path changes, focuses the sub-document
+	how to decide: to dive or not to dive?
+	key is copy/paste simplicity, allow no deep pastes
+	so that means what's single in the source should stay single in the copy, so no dive into it
+	OK so I have to keep a list of items where I should dive, so I might as well keep their ranges rather than boolean flag
+	another reason for ranges is translate click into caret, so I might wanna keep ranges of single items as well
+	single items will never be dived into even if generated? yes.. left/right caret will only affect attribute carryover
+document/selected cannot be a pair!
+	it works for drawing it, but not for copying/pasting
+	since for copying/pasting it matters if it starts/ends before/after paragraph split (effectively, linebreak)
+	also for removal (cutting) it matters as well
+	so I suppose let it be object [start: [offset: side:] end: [offset: side:]] ?
+about clipboard
+	I need to copy into it arbitrary paragraphs with arbitrary spaces
+	and provide text version of this data for exporting
+	paragraphs may be copied as a single line or formatted to 80 columns, divided by empty line
+	this works for code as well
+	grid will need tabs and newlines as separators
+	for links to be copied, lists have to be scanned for text, as well as clickables
+	images are not editable nor measurable but still may have alt text to be copied
+		so this function should not be a part of edit [] dsl
+	lists can be horizontal or vertical, copied differently
+		delimit with a space char or not?
+		in rich-paragraph, all spaces are present already, so probably not
+		OTOH I could check spacing/x if it's non zero
+	again, facet or not? explicit or implicit inheritance?
+		container -> list -> ring make zero sense to inherit
+		list -> cosmetically-different-list does make sense
+		text -> code makes sense
+		ok facet then!
+	too bad can't use /copy name for it, too widely used... /clip has other meaning, should take segment
+		/copy-text ? /export ? /save ? /to-string (most to the point of all) ?
+		/form ? (also great, and I use it rarely enough to fear the override)
+		REP 134: form, format or to-string?
+		format implies some format-template, which is not used here
+		also, formatting intent is unknown: for readability or for reuse in other software?
+		readability would insert separators into numbers, reuse would not (preferable as more general case then)
+		form is mostly for single line messages though
+		format for interchange is a best fit so far, so let it be /format
+		later with a possibility to extend format function to accept spaces
+clipboard and copying
+	content in clipboard is supposed to be passive isolated stateless data
+	once it's copied it should not change into something else, or it may have unexpected consequences
+	currently clipboard expects only strings and blocks of spaces, nothing else
+	spaces are cloned when copied (cloning was introduced for that - to make spaces into data)
+	they are also cloned again when read, so the receiver can change the copy but not the data on the clipboard
+	but it doesn't feel 100% reliable, given how many quirks the 'copy' has
+	if anything other than space/string is passed, should it cause an error, pass, or skip the item?
+	should it have extendable list of conditions which it can accept, with functions that prepare the data?
+format and lists
+	should format use content or items?
+	items is filtered and sorted data so it makes sense to copy what is shown
+	content makes less sense 
+	but maybe use map instead?
+	btw, rich-paragraph should format not the source but actual items, to ensure spaces are not skipped
+	how to add space after bullets/numbers? should be done on document level, since it's introduced there not in rich-content
+what about blockquotes?
+	I could base them on paragraph, sure, but how to copy/paste it?
+	oh easy, they will just clone themselves together with their block thing
+	or rather, they will be normal paragraphs, just under a different name, to style them accordingly
+how they can be listed in the document?
+	don't wanna make a new DSL
+	could extend VID/S with something, but then again not sure it's worth since most likely document layout will be generated anyway
+	I need to either ensure nothing not based on rich-content appears in the document (or on rich-paragraph?)
+	or everything should just get skipped (ignored) by copy paste
+	but since paragraph can include any space I don't see why this space should appear there without a paragraph 
+composite widgets pose hard design questions
+	drop-button example:
+	I could organize it as a `hlist [box button]`
+		best thing about this is that `draw` works automagically
+		problem is when user clicks on box, how to mirror it's inner 'pushed?' into the drop-button?
+		need two-way mirroring.. somehow.. or maybe not, maybe pushed? should stay within the child only
+		but then read access is more complex, and no programmatic control over it (only from UI)
+		(same as list-view doesn't have /axis, only /list/axis)
+		read access could be simplified with a function reader, but the other one..
+		another good thing in this model: total control, e.g. /limits for box
+	or as a data-clickable mirroring itself into box, and drawing box and button side by side
+		but this needs custom draw, and doesn't solve anything
+		I still need to list all mirrored facets, so I may as well just define them in the list
+	or as a data-clickable without other spaces inside
+		but this will not only need more complicated custom draw, but also hittesting
+how should hovering work?
+	uses: highlight hovered over list item, or indicate a clickable surface
+	lol turns out I have a %hovering.red file that was never imported (and event/away? is not for writing)
+		it also previewed time events which is a heavy and bad idea
+		but the point was that pointer may stay in place but space itself become rendered elsewhere
+		so the away event, and perhaps there's no way to achieve that without timer
+	options:
+	1. generate extra on-over event for all spaces the pointer just left (like event/away in View)
+	   can't modify event/away but can pass away? as another parameter to the handler
+	   for this to work I will have to keep track either:
+	   - of all spaces that received over events but no away event
+	   - of all spaces under the previous over event - faster
+	     just compare two stacks (paths) - last and previous one, fire the event
+	     this will also play nice with dragging
+	     whether or not I should check if space is still on the tree, unsure - perhaps not worth it
+	2. have on-enter (not the enter key) and on-leave events, which aren't View-compatible
+	3. have on-over work as on-enter and on-leave/on-away as another event
+	4. have a check that tells if pointer is over the space or not
+	   but what will trigger the redraw? still need an event
+	5. make it work akin to focus model - with only one space ever being hovered upon/highlighted
+	   under the hood it will be a previewer
+	   but there's a need for a list of 'highlightable' types then
+	   and it will be impossible to highlight multiple spaces, which is not an option
+	   e.g. item(row) in a big vertical list and at the same time item in that row
+on-drawing event	   
+	timer previewers are now called for each rated space, not once per host
+	so 'drawing' event introduction may win some performance
+	plus if no space has a timer, now it's the only way to ensure away event, except insert-event-func
+	another reason for this addition is that `render` may be called by the user, which I wanna catch too
+	OTOH I don't want spaces to support this event (for performance), only the host, so maybe I should not add it
+	OK I'll use a kludge for now, `prerender` block for face render, no better idea
+	aw shit, it doesn't have access to the event... so can't know pointer offset
+	but in arbitrary code calling 'render' I don't have events, nor pointer offset
+	so it's not possible to generate away events outside the timer code?
+	I can stash last event/offset for each host during host over events, then hittest against it
+	but there's the question of dragging - is it on or off, should hittest go into the last path or not
+	but it's fine I guess
+	btw, it should not use spaces event system, only faces event system
+	another consideration: during dragging a lot of events will land outside the space
+		should they have away flag? or maybe just test if offset is within the space? I prefer the latter
+		(but away event can still occur during dragging if render relocated the space)
+	another: if render relocates a space, it's not enough to only produce over event if it's /away
+		all renders must generate over events if offsets in the paths differ
+	what a mess, ok:
+		over events are there already, I just need to add one when new-path and old-path have different spaces
+			2 hittests: one normal, another into old-path (to obtain proper away offsets in the old spaces)
+		this will cause duplicate offset for all spaces in the path that did not change
+			and generally there will be twice more over events where spaces are small
+			but it's fine I guess
+		and this event should ideally happen before the 'over' that goes into new space
+		render again only triggers new event if paths aren't equal
+			should it be generated before or after the render?
+			if render is the cause of it, then after makes sense - just rendered and now invalidated
+			OTOH, before makes sense too - invalidate as a reaction to previous render and re-render
+			after is better since dispatch will test for invalidation before rendering, and prevent render (and away event)
+			but this will alarm validity cycle detection (rightfully).. hmm
+		what if dragging stopped - on-up event - same pointer offset, maybe no render - View generates over event?
+		fuck it's so complex and dangerous! maybe I should only react to over events and not to render?
+		or just compare paths by timer and don't bother with user-triggered render calls?
+			it will only be a problem if one tries to build one's own rendering pipeline, not timer based
+			but no validity issues and no pre/post-render kludges
+		another reason not to overload render is: during render many size changes happen normally, don't want it to mess everything
+		case by case:
+		1. pointer moved and no dragging
+		   compare paths: old-path with new offset and new-path (free)
+		   gen event if at least one space differs, for the spaces in old-path (one event chain)
+		2. pointer didn't move and no dragging
+		   same, but can only gen event if previous render shifted something
+		3. pointer moved and dragging
+		   path spaces are equal by definition, so normal over event will trigger away-ness
+		4. pointer didn't move and dragging
+		   same here, no event needed
+		another issue: cannot set event/offset, and for timer event it's invalid, have to use object
+		or why bother, pass 'none' for event, offset is known from path
+		it's still lagging:
+			render (on timer) moves the spaces
+			next timer kicks - detects movement
+			and then hopefully on the same timer hit it rerenders it
+			so it's still 1 frame behind
+			but it's either that or postrender with all of it's risks of cycles
+drop-button UI/UX
+	at first I thought of using popups for it, but I need to show it below the drop-button
+	how can I translate the left/right bottom corner of the space back into the face and window? I can't
+	besides, such translation may need scaling/distortion
+	what I can only do is show this menu in the drop-button's coordinates
+	but then how can it stay on top of other spaces (which it will occlude)
+	and how to avoid clipping by the parents?
+	in some mobile UI I would just expand the list this item is in, without occlusion
+	heck maybe I should consider it a bad UI practice to have these dropdowns..
+	but what's desktop alternative? locker pane? still less efficient than a drop down
+	better idea: don't tie the list to the drop down's corners
+	instead display it as a popup centered on the selected item around the pointer
+should caret be part of field/document or of text/rich-paragraph ?
+	part of text is simpler, since it automatically applies correct translation, scale, clipping
+	on the other hand it carries features of the parent
+	- in field this is offset and look-around
+	- in document caret isn't the same at all as in rich-paragraph, even offset is different
+	the only thing I dislike here is that style will be spelled as field/text/caret or document/rich-content/caret
+	let it be for now
+	if I find a good reason to put caret into field/document, I will look for workarounds 
+I decided not to burden implementation with links that span multiple caret places
+	because if I did, I would have to add analogs of offset-to-caret/to-char into every space used (list, clickable)
+	seems like unnecessary complication for now
+	as a result I don't need /command attribute anymore - let it just be inserted as a space
+how to "linkify" whole paragraphs if they're selected?
+	it might be best to create one link per paragraph, skipping the list marker
+need to reconsider what spaces are significant in rich-paragraph
+	text: "a b c" - if I select " b " and make it a clickable/rich-paragraph, it eats the last space
+	so trailing spaces must always affect the size, as well as leading ones
+	only spaces where lines are split are insignificant
+row ranges concept in rich-paragraph has a problem...
+	when an item spans multiple rows - what are the ranges for each row? they interlap
+	these rows caused so many problems already that I regret not making a coordinate system initially for it
+	why didn't I? because didn't see benefits back then
+	how 1D/2D map to one another then?
+	paragraph itself is 2D and receives clicks on it's 2D area
+	it unrolls clicks into 1D row and then into a specific space
+	need to think on vertical offsets during this translation...
+		tricky: rows are of different heights, so single space may have different vertical offsets in different rows
+		so one option is not have them in the map at all, store separately e.g. as map (row-number, space) -> y-offset
+		another, better: have whole map properly vertically aligned as a single row (along baseline)
+			and visible rows will each have start-y end-y that define their vertical offset and height
+	but it's map is 1D, because it can't be 2D without having duplicates
+	and it should not be a problem as /into handles translation..
+	but map is expressed in space's coordinates.. so it should be 2D
+	only valid implementation would be to have a nested structure: rich-paragraph/unroller/spaces...
+	paragraph is 2D and has 2D unroller, but during /into unroller, 2D is converted into 1D
+	and unroller deals in 1D coordinates and has deduped spaces in it's map
+	spaces in unroller map will be unscaled, so no /into will be needed
+	scaling will be done during paragraph->unroller translation then
+	or wrong?
+	maybe rich-paragraph will have a 2D size but /into will translate points into internal 1D?
+	indeed! it's map is 1D, but size is 2D
+	same as zoomer may have 100x100 size, but with scale 0.5 a child may have 200x200 size
+	zoomer doesn't need a map, but if it had, it may store children in scaled coordinates
+	so assumption that /size and /map/child/geom/size belong to the same CS is wrong generally
+	still having an unroller may help abstraction?
+	worst thing currently is having single child in multiple rows - need to get rid of that
+	if unroller supported draw/window I could go row by row obtaining fragments? (it may ignore Y axis)
+	what about splitting/sectioning and 'fill' mode that fills split whitespace?
+	and how it works together with scaling? who scales?
+	'chain' may be a good name for unroller, or 'chopper' or 'slicer' or 'sausage'
+	so para asks chopper to return 0..100 range
+	chopper renders everything and caches the results anticipating multiple range requests
+	returns spaces that fit, but NO!, this won't work since it has to set it's size and not change it with each row
+	let it just be a function in paragraph or chopper then: chop the row (map) given a range?
+	it may return then both size and spaces and their offsets
+	it's returned size may be bigger than requested, which means clipping
+	and first space's offset may be negative (left clipping)
+	what about sections? will need sections of each returned space
+	and will need to know if last visible section is optional
+	if it is, and it's skipped on next range request, if not, subtract it from next range
+	scaling may apply too
+	rows primarily become ranges [start-x end-x] of each visible row
+	with less sections usage (only on row edge) it might actually be faster!
+how to cache sections?
+	they depend on canvas, at least on some dimensions of it
+		e.g. hlist's items height affects their width
+		or paragraph may turn off sectioning when it's split
+	but they're optional and it's unwise to fill them until needed
+	so maybe let them stay in /frame or other cache and get invalidated by /size change?
+	ideally I need a custom caching mechanics for it, but too lazy
+	shit it's tricky!
+	case: hlist may be rendered on other canvas and it's map fetched from cache
+	but items and their sizes and maps won't be
+	and this means items will have outdated/invalid sections cache if they change their width with height
+	but it also means that map of items and hittesting will be invalid
+	forgot.. I have cache generations to defend against that
+	plan for now is: store them separately
+	set to none on draw and by cache fetches - so canvas changes always reset it
+		problem then that fetching cache for current canvas also resets it..
+	fill by /sections
+	have another idea...
+	draw resets it (to new empty block)
+	use common cache to store a block, and this block will later get filled (also in the cache) by /sections
+	purrfect!
+so what's the effect of generations on out of sync children maps and sizes?
+	rather hard to predict...
+	inf/zero combos are never replaced but possible to get to glitch:
+		render on a new finite canvas, changing items, then on infinite (cached), leaving items finite
+		how likely? no space I know of does that
+		tube: half-fixed size, and if it becomes 0xinf (after Nxinf) it cannot be hittested anyway
+		list: same
+		grid: inf then fixed for children
+	wrote a design card for now, don't see immediate blockers
+paragraph edge cases as I see them:
+	leading space - always significant, even if right-aligned
+		esp important during editing
+	trailing space - significant, but should not produce a new empty line
+	split space - disappears basically, but caret locations still exist, to walk across whitespace
+	linefeed - should not be part of the paragraph! bcuz cannot be unrolled into a row
+		should split input into two paragraphs - need assertions in paragraph code
+		(plus it's just a complication to support it)
+	map will simply contain a list-layout-like row of all items
+		either on source change or on-demand after the change
+	map will be split into rows by draw (splitting depends on canvas) and rows are cached
+		splitting also handles indent and scaling
+	need translation func 1D->2D and back (roll/unroll? slice/stitch?)
+		should it use subpixel precision, for scaling? no reason, since on both ends are pixels
+		it will account for indents, alignment, zoom and chosen /size (not canvas - canvas is handled by draw)
+		since row splitting depends on sectioning and item sizes, some things must be cached:
+			each row's start-x end-x (unrolled) scale-x offset-y height (rolled)
+			each space's caret-start and -end - but this is for caret-to-and-from
+				instead of space->range map - maybe just by space's index?
+			within each row - each space's offset - for stretched spaces support (size is known from item/size & scaling)
+	should alignment always be added from left side? it becomes rather weird
+		alignment for numbering doesn't make sense at all when not left-aligned
+		what editors do is align the paragraph itself but not the number
+		it's still weird but probably less weird ? or not...
+		what makes most sense it seems is to rearrange alignment
+		that is, it should be first subtracted from max row size, then whole row (that's left) is aligned as it should be
+		'fill however should not fill alignment's empty space, only what's left after subtraction
+		and fill should really scale whitespace not content
+		else there will be fill-left fill-right fill-center and they'll all be weird
+		I might allow scaling up to 5-10% before stretching spaces, but then only spaces
+		this is challenging though, since paragraph & text do not know how to stretch their spaces
+		it can only work simply enough if text is split into individual words (and even then complicates it much)
+		or maybe like this! not just split map into rows, but split it into words (significant regions, projections)
+		each word then project into the output using clipping
+	'fill with scaling should somehow also reduce row's width! that is row can be bigger than allowed width, downscaled
+	should it render items on infxinf or use width?
+		for grid (images too?) it makes sense to use width, but for sub-paragraphs totally not
+		so I suppose it will be up to document to autofit all grids
+so I laid out a 1D map, now what?
+	to create rows, ideally I need to give it pixels and it returns space index
+	otherwise I will have to repeat the positioning again during row layout
+	(and it has proven previously to be challenging when sections are taken into account)
+	but even if I repeat it, translation will still be slow - inspect all items, find one that intersects the given pixel
+	to speedup I can:
+	- list pixel ranges, look within it, maybe structure in a tree or use binary search
+	  still should be faster than sectioning everything
+	  shit, my binary impl is not great for step functions
+	- make a vector or binary map of pixel->index (vector is super slow because 2 vectors can't be joined together, so binary)
+	  4 bytes per pixel - 4kB per 1000 pixels, 40kB per 10000 (normal paragraph), 1000 paragraphs = 40MB a bit too much
+	  can make a block then convert to vector - convenient access, still small
+	  so maybe lessen it, to 4 bytes per 16 pixels, and then correct the index on misses?
+	I also hate having spacing in the map, have to account for it, breaks binary search, return value is trickier...
+	I'll disable spacing for now, too cumbersome to support
+	shit again.. snapping by row width makes algo too complex due to forth and back sections handling
+	(due to possibility of ending with an empty section)
+	section-based algo was much simpler/shorter, will have to get back to it :(
+so the structures...
+	to draw a fill row I need it as a list of words (word ranges)
+	for each word I need it's space and geom (including drawn) - looked up or cached
+	edge word ranges -> row range
+	word count + row range -> amount of whitespace to distribute
+	each word + geom/offset/x -> clipping region for drawn
+	amount of whitespace + geom/offset + alignment -> x offset of word
+	all geom/sizes -> row height -> y offset of row and word
+how should caret-to-box work for fill alignment with stretched whitespaces?
+	I suppose there should be a separate scaling ratio for each interval between words
+	or for each section
+	how about a function that takes cumulative 2D x value and returns a 1D x value
+	it would be based on a set of scale factors for each segment
+	main goal: mapping of all 2D points to 1D points and back, fast
+	useful for:
+	- mapping pointer events, but also need 1D point into space translation (/into)
+	- caret-to-box, but also needs caret to 1D box
+	subgoals:
+	- 1D x to caret offset
+	- caret offset to 1D x
+	- 1D x to 2D x
+	- 1D x+y to 2D y and row offset (may depend on row height)
+	- 1D x to row number
+	- 1D x to map item number? (then given item offset -> offset within item)
+	- 2D x to 1D x (row-dependent)
+	- 2D y to 1D x row offset
+	- 2D y to row number
+	+ fast interpolation over a function as a sequence of points, possibly with flat regions
+	don't need no row number in 2D since it's easy to get by division, as long as row width is fixed
+	only problem is with rows that are bigger than canvas...
+	should not be a problem since I have to measure all words before I know the total width (which determines row widths)
+	(otherwise single rows will stick out of the paragraph = ugly)
+oops still an issue with fill align
+	what if whole row is a single word? no whitespace is in it that can be stretched
+	what all text processors seem to do (incl google shitty docs)
+	is they left align it and start each word on a new line: https://i.gyazo.com/16df2b90d111df6e3456d6045a05e68b.png	  
+	I can either force split like they do, or increase the total width (perhaps an option eventually?)
+	I could increase total width over canvas until /limits/x and then force split...
+	since I'm not making a word processor, it doesn't matter much though
+	value of forcing split is in no risk of paragraph making the whole document wider than the page
+	value of not doing it is e.g. in autofitting grid column to paragraph, or laying it out inside a row/column
+	so it should be controllable after all, as changing /limit with canvas is too tedious, it should be a flag
+	flag that controls whether canvas width is enforced by hard split or not (/limit will affect it by affecting canvas)
+	name? /hard-wrap ? /force-wrap ? /split-by-canvas ?
+	too tight width may make it very inefficient though, repeating the same draw command for every pixel
+	I may have a single /limits object shared between all paragraphs, and then I don't need a separate flag
+	just change limits and invalidate all paragraphs... still extra work though
+	at least this will avoid the inefficiency, as long as limit itself is wide enough
+	problem of forced wrapping is it can split single letters... which should be avoided when possible
+	sections already contain chars and will be split fine, including urls, but with exception of text wrapped into some custom container
+	ok postponed for now, but main point is that need to know the min section width before splitting into rows!
+now another question: split by words (on whitespace) or by letters? should this be controlled?
+	perhaps a good solution is: to split by words, but when single word is bigger than the row then split it by letters
+	should be fine with it, even better than text processors 
+	but should total width be estimated from min section or min word?
+	min word is better UX, and thats what I came to with the basic text paragraph
+	but then it opens up a question of hard wrapping again, as this contradicts the above solution
+	curious fact: if I split by words (on negative sections),
+	then images that follow one another without a whitespace will not be split
+	only if they have a margin and support /sections via generate-sections then they may be split.. and it's fine
+another issue, catch-22 like:
+	I need to know total width to be able to split it by rows
+	I need to know rows content to know total width because it's affected by indent
+	solution: if biggest section or word is the first one, add indent1, otherwise add indent2
+	it has a drawback: if indent1 < indent2 and first word is small, then 2nd word may fit into 1st row,
+	but this solution will make total width as big as if it doesn't fit
+	more robust solution:
+		only if indent2 > indent1
+		loop thru all words, accumulate maximum of
+		min (word/x2 + indent1) (word/x2 - word/x1 + indent2)
+		and total-width will be max allowed-row-width and this accumulated value
+apply scaling to whole row or individual items
+	if I apply to whole row it complicates draw a bit:
+		can't just move to a given offset and draw a word (offset is a float and it's already scaled)
+	if I apply scaling to words, whitespace and text will be aligned on pixels, while rich-text can render it at subpixel precision
+		so I expect a bit of jitter as size changes
+on last (split) whitespace and how to store it in the 1D/2D mapping points
+	inter-word whitespaces have their points already, so this concerns only the split whitespace
+	last whitespace should be added after the row, i.e. it may even stick out of the allowed width
+	(in right and fill mode it will almost always stick out, except for the last row, in other modes less likely)
+	sticking out whitespace won't be possible to click on (outside of space geometry), so I can still obtain Y by division
+	but it will be there for the caret: caret to box may produce caret box after the row if not clipped
+	if it doesn't stick out (in left or center mode), it can also be clicked on
+	no point in scaling it but for convenience it's an open option
+if trailing whitespace made significant it raises a new problem:
+	now it becomes part of the last word e.g. `x        ` which can't be split, so will affect the overall width
+	if I make multiple words out of it then intervals can be stretched - bad? probably not..
+	what's bad is that then `x` and ` ` may occur on a row as two words, while the rest on another row
+	so this will look pretty unexpected, and produces a new row, which is also bad
+	I have to leave it as insignificant but make special cases in row layout algo:
+	trailing whitespace should be placed just like split-whitespaces, after the row, never making a new row
+leading whitespace can be made significant, and become part of the word it prefixes
+	I see no harm in that
+	word processors do not make it part of the next word,
+	but they make it a single word, that can occupy a single line but not two or more lines
+	google docs is a bit funny in this regard: https://i.gyazo.com/5165ca2dfb0268c4f8ca39373b4d8077.gif
+	while textmaker clips the visible caret as I prefer doing
+	the drawback of making it part of the word is that it will affect the overall width,
+	or it will be force-wrapped into multiple lines
+	which is not a serious enough drawback to even bother
+what about tabs?
+	textmaker makes each tab snap to a specific horizontal offset, which includes indent
+	google docs just converts tab into a linefeed lol
+	I guess I should not bother with tabs then
+	but if I did, I would have to modify the row layout algo, with a special case for tabs
+	shouldn't be too hard if need arises, but may need special kind of section for it (zero is the best fit)
+should row's Y be obtained via simple division?
+	in this case X cannot be bigger than allowed width
+	and trailing whitespace will become compressed, in the worst case (fill, right align) - into zero
+	or alternatively, only sticking out whitespace becomes compressed (what word processors are doing, except google docs)
+	ok fine with division for now then
+on coordinate naming: maybe `x` for original row, `x'` for unrolled 2D row, `x''` for rolled 2D row?
+	though the difference between the last two is only in row-x1', so perhaps `x'` for rolled 2D row x, and `x''` shouldn't be used
+	scaling can be performed after subtracting indent from x'
+	total-width, total-width', total-width'' ?
+	total-width-1, total-width-2, total-width-3 ?
+	total-width-source, total-width-unrolled, total-width-rolled ?
+	Stotal-width, Utotal-width, Rtotal-width ?
+	total-width-1D, total-width-1D', total-width-2D ?
+another issue will be with clipping:
+	if I clip each word, this will cut the possible outline of code spans, or selection box around url
+	so I should not stretch just any section - only whitespace text sections! while containers will be left unstretched (but scaled)
+	but how do I even know? from paragraphs POV they both spaces - list and text
+	make a special case for `text`? or drop the stretching support?
+	better idea: scale the whitespace horizontally, not skip it! then frame will also be scaled (which is fine)
+	then if whitespace is to be drawn, it makes sense to not only keep words but whitespace too
+how will force-wrap affect the row split algo?
+	if single word is bigger than the row, it should be split between sections, without any force-wrap
+	force-wrap may enable splitting not at section boundary, but at any point
+	it will also prioritize given canvas and won't try to extend it, or determine max word size
+problem is, words do not carry info about sections, so how to split at section margin?
+	I could just group sections into words, but keep sections too:
+	words: [AxB white? [sections...] ...]
+	rows:  [RAxRB [AxB white? [sections...] ...]]
+to simplify algorithms I decided to add another alignment: 'scale
+	'fill will have no scaling, 'scale will have no space adjustment
+	in 'fill all words will be aligned to pixels then and rendered separately
+	'scale and all other alignments will render row as a whole single word
+	how will scale fill the row though? up to the max and then upscale? or to achieve best ratio (closest to 1)?
+	maybe 'upscale will fill the row up to the max, while 'scale will aim for scale closest to 1
+	only 'fill needs to know if we're on the last row then, 'scale/'upscale don't
+'scale splitting algo:
+	add words until predicted scaling ratio becomes worse than last one, then split here
+	last line will usually be scaled by a lot, and I don't care
+	there can be a more sophisticated balanced algo that would achieve best result for all rows, but no reason for it yet 
+	this mode might not play well with force-wrap, so I should disable force-wrap in 'scale mode 
+should margins actually be reported by /sections as empty?
+	if I use margins to draw an outline, this outline will become clipped
+	so perhaps only spacing, but not margins?
+	margin should stay significant, but still separate section, so in bad cases it may serve as split joint
+row Y as x / width doesn't work, simply because they are of different heights
+	only row number can be obtained like that
+	then what's the optimum mapping?
+	whole chops of total-width correspond to specific Y2D offsets and back
+	so the mapping is x-1D' <-> row-y1-2D,
+	where row-y1-2D corresponds to the y=0 of 1D/1D' spaces (and may point at an empty area up to geom/offset/y)
+when to split text in rich-content:
+	row starts at command: https://i.gyazo.com/cb78c0ce0554a30eb760eae7d33b786e.png
+	row starts before command: https://i.gyazo.com/fc0b44860f5b13a676b98dadab7bc158.png 
+	row 2 becomes bigger than it should because part of the previous space (from "orem" thru "elit,") is big
+	so I could for now force splitting on font/font-size change
+	whether to split on words is still debatable - needs benchmarking
+	
+	
+|                                                    <- total-width ->                                               |
+^-- row-x1'                                                                                                row-x2' --^ (multiples of total-width)
+^-- row-x1                                                                                                  row-x2 --^ (in 1D space)
+|      <- indent1 ->      |                                      <- row-avail ->                                     |
+|   <- indent2 ->    |                                         <- row-avail ->                                       |
+|   <- indent2 ->    |                                         <- row-avail ->                                       |
+(fill-aligned)       |word1  word2  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...   wordi|_____ (trailing whitespace)
+                     |     ^-- whitespace (distributed and inherent)                                                 | ^-- white-trail (unscaled)
+(center-aligned)     |                                     wordi+1 wordi+2 ... wordn_____                            |
+^-- row-x1                   =                    row-x1 --^                             ^-- row-x2    =    row-x2 --^ = next row-x1
+|   <- indent ->     |          <- in-row-indent ->        |  <- row-used-width -> |      <- row-left-width ->       |
+(left-aligned)       |wordi+1 wordi+2 ... wordn_____                                                                 |
+                     |  <- row-used-width ->   |                        <- row-left-width ->                         |
+(right-aligned)      |                                                                      wordi+1 wordi+2 ... wordn|_____
+|   <- indent ->     |                              <- in-row-indent ->                     |  <- row-used-width ->  |
+
+summary of paragraph layout:
+	- limits are applied to canvas (by render, not the layout, which doesn't need to know about limits) 
+	+ prep a 1D map of all children without spacing (spacing complicates X to child mapping significantly)
+	+ align the map vertically along baseline
+	+ build an indexed function of 1D x to index in the map -> will be used to quickly locate the space it lands on
+	+ list all sections of a 1D space -> to determine min. section and to simplify the by-row splitting algorithm
+	  also save total-1D-width, i.e. result of all sections summation -> needed by row layout algo since it does not use sections
+	  mark leading whitespaces as significant, or at least ensure they become part of the 1st word
+	+ list all words from sections, as X1..X2 1D ranges -> to split between words and to know used row size
+	  output should also contain whitespace, so the format should be: [AxB width-1D' white? SxE...] (pair + pair + logic + pair)
+	  where SxE is a slice of sections (offsets in the block)
+	  one word may span multiple spaces (feature, not a bug), since at this point we don't know this relationship
+	+ determine min. total width and if it's less than allowed row width, allowed width should be extended
+	  -> so that there will be no single sticking out rows, and so row number can be estimated by simple division of 2D X by row width
+		- if /force-wrap is on: this step is skipped, and canvas is respected
+		- if /force-wrap is off: determine as max word width
+	  total width is found according to the catch-22 algorightm described above
+	+ available row-width1 and row-widthN are determined from allowed width and indents:
+	  as (total-width - indent1) and (total-width - indent2)
+	  -> these tell how many pixels is there available for each row in unscaled 2D
+	- lay out each row:
+		;@@ need to split tasks: first create rows, then align them, pad with whitespace (at least for each row)
+		+ row-x1-1D' = row-number * total-width = this row's x=0 in unrolled CS
+		  row-x1-1D = first word's x1
+		  row-x2-1D' = row-x1-1D' + total-width
+		+ take a number of words until they fit the row-width (in all modes except 'scale)
+		  in scale mode: take words until scaling ratio worsens
+		  ensure at least 1 word per row
+		  format same as words
+		  empty words are always added
+		+ if only single word is in the row and mode <> 'scale:
+		  cut only a part of the word, based on it's sections range, until they fit the row-width
+		  ensure at least 1 section per row
+		  + if only single section is in the row and force-wrap = on
+		    cut this word further until it fits row-width
+		    ensure at least 1 pixel per row (need a special case somewhere for 0 row-width as it may be slow)
+		+ row-x2-1D = last (empty or not) word's x2
+		+ used-row-width = x2 of last non-empty word - x1 of first word (only in 'scale mode may be > row-width)
+		+ in fill mode only if number-of-words > 1 (otherwise left-aligned):
+		  + determine additional whitespace between words as:
+			whitespace = (max 0 row-width - used-row-width) / number-of-words
+			(becomes 0 if used > min)
+			quantize whitespace as a vector, so we'll have whole-pixel coordinates for Draw
+			distribute whitespace across width-1D' of empty row-words
+		+ in all modes other than fill, unify row-words into one (save for trailing whitespace)
+		  set it's width-1D' to:
+		  + used-row-width in left/right/center modes
+		  + row-width in upscale/scale modes
+		  now produced word vector doesn't depend on alignment at all, simplifying draw
+		- accumulate row xs in the function data:
+		  + store left row margin: [row-x1-1D  row-x1-1D']
+		  + store indent:
+		    indent does not depend on alignment, always located to the left (textmaker and google docs agree with that)
+		    factor = select [left 0 scale 0 upscale 0 fill 0 right 1 center 0.5] align
+		    in-row-indent = round/ceiling row-width - used-row-width * factor
+		    [row-x1-1D  row-x1-1D' + indent + in-row-indent]
+		  + store words, each as:
+		    word-x1-1D' = offset that starts at (row-x1-1D' + indent + in-row-indent) and accumulates word width
+		    word-x2-1D' = word-x1-1D' + word-width-1D'  (last value may have been scaled)
+		    also calc word-x1-2D and word-x2-2D -> will be used in draw
+		    [word/2 word-x2-1D'] (only closing point, opening is there already)
+		    this includes trailing whitespace (empty sections), but it requires a special case:
+		    word-x2-1D' = min word-x2-1D' row-x2-1D' (downscale the last empty word)
+		  + trailing empty area (no sections) needs not storing, as it will be added by left row margin
+		    function should be smart enough to skip the same point added multiple times
+		+ accumulate vertical row offset
+		  + find spaces used by row from row-x1-1D and row-x2-1D
+		  + determine row-height: as max size/y over the slice of spaces
+		  + determine row-y1-1D: as min offset/y over the slice of spaces
+		  + row-y1-2D: starts at 0 and accumulates row-height of finished rows
+		  instead of keeping both row-y1-1D and row-y1-2D, keep the difference row-y0-2D: row-y1-2D - row-y1-1D
+		  [row-x1-1D row-y0-2D row-x2-1D row-y0-2D]
+		  draw will be adding each geom/offset/y to this difference
+		  still need real row vertical ranges - for click to row translation! 
+		+ draw each word (empty or not):  
+		  + find spaces(objects) used by this word:
+		    feed each word's x1 and x2 into x-to-map func - this gets us a list of geoms
+		  + word's scale = word-width-1D' / (word-x2-1D - word-x1-1D)
+		  + drawn-spaces = [draw code for involved spaces starting at 0x0]
+		  + first space's x offset offset1 = word-x1-1D - geom1/offset/x
+		  + drawn-word = compose/only [
+		  		translate (word-x1-2D by 0)			;) moves to the 2D point
+		  		scale (word-scale) (1.0)
+		  		clip 0x0 (word-x2-1D - word-x1-1D by row-height)
+		  		translate (0 - offset1 by 0)		;) accounts for starting in the middle of a word /drawn
+		  		(drawn-spaces)
+		    ]
+		    collect these into drawn-words, separate with `push`
+		+ draw the row: drawn-row = compose/only [
+			translate (indent + in-row-indent by row-y0-2D)
+			(drawn-words)
+		  ]
+    + build a 1D/2D indexed x mapping out of xs vector accumulated from rows
+    + carets don't need mapping built in advance - rather, let it be created when need arises
+		
+	
+;@@ what about general funcs that realign parts of the map vertically/horizontally (modify)? for paragraph and tubes
+
+;@@ on over events are too populous now, need to reduce the load
+	
+
+;@@ don't treat margin as empty section, only spacing - or outline/frame will be cut
+ 
+;@@ I need to get rid of serialization into /source
+	this step is currently totally extraneous and slow - serialize then deserialize again on every edit
+	moreover it requires document to contain rich-contents not rich-paragraphs
+	while paragraphs are good enough and can be edited as long as they can unpack their /content
+	then every space in the paragraph will become editable
+	and to turn off editability one will just have to override length (set to 1 or remove it)
+	
+
+;@@ split rich-content text on font/size change!
+;@@ ensure not only last row is not scaled, but those before the linebreak as well! assertion maybe too?
+;@@ try tube/stripe/fill setting it to -1x-1 on tube-test
+;@@ remove non-pair (integer) support from margin & spacing? it's too much trouble overall, with 'along' and checks and conversion
+;@@   instead, I could let on-change convert them into pairs automatically
+;@@ instead of decode canvas calls everywhere, consider decoding it inside render! passing as 2 args (or 3 args fill-x fill-y?)
+;@@ monospace flag for rich-content? - to model extensibility on it
+;@@ date selector widget in the text? - to copy it into clipboard as date?
+;@@ make start-drag automatic? although what if I want to pass a parameter... plus, how to know which space in the path start the drag?
+;@@ document /indent format
+;@@ document /format facet.. also measure/edit if I keep them
+;@@ document image/data block format (draw)
+;@@ document strike style
+;@@ document cache and generations as I tend to forget how it works all the time
+
+
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
@@ -6434,6 +7883,112 @@ paragraph that splits on line granularity - I might return to that if speed requ
 	; ]
 ; ]
 
+experiment in high level paragraph
+; layouts/paragraph: context [
+	; ;; unlike tube, this will require extra render and will split text spaces at right margin
+	; ;; settings for paragraph layout:
+	; ;;   align         [word! none!]   'left (default), 'center, 'right, 'fill
+	; ;;   margin        [integer! pair!]   >= 0x0
+	; ;;   spacing       [integer! pair!]   >= 0x0
+	; ;;   canvas         [none! pair!]   if none=inf, width determined by widest item
+	; ;;   limits        [none! object!]
+	; create: function [
+		; "Build a rich pagagraph out of given spaces and settings as bound words"
+		; list [block! function!] "List of spaces & strings/urls, or a picker func [/size /pick i]"
+		; settings [block!] "Any subset of [align margin spacing canvas limits]"
+		; ;; settings - imported locally to speed up and simplify access to them:
+		; /local align margin spacing canvas limits
+	; ][
+		; func?: function? :list
+		; count: either func? [list/size][length? list]
+		; if count <= 0 [return copy/deep [0x0 []]]	;-- empty list optimization
+		; foreach word settings [						;-- free settings block so it can be reused by the caller
+			; set bind word 'local get word			;@@ check that only allowed words are overwritten, not e.g. `count`
+		; ]
+		; axes: [e s]									;-- hardcoded
+		; default align: 'left
+		; map: #(left -1x1 center 0x1 right 1x1 fill 0x1)		;-- vertically align along the line's bottom
+		; align: select map para-align: align			;-- convert into alignment supported by tube
+		; set [canvas: _:] decode-canvas canvas		;-- doesn't use the fill flag
+		; canvas: constrain canvas limits
+		; width: canvas/x - (margin along 'x * 2)		;-- max text width
+		
+		; ;; prototypes used for faster space creation - is 5x faster than new space creation (57 vs 10us)
+		; ;@@ will this trick work? spaces are not designed for copy safety, but in their initial state it should be fine
+		; text-proto:    make-space 'text []
+		; #assert [text-proto/weight = 0]
+		; link-proto:    make-space 'link [
+			; quietly weight: 0
+			; quietly flags: [underline]				;-- don't wrap inline links
+		; ]
+		; stretch-proto: make-space 'stretch [
+			; quietly weight: either para-align = 'fill [1][0]
+		; ]
+		; #assert [not stretch-proto/cache]			;-- requirement to use shallow copy on it
+		; linebreak-proto: make-space 'space [
+			; quietly type: 'linebreak
+			; quietly size: width by 0 
+		; ]
+		
+		; ;; measure and set minimal space size
+		; space: copy/deep text-proto
+		; space/text: " "
+		; render space
+		; limit: caret-to-offset/lower space/layout 2	;-- size-text doesn't work without letters, using caret-to-offset
+		; stretch-proto/limits: limit .. none			;-- nonzero height is needed for multiple empty lines case
+		
+		; init: [
+			; quietly space/cached: clone link-proto/cached space/cached	;-- required because copy wrecks it
+			; quietly space/color:  color
+			; quietly space/flags:  copy flags
+		; ] 
+		; spaces: clear []							;-- use shared buffer until length is known
+		; flags:  clear []
+		; repeat i count [
+			; item: either func? [list/pick i][list/:i]
+			; switch/default type: type?/word :item [
+				; string! [
+					; parse item [collect after spaces any [
+						; ;; every space group is significant as it determines separation from adjacent items
+						; some space! keep (copy stretch-proto)	;-- don't copy /limits object
+					; |	#"^M"						;@@ I ignore it but markdown spec doesn't
+					; |	#"^/" keep (copy linebreak-proto)
+						; opt [ahead #"^/" keep (copy stretch-proto)]	;-- separate multiple linebreaks by empty lines
+					; |	copy word some non-white! keep (space: copy/deep text-proto) (
+							; quietly space/text: word
+							; do init
+						; )
+					; ]]
+				; ]
+				; url! [								;@@ wrap if too long
+					; append spaces space: copy/deep link-proto
+					; quietly space/text: item
+					; do init
+				; ]
+				; refinement! [alter flags to word! item]
+				; tuple!      [color: item]
+				; none!       [color: none]
+				; object!     [append spaces item]
+			; ] [ERROR "Items of type (type) are not supported by the paragraph layout"]
+		; ]
+		
+		; ;; add final stretch - so last line won't stretch in fill mode
+		; if para-align = 'fill [
+			; append spaces space: copy stretch-proto
+			; quietly space/limits: none
+			; quietly space/weight: 1e6
+		; ]
+		
+		; spaces: copy spaces							;-- free shared buffer for reentrancy
+		
+		; ;@@ if no strings - early exit
+		
+		; settings: [axes align margin spacing canvas limits]
+		; limits: canvas/x .. canvas/x
+		; make-layout 'tube spaces settings
+	; ]
+; ]
+	
 first implementation of paragraph/flow layout, rather boring and buggy
 ; foreach [space drawn] info [				;@@ use for-each
 	; index:  index + 1
@@ -6627,4 +8182,2143 @@ another unfinished flow attempt, not better
 		; ]
 	; ]
 	
+; ]
+
+scaling decision that will downscale rows that are too big
+not sure it's a good thing though, since if line is huge in a paragraph it will become unreadable
+the opposite - upscaling smaller rows to total-width - will also be as bad
+instead, no downscaling should be allowed, and upscaling only to the canvas
+or else, rows should be split by the maximum space width rather than by canvas/x (but I don't prefer that)
+; if align = 'fill [						;-- set the scale
+	; closing?: any [
+		; 'break = select (pick tail row -3) 'type	;-- avoid scaling rows ending with a break (currently stands alone)
+		; tail? skip rows 5							;-- avoid scaling last row
+	; ]
+	; width: row-clip-end - row-clip-start
+	; if any [
+		; not closing?
+		; width > allowed-row-width		;-- allow downscaling closing rows if they're too big
+	; ][
+		; ;; using allowed-row-width it can be both zooming in and out (<1 or >1)
+		; rows/2: allowed-row-width / (max 1 width)
+	; ]
+; ]
+
+line scaling variant that doesn't limit the scale, but disables scaling before line breaks and paragraph end
+I realized if I limit the scale, I don't need to bother with breaks at all
+; forall rows [								;@@ use for-each or map-each
+	; set [row-offset: _: row-clip-start: row-clip-end: row:] rows
+	; left:  total-width - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
+	; shift: left * select #(left 0 fill 0 right 1 center 0.5) align
+	; if align = 'fill [						;-- set the scale
+		; either all [
+			; not empty? row
+			; row/1/type = 'break
+		; ][
+			; if last-row [last-row/2: 1.0]	;-- reset scaling for lines before linebreak
+		; ][
+			; width: first row-clip-end - row-clip-start
+			; if width < allowed-row-width [	;-- only upscale smaller rows, never downscale
+				; ;@@ maybe also require a width limit, e.g. not less than 90% of the canvas?
+				; ;@@ and then downscale < 110% ?
+				; ;; scale around allowed-row-width, not total-width
+				; ;; allowing big rows to stick out, still aligning the rest:
+				; probe rows/2: allowed-row-width / (max 1 width)
+			; ]
+		; ]
+	; ]
+	; rows/1: row-offset + (shift by 0)
+	; pos: 0x0
+	; forall row [							;@@ use for-each or map-each
+		; space: row/1
+		; row/2: row/2 by (row-clip-end/y - space/size/y)	;-- remember offset within the row (used by /draw and /into)
+		; unless space =? pick tail map -2 [	;-- do not duplicate items in the map
+			; repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
+		; ]
+		; row: skip row 2
+	; ]
+	; last-row: rows
+	; rows: skip rows 4
+; ]
+; if last-row [last-row/2: 1.0]				;-- reset scaling for last line
+; size: 2 * margin + (total-width by total-length)
+
+first, futile attempt at abstracting row format
+; abstract-item: function [
+	; "Get visual box of a child in space's coordinates (may stick out of margin FUCK"
+	; prow [block!] "Location in row data" pitem [block!] "Location in the row"
+; ][
+	; all [
+		; set [row-offset: row-scale: clip-start: clip-end: row:] prow
+		; set [child: child-offset:] pitem
+		; compose [
+			; item:   (child)
+			; offset: (space/margin + xscale child-offset + row-offset row-scale)
+			; size:   (xscale child/size row-scale)
+		; ]
+	; ]												;-- may return none on empty slot
+; ]
+
+; abstract-item: function [pos [block!] "Location in the row"] [
+	; all [
+		; set [child: child-offset:] pos
+		; compose [
+			; item:   (child)
+			; offset: (space/margin + xscale child-offset + row-offset row-scale)
+			; size:   (xscale child/size row-scale)
+		; ]
+	; ]												;-- may return none on empty slot
+; ]
+
+; abstract-row: function [
+	; "Get visual box of a whole row in space's coordinates"
+	; space [object!] pos [block!] "Location in rows block"
+; ][
+	; if set [row-offset: row-scale: clip-start: clip-end: row:] pos [
+		; compose/only [
+			; length: ((length? row) / 3)
+			; offset: (row-offset + clip-start + space/margin)	;-- returns visible (clipped & scaled) box only
+			; size:   (as-pair  clip-end/x - clip-start/x * row-scale  clip-end/y - clip-start/y)
+			; scale:  (row-scale)
+			; items:  (row)
+		; ]
+	; ]												;-- may return none on empty slot
+; ]
+
+; abstract-row: function [space [object!] pos [block!] "Location in rows block"] [
+	; all [
+		; set [row-offset: row-scale: clip-start: clip-end: row:] pos
+		; compose/only [
+			; length:     ((length? row) / 3)
+			; offset:     (row-offset)
+			; clip-start: (clip-start)
+			; clip-end:   (clip-end)
+			; scale:      (row-scale)
+			; items:      (row)
+		; ]
+	; ]												;-- may return none on empty slot
+; ]
+
+; get-row-item: function [space [object!] rowxcol [pair!]] [
+	; if 0 < r: rowxcol/1 [
+		; rows: skip space/rows r - 1 * 5
+		; if row: rows/5 [
+			; pos: skip row rowxcol/2 - 1 * 3
+			; abstract-item abstract-row rows pos
+		; ]
+	; ]
+; ]
+; get-row: function [space [object!] row [integer!]] [
+	; if row > 0 [abstract-row skip space/rows rowxcol/1 - 1 * 5]
+; ]
+; row-count?: function [space [object!]] [
+	; (length? space/rows) / 5
+; ]
+; next-item: function [
+	; "Find existing next/previous item's RC or returns none"
+	; space [object!] rowxcol [pair!] side [word!] (find [left right] side)
+; ][
+	; either side = 'left [
+		; rowxcol: rowxcol - 0x1
+		; while [rowxcol/2 <= 0] [
+			; row: get-row space rowxcol/1: rowxcol/1 - 1
+			; unless row [return none]
+			; rowxcol/2: row/length
+		; ]
+	; ][
+		; rowxcol: rowxcol + 0x1
+		; while [
+			; row: get-row space rowxcol/1
+			; unless row [return none]
+			; rowxcol/2 > row/length
+		; ][
+			; rowxcol: rowxcol/1 + 1 by 1
+		; ]
+	; ]
+; ]
+; next-item: function [
+	; "Find existing next/previous item's RC or returns none"
+	; space [object!] prow [block!] pcol [block!] side [word!] (find [left right] side)
+; ][
+	; either side = 'left [
+		; while [head? pcol] [
+			; if head? prow [return none]
+			; prow: skip prow -5
+			; pcol: prow/5
+		; ]
+	; ][
+		; pcol: skip pcol 3
+		; while [tail? pcol] [
+			; prow: skip prow 5
+			; unless pcol: prow/5 [return none]
+		; ]
+	; ]
+	; reduce [prow pcol]
+; ]
+
+; rc-to-caret: function [space [object!] rowxcol [pair!] side [word!] "left/right/both"] [
+
+; ]
+
+; caret-to-box: function [space [object!] caret [integer!] side [word!] "left/right"] [
+; ]
+
+; xy-to-rc: function [space [object!] xy [pair!]] [	;-- never fails, 1x1 if no rows
+	; xy: xy - space/margin
+	; rows: tail space/rows
+	; while [not head? rows] [
+		; rows: skip rows -5
+		; set [row-offset: row-scale: clip-start: clip-end: row:] pos
+		; row: tail row
+		; row-xy: xscale xy - row-offset
+		; while [not head? row] [
+			; set [child: child-offset:] row: skip row -3
+			; child-xy: row-xy - child-offset
+			; if child-offset
+		; ]
+	; ]
+	
+	; if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
+		; child:  row/1
+		; #assert [find/same space/ranges/spaces child]
+		; crange: pick find/same space/ranges/spaces child -1
+		; either crange/1 + 1 = crange/2 [
+			; index: crange/2
+			; caret: pick crange child-xy/x < (child/size/x / 2)
+		; ][
+			; index: crange/1 + offset-to-char  child/layout child-xy
+			; caret: crange/1 + offset-to-caret child/layout child-xy
+		; ]
+		; reduce [child child-xy index caret]			;@@ what to return?
+	; ]
+; ]
+
+
+
+; locate-point: function [space [object!] xy [pair!]] [
+	; if set [rows: row-xy: row: child-xy:] rich-paragraph-ctx/locate-child space xy [
+		; child:  row/1
+		; #assert [find/same space/ranges/spaces child]
+		; crange: pick find/same space/ranges/spaces child -1
+		; either crange/1 + 1 = crange/2 [
+			; index: crange/2
+			; caret: pick crange child-xy/x < (child/size/x / 2)
+		; ][
+			; index: crange/1 + offset-to-char  child/layout child-xy
+			; caret: crange/1 + offset-to-caret child/layout child-xy
+		; ]
+		; reduce [child child-xy index caret]			;@@ what to return?
+	; ]
+; ]
+
+; ;; returns thin 2D box for specified caret offset either on the left or right side (same result unless it spans rows)
+; get-caret-box: function [
+	; space [object!]
+	; caret [integer!] (caret >= 0)
+	; side  [word!] (find [left right both] side)
+; ][
+	; rows: space/frame/rows
+	; foreach [child range] space/ranges/spaces [
+		; if all [range/1 <= caret caret <= range/2] [
+			; set [row-offset row-scale clip-start clip-end row] rows [
+		; ]
+	; ]
+; ]
+
+event handlers for selection over rich-content
+I decided it has to be done by the container of rich-content instead
+; rich-content: [
+	; on-down [space path event] [
+		; unless space/selectable? [exit]
+		; space/selected: none
+		; start-drag/with path space/point-to-caret path/2
+	; ]
+	; on-over [space path event] [
+		; unless dragging? [exit]
+		; caret1: drag-parameter
+		; caret2: space/point-to-caret path/2
+		; space/selected: caret1 by caret2
+	; ]
+	; on-up [space path event] [
+		; if space/selectable? [stop-drag]
+	; ]
+; ]
+
+I wanted to make /editable facet for text spaces... reconsidered, limited to /measure
+; remove: function [offset [integer!] length [integer!]] with :edit [
+	; rng:  ranges/decode space/flags
+	; rng1: ranges/extract rng 0 by offset
+	; rng2: ranges/extract rng offset by (offset + length)
+	; rng:  ranges/join rng1 offset rng2
+	; system/words/remove/part skip space/text offset length
+	; space/flags: ranges/encode rng				;-- invalidates
+; ]
+; copy:   function [offset [integer!] length [integer!]] with :edit [
+	; -> data
+; ]
+; insert: function [offset [integer!] side [word!] data [block!]] with :edit [
+; ]
+
+first attempt at range arithmetic, don't wanna even see it
+; non-pair!: complement make typeset! [pair!]
+; ranges: context [
+	; ;@@ some of these funcs are general, some only apply to text space
+	; decoded-length?: function [map [map!]] [
+		; len: 0
+		; foreach [attr list] map [					;@@ use map-each
+			; len: max len maximum-of keys-of list
+		; ]
+		; len
+	; ]
+	; union: function [ranges1 [block!] ranges2 [block!]] [
+		; map1: decode ranges1
+		; map2: decode ranges2
+		; len:  max decoded-length? map1 decoded-length? map2
+		; foreach [attr list2] map2 [
+			; map1/:attr: either map1/:attr [
+				; extend map1/:attr map2/:attr
+			; ][
+				; copy map2/:attr
+			; ]
+		; ]
+		; encode map1 len
+	; ]
+	; shift: function [ranges [block!] offset [integer!] /local pair] [
+		; if offset <> 0 [
+			; parse ranges [any [						;@@ use map-each
+				; change set pair pair! (offset by 0 + pair)
+			; |	skip
+			; ]]
+		; ]
+		; ranges
+	; ]
+	; ;@@ should interval/2 clip the result here? extra work, but may save some other work later
+	; extract: function [ranges [block!] interval [pair!] /local pair] [
+		; ranges: shift copy ranges negate interval/1
+		; parse ranges [any [							;@@ use map-each
+			; ahead set pair pair! [
+				; if (pair/1 + pair/2 > 2)			;-- keep the range
+				; [
+					; if (pair/1 < 1)					;-- normalize pair to start from 1 if it's <= 0
+					; change skip (1 by (pair/1 + pair/2 - 1))
+				; |	skip
+				; ]
+				; any non-pair!
+			; |	remove [skip any non-pair!]  
+			; ]
+		; |	skip
+		; ]]
+		; ranges
+	; ]
+	; join: function [ranges1 [block!] offset [integer!] ranges2 [block!]] [
+		; union ranges1 shift copy ranges2 offset
+	; ]
+	; decode: function [ranges [block!] /local pair flag value] [
+	; ;@@ need to support simple (pair-less) flags here too
+		; attrs: make map! 10
+		; parse ranges [any [
+			; ;@@ should pair be clipped to length here or allow expanding unapplied attributes?
+			; set pair pair! any [
+				; [
+					; set flag [
+						; ['bold | 'italic] (value: true)
+					; |	['underline | 'strike] [set value tuple! | (value: true)]
+					; |	'backdrop set value tuple!
+					; ]
+				; |	set value [
+						; tuple!   (flag: 'color)
+					; |	integer! (flag: 'size)
+					; |	string!  (flag: 'font)
+					; ]
+				; ]
+				; (
+					; list: any [attrs/:flag  attrs/:flag: make map! 10]
+					; repeat i pair/2 [put list (i + pair/1 - 1) value]
+				; )
+			; ]
+		; ]]
+		; attrs
+	; ]
+	; encode: function [attrs [map!] length [integer!]] [
+		; ;; instead of grouping all the attrs together I just list them one by one since it's much simpler:
+		; flags: clear []
+		; foreach [attr list] attrs [
+			; add-value: switch attr: to word! attr [
+				; bold italic               [[append flags attr]]
+				; color size font           [[append flags old]]
+				; underline strike backdrop [[append append flags attr only old]]
+			; ];; rest is ignored as it's not supported
+			; start: old: none
+			; repeat i length [
+				; case [
+					; old = list/:i [continue]
+					; old [
+						; append flags start by (i - start)
+						; do add-value
+						; old: start: none
+					; ]
+					; 'started [old: select list start: i]
+				; ]
+			; ]
+			; if old [
+				; append flags start by (length + 1 - start)
+				; do add-value
+			; ]
+		; ] 
+		; copy flags
+	; ]
+	; ;@@ shouldn't be part of ranges? also not sure about arg list
+	; ;@@ this should work not only on text but on arbitrary items
+	; refine: function [text [string!] attrs [map!]] [
+		; ;; instead of grouping all the attrs together I just list them one by one since it's much simpler:
+		; source: clear []
+		; buf: clear ""
+		; old: clear #()
+		; len: length? text
+		; openings: make map! [
+			; bold      [[ bold ]]
+			; italic    [[ italic ]]
+			; color     [[ color: (value) ]]
+			; size      [[ size: (value) ]]
+			; font      [[ font: (value) ]]
+			; backdrop  [[ backdrop: (value) ]]
+			; underline [either value [[ underline: (value) ]][[ underline ]]]
+			; strike    [either value [[ strike: (value) ]][[ strike ]]]
+			; ;@@ more?
+		; ]
+		; closures: make map! [
+			; bold      [[ /bold      ]]
+			; italic    [[ /italic    ]]
+			; color     [[ /color     ]]
+			; size      [[ /size      ]]
+			; font      [[ /font      ]]
+			; backdrop  [[ /backdrop  ]]
+			; underline [[ /underline ]]
+			; strike    [[ /strike    ]]
+		; ]
+		; repeat i len [
+			; foreach [attr list] attrs [
+				; attr: to word! attr
+				; case [
+					; old/:attr = list/:i [continue]
+					; old/:attr [
+						; value: old/:attr
+						; unless empty? buf [append source copy buf  clear buf]
+						; append source compose do closures/:attr
+						; old/:attr: none
+					; ]
+					; 'opening  [
+						; value: list/:i
+						; unless empty? buf [append source copy buf  clear buf]
+						; append source compose do openings/:attr
+						; old/:attr: list/:i
+					; ]
+				; ]
+			; ]
+			; append buf text/:i
+		; ]
+		; unless empty? buf [append source copy buf  clear buf]
+		; foreach [attr list] attrs [
+			; if old/:attr [
+				; value: old/:attr
+				; append source compose do closures/:attr
+				; unless empty? buf [append source copy buf  clear buf]
+			; ]
+		; ]
+		; copy source
+	; ]
+; ]
+
+pair list version of masks - requires too much code to support it
+; context [	;@@ how to name it?
+	; ~: self												;-- allows to combine 'ranges' context with 'ranges' word
+	
+	; ranges: context [
+		; to-rtd-pair:
+		; from-rtd-pair:
+		; normalize:
+		; shift:
+		; union:
+		; clip:
+		; exclude:
+		; remove:
+			; none
+	; ]
+	
+	; ranges/to-rtd-pair: function [
+		; "Convert source range into RTD range"
+		; range [pair!]
+	; ][
+		; range/1 + 1 by (range/2 - range/1)
+	; ]
+
+	; ranges/from-rtd-pair: function [
+		; "Convert RTD range into source range"
+		; range [pair!]
+	; ][
+		; range/1 - 1 by (range/2 + range/1 - 1)
+	; ]
+	
+	; #assert [2x5 = ranges/from-rtd-pair ranges/to-rtd-pair 2x5]
+	
+	; ranges/normalize: function [
+		; "Bring a list of ranges into it's canonical minimal representation (modifies)"
+		; list [block!]
+	; ][
+		; list: sort list
+		; while [2 <= length? list] [						;@@ use for-each
+			; set [a: b:] list
+			; either a/2 >= b/1 [
+				; remove change list a/1 by max a/2 b/2
+			; ][
+				; list: next list
+			; ]
+		; ]
+		; head list
+	; ]
+	
+	; ranges/shift: function [
+		; "Return a copy of LIST moved by a given OFFSET"
+		; list [block!] offset [integer!]
+	; ][
+		; list: copy list
+		; forall list [list/1: list/1 + offset]			;@@ use map-each
+		; list
+	; ]
+	
+	; ranges/union: function [
+		; "Unify and normalize two lists of ranges"
+		; list1 [block!] list2 [block! pair!]
+	; ][
+		; ranges/normalize compose [(list1) (list2)]
+	; ]
+	
+	; ranges/clip: function [
+		; "Return sublist of ranges local to a specific range"
+		; list [block!] range [pair!]
+	; ][
+		; result: clear []
+		; forall list [									;@@ use map-each
+			; pair: clip list/1 range/1 range/2
+			; if pair/1 < pair/2 [append result pair]
+		; ]
+		; copy result
+	; ]
+	
+	; ranges/exclude: function [
+		; "Return copy of LIST with RANGE absent from it"
+		; list [block!] range [pair!]
+	; ][
+		; ranges/union
+			; ranges/clip list 0 by range/1
+			; ranges/clip list range/2 by infxinf/x
+	; ]
+	
+	; ranges/remove: function [
+		; "Return copy of LIST with RANGE removed from it (excludes and shifts)"
+		; list [block!] range [pair!]
+	; ][
+		; ranges/union
+			; ranges/clip list 0 by range/1
+			; ranges/shift
+				; ranges/clip list range/2 by infxinf/x
+				; range/1 - range/2
+	; ]
+	
+	; split: function [
+		; "Split ranges at given offset"
+		; list [block!] offset [integer!]
+	; ][
+		; reduce [
+			; clip list 0 by offset
+			; shift
+				; clip list offset by infxinf/x
+				; negate offset
+		; ]
+	; ]
+	
+	; values: context [
+		; normalize:
+			; none
+	; ]
+	
+	; values/normalize: function [
+		; "Returns a copy of values list without intersections"
+		; vlist [block!] "Latter values take priority"
+	; ][
+		; vlist: skip tail vlist -2
+		; coverage: vlist/2								;-- maintaining coverage allows it to be O(number of values)
+		; while [not head? vlist] [						;@@ use for-each/reverse
+			; vlist: skip vlist -2
+			; vlist/2: ranges/exclude vlist/2 coverage
+			; unless head? vlist [coverage: ranges/union coverage vlist/2]
+		; ]
+	; ]
+	
+	; values/
+	
+
+; attributes: context [
+	; {
+		; attrs format: #(
+			; name [
+				; value1 [range range ...]				;-- ranges sorted (by start then end)
+				; value2 [range range ...]				;-- value is 'true' for words, anything else for set-words
+				; ...
+			; ]
+			; ...
+		; )
+	; }
+	; to-rtd-flag: function [attr [word!] value [tuple! logic! string! integer!]] [
+		; switch attr [
+			; bold italic underline strike [attr]
+			; color size font [value]
+			; backdrop [compose [backdrop (value)]]
+		; ]
+	; ]
+	
+	; rtd-attrs: make hash! [bold italic underline strike color backdrop size font]
+	; make-rtd-flags: function [
+		; "Make an RTD flags block out of given attributes"
+		; attrs [map!] range [pair!]
+	; ][
+		; flags: clear []
+		; foreach [attr value-list] attrs [
+			; unless find rtd-attrs attr [continue]
+			; foreach [value range-list] value-list [
+				; ;; z-order: in RTD later styles take priority, and my range list is sorted by starting offset
+				; foreach range range-list [				;@@ use map-each
+					; pair: ranges/to-rtd-pair range
+					; flag: to-rtd-flag attr value
+					; append append flags pair flag
+				; ]
+			; ]
+		; ]
+		; copy flags
+	; ]
+	
+	; get-length: function [item] [
+		; case [
+			; object? :item [
+				; measure: select item 'measure
+				; either :measure [measure [length]][1]
+			; ]
+			; series? :item [
+				; length? item
+			; ]
+			; 'else [1]
+		; ]
+	; ]
+	
+	; get-ranges: function [attrs [map!] attr [word!] value] [
+		; values: any [attrs/:attr attrs/:attr: make [] 2]
+		; unless ranges: select/same/skip values :value 2 [
+			; repend values [:value ranges: make [] 4]
+		; ]
+		; ranges
+	; ]
+	
+	; split-at: function [source [block!] offset [integer!] side [word!] /local s] [
+		; pos: 0
+		; =skip-attrs=: when side = 'right [refinement! | word! | set-word! skip]
+		; parse source [any [
+			; =skip-attrs=
+		; |	if (pos >= offset) p: (return p)			;-- no split required
+		; |	char! object! (pos: pos + 1)
+		; |	p: set s string! [
+				; if ((left: offset - pos) < len: length? s) 	;-- must split the string
+				; :p change skip (reduce [copy/part s left  copy skip s left])	;@@ use 'split' func for this when available
+				; (return next p)
+			; |	(pos: pos + len)
+			; ]
+		; |	skip
+		; ]]
+		; tail source										;-- offset is past-tail
+	; ]
+	
+	; inject-token: function [source [block!] offset [integer!] side [word!] token] [
+		; insert/only split-at source offset side :token
+	; ]
+	
+	; inject: function [
+		; "Inject attribute into a source block (modified)"
+		; source [block!] attr [word!] value range [pair!]
+	; ][
+		; opening: either true = :value [attr][reduce [to set-word! attr :value]]
+		; closing: to refinement! attr
+		; inject-token source range/1 opening 'right
+		; inject-token source range/2 closing 'left
+		; source
+	; ]
+	
+	; copy-range: function [
+		; "Copy selected range of items (some items may span multiple offsets)"
+		; items [block!] attrs [map!] range [pair!]
+	; ][
+		; items: copy items
+		; s: split-at items range/1
+		; e: split-at items range/2
+		; items: copy/part s e
+		; attrs: map-each/eval/drop [attr value-list] attrs [
+			; value-list: map-each/eval/drop [value range-list] value-list [
+				; range-list: ranges/shift ranges/clip range-list range negate range/1
+				; either empty? range-list [continue][[:value range-list]]
+			; ]
+			; either empty? value-list [continue][[attr value-list]]
+		; ]
+		; reduce [items attrs]
+	; ]
+	
+	; remove-range: function [
+		; "Copy selected range of items (some items may span multiple offsets)"
+		; items [block!] attrs [map!] range [pair!]
+	; ][
+		; items: copy items
+		; s: split-at items range/1
+		; e: split-at items range/2
+		; remove/part s e
+		; attrs: map-each/eval/drop [attr value-list] attrs [
+			; value-list: map-each/eval/drop [value range-list] value-list [
+				; range-list: ranges/remove-range range-list range
+				; either empty? range-list [continue][[:value range-list]]
+			; ]
+			; either empty? value-list [continue][[attr value-list]]
+		; ]
+		; reduce [items attrs]
+	; ]
+	
+; ]
+
+; ;; externalization avoids name collision for common names like insert, copy, etc
+
+; attributes/shift: function [
+	; "Shift all ranges in ATTRS by SHIFT value (modifies)"
+	; attrs [map!] shift [integer!]
+; ][
+	; foreach [attr value-list] attrs [
+		; foreach [value range-list] value-list [
+			; ranges/shift range-list range
+		; ]
+	; ]
+	; attrs
+; ]
+
+; attributes/insert: function [
+	; "Insert OTHER attributes into ATTRS at given OFFSET"
+	; attrs [map!] offset [integer!] other [map!] length [integer!] "Length of OTHER segment"
+; ][
+	; left:  attributes/clip attrs 0 by offset
+	; right: attributes/clip attrs offset by infxinf/x
+	; attributes/shift right length
+	; attributes/shift other offset
+	; attributes/union attributes/union left other right
+; ]
+
+; attributes/clip: function [
+	; "Return submap of attributes local to a specific range"
+	; attrs [map!] range [pair!]
+; ][
+; ]
+
+; attributes/union: function [
+	; "Unify two attribute maps"
+	; attrs [map!] other [map!]
+; ][
+	; names: union keys-of attrs keys-of other
+	; result: make map! length? names
+	; foreach name names [
+	; ;@@ THIS FORMAT IS SO COMPLEX FFS MAYBE JUST USE PLAIN BLOCK/HASH?
+		; value-list: clear []
+		; result/:name:
+	; ]
+; ]
+
+; source: context [
+	; ;@@ need to make modularity somehow, later
+	; datatypes: make map! reduce [
+		; string! object [
+			
+		; ]
+	; ]
+	
+	; deserialize: function [
+		; "Split source into [items attributes]"
+		; source [block!]
+		; /local attr value item
+	; ][
+		; items:   clear copy source						;@@ should items be just chars and objects? other types support, e.g. image?
+		; attrs:   make #() 10
+		; pending: make #() 10
+		; offset:  0
+		; parse source [any [
+			; set attr [word! (value: on) | set-word! set value skip] (
+				; attr:  to word! attr
+				; stack: any [pending/:attr  pending/:attr: make [] 8]
+				; repend stack [offset :value]
+			; )
+		; |	set attr refinement! (						;-- attributes work stack-like and do not close automatically
+				; attr:  to word! attr
+				; unless empty? stack: pending/:attr [	;-- extra closings are silently ignored
+					; value: take/last stack
+					; start: take/last stack
+					; range-list: get-ranges attrs attr :value
+					; repend range-list start by offset
+				; ]
+			; )
+		; |	set item string! (							;@@ make it a module
+				; parse item [collect after items keep pick to end]
+				; offset: offset + length? item
+			; )
+		; |	set item skip (
+				; append/only items item
+				; offset: offset + 1
+			; ]
+		; ]]
+		; foreach [attr stack] pending [					;-- auto-close unclosed ranges
+			; attr: to word! attr
+			; foreach [start value] stack [
+				; range-list: get-ranges attrs attr :value
+				; repend range-list start by offset
+			; ]
+		; ]
+		; foreach [attr value-list] attrs [				;-- normalize obtained ranges (else may be unsorted since I add in closing order)
+			; foreach [value range-list] value-list [
+				; ranges/normalize range-list
+			; ]
+		; ]
+		; reduce [items attrs]
+	; ]
+	
+	; serialize: function [
+		; "Create a source block out of items and attributes"
+		; items [block!] attrs [map!]
+	; ][
+		; queue: clear []
+		; foreach [attr value-list] attrs [
+			; foreach [value range-list] value-list [
+				; opening: either true = :value [attr][[to set-word! attr :value]]
+				; closing: to refinement! attr
+				; foreach range range-list [
+					; repend queue [range/1 opening range/2 closing]
+				; ]
+			; ]
+		; ]
+		; sort/skip queue 2
+		; result: clear []
+		; foreach [offset marker] queue [
+			; append/part result items part: offset - skip? items
+			; items: skip items part
+			; append result marker
+		; ]
+		; parse result [any [
+			; change copy part [char! some char!] (to string! part)
+		; |	skip
+		; ]]
+		; copy result
+	; ]
+	
+; ]
+
+bitset version of masks - more problematic than binary, slower due to allocations in bitset<->binary conversion
+; context [	;@@ how to name it?
+	; ~: self												;-- allows to combine 'ranges' context with 'ranges' word
+	
+	; ranges: context [
+		; to-rtd-pair: function [
+			; "Convert source range into RTD range"
+			; range [pair!]
+		; ][
+			; range/1 + 1 by (range/2 - range/1)
+		; ]
+	
+		; from-rtd-pair: function [
+			; "Convert RTD range into source range"
+			; range [pair!]
+		; ][
+			; range/1 - 1 by (range/2 + range/1 - 1)
+		; ]
+		
+		; #assert [2x5 = from-rtd-pair to-rtd-pair 2x5]
+	; ]
+		
+		
+		
+	; masks: context [
+		; from-range:
+		; to-ranges:
+		; normalize:
+		; empty?:
+		; shift:
+		; clip:
+		; exclude:
+		; remove:
+			; none
+	; ]
+	
+	; masks/from-range: function [range [pair!]] [
+		; if range/2 < range/1 [range: reverse range]
+		; charset when range/2 <> range/1 (
+			; reduce [range/1 '- range/2 - 1]
+		; )
+	; ]
+	
+	; zero!:          charset [0]
+	; nonzero!:       complement zero!
+	; nonzero-digit!: complement charset "0"
+	
+	; masks/to-ranges: function [mask [bitset!]] [
+		; mask: to binary! mask
+		; parse mask [any zero! mask:]					;-- optimization: skip leading zeroes
+		; ranges: clear []
+			; unless empty? mask [
+			; base: 8 * skip? mask
+			; mask: enbase/base mask 2
+			; parse mask [any [
+				; any #"0" opt [s: some #"1" e: (
+					; append ranges base + as-pair skip? s skip? e
+				; )]
+			; ]]
+		; ]
+		; copy ranges
+	; ]
+	
+	; masks/normalize: function [mask [bitset!]] [
+		; make bitset! trim/tail to binary! mask			;@@ workaround for bitset weirdness - auto trim the tail
+	; ]
+	
+	; masks/empty?: function [mask [bitset!]] [			;@@ workaround for bitset weirdness
+		; mask = make bitset! length? mask
+	; ]
+	
+	; masks/shift: function [mask [bitset!] offset [integer!]] [
+		; if zero? offset [return copy mask]
+		; #assert [not complement? mask]
+		; mask: enbase/base to binary! mask 2
+		; either offset < 0 [
+			; remove/part mask negate offset
+		; ][
+			; insert/dup mask #"0" offset
+		; ]
+		; clear find/last/tail mask nonzero-digit!		;@@ workaround for bitset weirdness
+		; to bitset! debase/base mask 2
+	; ]
+	
+	; masks/clip: function [mask [bitset!] range [pair!]] [
+		; masks/normalize mask and masks/from-range range
+	; ]
+	
+	; masks/exclude: function [mask [bitset!] range [pair!]] [
+		; masks/normalize exclude mask masks/from-range range		;-- exclude 1.5x faster than `or complement`
+	; ]
+	
+	; masks/remove: function [mask [bitset!] range [pair!]] [
+		; if zero? span? range [return copy mask]
+		; #assert [not complement? mask]
+		; mask: enbase/base to binary! mask 2
+		; clear find/last/tail mask nonzero-digit!		;@@ workaround for bitset weirdness
+		; remove/part skip mask range/1 range/2 - range/1 
+		; to bitset! debase/base mask 2
+	; ]
+	
+	
+	
+	; values: context [
+		; normalize:
+			; none
+	; ]
+	
+	; empty-set: make bitset! #{}
+	; #assert [empty? empty-set]
+	
+	; values/normalize: function [
+		; "Returns a copy of values list without intersections and empty ranges"
+		; vlist [block!] "Latter values take priority"
+	; ][
+		; vlist: skip tail copy vlist -2
+		; coverage: vlist/2								;-- maintaining coverage allows it to be O(number of values)
+		; while [not head? vlist] [						;@@ use for-each/reverse
+			; vlist: skip vlist -2
+			; vlist/2: masks/exclude vlist/2 coverage
+			; unless head? vlist [coverage: coverage or vlist/2]
+			; if vlist/2 = empty-set [remove/part vlist 2]	;-- empty-set works because masks/exclude trims it
+		; ]
+		; vlist
+	; ]
+	
+	; values/map-each: function [							;@@ use normal map-each when it's native
+		; "Map value list into another one, transforming masks"
+		; spec [block!] "[value mask]" vlist [block!] code [block!] "Should return a new mask"
+	; ][
+		; result: clear copy vlist
+		; foreach (spec) vlist [repend result [:value do code]]
+		; result 
+	; ]
+	
+	; values/remove: function [vlist [block!] range [pair!] /local value mask] [
+		; values/normalize values/map-each [value mask] vlist [masks/remove mask range]
+	; ]
+	
+	; values/clip: function [vlist [block!] range [pair!] /local value mask] [
+		; values/normalize values/map-each [value mask] vlist [masks/clip mask range] 
+	; ]
+	
+	; values/shift: function [vlist [block!] offset [integer!] /local value mask] [
+		; values/map-each [value mask] vlist [masks/shift mask offset]
+	; ]
+	
+	; values/union: function [vlist1 [block!] vlist2 [block!]] [
+		; vlist1: copy vlist1
+		; foreach [value mask2] vlist2 [
+			; either pos: find/only/same/skip vlist1 :value 2 [
+				; pos/2: pos/2 or mask2
+			; ][
+				; repend vlist1 [:value copy mask2]
+			; ]
+		; ]
+		; values/normalize vlist1
+	; ]
+	
+	; values/insert: function [vlist [block!] range [pair!] other [block!]] [
+		; part1: values/clip vlist 0 by range/1
+		; part2: values/clip vlist range/2 by infxinf/x
+		; other: values/shift other range/1
+		; values/union values/union part1 part2 other
+	; ]
+
+original /source decoder monstrosity
+; on-source-change: function [
+	; space [object!] word [word!] new-source [block!]
+	; /local range attr value char string obj2
+; ][
+	; if unset? :space/ranges [exit]					;-- not initialized yet
+	; clear att-ranges: space/ranges/attributes
+	; clear spc-ranges: space/ranges/spaces
+	; clear content:    space/content
+	; buffer: clear ""
+	; offset: 0										;-- using offset, not indexes, I avoid applying just opened (empty) ranges
+	; start: clear #()								;-- offset of each attr's opening
+	; attrs: clear #()								;-- last value of each attribute
+	; get-range-blueprint: [
+		; switch/default attr [						;-- transforms attributes into RTD low-level format
+			; bold italic underline strike [[pair attr]]
+			; color size font command [[pair attrs/:attr]]
+			; backdrop [[pair 'backdrop attrs/backdrop]]
+		; ][ [] ]
+	; ]
+	; flush: [
+		; if 0 < text-len: length? buffer [
+			; text-ofs: offset - text-len				;-- offset of the buffer
+			; command: none
+			; flags: clear []
+			; parse att-ranges [collect after flags any [	;-- add closed ranges if they intersect with text
+				; set range pair! if (range/2 > text-ofs)		;-- nonzero intersection found
+				; [
+					; set command block!						;-- command is RTD dialect extension
+				; |	keep (as-pair  1 + max 0 range/1 - text-ofs  range/2 - range/1)
+					; keep to [pair! | end]
+				; ]
+			; |	skip to pair!
+			; ]]
+			; ?? [offset text-ofs buffer att-ranges flags start]
+			; main-attr: attr
+			; foreach [attr attr-ofs] start [			;-- add all open ranges
+				; attr: to word! attr
+				; if attr-ofs >= offset [continue]	;-- empty range yet, shouldn't apply until at least 1 item
+				; either attr = 'command [
+					; command: attrs/command
+				; ][									;-- rest goes into the /flags facet
+					; flag-ofs: attr-ofs - text-ofs
+					; pair: as-pair
+						; 1 + max 0 flag-ofs
+						; max 0 text-len - flag-ofs
+					; repend flags do get-range-blueprint
+				; ]
+				; ?? [attr pair flags]
+			; ]
+			
+			; ;@@ whether to commit whole buffer or split it into many spaces by words - I'm undecided
+			; ;@@ less spaces = faster, but if single space spans all the lines it's many extra renders
+			; ;@@ only benchmark can tell when splitting should occur
+			; append content obj: make text-prototype [
+				; quietly cached: spaces/ctx/clone text-prototype/cached cached
+			; ]
+			; quietly obj/text:  copy buffer
+			; quietly obj/flags: copy flags
+			; repend spc-ranges [text-ofs by offset obj]
+			; ?? obj
+			; clear buffer
+			
+			; ?? [offset main-attr command-group]
+			; if main-attr = 'command [				;-- group multiple spaces into a clickable/hlist
+				; unless empty? command-group [
+					; clear back find/same spc-ranges first command-group		;-- remove ranges for subitems
+					; ;; collapse all ranges
+					; ;@@ this whole func needs a lot of refactoring, what a mess
+					; ?? offset
+					; offset: command-offset + 1
+					; range-limit: command-offset by offset
+					; ?? offset
+					; ?? att-ranges
+					; ?? start
+					; forall att-ranges [				;@@ use map-each
+						; att-ranges/1: min att-ranges/1 range-limit
+						; att-ranges: next att-ranges
+					; ]
+					; foreach [attr attr-ofs] start [
+						; start/:attr: min attr-ofs command-offset
+					; ] 
+					; ?? att-ranges
+					; ?? start
+					
+					; obj: make-space 'clickable [
+						; content: make-space 'list [
+							; quietly axis:   'x
+							; quietly margin: 0x0
+						; ]
+					; ]
+					; quietly obj/content/spacing: space/spacing
+					; quietly obj/content/content: copy command-group
+					; quietly obj/command: command
+					; insert clear command-group obj
+					
+					; repend spc-ranges [range-limit obj]
+				; ]
+				; command-group: unless main-attr == /command [tail content]	;-- offset in content (unlike `start`)
+				; command-offset: offset
+			; ]
+			; attr: main-attr
+		; ]
+	; ]
+	; commit-attr: [
+		; attr: to word! attr							;-- convert /ref & set-word: to words
+		; if start/:attr [
+			; pair: start/:attr by offset
+			; if pair/2 > pair/1 [repend att-ranges do get-range-blueprint]
+		; ]
+	; ]
+	; =open-flag=:  [(unless start/:attr [start/:attr: offset  attrs/:attr: on])]
+	; =open-attr=:  [(do commit-attr  start/:attr: offset  attrs/:attr: value)]
+	; =close-attr=: [(do commit-attr  remove/key start attr  attrs/:attr: off)]
+	; =color=: [
+		; set value word! (value: get value #assert [tuple? value])
+	; |	set value #expect tuple!
+	; ]
+	
+	; parse/case new-source [any [
+		; ahead word! set attr ['bold | 'italic | 'underline | 'strike] =open-flag=
+	; |	ahead refinement! set attr [						;-- first closing closes the attribute
+			; /bold | /italic | /underline | /strike
+		; |	/color | /backdrop | /size | /font | /command
+		; ] (if attr = 'command flush) =close-attr=
+	; |	ahead set-word! [
+			; set attr quote color:    =color= =open-attr=
+		; |	set attr quote backdrop: =color= =open-attr=
+			; ;; font and size split the result because otherwise a single big letter will make all rows distant
+		; |	set attr quote size:     set value #expect integer! =open-attr= (do flush)
+		; |	set attr quote font:     set value #expect string!  =open-attr= (do flush)
+			; ;; command splits it because only single command per space is supported
+		; |	set attr quote command:  set value #expect block!   =open-attr= (do flush)
+		; ]
+	; |	set string string! (
+			; chunks: next split string #"^/"
+			; append buffer chunks/-1
+			; offset: offset + length? chunks/-1
+			; forall chunks [							;@@ use for-each
+				; do flush
+				; append content obj2: copy linebreak-prototype
+				; repend spc-ranges [offset + 0x1 obj2]
+				; append buffer chunks/1
+				; offset: offset + 1 + length? chunks/1
+			; ]
+		; )
+	; |	set char char! (
+			; either char = #"^/" [
+				; do flush
+				; append content obj2: copy linebreak-prototype
+				; repend spc-ranges [offset + 0x1 obj2]
+			; ][
+				; append buffer char
+			; ]
+			; offset: offset + 1
+		; )
+	; |	paren! reserved
+	; |	block! TODO grouping
+	; |	set obj2 object! (							;-- flush will override 'obj', so 'obj2' here
+			; do flush
+			; #assert [space? obj2]
+			; obj2: space/apply-attributes obj2 attrs
+			; #assert [space? obj2  "apply-attributes must return the space object!"]
+			; append content obj2
+			; repend spc-ranges [offset + 0x1 obj2]
+			; offset: offset + 1
+		; )
+	; |	end | p: (ERROR "Unexpected (type? :p/1) value at: (mold/part/flat p 40)")
+	; ] end]
+	; do flush										;-- commit last string
+	; ?? content ?? ranges		
+	
+	; invalidate space
+; ]
+
+some feeble attempts at deep copy/paste
+; clone: function [space [object!] range [pair!]] [
+	; if range/1 > range/2 [range: reverse range]
+		; text paragraph [
+			; cloned: space/clone
+			; len: get-length space
+			; clipped: clip range 0 len
+			; if clipped/2 < len [
+				; clear skip cloned/text clipped/2
+				; if cloned/flags [
+					; cloned/flags: map-each [p [pair!]] cloned/flags [
+						; e: p/2 + s: p/1
+						; e: clip e s clipped/2		;@@ get rid of empty flags
+						; s by e 
+					; ]
+				; ]
+			; ]
+			; if clipped/1 > 0 [
+				; remove/part cloned/text clipped/1
+				; if cloned/flags [
+					; cloned/flags: map-each [p [pair!]] cloned/flags [
+						; e: p/2 + s: p/1 - clipped/1
+						; s by e 
+					; ]
+				; ]
+			; ]
+			; cloned
+		; ]
+	; switch/default space/type [
+		; rich-content [
+			; len: get-length cloned: space/clone
+			; clipped: clip range 0 len
+			; ;@@ use source facilities here; remove recursion
+			; cloned
+		; ]
+	; ][
+		; #assert [in space 'items]
+		; content: make [] len: space/items/size
+		; repeat i len [
+			; child: space/items/pick i
+			; len: get-length child
+			; unless zero? span? clipped: clip range 0 len [
+				; append content clone child clipped
+			; ]
+			; range: range - len
+			; if range/2 <= 0 [break]
+		; ]
+		; either 0 by len = range [
+			; cloned: space/clone
+			; cloned/content: content
+			; cloned
+		; ][
+			; content
+		; ]
+	; ]
+; ]
+
+generic section generation that uses explicit margin & spacing (decided to infer from map later)
+; ;; this function assumes no scaling or anything fishy, plain map
+; ;; uses geom/size/x, not space/size/x because parent's map may have been fetched from the cache,
+; ;; while children sizes may not have been updated
+; ;; it's not totally error-proof but I haven't come up with a better plan
+; generate-sections: function [
+	; "Generate sections block out of list of spaces; returns none if nothing to dissect"
+	; map     [block!] "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
+	; margin  [integer!] (margin  >= 0)
+	; spacing [integer!] (spacing >= 0)					;@@ or take spacing directly from the map?
+; ][
+	; switch n: half length? map [						;-- optimizations
+		; 0 [return if margin <> 0 [reduce [margin * -2]]]
+		; 1 [
+			; if margin = 0 [
+				; return if sections: select map/1 'sections [sections]	;-- calls if a function
+			; ]
+		; ]
+	; ]
+	; margin:   when margin  <> 0 (negate margin)
+	; spacing:  when spacing <> 0 (negate spacing)
+	; sections: make [] 16								;-- can't be shared due to reentrancy, needed length is unknown
+	; append sections margin
+	; foreach [space geom] map [
+		; batch: if in space 'sections [space/sections]	;-- calls if a function, may return none
+		; append append sections any [batch geom/size/x] spacing
+	; ]
+	; if integer? spacing [take/last sections]
+	; unless all [single? sections  sections/1 >= 0] [	;-- optimize single positive out
+		; sections
+	; ]
+; ]
+
+first working paragraph layout that I decided to unroll into a row
+; ;; unlike tube this allows the single space to span multiple lines, wrapping it accordingly
+; ;; wrapping occurs between spaces and between sections (if supported by each item)
+; ;; it is able to wrap any space without that space knowing about it, letting it keep simple box-like rendering logic
+; ;; has no support for axes or weight
+; ;@@ maybe remove limits and apply them to canvas in advance?
+; paragraph: context [
+	; ;; settings for paragraph layout:
+	; ;;   align          [none! word!]   one of: [left center right fill], default: left
+	; ;;   baseline      [float! percent!]  0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
+	; ;;   margin        [integer! pair!]   >= 0x0
+	; ;;   spacing       [integer! pair!]   >= 0x0 - mostly used for vertical distancing
+	; ;;   canvas         [none! pair!]   if none=inf, width determined by widest item
+	; ;;   limits        [none! object!]
+	; ;;   indent        [none! block!]   [first: integer! rest: integer!], first and rest are independent of each other 
+	; create: function [
+		; "Build a paragraph layout out of given spaces and settings as bound words"
+		; spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
+		; settings [block!] "Any subset of [align margin spacing canvas limits]"
+		; ;; settings - imported locally to speed up and simplify access to them:
+		; /local align baseline margin spacing canvas limits
+	; ][
+		; func?: function? :spaces
+		; count: either func? [spaces/size][length? spaces]
+		; if count <= 0 [return copy/deep [0x0 [] []]]
+		; foreach word settings [						;-- free settings block so it can be reused by the caller
+			; #assert [:self/create =? context? bind word 'local]
+			; set bind word 'local get word
+		; ]
+		; #debug [typecheck [
+			; align    [word! (find [left center right fill] align) none!]
+			; baseline [percent! float!]
+			; margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+			; spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
+			; canvas   [none! pair!]
+			; limits   [object! (range? limits) none!]
+			; indent   [block! (valid-indent? indent) none!]
+		; ]]
+		; default align:    'left
+		; default baseline: 80%
+		; default canvas:   infxinf					;-- none to pair normalization
+		; set [|canvas|: fill:] decode-canvas canvas
+		; default indent:   []
+		; indent1: any [indent/first 0]
+		; indent2: any [indent/rest  0]
+		; margin:  margin  * 1x1						;-- integer to pair normalization
+		; spacing: spacing * 1x1
+		; info: obtain block! count * 2
+		; #leaving [stash info]
+		
+		; ;; clipped canvas - used for allowed width fitting
+		; ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
+		; #debug sizing [#print "paragraph canvas=(canvas) ccanvas=(ccanvas)"]
+		
+		; ;; render everything
+		; repeat i count [
+			; space: either func? [spaces/pick i][spaces/:i]
+			; #assert [space? :space]
+			; ;; linebreaks will be rendered on finite canvas so they set their size (matters if they are made visible):
+			; ;@@ not sure, maybe they should stretch to total-width, but canvas/x seems more reasonable
+			; ;; using infxinf canvas for the rest to avoid wrapping and any canvas dependence (which also avoids extra renders)
+			; ;@@ I could make an extra render run to stretch items vertically to row height,
+			; ;@@ but that won't work for spaces that get wrapped to the next row: row sizes may differ
+			; ;@@ I could use min of all of them, but so far I see no clear need in this slowdown
+			; drawn: render/on space either space/type = 'break [canvas][infxinf]
+			; repend info [space drawn]
+		; ]
+		
+		; ;; split info into rows according to found widths
+		; rows: obtain block! 50						;-- [row-offset row-scale clip-start clip-end row ...]
+		; row:  obtain block! count * 3				;-- [item item-offset item-drawn ...]
+		; #leaving [foreach [_ _ _ _ row] rows [stash row]  stash rows]
+		
+		; allowed-row-width: max 0 ccanvas/x			;-- how wide rows to allow (splitting margin)
+		; total-length: total-width: 0				;-- total final extent of non-empty area
+		; row-width: row-hidden: row-visible: row-height: 0	;-- per-row counters
+		; row-indent: indent1
+		
+		; ;; next part relies on other functions from the context:
+		; foreach [space: drawn:] info [				;@@ use for-each
+			; sections: if in space 'sections [space/sections]	;-- calls if a function
+			; either sections [
+				; offset: 0
+				; foreach width sections [
+					; ;; empty part is significant at head - for code indentation
+					; ;; and at tail - for sub-paragraphs (e.g. in urls) to not eat spaces (handled later)
+					; either any [width > 0 offset = 0] [
+						; commit-part space drawn offset offset + abs width
+					; ][
+						; commit-empty width: negate width	;-- soft break on empty region (whitespace)
+					; ]
+					; offset: offset + width
+				; ]
+			; ][
+				; either space/type = 'break [		;-- ensure break is always on a separate line
+					; new-row
+					; commit-space space drawn
+					; new-row
+				; ][									;-- normal space
+					; commit-space space drawn
+					; commit-empty spacing/x
+				; ]
+			; ]
+		; ]
+		; row-visible: row-width - row-hidden			;-- force trailing space to become significant
+		; unless empty? row [new-row]					;-- count last row's size
+		; #assert [any [empty? rows  not empty? last rows]]	;-- can be empty if all spaces are whitespace
+		; if total-length > 0 [total-length: total-length - spacing/y]
+		
+		; ;; build the map & fix alignment
+		; ;; vertical alignment requires final row height
+		; ;; horizontal alignment requires final total width (known after all rows are finished)
+		; ;; map cannot have doubled (wrapped) items, because focus should be set on the whole item
+		; ;; so coordinates must be unrolled, but for simplicity I'll make a map without coordinates
+		; map: clear []
+		; forall rows [								;@@ use for-each or map-each
+			; set [row-offset: row-indent: row-clip-start: row-clip-end: row:] rows
+			; rows/2: 1.0								;-- replace indent by scale 
+			; left:  total-width - row-indent - (row-clip-end/x - row-clip-start/x)	;-- can be negative and it's fine
+			; shift: left * select #(left 0 fill 0 right 1 center 0.5) align
+			; if align = 'fill [						;-- set the scale
+				; unless any [
+					; empty? row
+					; row/1/type = 'break				;-- don't scale linebreak row
+					; tail? skip rows 5				;-- don't scale the last row or it's always scaled
+				; ][
+					; ;@@ ideally I should also stretch empty parts but it's tricky to implement
+					; width: first row-clip-end - row-clip-start
+					; limit: 90%
+					; scale: allowed-row-width - row-indent / (max 1 width)
+					; scale: clip scale limit 1 / limit
+					; ;; reduce scale to align it to pixels, else width may become 1px bigger than the canvas:
+					; rows/2: scale: min scale (to integer! scale * width) / width
+					; total-width: max total-width row-indent + round/to width * scale 1
+				; ]
+			; ]
+			; rows/1: row-offset + (shift by 0)
+			; pos: 0x0
+			; forall row [							;@@ use for-each or map-each
+				; space: row/1
+				; ;; remember vertical offset within the row (used by /draw and /into):
+				; row/2: row/2 by round/to row-clip-end/y - space/size/y * baseline 1	
+				; unless space =? pick tail map -2 [	;-- do not duplicate items in the map
+					; repend map [space none]			;-- list-spaces rely on maps having 2 columns ;@@ for-each could fix that
+				; ]
+				; row: skip row 2
+			; ]
+			; rows: skip rows 4
+		; ]
+		; size: 2 * margin + (total-width by total-length)
+		; #debug sizing [#print "paragraph c=(canvas) cc=(ccanvas) >> size=(size)"]
+		; #assert [size +< infxinf]
+		
+		; ;; container/draw cannot be used with this layout due to it's tricky coordinate shifts
+		; ;; so return format is different too ;@@ any way to unify return format with the others?
+		; reduce [size copy map copy/deep rows]		;@@ should rows include margin offset? currently they do not
+	; ]
+	
+	; ;; these are externalized from the /create function to avoid spawning new functions all the time
+	; commit-empty: func [width] with :create [				;-- soft break (usually whitespace)
+		; if empty? row [row-hidden: row-hidden + width]
+		; row-width: row-width + width
+	; ]
+	; commit-space: func [space drawn] with :create [			;-- whole space object (indivisible)
+		; claim space/size/x
+		; row-height: max row-height space/size/y
+		; repend row [space row-width - space/size/x drawn]
+	; ]
+	; commit-part: func [space drawn offset1 offset2] with :create [	;-- region of space (usually chars)
+		; claim width: offset2 - offset1						;-- offsets carry the info on where this section is located
+		; unless space =? pick tail row -3 [					;-- it's not the last added space? (was split or is a new one)
+			; row-height: max row-height space/size/y
+			; if empty? row [
+				; row-hidden: offset1
+				; row-width:  offset2
+			; ]
+			; repend row [space row-width - offset2 drawn]
+		; ]
+	; ]
+	; claim: func [width] with :create [
+		; if all [
+			; not empty? row
+			; row-indent + row-width - row-hidden + width > allowed-row-width
+		; ] [new-row]
+		; row-width:   row-width + width
+		; row-visible: row-width - row-hidden
+	; ]
+	
+	; ;; hidden [ visible ] empty  (both edges are hidden but I only keep track of the 1st, so I call it 'hidden')
+	; ;; <-      row-width     ->
+	; new-row: does with :create [
+		; repend rows [
+			; (row-indent - row-hidden) by total-length	;-- row offset
+			; row-indent								;-- row indent at first, then replaced by row-scale
+			; row-hidden by 0							;-- clip start
+			; row-hidden + row-visible by row-height	;-- clip end
+			; copy row
+		; ]
+		; clear row
+		; total-length: total-length + row-height + spacing/y
+		; total-width:  max total-width row-indent + row-visible
+		; row-hidden: row-width: row-visible: row-height: 0
+		; row-indent: indent2
+	; ]
+	
+	; #debug [
+		; valid-indent?: function [indent [block!]] [
+			; all [
+				; find [none! integer!] indent/first
+				; find [none! integer!] indent/rest
+			; ]
+		; ]
+	; ]
+; ]
+
+another failed attempt at rich-paragraph - too many complications caused by sections handling
+e.g. when determining if row ended on an empty section, and it's real size is less than predicted
+; ;; collect all sections on the map (not the same as sections on the paragraph layout)
+; ;; for non-fill alignments it may skip spaces that fully fit
+; dissect-map: function [] with :create [
+	; words: make [] count * 5
+	; row: clear []
+	; ;@@ need to disable scaling for non-fill alignments
+	; #assert [any [align = 'fill scaling = 0]]
+	; max-width: to integer! 1 + scaling * allowed-row-width	;-- rounded down; allows bigger rows if scaled
+	; row-width: 0
+	; foreach [space geom] map [
+		; width: space/size/x
+		; either row-width + width <= max-width [
+			; row-width: row-width + width
+		; ][
+		; ]
+	; ]
+	; words
+; ]
+
+; build-index: function [] with :create [
+	; index: clear []
+	; i: 0
+	; foreach [space geom] map [					;@@ use for-each
+		; reach: geom/offset/x + geom/size/x - 1 >> 4 + 1
+		; enlarge index reach i: i + 1
+	; ]
+	; make vector! index
+; ]
+
+; ;; returns map before item that either contains x level
+; locate: function [map [block!] index [vector!] level [integer!]] [
+	; #assert [not empty? map]
+	; n: half length? map
+	; i: pick index level >> 4 + 1
+	; #assert [i]
+	; map: at map i * 2
+	; while [all [geom: map/4  geom/offset/x <= level]] [map: skip map 2]	;@@ REP #113
+	; #assert [not empty? map]
+	; map
+; ]
+
+; ;; add up sections until width is reached (or less)
+; ;; returns [used taken], where used <= width, taken can be > width but includes only empty regions
+; add-sections: function [sections [block!] width [integer!]] [
+	; taken: used: 0
+	; foreach w sections [
+		; either w >= 0 [
+			; if used + w > width [break]
+			; taken: used: taken + w
+		; ][
+			; taken: taken - w
+		; ]
+	; ] 
+	; reduce [used taken]
+; ]
+
+; ;@@ must be rebuilt on alignment change
+; ;; each "word" is either a whole space or a part of one
+; ;; words format: [startxend space] where start and end are x offsets in the map
+; split-map: function [] with :create [
+	; words: make [] count * 5
+	; row: clear []
+	; ;@@ need to disable scaling for non-fill alignments
+	; #assert [any [align = 'fill scaling = 0]]
+	; max-width: to integer! 1 + scaling * allowed-row-width	;-- rounded down; allows bigger rows if scaled
+	; x1: 0
+	; x2: x1 + max-width
+	; m1: map
+	; m2: locate map index x2
+	; ;@@ consider case when x2 = geom2/offset/x! - need not section that item
+	; set [item2: geom2:] m2
+	; sec: if in item2 'sections [item2/sections]
+	; ;; determine actual width that fits (x2')
+	; either sec [
+		; base: geom2/offset/x
+		; set [used: taken:] add-sections sections x2 - base
+		; x2': base + used
+		; #assert [x2' - x1 <= max-width]
+		; ;@@ in fill mode - scale & split
+		; ;@@ else add region as row or single space per word? single makes sense
+		; x1:  base + taken
+	; ][
+		; x2': geom2/offset/x
+		; ;@@ what if previous space ends with an empty region?
+		; repeat i 1 + offset? m1 m2 [
+			; set [item: geom:] skip m1 i - 1 * 2
+			; repend words [item x1 x2']
+		; ]
+		; x1:  x2'
+	; ]
+	; ;; save it
+	; ;; continue
+	; words
+; ]
+
+how I hate these paragraph divisions..
+; flush-word: [
+	; if section-start > word-start [			;-- word pending?
+		; append words word-start by word-start: row-start + row-width
+	; ]
+; ]
+; flush-row: [
+	; do flush-word							;-- split words on row flush
+	; if row-used > 0 [						;-- not empty row pending?
+		; append rows row-start by row-start: length? words
+		; row-start: row-start + row-width
+		; row-width: row-used: 0
+		; max-width: max-width2
+	; ]
+; ]
+; foreach w sections [
+	; either w > 0 [							;-- significant section
+		; if row-width + w > max-width [		;-- row overflow, need to flush
+			; do flush-row
+		; ]
+		; row-width: row-used: row-width + w
+		; word-width: word-width + w
+	; ][										;-- empty section
+		; do flush-word
+		; row-width: row-width - w
+		; word-start: section-start - w
+	; ]
+	; section-start: section-start + abs w
+; ] 
+; do flush-row
+
+early experiments in advanced paragraph
+; ;@@ must be rebuilt on alignment change
+; ;@@ although word splitting can be done once, not relevant to alignment
+; ;; each "word" is either a whole space or a part of one
+; ;; words format: [startxend space] where start and end are x offsets in the map
+; split-map: function [] with :create [
+	; ;@@ needs map, total, scaling, align, allowed-row-width
+	; generate-sections map total sections: clear []
+	; ;; make leading whitespace significant - and it can split the row
+	; ;; (otherwise whitespace may dictate the width on slim canvases)
+	; ;; (all other whitespace trails the relevant row and does not split it)
+	; parse sections [some change [set w integer! (if w < 0)] (abs w)]
+	
+	; ;@@ need to return copy of sections - with margins added should be used as paragraph sections
+	; ;@@ alignment should be ignored on inf canvas - optimize
+	
+	; ;@@ need to disable scaling for non-fill alignments
+	; #assert [any [align = 'fill scaling = 0]]
+	; max-width1: to integer! 1 + scaling * max 0 allowed-row-width - indent1	;-- rounded down; allows bigger rows if scaled
+	; max-width2: to integer! 1 + scaling * max 0 allowed-row-width - indent2
+				
+	; ;; words are sequential groups of significant sections, but new-lines split words
+	; words: clear []
+	; rows:  clear []
+	; max-width: max-width1
+	
+	; flush-row: [
+		; unless tail? row-words [				;-- row is not empty?
+			; append rows as-pair					;-- keep it as range of words
+				; skip? row-words
+				; length? words
+			; row-words: tail words
+			; row-base: base
+		; ]
+	; ]
+	; parse sections [
+		; (word-base: row-base: 0  row-words: words)
+		; any [
+			; opt [
+				; (word-base: base)
+				; some [
+					; set w integer! if (w >= 0) (
+						; if base + w - row-base > max-width [	;-- row overflow
+							; if word-base < base [				;-- word is not empty already?
+								; append words word-base by word-base: base	;-- commit word part
+							; ]
+							; do flush-row
+						; ]
+						; base: base + w
+					; )
+				; ]
+				; (append words word-base by base)				;-- commit the last word
+			; ]
+			; any [set w integer! if (w <= 0) (base: base - w)]	;-- skip empty parts
+		; ]
+		; (do flush-row)
+	; ]
+	
+	; reduce [sections  copy words  copy rows]
+; ]
+
+; ;@@ need to draw rows now and vertically align
+; ;@@ perhaps they can vertically intersect (by the empty bands) on drawing
+; ;@@ draw will be later, this only creates a 2D layout out of 1D
+; draw: function [] with :create [
+	; ;@@ needs rows, words, map, index, indent1,2, allowed-row-width
+	
+	; ;; normal row widths in pixels
+	; width1: max 0 allowed-row-width - indent1
+	; width2: max 0 allowed-row-width - indent2
+	; ;; min widths are used to distribute whitespace over the allowed scaling
+	; min-width1: round/ceiling/to 1 - scaling * width1 1	;-- rounded up
+	; min-width2: round/ceiling/to 1 - scaling * width2 1
+	; max-width1: to integer!      1 + scaling * width1	;-- rounded down; allows bigger rows if scaled
+	; max-width2: to integer!      1 + scaling * width2
+	
+	; min-width: min-width1
+	; width: width1
+	; if align = 'fill [
+		; vector: make vector! compose [float! 32 8]
+	; ]
+	; foreach row rows [
+		; n-words: length? row-words: append/part clear [] words row + 1
+		; #assert [n-words > 0]
+		; word1: row-words/1  wordn: last row-words
+		; src-row-width: wordn/2 - row-base: word1/1
+		; either align = 'fill [
+			; ;; additional white space to insert between words
+			; white: (max 0 min-width - src-row-width) / (max 1 n-words - 1)
+			
+			; dst-row-width: width
+			; row-width: max min-width src-row-width
+			; row-scale: dst-row-width / row-width
+			
+			; ;; calculate each word's x offset
+			; x-offsets: clear []
+			; item-offset: 0
+			; repeat i n-words [
+				; word:  row-words/:i
+				; item-offset: item-offset + any [shifts/:i 0]
+				; append x-offsets word/1 - row-base + item-offset
+			; ]
+			; row-drawn: clear []
+			; i: 0
+			; foreach word row-words [			;@@ use map-each
+				; i: i + 1
+				; word-offset: pick x-offsets i
+				
+			; ]
+		; ][
+			; dst-row-width: src-row-width
+			
+		; ]
+		
+		
+		
+		; min-width: min-width2
+		; width: width2
+	; ]
+; ]
+
+; ;@@ move these out of layout
+; roll: function [xy [pair!]] [
+; ]
+; unroll: function [xy [pair!]] [
+; ]
+
+; #debug [
+	; valid-indent?: function [indent [block!]] [
+		; all [
+			; find [none! integer!] type?/word indent/first
+			; find [none! integer!] type?/word indent/rest
+		; ]
+	; ]
+; ]
+
+initial paragraph/locate-child
+; locate-child: function [
+	; "Find a child closest to XY and return corresponding row and child pointers and offsets"
+	; space [object!] xy [pair!]
+; ][
+	; rows:   space/frame/rows
+	; margin: space/frame/margin
+	; xy:     xy - margin
+	; ;@@ use locate instead maybe?
+	; for-each [prow: row-offset row-scale clip-start clip-end row] rows [
+		; last-row: prow
+		; xy': xscale xy 1 / row-scale				;-- correct xy/x for scaling if it's applied
+		; row-xy: xy' - row-offset
+		; if row-xy/y < clip-end/y [					;-- last line always accepts xy
+			; row-xy: clip row-xy clip-start clip-end			;-- contain xy within row, so it doesn't get into hidden child areas
+			; for-each [pchild: child child-offset _] row [
+				; last-child: pchild
+				; child-xy: row-xy - child-offset
+				; if child-xy/x < child/size/x [break]
+			; ]
+			; break
+		; ]
+		; unless empty? row [last-child: skip tail row -3]	;-- if for-each terminates, last child in a row is "closest" to xy
+	; ]
+	; if last-child [
+		; child-xy: row-xy - last-child/2
+		; reduce [last-row row-xy last-child child-xy]
+	; ]
+; ]
+
+working rich-content before I moved it to a new paragraph API
+; xscale: :rich-paragraph-ctx/xscale
+
+; locate-point: function [space [object!] xy [pair!]] [
+	; xy: xy - space/frame/margin
+	; if set [child: child-xy:] rich-paragraph-ctx/locate-child space xy [
+		; child:  row/1
+		; #assert [find/same space/decoded/ranges child]
+		; crange: pick find/same space/decoded/ranges child -1
+		; either crange/1 + 1 = crange/2 [
+			; index: crange/2
+			; caret: pick crange child-xy/x < (child/size/x / 2)
+		; ][
+			; index: crange/1     + offset-to-char  child/layout child-xy
+			; caret: crange/1 - 1 + offset-to-caret child/layout child-xy
+		; ]
+		; reduce [child child-xy index caret]			;@@ what to return?
+	; ]
+; ]
+
+; xy-to-caret: function [space [object!] xy [pair!]] [
+	; last locate-point space xy
+; ]
+
+; caret-to-row: function [space [object!] caret [integer!] (caret >= 0) side [word!] (find [left right] side)] [
+	; if empty? space/frame/rows [return none]
+	; caret: caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
+	; row-ranges: fill-row-ranges space
+	; row: 1
+	; foreach [irow range] row-ranges [
+		; if caret < range/1 [if side = 'right [break]]		;-- this improves UX when crossing over 'break'
+		; row: irow
+		; if caret < range/2 [break]
+	; ]
+	; ;; returns row number - to cycle across row range to draw multiline selection (or none if no rows)
+	; ;; some rows may only include a linebreak (ignored here), so visible row number <> real row number
+	; row
+; ]
+
+; row-to-box: function [space [object!] row-number [integer!] (row-number >= 1)] [
+	; set [row-offset: row-scale: clip-start: clip-end: row:] skip space/frame/rows row-number - 1 * 5
+	; mrg: space/margin * 1x1
+	; xy1: mrg + row-offset + (xscale clip-start row-scale)
+	; xy2: xy1 + (xscale clip-end - clip-start row-scale)
+	; reduce [xy1 xy2]
+; ]
+
+; ;@@ height returned should be not that of the row, but that of the highest adjacent item!!!
+; caret-to-box: function [space [object!] caret [integer!] side [word!] (find [left right] side)] [
+	; mrg: space/margin * 1x1
+	; ;@@ if no rows - no row heights - no caret height, so what to return? margin + 0x0-0x0?
+	; unless irow: caret-to-row space caret side [return reduce [mrg mrg]]
+	; prow: skip space/frame/rows irow - 1 * 5
+	; set [row-offset: row-scale: clip-start: clip-end: row:] prow
+	
+	; #assert [not empty? row]
+	; caret': caret + pick [0.5 -0.5] side = 'right	;-- right caret sticks to the right item
+	; pitem: row
+	; for-each [p: item item-offset _] row [
+		; range: pick find/same space/decoded/ranges item -1	;@@ maybe reorder these ranges for select usage
+		; if caret' < range/1 [if side = 'left [break]]		;@@ can't use break/return in for-each :(
+		; pitem: p
+		; if caret' < range/2 [break]
+	; ]
+		
+	; set [item: item-offset: _:] pitem
+	; caret: clip caret range/1 range/2						;-- skip empty ranges that don't land on items
+	; x: case [
+		; caret = range/1 [item-offset/x]						;-- item height may not equal row height, so it's ignored
+		; caret = range/2 [item-offset/x + item/size/x]
+		; 'within [item-offset/x + first caret-to-offset item/layout (caret - range/1 + 1)]
+	; ]
+	; xy1: mrg + row-offset + xscale x by 0 row-scale
+	; xy1/x: clip xy1/x mrg/x space/size/x - mrg/x			;-- contain caret within the paragraph (trailing spaces)
+	; xy2: xy1 + (0 by clip-end/y)
+	; ?? [x caret range xy1 xy2 clip-start clip-end]
+	; reduce [xy1 xy2]
+; ]
+
+; non-white!: negate charset " ^-^/^M"
+
+; ;@@ should these be cached? they depend on canvas, can't be put into space/ranges
+; fill-row-ranges: function [space [object!]] [
+	; ranges: clear []
+	; caret-right: 0
+	; for-each [/irow row-offset row-scale clip-start clip-end row] space/frame/rows [
+		; ;; empty rows (and those with a linebreak) are excluded, since we don't want zero-sized caret
+		; if any [
+			; empty? row
+			; all [3 = length? row  row/1/type = 'break]
+		; ] [continue]
+		
+		; ;; leftmost caret
+		; set [item: item-offset: _:] row
+		; #assert [									;-- clipping margin should land on the first item
+			; item-offset/x <= clip-start/x
+			; clip-start/x < (item-offset/x + item/size/x)
+		; ]
+		; item-range: pick find/same space/decoded/ranges item -1
+		; either item-range/2 - item-range/1 <= 1 [
+			; ;@@ I don't do this, but user could provide breakpoints for a custom space so it gets split
+			; ;@@ in this case I guess I should just consider the whole space a separator and not include it in the ranges
+			; ;@@ I'm lazy to bother with this case for now, to hell with it
+			; ;; current algorithm treats 'single-index' space as belonging to only one row
+			; caret-left: item-range/1
+		; ][
+			; clipx: clip-start/x - item-offset/x
+			; caret-left: item-range/1 - 1 + offset-to-caret item/layout clipx by 0
+		; ]
+		
+		; ;; rightmost caret
+		; set [item: item-offset: _:] skip tail row -3
+		; #assert [									;-- clipping margin should land on the first item
+			; item-offset/x <= clip-end/x
+			; clip-end/x <= (item-offset/x + item/size/x)
+		; ]
+		; item-range: pick find/same space/decoded/ranges item -1
+		; either item-range/2 - item-range/1 <= 1 [	;@@ same concern here as above
+			; caret-right: item-range/2
+		; ][
+			; text:  item/layout/text
+			; clipx: clip-end/x - item-offset/x
+			; index: offset-to-caret item/layout clipx by 0
+			; index: index? any [
+				; find at text index non-white!
+				; tail text
+			; ]
+			; caret-right: item-range/1 - 1 + index
+		; ]
+		
+		; repend ranges [irow  caret-left by caret-right]
+	; ]
+	; copy ranges
+; ]
+
+; metrics: context [
+	; measure: function [space [object!] plan [block!]] [
+		; do with self plan
+	; ]
+	; length: function [/local s] with :measure [
+		; ;@@ measure source or content? should be in sync but what is faster?
+		; ;@@ or cache it once source is processed and return? what if invalidated?
+		; len: 0
+		; parse space/source [any [
+			; set-word! skip | word! | refinement!
+		; |	set s string! (len: len + length? s)
+		; |	[char! | object!] (len: len + 1)
+		; ]]
+		; len
+	; ]
+	; point-to-caret: function [xy [pair!]] with :measure [
+		; set [_: _: index: offset:] ~/locate-point space xy
+		; side: pick [right left] offset < index
+		; compose [offset: (offset) side: (side)]
+	; ]
+	; caret-to-box: function [offset [integer!] side [word!]] with :measure [
+		; ~/caret-to-box space offset side
+	; ]
+; ]
+
+; ;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
+; linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
+; text-prototype:      make-space 'text []
+; link-prototype:      make-space 'link []
+
+; ;@@ should source support image! in it's content? url! ? anything else?
+; on-source-change: function [
+	; space [object!] word [word!] source [block!]
+	; /local range attr value char string obj2
+; ][
+	; if unset? :space/decoded [exit]					;-- not initialized yet
+	; set [items: attrs:] rich/source/deserialize source
+	; space/decoded/items: items						;@@ use multiset here
+	; space/decoded/attrs: attrs
+	; set [content: ranges:] rich/source/to-spaces items attrs
+	; space/decoded/ranges: ranges
+	; space/content: content
+	; invalidate space
+; ]
+
+; ;; can be styled but cannot be accessed (and in fact shared)
+; ;; because there's a selection per every row - can be many in one rich-content
+; selection-prototype: make-space 'rectangle [
+	; type: 'selection
+	; cache: none										;-- this way I can avoid cloning /cached facet
+; ]
+
+; draw-box: function [xy1 [pair!] xy2 [pair!]] [
+	; selection: copy selection-prototype
+	; quietly selection/size: xy2 - xy1
+	; compose/only [translate (xy1) (render selection)]
+; ]
+
+; draw-selection: function [space [object!]] [
+	; if any [
+		; not sel: space/selected
+		; empty? space/decoded/items
+	; ] [return []]
+	; if sel/1 > sel/2 [sel: reverse sel]
+	; ;@@ this calls fill-row-ranges so many times that it must be super slow
+	; lrow: caret-to-row space sel/1 'left  1
+	; rrow: caret-to-row space sel/2 'right 1
+	; set [lcar1: lcar2:] caret-to-box space sel/1 'left
+	; set [rcar1: rcar2:] caret-to-box space sel/2 'right
+	; ?? [sel lrow rrow lcar1 lcar2 rcar1 rcar2]
+	; #assert [lrow <= rrow]
+	; either lrow = rrow [
+		; draw-box lcar1 rcar2
+	; ][
+		; collect [
+			; set [lrow1: lrow2:] row-to-box space lrow
+			; keep draw-box lcar1 lrow2
+			; for irow lrow + 1 rrow - 1 [
+				; set [row1: row2:] row-to-box space irow
+				; if row1/y < row2/y [				;-- ignore empty lines
+					; keep draw-box row1 row2
+				; ]
+			; ] 
+			; set [rrow1: rrow2:] row-to-box space rrow
+			; keep draw-box rrow1 rcar2
+		; ]
+	; ]
+; ]
+
+; draw-caret: function [space [object!]] [
+	; unless caret: space/caret [return []]
+	; box: space/measure [caret-to-box caret/offset caret/side]
+	; quietly caret/size: box/2 - box/1 + (caret/width by 0)
+	; invalidate/only caret
+	; drawn: render caret
+	; compose/only [translate (box/1) (drawn)]
+; ]
+	
+; draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- adds selection and caret
+	; drawn: space/rich-paragraph-draw/on canvas
+	; if space/selected [
+		; sdrawn: draw-selection space
+		; drawn: reduce [sdrawn drawn]
+	; ]
+	; if space/caret [
+		; cdrawn: draw-caret space
+		; drawn: reduce ['push drawn cdrawn]
+	; ] 
+	; drawn
+; ]
+
+; clone: function [space [object!]] [		
+	; clone: clone-space space [margin spacing align baseline weight color font indent]
+	; ;; clone objects in the /source, /content will be regenerated automatically:
+	; clone/source: map-each [item [object!]] space/source [
+		; when select item 'clone (item/clone)
+	; ]
+	; clone
+; ]
+	
+; ;@@ can this be unified with metrics?
+; edit: context [
+	; edit: function [target [object!] plan [block!] /local changed?] [
+		; also do with self plan
+			; if changed? [							;-- regens content & decoded
+				; target/source: rich/source/serialize target/decoded/items target/decoded/attrs
+			; ]
+	; ]
+	; copy: remove: insert: mark: none
+; ]
+; edit/copy: function [range [pair!] /keep /text] with :edit/edit [
+	; if range/2 < range/1 [range: reverse range]
+	; range: clip range 0 length? target/decoded/items		;@@ workaround for #5263 here as well
+	; attrs: rich/attributes/copy target/decoded/attrs range
+	; items: copy/part target/decoded/items range + 1
+	; if keep [
+		; target/decoded/attrs: attrs
+		; target/decoded/items: items
+		; set 'changed? yes
+	; ]
+	; either text [
+		; to string! map-each/drop item items [
+			; case [
+				; char? :item [item]
+				; all [space? :item  select item 'edit] [
+					; item/edit [copy/text]
+				; ]
+				; 'else [continue]
+			; ]
+		; ]
+	; ][
+		; reduce [items attrs]
+	; ]
+; ]
+; edit/remove: function [range [pair!]] with :edit/edit [
+	; if range/2 < range/1 [range: reverse range]
+	; range: clip range 0 length? target/decoded/items
+	; target/decoded/attrs: rich/attributes/remove target/decoded/attrs range
+	; remove/part (skip target/decoded/items range/1) (range/2 - range/1)
+	; set 'changed? yes
+; ]
+; edit/insert: function [
+	; offset [integer!]
+	; items [object! (space? items) string! block!]
+	; /with attrs: #() [map!]
+; ] with :edit/edit [
+	; offset: clip offset 0 length? target/decoded/items
+	; case [
+		; object? items [
+			; attrs: items/decoded/attrs
+			; items: items/decoded/items
+		; ]
+		; string? items [items: explode items]
+	; ]
+	; range: offset + (0x1 * length? items)
+	; target/decoded/attrs: rich/attributes/insert target/decoded/attrs range attrs
+	; insert skip target/decoded/items offset items
+	; ?? offset ?? items ?? target/decoded/items
+	; set 'changed? yes
+; ]
+; edit/mark: function [
+	; range [pair!]
+	; attr  [word!]
+	; value "If falsey, attribute is cleared"
+; ] with :edit/edit [
+	; either :value [
+		; #assert [(max range/1 range/2) <= length? target/decoded/items]
+		; rich/attributes/mark  target/decoded/attrs attr :value range on
+	; ][
+		; rich/attributes/clear target/decoded/attrs attr range
+	; ]
+	; set 'changed? yes
+; ]
+
+	
+; ;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
+; declare-template 'rich-content/rich-paragraph [
+	; ;; data flow: source -> breakpoints & (content -> items) -> make-layout
+	; source:      []		#type [block!] :on-source-change			;-- holds high-level dialected data
+	; color:       none												;-- color & font defaults are accounted for in style
+	; font:        none
+	; selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)
+	
+	; ;; caret disabled by default, can be set to a caret space
+	; caret:       none	#type [object! (space? caret) none!] :invalidates	
+	
+	; ;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
+	; ;@@ need to think more on this one
+	; apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
+	
+	; ;@@ measure [length] can just use decoded/items now
+	; measure: func [plan [block!]] [~/metrics/measure self plan]		#type [function!]
+	; edit:    func [plan [block!]] [~/edit/edit       self plan]		#type [function!]
+	; clone: does [~/clone self]
+	
+	; decoded: context [								;-- internal data, generated on source change
+		; ;; items is the list of all things caret can skip: chars and spaces
+		; items:  []
+		; ;; attrs describes attribute mapping onto items: #(name [value mask ...] ...) 
+		; attrs:  #()									;-- okay to have literal map (that's not copied) - will be overridden
+		; ;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
+		; ;; so caret can skip the single ones but dive into the created ones
+		; ranges: []
+	; ] #type [object!]
+	
+	; rich-paragraph-draw: :draw	#type [function!]
+	; draw: func [/on canvas [pair!]] [~/draw self canvas]
 ; ]
