@@ -33,6 +33,7 @@ do/expand [
 	; #debug set events									;-- turn on to see what events get dispatched by hosts
 	; #debug set timer									;-- turn on to see timer events
 	; #debug set styles									;-- turn on to see which styles get applied
+	; #debug set paragraph								;-- turn on to see words inside paragraph layout
 	; #debug set grid-view
 	; #debug set list-view
 	
@@ -43,6 +44,7 @@ do/expand [
 	; #include %../common/composite.red
 	#include %../common/relativity.red
 	#include %../common/scoping.red
+	#include %../common/collect-set-words.red
 	#include %../common/print-macro.red
 	#include %../common/error-macro.red
 	#include %../common/prettify.red
@@ -57,6 +59,7 @@ do/expand [
 	#include %../common/with.red
 	#include %../common/catchers.red
 	#include %../common/is-face.red
+	#include %../common/color-models.red
 	#include %../common/contrast-with.red
 	#include %../common/keep-type.red
 	#include %../common/step.red
@@ -81,11 +84,11 @@ do/expand [
 				#include %cache.red
 				#include %rendering.red
 				#include %layouts.red
-				#include %vid.red
 				#include %events.red
 				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %source.red
 				#include %templates.red
+				#include %vid.red
 				#include %popups.red
 				#include %traversal.red
 				#include %focus.red
