@@ -516,7 +516,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			] align <> 'scale 
 			
 			set [word-x-1D: word-width: white?: word-sections:] words-end: words	;-- always add at least one word
-			row-used-width: either white? [word-width][0]
+			row-used-width: either white? [0][word-width]
 			while [not tail? words-end: skip words-end words-period] [
 				if white?: words-end/3 [continue]				;-- add as many empty words as possible
 				new-used-width: words-end/1/2 - word-x-1D/1
@@ -571,15 +571,20 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		float-vector: make vector! [float! 64 10]
 		;; evenly distributes remaining whitespace in fill mode
 		distribute-whitespace: function [words [block!] size [integer!]] [
-			n-white: 0
-			foreach [_ _ white? _] words [if white? [n-white: n-white + 1]]
+			;; last (trailing) whitespace should not be changed, so need to get rid of it first
+			whites: clear {}
+			foreach [_ _ white? _] words [append whites pick " +" white?]	;@@ use map-each or sift
+			trim/tail whites							;@@ due to #5119 find/last/skip cannot be used
+			trim/with whites #"+"
+			n-white: length? whites
 			if n-white = 0 [exit]						;-- no empty words in the row, have to leave it left-aligned
+			
 			append/dup clear float-vector 1.0 * size / n-white n-white
 			white: quantize float-vector
 			while [not tail? words] [					;-- skip 1st word ;@@ use for-each
-				if words/3 [
+				if white?: words/3 [
 					words/2: words/2 + white/1			;-- modifies word-width-1D
-					white: next white
+					if tail? white: next white [break]
 				]
 				words: skip words words-period
 			]

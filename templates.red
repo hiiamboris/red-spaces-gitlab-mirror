@@ -59,7 +59,7 @@ modify-class 'space [
 	on-invalidate: 	#type [function! none!]
 ]	
 
-space?: func ["Determine of OBJ is a space! object" obj [any-type!]] [
+space?: function ["Determine of OBJ is a space! object" obj [any-type!]] [
 	all [
 		object? :obj
 		any [
@@ -753,6 +753,8 @@ paragraph-ctx: context [
 		quietly space/layout: layout					;-- must return layout
 	]
 
+	;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
+	;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
 	get-sections: function [space [object!]] [
 		#assert [space/layout  "text must be rendered to get sections"]
 		mrg: space/margin along 'x
@@ -1262,7 +1264,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		side  [word!] (find [left right] side) "Map contested points to previous or next row"
 	][
 		#assert [all [0 <= x x <= frame/size-1D/x]  "Map point must be within total size"]
-		x-1D': map-x1D->x1D' frame x-1D side
+		x-1D': map-x1D->x1D' frame x side
 		map-x1D'->row frame x-1D' side
 	]
 	
@@ -1304,14 +1306,13 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		row   [integer!] (row >= 1)
 		;@@ need a refinement for indent inclusion? it should be as easy as setting xy1/x: 0 though
 	][
-		frame: space/frame
 		#assert [not empty? frame/map  "no rows available"]
 		set [y0: y1: y2:] skip frame/y-levels row - 1 * 3
 		offset-1D': row - 1 * width: frame/size-2D/x
 		;; simplest thing would be to locate row in 2D and map it to 1D and back, but that's ambiguous for zero-height rows
 		;; so I need to use 1D'->1D->1D' mapping to detect and skip indentation
 		x1-1D:  reproject/inverse frame/x1D->x1D' x1-1D': offset-1D'
-		x2-1D:  reproject/inverse frame/x1D->x1D' x2-1D': offset-1D' + width
+		x2-1D:  reproject/inverse frame/x1D->x1D' x2-1D': min (offset-1D' + width) frame/size-1D'/x
 		x1-1D': reproject/up      frame/x1D->x1D' x1-1D
 		x2-1D': reproject         frame/x1D->x1D' x2-1D
 		xy1: x1-1D' - offset-1D' by y1
@@ -1339,16 +1340,17 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 		
 	;; /map is kept in 1D space, so /into is required for translation from 2D
-	into: func [space [object!] xy [pair!] child [object! none!]] [
+	into: function [space [object!] xy [pair!] child [object! none!]] [
 		unless frame: space/frame [return none]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
 		xy-2D: xy - frame/margin
 		either child [
-			geom: select/same frame/map child
-			#assert [geom]
-			oxy-2D: to pair! map-1D->2D frame geom/offset 'right
-			child-xy: xy-2D - oxy-2D
+			child-xy: 0x0
+			if geom: select/same frame/map child [		;-- can be none if content changed (see %hovering.red)
+				oxy-2D: to pair! map-1D->2D frame geom/offset 'right
+				child-xy: xy-2D - oxy-2D
+			]
 			reduce [child child-xy]
 		][
 			xy-1D:  map-2D->1D frame xy-2D
@@ -1592,15 +1594,15 @@ rich-content-ctx: context [								;-- rich content
 			draw-box lcar1 rcar2
 		][
 			collect [
-				set [lrow1: lrow2:] row-to-box space lrow
+				set [lrow1: lrow2:] row->box space lrow
 				keep draw-box lcar1 lrow2
 				for irow lrow + 1 rrow - 1 [
-					set [row1: row2:] row-to-box space irow
+					set [row1: row2:] row->box space irow
 					if row1/y < row2/y [				;-- ignore empty lines
 						keep draw-box row1 row2
 					]
 				] 
-				set [rrow1: rrow2:] row-to-box space rrow
+				set [rrow1: rrow2:] row->box space rrow
 				keep draw-box rrow1 rcar2
 			]
 		]
@@ -2325,7 +2327,7 @@ list-view-ctx: context [
 grid-ctx: context [
 	~: self
 	
-	into: func [grid [object!] xy [pair!] cell [object! none!]] [	;-- faster than generic map-based into
+	into: function [grid [object!] xy [pair!] cell [object! none!]] [	;-- faster than generic map-based into
 		if cell [return into-map grid/map xy cell]		;-- let into-map handle it ;@@ slow! need a better solution!
 		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
@@ -3521,7 +3523,7 @@ field-ctx: context [
 		clip field/origin min-org max-org
 	]
 			
-	offset-to-caret: func [
+	offset-to-caret: function [
 		"Get caret location [0..length] closest to given OFFSET within FIELD"
 		field [object!] offset [pair! integer!]
 	][
