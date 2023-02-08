@@ -15,7 +15,8 @@ into-map: function [
 	either child [
 		#debug events [#assert [find/same map child]]	;-- may fail, but still worth seeing it
 		;; geom=none possible if e.g. hittest on 'up' event uses drag-path of 'down' event
-		;; and some code of 'down' event replaces part of the tree:
+		;; and some code of 'down' event replaces part of the tree;
+		;; also %hovering.red on tree modification uses a no longer valid path
 		xy: either geom: select/same/only map child [xy - geom/offset][0x0] 
 		reduce [child xy]
 	][

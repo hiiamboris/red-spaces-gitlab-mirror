@@ -204,7 +204,8 @@ Function that is used in hittesting only.
 - takes a point in it's space's coordinate system
 - determines which *inner* space this point lands to
 - returns the inner space and a point in inner space's coordinate system, or `none` if it lands outside
-- when `child` argument is not `none`, it should translate coordinates into the given child (only required if this space wants to support dragging) even it point lands outside; `/force` value should be ignored
+- when `child` argument is not `none`, it should translate coordinates into the given child (only required if this space wants to support dragging) even it point lands outside; `/force` value should be ignored\
+  if child is no longer present in the space, it should return 0x0 coordinate for it (happens when testing paths that were valid on one frame, but became invalid on another)
 
 This allows for rotation, compression, reflection, anything. Can we make a "mirror" space that reflects another space along some axis? Easily.
 

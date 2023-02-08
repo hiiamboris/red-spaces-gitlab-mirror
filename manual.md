@@ -456,7 +456,7 @@ ARGUMENTS:
 
 Spec of global handlers follows that of normal event handlers.
 
-For examples see [`tabbing.red`](tabbing.red), [`single-click.red`](single-click.red), [`hovering.red`](hovering.red), [`focus.red`](focus.red)
+For examples see [`tabbing.red`](tabbing.red), [`single-click.red`](single-click.red), [`focus.red`](focus.red)
 
 </details>
 

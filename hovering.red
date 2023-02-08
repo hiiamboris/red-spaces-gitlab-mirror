@@ -7,6 +7,7 @@ Red [
 
 ;-- no load requirements
 
+;@@ for this design to work, all /into funcs must accept (return none) spaces that are no longer their children!
 
 context [
 	last-offsets: make hash! 2							;@@ suffers from REP #129
@@ -59,7 +60,7 @@ context [
 		if moved?: not same-paths? old-path new-path [
 			if event/type = 'time [						;@@ can't write event/offset, have to provide virtual event:
 				false-event/type:   'over
-				false-event/face:   event/face
+				false-event/face:   host				;-- host is event/face but see fix for #5278 
 				false-event/window: event/window
 				false-event/offset: host-offset
 				event: false-event

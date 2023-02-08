@@ -204,6 +204,7 @@ show-menu: function [
 	menu    [block!] "Written using Menu DSL"
 	;@@ maybe also a flag to make it appear above the offset?
 ][
+	;@@ it's dumb to 'make' it with 'level' and then 'show' with 'level' again - need to remove one
 	face: make-popup window level
 	face/rate:  10										;-- reduced timer pressure
 	face/space: lay-out-menu menu
