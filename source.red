@@ -548,14 +548,14 @@ rich: context [	;@@ how to name it?
 						append/part obj/text s e
 						limits: offset + as-pair skip? s skip? e
 						obj/flags: attributes/make-rtd-flags attrs limits
-						repend ranges [limits obj]
+						repend ranges [obj limits]
 					)
 				|	[
 						#"^/" (obj: make-space 'break [])		;-- equivalent: lf <-> break (single item)
 					|	set obj object!
 					] (
 						append spaces obj 
-						repend ranges [offset + 0x1 + skip? s  obj]
+						repend ranges [obj  offset + 0x1 + skip? s]
 					)
 				|	end
 				|	(ERROR "Unsupported data in the source: (mold/part s 40)")
@@ -572,8 +572,8 @@ rich: context [	;@@ how to name it?
 					quietly obj/command: value
 					limits: offset by length? items
 					repend ranges [
-						limits obj
-						limits obj/content
+						obj limits
+						obj/content limits
 					]
 				][
 					append content spaces
