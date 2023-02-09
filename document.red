@@ -266,12 +266,21 @@ doc-ctx: context [
 		rich/attributes/pick item/decoded/attrs attr offset + 1
 	]
 	
-	document/align: function [doc [object!] range [pair!] align [word!] (find [left right center fill] align)] [
-		if range/1 > range/2 [range: reverse range]
+	document/align: function [
+		doc [object!]
+		range [object!] (all [in range 'start in range 'end])	;-- sides are useful for absent selection (align by caret)
+		align [word!] (find [left right center fill] align)
+	][
+		#assert [
+			range/start/offset <= range/end/offset
+			0 <= range/start/offset
+			range/end/offset <= get-length doc
+		]
 		; range: clip range 0 doc/measure [length]
-		range: clip range 0 get-length doc
-		set [item1: _:] caret-to-child doc range/1 'right
-		set [item2: _:] caret-to-child doc range/2 'left
+		set [item1: _:] caret-to-child doc range/start/offset range/start/side
+		set [item2: _:] caret-to-child doc range/end/offset   range/end/side
+		; ?? item1
+		; ?? item2
 		items: copy/part
 			find/same      doc/content item1
 			find/same/tail doc/content item2
@@ -536,8 +545,11 @@ toggle-attr: function [name] [
 ]
 realign: function [name] [
 	range: any [
-		if doc/selected [doc/selected/range]
-		doc/caret/offset * 1x1
+		if doc/selected [doc/selected]
+		object [
+			start: end: compose [offset: (o: doc/caret/offset) side: (doc/caret/side)]
+			range: o * 1x1
+		]
 	]
 	doc-ctx/document/align doc range name
 ]
@@ -622,7 +634,7 @@ view reshape [
 					rich-content source= [!(make-space 'bullet [text: ">"]) !(copy skip lorem 220)] indent= [rest: 15]
 				] with [watch 'size] 
 				on-down [
-					; space/selected: none
+					space/selected: none
 					if caret: doc-ctx/point-to-caret space path/2 [
 						set with space/caret [offset side] reduce [caret/offset caret/side]
 						start-drag/with path copy caret
@@ -636,6 +648,7 @@ view reshape [
 							start: drag-parameter
 							range: start/offset by caret/offset
 							if range/1 > range/2 [range: reverse range]
+							;@@ need to design selection API - is it going to use on-change or laziness or what, or just a block?
 							space/selected: construct compose/only [
 								start: (start) end: (caret) range: (range)
 							]
