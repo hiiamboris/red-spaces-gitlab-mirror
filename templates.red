@@ -1252,7 +1252,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		if rows-above = rows-above' [					;-- contested pixel
 			rows-above: either side = 'left
 				[max rows-above - 1 0]
-				[min rows-above + 1 frame/nrows - 1]
+				[min rows-above frame/nrows - 1]
 		]
 		1 + rows-above
 	]
@@ -1282,9 +1282,11 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		x-1D': map-x1D->x1D' frame x-1D side
 		rows-above: -1 + map-x1D'->row frame x-1D' side
 		x-2D: x-1D' - (frame/size-2D/x * rows-above)	;-- modulo doesn't work due to left/right duality
+		#assert [x-2D >= 0]
 		set [y0-2D: y1-2D: y2-2D:] skip frame/y-levels rows-above * 3
 		#assert [y0-2D]
 		y-2D:  clip y1-2D y2-2D (y0-2D + y-1D)			;-- do not let it step into other rows
+		; ?? [rows-above x-1D' side x-2D y-2D]
 		reduce [x-2D y-2D]
 	]
 	
@@ -1624,7 +1626,7 @@ rich-content-ctx: context [								;-- rich content
 			drawn: reduce [sdrawn drawn]
 		]
 		if space/caret [
-			cdrawn: draw-caret space
+			probe cdrawn: draw-caret space
 			drawn: reduce ['push drawn cdrawn]
 		] 
 		drawn
