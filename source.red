@@ -542,18 +542,17 @@ rich: context [	;@@ how to name it?
 			ranges:  clear []							;-- range spans of items that caret can dive into
 			foreach [attr value offset items] spans [
 				spaces: clear []
+				;@@ or trim them? or silently split into multiple paragraphs (hard)?
+				#assert [not find items #"^/"  "line breaks are not allowed inside paragraph text"]
 				parse items [any [
-					s: some [not #"^/" char!] e: (
+					s: some char! e: (
 						append spaces obj: make-space 'text []
 						append/part obj/text s e
 						limits: offset + as-pair skip? s skip? e
 						obj/flags: attributes/make-rtd-flags attrs limits
 						repend ranges [obj limits]
 					)
-				|	[
-						#"^/" (obj: make-space 'break [])		;-- equivalent: lf <-> break (single item)
-					|	set obj object!
-					] (
+				|	set obj object! (
 						append spaces obj 
 						repend ranges [obj  offset + 0x1 + skip? s]
 					)

@@ -208,12 +208,12 @@ context [
 		[]
 	]
 		
-	declare-template 'break/space [						;-- template space for line breaks in rich paragraph
-		length: 0	#type [integer!]					;-- determines linebreak thickness (exposed for styling)
-		cache:  none
-		draw:   function [/on canvas [pair!]] [~/draw self canvas]
-		format: does [copy "^/"]
-	]		
+	; declare-template 'break/space [						;-- template space for line breaks in rich paragraph
+		; length: 0	#type [integer!]					;-- determines linebreak thickness (exposed for styling)
+		; cache:  none
+		; draw:   function [/on canvas [pair!]] [~/draw self canvas]
+		; format: does [copy "^/"]
+	; ]		
 ]		
 
 rectangle-ctx: context [
@@ -1626,7 +1626,7 @@ rich-content-ctx: context [								;-- rich content
 			drawn: reduce [sdrawn drawn]
 		]
 		if space/caret [
-			probe cdrawn: draw-caret space
+			cdrawn: draw-caret space
 			drawn: reduce ['push drawn cdrawn]
 		] 
 		drawn

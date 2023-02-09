@@ -522,7 +522,7 @@ request-url: function [
 
 font-20: make font! [size: 20]
 				
-lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.laborum.laborum.laborum.laborum.laborum.}
+lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
 append keyboard/focusable 'document
 toggle-attr: function [name] [
 	; doc-ctx/document/toggle-attribute range
@@ -611,8 +611,10 @@ view reshape [
 					; code source= ["12" underline bold "34" /bold /underline "56"]
 					; rich-content source= [!(make-space 'bullet [text: "○"]) !(copy skip lorem 200)] indent= [rest: 15] ;align= 'fill
 					
-					code source= ["block [^/    of wrapped long long long code^/]"]
-					code source= compose ["12" (lay-out-vids [clickable command= [print 34] [rich-content [underline bold "34" /bold /underline]]]) "56"]
+					code source= ["block ["]
+					code source= ["    of wrapped long long long code"]
+					code source= ["]"]
+					code source= compose ["12" (lay-out-vids [clickable margin= 0x2 command= [print 34] [rich-content [underline bold "34" /bold /underline]]]) "56"]
 					rich-content source= [!(make-space 'bullet [text: "○"]) 
 					@(
 						lay-out-vids [rich-content source= [!(copy skip lorem 200)]]
