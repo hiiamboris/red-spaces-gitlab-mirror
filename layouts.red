@@ -701,7 +701,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			sections: list-sections map total-1D/x
 			words: list-words sections
 			total-2D: 1x0 * ccanvas						;-- without margins
-			total-2D/x: min total-2D/x total-1D/x		;-- convert infinite canvas into single-row canvas
+			if any [
+				ccanvas/x >= infxinf/x					;-- convert infinite canvas into single-row canvas
+				fill/x < 1								;-- contract width if not asked to fill it
+			][
+				total-2D/x: min total-2D/x total-1D/x
+			]
 			unless force-wrap? [						;-- extend width to the longest predicted row
 				total-2D/x: max total-2D/x get-min-total-width-2D words indent1 indent2
 			]
