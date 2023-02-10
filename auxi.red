@@ -321,7 +321,7 @@ include-into: function [
 	"Include flag into series if it's not there"
 	series [series!] flag [any-type!]
 ][
-	unless find series :flag [append series :flag]
+	unless find/only series :flag [append/only series :flag]
 	series
 ]
 
@@ -329,7 +329,7 @@ exclude-from: function [
 	"Exclude flag into series if it's there"
 	series [series!] flag [any-type!]
 ][
-	remove find series :flag
+	remove find/only series :flag
 	series
 ]
 
@@ -359,8 +359,11 @@ set-after: function [
 explode: function [										;@@ use split or map-each when fast
 	"Split string into a block of characters"
 	string [string!]
+	/into buffer [any-list!]
 ][
-	parse string [collect keep pick to end]
+	unless buffer [buffer: make [] length? string]
+	parse string [collect after buffer keep pick to end]
+	buffer
 ]
 
 delimit: function [
@@ -1010,9 +1013,10 @@ fast-remove: function [block [any-block!] length [integer!]] [
 ;; extend & expand are taken already ;@@ prolong?
 enlarge: function [
 	"Ensure certain SIZE of the BLOCK, fill empty space with VALUE"
-	block [any-block!] size [integer!] value [any-type!]
+	block [any-block! any-string!] size [integer!] value [any-type!]
 ][
-	insert/dup skip block size :value size - length? block
+	#assert [any [any-block? block  char? :value]]
+	insert/only/dup skip block size :value size - length? block
 	;; returns after size
 ]
 
