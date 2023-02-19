@@ -80,14 +80,6 @@ VID: context [
 				spec:     [list/spacing: 5x5 list/axis: 'y]
 				facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
 			]
-			rich-paragraph [
-				template: rich-paragraph
-				facets:   [percent! baseline #text-align]
-			]
-			rich-content [
-				template: rich-content
-				facets:   [percent! baseline block! source #text-align]
-			]
 			label [
 				template: label
 				spec:     [limits: 80 .. none]
@@ -114,6 +106,20 @@ VID: context [
 						with [caret :caret/on-change*] [		;-- newlines are imporant here for mold readability
 							system/reactivity/check/only self word
 						]
+				]
+			]
+			rich-paragraph [
+				template: rich-paragraph
+				facets:   [percent! baseline #text-align]
+			]
+			rich-content [
+				template: rich-content
+				facets: [
+					percent! baseline
+					block! !(func [block] [				;-- high level source dialect support for VID
+						compose/only [decode (block)]
+					])
+					#text-align
 				]
 			]
 			
