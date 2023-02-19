@@ -1653,14 +1653,15 @@ rich-content-ctx: context [								;-- rich content
 	edit/insert!: function [
 		offset [integer!]
 		items  [
-			object! ('rich-content = class? items)
+			object! (space? items)						;-- not inlined! for inlining use `insert! ofs values-of para/data`
 			block!  (parse items [block! map!])
 			string!
 		]
 	] with :edit/edit [
 		case [
-			object? items [items: values-of items/data]	;@@ should inserted objects be copied/cloned automatically? (now document does that)
-			string? items [items: reduce [explode items  copy #()]]
+			;@@ should inserted objects be copied/cloned automatically? (document does that atm)
+			object? items [items: reduce [reduce [items] #()]]	
+			string? items [items: reduce [explode items  #()]]
 		]
 		unless empty? items [
 			space/data: rich/decoded/insert! values-of space/data offset items
@@ -1716,9 +1717,9 @@ rich-content-ctx: context [								;-- rich content
 		;; caret disabled by default, can be set to a caret space
 		caret:       none	#type [object! (space? caret) none!] :invalidates	
 		
-		;; user may override this to carry attributes (bold, italic, color, font, command, etc) to a space from the /source
-		;@@ need to think more on this one
-		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
+		;; user may override this to carry attributes (bold, italic, color, font, etc) to a space from the /source
+		;@@ need to think more on this one - disabled for now
+		; apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]		#type [function!]
 		edit:    func [plan [block!]] [~/edit/edit       self plan]		#type [function!]

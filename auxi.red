@@ -1010,7 +1010,8 @@ fast-remove: function [block [any-block!] length [integer!]] [
 	clear other
 ]
 
-;; extend & expand are taken already ;@@ prolong?
+;@@ extend & expand are taken already, maybe prolong?
+;; it's similar to pad/with but supports blocks, returns insert position, and should be faster
 enlarge: function [
 	"Ensure certain SIZE of the BLOCK, fill empty space with VALUE"
 	block [any-block! any-string!] size [integer!] value [any-type!]
