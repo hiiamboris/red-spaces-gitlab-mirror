@@ -642,8 +642,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			x1D->map:    none
 			y2D->row:    none
 			caret-boxes: none							;-- not filled by layout/create - only on demand
-			;@@ need to decide what's part of a frame and what - of space itself, based on lifespan
 		]
+		
+		empty-mapping: build-index [0 0 0 0] 1			;-- cached for faster 0x0 layout
 				
 		;; settings for paragraph layout:
 		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
@@ -681,9 +682,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					spacing:   (spacing)
 					map:       (map)
 					sections:  (reduce [margin/x margin/x])
-					x1D->x1D': (build-index copy [0 0 0 0] 1)
-					x1D->map:  (build-index copy [0 0 0 0] 1)
-					y2D->row:  (build-index copy [0 0 0 0] 1)
+					x1D->x1D':
+					x1D->map:
+					y2D->row:  (copy/deep empty-mapping)	;-- single shared mapping is OK since they're read only
 				]
 			]
 			default align:  'left
