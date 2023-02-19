@@ -1434,7 +1434,7 @@ rich-content-ctx: context [								;-- rich content
 				]
 			]
 		]
-		if geom [
+		unless empty? boxes [
 			offset: 1x0 * geom/size
 			repend boxes [xy1 + offset xy2 + offset]	;-- n+1 carets for n items
 		]
@@ -1457,10 +1457,10 @@ rich-content-ctx: context [								;-- rich content
 	][
 		boxes: any [
 			space/frame/caret-boxes
-			space/frame/caret-boxes: list-carets space/map space/decoded/ranges	;@@ remove ranges after this?
+			space/frame/caret-boxes: list-carets space/map space/ranges	;@@ remove ranges after this?
 		]
-		if set [xy1: xy2:] skip boxes caret * 2 [		;-- returns none when outside of range or no carets allowed
-			reduce [xy1 xy2]
+		unless tail? boxes: skip boxes caret * 2 [		;-- returns none when outside of range or no carets allowed
+			copy/part boxes 2
 		]
 	]
 	
@@ -1481,8 +1481,8 @@ rich-content-ctx: context [								;-- rich content
 	locate-point: function [space [object!] xy [pair!] "with margin"] [
 		xy: xy - space/frame/margin
 		if set [child: child-xy:] rich-paragraph-ctx/locate-child space xy [
-			#assert [find/same space/decoded/ranges child]
-			crange: select/same space/decoded/ranges child
+			#assert [find/same space/ranges child]
+			crange: select/same space/ranges child
 			either 1 = span? crange [
 				index: crange/2
 				caret: pick crange child-xy/x < (child/size/x / 2)
@@ -1525,17 +1525,7 @@ rich-content-ctx: context [								;-- rich content
 		measure: function [space [object!] plan [block!]] [
 			do with self plan
 		]
-		length: function [/local s] with :measure [
-			;@@ measure source or content? should be in sync but what is faster?
-			;@@ or cache it once source is processed and return? what if invalidated?
-			len: 0
-			parse space/source [any [
-				set-word! skip | word! | refinement!
-			|	set s string! (len: len + length? s)
-			|	[char! | object!] (len: len + 1)
-			]]
-			len
-		]
+		length: function [/local s] with :measure [length? space/data/items]
 		point-to-caret: function [xy [pair!]] with :measure [
 			set [_: _: index: offset:] ~/locate-point space xy
 			side: pick [right left] offset < index
@@ -1550,21 +1540,6 @@ rich-content-ctx: context [								;-- rich content
 	; linebreak-prototype: make-space 'break [#assert [cache = none]]	;-- otherwise /cached facet should be `clone`d
 	; text-prototype:      make-space 'text []
 	; link-prototype:      make-space 'link []
-	
-	;@@ should source support image! in it's content? url! ? anything else?
-	on-source-change: function [
-		space [object!] word [word!] source [block!]
-		/local range attr value char string obj2
-	][
-		if unset? :space/decoded [exit]					;-- not initialized yet
-		set [items: attrs:] rich/source/deserialize source
-		space/decoded/items: items						;@@ use multiset here
-		space/decoded/attrs: attrs
-		set [content: ranges:] rich/source/to-spaces items attrs
-		space/decoded/ranges: ranges
-		space/content: content
-		; invalidate space
-	]
 	
 	;; can be styled but cannot be accessed (and in fact shared)
 	;; because there's a selection per every row - can be many in one rich-content
@@ -1582,7 +1557,7 @@ rich-content-ctx: context [								;-- rich content
 	draw-selection: function [space [object!]] [
 		if any [
 			not sel: space/selected
-			empty? space/decoded/items
+			empty? space/data/items
 		] [return []]
 		if sel/1 > sel/2 [sel: reverse sel]
 		;@@ this calls fill-row-ranges so many times that it must be super slow
@@ -1613,6 +1588,8 @@ rich-content-ctx: context [								;-- rich content
 	draw-caret: function [space [object!]] [
 		unless caret: space/caret [return []]
 		box: space/measure [caret-to-box caret/offset caret/side]
+		; ?? [caret/offset caret/side box] 
+		#assert [not empty? box]
 		quietly caret/size: box/2 - box/1 + (caret/width by 0)
 		invalidate/only caret
 		drawn: render caret
@@ -1632,94 +1609,106 @@ rich-content-ctx: context [								;-- rich content
 		drawn
 	]
 	
-	clone: function [space [object!]] [		
-		clone: clone-space space [margin spacing align baseline weight color font indent]
-		;; clone objects in the /source, /content will be regenerated automatically:
-		clone/source: map-each [item [object!]] space/source [
-			when select item 'clone (item/clone)
-		]
-		clone
-	]
-		
 	;@@ can this be unified with metrics?
 	edit: context [
-		edit: function [target [object!] plan [block!] /local changed?] [
-			also do with self plan
-				if changed? [							;-- regens content & decoded
-					target/source: rich/source/serialize target/decoded/items target/decoded/attrs
-				]
+		edit: function [space [object!] plan [block!]] [
+			do with self plan
 		]
-		copy: remove: insert: mark: none
+		;; NOTE: modifying operations must explicitly set `space/data:` to trigger content/ranges update!
+		full-range?: empty-range?: copy: serialize: clip!: remove!: insert!: mark!: none
 	]
-	edit/copy: function [range [pair!] /keep /text] with :edit/edit [
-		if range/2 < range/1 [range: reverse range]
-		range: clip range 0 length? target/decoded/items		;@@ workaround for #5263 here as well
-		attrs: rich/attributes/copy target/decoded/attrs range
-		items: copy/part target/decoded/items range + 1
-		if keep [
-			target/decoded/attrs: attrs
-			target/decoded/items: items
-			set 'changed? yes
+	
+	edit/full-range?: function [range [pair!]] with :edit/edit [
+		n: length? space/data/items
+		0 by n = range
+	]
+
+	edit/empty-range?: function [range [pair!]] with :edit/edit [
+		zero? span? clip range 0 length? space/data/items
+	]
+	
+	edit/copy: function [range [pair!] /text] with :edit/edit [
+		slice: rich/decoded/copy values-of space/data range
+		either text [rich/decoded/format slice][slice]
+	]
+	
+	edit/serialize: function [] with :edit/edit [
+		rich/source/serialize space/data/items space/data/attrs
+	]
+	
+	edit/clip!: function [range [pair!]] with :edit/edit [
+		unless edit/full-range? range [
+			space/data: rich/decoded/normalize! rich/decoded/copy values-of space/data range
 		]
-		either text [
-			to string! map-each/drop item items [
-				case [
-					char? :item [item]
-					all [space? :item  select item 'edit] [
-						item/edit [copy/text]
-					]
-					'else [continue]
-				]
-			]
-		][
-			reduce [items attrs]
+		space/data
+	]
+	
+	edit/remove!: function [range [pair!]] with :edit/edit [
+		unless edit/empty-range? range [
+			space/data: rich/decoded/normalize! rich/decoded/remove! values-of space/data range
 		]
+		space/data
 	]
-	edit/remove: function [range [pair!]] with :edit/edit [
-		if range/2 < range/1 [range: reverse range]
-		range: clip range 0 length? target/decoded/items
-		target/decoded/attrs: rich/attributes/remove target/decoded/attrs range
-		remove/part (skip target/decoded/items range/1) (range/2 - range/1)
-		set 'changed? yes
-	]
-	edit/insert: function [
+	
+	edit/insert!: function [
 		offset [integer!]
-		items [object! (space? items) string! block!]
-		/with attrs: #() [map!]
-	] with :edit/edit [
-		offset: clip offset 0 length? target/decoded/items
-		case [
-			object? items [
-				attrs: items/decoded/attrs
-				items: items/decoded/items
-			]
-			string? items [items: explode items]
+		items  [
+			object! ('rich-content = class? items)
+			block!  (parse items [block! map!])
+			string!
 		]
-		range: offset + (0x1 * length? items)
-		target/decoded/attrs: rich/attributes/insert target/decoded/attrs range attrs
-		insert skip target/decoded/items offset items
-		; ?? offset ?? items ?? target/decoded/items
-		set 'changed? yes
+	] with :edit/edit [
+		case [
+			object? items [items: values-of items/data]	;@@ should inserted objects be copied/cloned automatically? (now document does that)
+			string? items [items: reduce [explode items  copy #()]]
+		]
+		unless empty? items [
+			space/data: rich/decoded/insert! values-of space/data offset items
+		]
+		space/data
 	]
-	edit/mark: function [
+	
+	edit/mark!: function [
 		range [pair!]
 		attr  [word!]
 		value "If falsey, attribute is cleared"
 	] with :edit/edit [
-		either :value [
-			#assert [(max range/1 range/2) <= length? target/decoded/items]
-			rich/attributes/mark  target/decoded/attrs attr :value range on
-		][
-			rich/attributes/clear target/decoded/attrs attr range
+		unless edit/empty-range? range [
+			rich/attributes/mark! space/data/attrs (length? space/data/items) range attr :value
+			space/data: rich/decoded/normalize! values-of space/data
 		]
-		set 'changed? yes
+		space/data
 	]
 	
+	format: function [space [object!]] [
+		rich/decoded/format values-of space/data
+	]
+	
+	;@@ should source support image! in it's content? url! ? anything else?
+	decode: function [space [object!] source [block!]] [
+		space/data: rich/source/deserialize source		;-- trigger on-data-change
+	]
+	
+	on-data-change: function [space [object!] word [word!] data [block! (parse data [block! map!]) object!]] [
+		if block? data [								;-- auto convert to object from [block map] block
+			quietly space/data: data: object [items: data/1 attrs: data/2]
+		]
+		set with space [content ranges] rich/decoded/to-spaces values-of data	;-- content triggers invalidation
+	]
+	
+	clone: function [space [object!]] [		
+		clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
+		attrs: copy/deep space/data/attrs
+		;; items may contain spaces - need special care
+		items: map-each [item [object!]] space/data/items [
+			when select item 'clone (item/clone)		;-- not cloneable spaces are skipped!
+		]
+		clone/data: reduce [items attrs]				;-- trigger on-data-change
+		clone
+	]
 		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
-		;; data flow: source -> breakpoints & (content -> items) -> make-layout
-		source:      []		#type [block!] :on-source-change			;-- holds high-level dialected data
 		color:       none												;-- color & font defaults are accounted for in style
 		font:        none
 		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)
@@ -1731,20 +1720,21 @@ rich-content-ctx: context [								;-- rich content
 		;@@ need to think more on this one
 		apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		;@@ measure [length] can just use decoded/items now
 		measure: func [plan [block!]] [~/metrics/measure self plan]		#type [function!]
 		edit:    func [plan [block!]] [~/edit/edit       self plan]		#type [function!]
-		clone: does [~/clone self]
+		clone:   does [~/clone  self]
+		format:  does [~/format self]
 		
-		decoded: context [								;-- internal data, generated on source change
+		decode:  func ["Set up paragraph with high-level dialected data" source [block!]] [~/decode self source]
+		data: context [									;-- internal data, generated by decode or from edit operations
 			;; items is the list of all things caret can skip: chars and spaces
-			items:  []
+			items: []
 			;; attrs describes attribute mapping onto items: #(name [value mask ...] ...) 
-			attrs:  #()									;-- okay to have literal map (that's not copied) - will be overridden
-			;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
-			;; so caret can skip the single ones but dive into the created ones
-			ranges: []
-		] #type [object!]
+			attrs: #()									;-- okay to have literal map (that's not copied) - will be overridden
+		] #type [object! block!] :on-data-change		;-- block [block map] gets converted into object
+		;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
+		;; so caret can skip the single ones but dive into the created ones
+		ranges: [] #type [block! hash!]					;-- filled by on-data-change
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
@@ -3260,6 +3250,16 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
+	clone-clickable: function [space [object!]] [
+		clone: clone-space space [align margin weight command]
+		all [
+			child: space/content
+			in child 'clone
+			clone/content: child/clone
+		]
+		clone
+	]
+		
 	declare-template 'clickable/box [					;-- low-level primitive, unlike data-view
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
@@ -3271,6 +3271,8 @@ button-ctx: context [
 			unless value [do space/command]				;-- trigger when released
 		]
 		;@@ should command be also a function (actor)? if so, where to take event info from?
+		
+		clone:     does [~/clone-clickable self]
 	]
 
 	;; main point of this being separate from button is to keep it not focusable (and so without a focus frame)
