@@ -643,6 +643,7 @@ view reshape [
 						#"^V" [
 							unless empty? data: clipboard/read [
 								doc-ctx/document/insert space space/caret/offset data
+								space/selected: none
 							]
 						]
 						#"^X" [
