@@ -174,9 +174,17 @@ doc-ctx: context [
 		if empty? data [exit]
 		set [para1: pofs:] caret-to-paragraph doc offset
 		case [
-			string? data [para1/edit [insert! pofs data]]
-			single? data [para1/edit [insert! pofs values-of data/1/data]]
+			string? data [
+				para1/edit [insert! pofs data]
+				added: length? data
+			]
+			single? data [
+				para1/edit [insert! pofs values-of data/1/data]
+				added: data/1/measure [length]
+			]
 			'multiple [
+				;; account for both paragraphs text and new-line slot
+				added: (length? data) - 1 + sum map-each para data [para/measure [length]]
 				;; edit first paragraph, but remember the after-insertion part
 				para1/edit [							;@@ make another action in edit for this?
 					stashed: copy range: pofs by infxinf/x
@@ -190,6 +198,7 @@ doc-ctx: context [
 				insert (find/same/tail doc/content para1) next data
 			]
 		]
+		adjust-offsets doc offset added
 	]
 	
 	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
