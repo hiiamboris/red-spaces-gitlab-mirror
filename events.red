@@ -163,13 +163,6 @@ events: context [
 	; 	r
 	; ]
 
-	;@@ copy/deep does not copy inner maps unfortunately, so have to use this
-	copy-deep-map: function [m [map!]] [
-		m: copy/deep m
-		foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
-		m
-	]
-
 	;-- it's own DSL:
 	;-- new-style: [                              
 	;--   OR                                      

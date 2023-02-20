@@ -66,6 +66,15 @@ without-GC: func [
 	sort/compare [1 1] func [a b] code
 ]
 
+
+;@@ copy/deep does not copy inner maps unfortunately, so have to use this in %events.red
+;@@ bug: this also doesn't copy nested strings
+copy-deep-map: function [m [map!]] [
+	m: copy/deep m
+	foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
+	m
+]
+	
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
 ;; since it's for layout usage only, I don't care about a few allocated objects, no need to optimize it
 ;; ranges are used by spaces to constrain their size, but those are read-only
