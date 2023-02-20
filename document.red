@@ -52,274 +52,230 @@ code-font: make font! [name: system/view/fonts/fixed]
 doc-ctx: context [
 	~: self
 	
-	;@@ simplify this, should not use recursion
-	get-length: function [space [object!]] [			;-- measures length of the document or any of it's children
-		case [
-			select space 'measure [space/measure [length]]
-			select space 'content [
-				len: 0
-				foreach child space/content [			;@@ use accumulate
-					len: len + get-length child			;@@ need cycle protection?
-				]
-				len
-			]
-			'empty [0]									;-- scaffolding has no length, should be skipped
+	;@@ need UNDO/REDO! but how?
+	
+	;@@ scalability problem: convenience of integer caret/selection offsets leads to linear increase of caret-to-offset calculation
+	;@@ don't wanna optimize this prematurely but for big texts a b-tree index should be implemented
+	
+	foreach-paragraph: function [spec [block!] "[paragraph offset length]" doc [object!] code [block!]] [
+		if empty? doc/content [return none]				;-- case for loop never entered
+		offset: 0
+		foreach para doc/content [
+			plen: para/measure [length]
+			set spec reduce/into [para offset plen] clear []
+			offset: offset + plen + 1					;-- +1 for empty 'new-line' space between paragraphs
+			do code										;-- result of last `do` is returned
 		]
 	]
 	
-	caret-to-child: function [space [object!] offset [integer!] side [word!]] [
-		foreach child space/content [
-			child-len: get-length child
-			if child-len = 0 [continue]					;-- ignore scaffolding
-			
-			;; remember best candidate in case caret prefers a non-empty child to the right of it, but none exists:
-			match: child 
-			
-			if any [									;-- prefer to skip this child if:
-				offset > child-len							;-- caret does not fit it
-				all [offset = child-len  side = 'right]		;-- right side prefers next child
-			][
-				offset: offset - child-len
-				continue
+	;; needs no /side in the model where paragraphs are separated by empty (newline) caret slot
+	;; cases to consider:
+	;; - no paragraphs                     => none (normally document has at least one paragraph which may be empty)
+	;; - offset < 0 or offset > doc/length => none
+	;; - offset = 0                        => 0 of first paragraph
+	;; - offset = doc/length               => tail of last paragraph
+	caret-to-paragraph: function [doc [object!] offset [integer!]] [
+		if offset >= 0 [
+			foreach-paragraph [para: pofs: plen:] doc [
+				if pofs + plen >= offset [return reduce [para offset - pofs]]
 			]
-			
-			break										;-- good match found, no need to continue
-		]
-		
-		if match [										;-- not none if at least one non-empty child exists
-			#assert [select match 'measure]
-			reduce [match offset]
+		]												;-- none if out of range or content is empty
+	]
+	
+	get-paragraph-offset: function [doc [object!] paragraph [object!]] [
+		foreach-paragraph [para: pofs:] doc [
+			if para =? paragraph [return pofs]
 		]
 	]
 		
-	;@@ problem here - need to set /selected facet of children as they are being drawn
-	;@@ another problem - whole tree traversal, while in most cases it's not needed
-	map-selection: function [space [object!] range [pair!]] [
-		foreach child space/content [
-			child-len: get-length child
-			#assert [select child 'measure]
-			clipped: clip range 0 child-len
-			child/selected: if clipped/2 > clipped/1 [clipped]
-			range: range - child-len
+	;; maps doc/selected into /selected facets of individual paragraphs
+	map-selection: function [doc [object!] range [pair!]] [
+		foreach-paragraph [para: pofs: plen:] doc [
+			prange: clip range - pofs 0 plen
+			para/selected: if prange/2 > prange/1 [prange]
 		]
+	]
+	
+	;; maps range into a [paragraph paragraph-range] list 
+	map-range: function [doc [object!] range [pair!]] [
+		mapped: clear []
+		foreach-paragraph [para: pofs: plen:] doc [
+			case [
+				pofs + plen <= range/1 [continue]
+				pofs        >= range/2 [break]
+				'else [
+					prange: clip range - pofs 0 plen
+					repend mapped [para prange]			;-- empty paragraphs are not skipped by design
+				]
+			]
+		]
+		copy mapped										;-- may be empty
 	]
 
-	document: context [clip: remove: insert: mark: get-attr: align: linkify: linkify-item: none]
-	document/clip: function [space [object!] range [object!] (all [in range 'start in range 'end])] [
-		if range/start/offset > range/end/offset [
-			swap in range 'start in range 'end
-		]
-		set [item1: offset1:] caret-to-child space range/start/offset range/start/side
-		set [item2: offset2:] caret-to-child space range/end/offset   range/end/side
-		#assert [item1]
-		#assert [item2]
-		items: copy/part
-			find/same      space/content item1
-			find/same/tail space/content item2
-		items: map-each item items [item/clone]
-		pair:  range/start/offset by range/end/offset
-		either item1 =? item2 [							;-- within the same paragraph
-			item: items/1
-			pair: pair - (pair/1 - offset1)
-			item/edit [copy/keep pair]
-		][
-			item1: items/1
-			item2: last items
-			pair1: pair - (pair/1 - offset1)
-			pair2: pair - (pair/2 - offset2)
-			item1/edit [copy/keep pair1]
-			item2/edit [copy/keep pair2]
-		]
-		; print mold/deep items
-		#print "Copied: (mold map-each item items [to string! item/decoded/items])"
-		items
+	;@@ rename this to edit, bind `doc` argument
+	;@@ 'length' should be under 'measure' context
+	document: context [length: copy: remove: insert: mark: get-attr: get-attrs: align: linkify: bulletify: none]
+	
+	document/length: function [doc] [
+		unless para: last doc/content [return 0]
+		add get-paragraph-offset doc para
+			para/measure [length]
 	]
 	
-	document/linkify-item: function [text [object!] range [pair!] command [block!]] [
-		set [items: attrs:] text/edit [copy range]
-		link: make-space 'clickable [
-			content: make-space 'rich-content []
-		]
-		range1: 0 by length? items
-		attrs: rich/attributes/mark attrs 'color hex-to-rgb #35F range1 on	;@@ shouldn't hardcode the color
-		attrs: rich/attributes/mark attrs 'underline on range1 on
-		link/content/source: rich/source/serialize items attrs
-		link/command: command
-		text/edit [
-			remove range
-			insert range/1 reduce [link]
+	document/copy: function [doc [object!] range [pair!]] [
+		map-each [para prange] map-range doc range [
+			also para: para/clone
+			para/edit [clip! prange]
 		]
 	]
-	
-	document/linkify: function [space [object!] range [pair!] command [block!]] [
-		#assert [range/1 < range/2]
-		set [item1: offset1:] caret-to-child space range/1 'right
-		set [item2: offset2:] caret-to-child space range/2 'left
-		#assert [item1]
-		#assert [item2]
-		either item1 =? item2 [							;-- within the same paragraph
-			range: range - (range/1 - offset1)
-			document/linkify-item item1 range command
-		][
-			items: copy/part
-				find/same      space/content item1
-				find/same/tail space/content item2
-			item1: items/1
-			item2: last items
-			range1: range - (range/1 - offset1)
-			range2: range - (range/2 - offset2)
-			document/linkify-item item1 range1 command
-			document/linkify-item item2 range2 command
-			items: next items
-			repeat i (length? items) - 1 [
-				document/linkify-item items/:i 0 by infxinf/x command
+		
+	;@@ do auto-linkification on space after url!
+	document/linkify: function [doc [object!] range [pair!] command [block!]] [
+		;; each paragraph becomes a separate link as this is simplest to do
+		map-each [para prange] map-range doc range [
+			if zero? span? prange [continue]
+			clone: para/clone
+			clone/edit [
+				mark! prange 'color hex-to-rgb #35F		;@@ shouldn't hardcode the color
+				mark! prange 'underline on
+				clip! prange
+			]
+			link: make-space 'clickable compose/only [
+				content: (clone)
+				command: (command)
+			]
+			para/edit [
+				remove! prange
+				insert! prange/1 link
 			]
 		]
 		; print mold/deep items
 	]
 	
-	document/remove: function [space [object!] range [object!] (all [in range 'start in range 'end])] [
-		if range/start/offset > range/end/offset [
-			swap in range 'start in range 'end
-		]
-		set [item1: offset1:] caret-to-child space range/start/offset range/start/side
-		set [item2: offset2:] caret-to-child space range/end/offset   range/end/side
-		#assert [item1]
-		#assert [item2]
-		pair:  range/start/offset by range/end/offset
-		either item1 =? item2 [							;-- within the same paragraph
-			pair: pair - (pair/1 - offset1)
-			item1/edit [remove pair]
-		][
-			pair1: pair - (pair/1 - offset1)
-			pair2: pair - (pair/2 - offset2)
-			item2/edit [remove pair2]
-			item1/edit [
-				remove pair1
-				insert infxinf/x item2
-			]
-			remove/part
-				find/same/tail space/content item1
-				find/same      space/content item2
+	document/remove: function [doc [object!] range [pair!]] [
+		n: half length? mapped: map-range doc range
+		set [para1: range1:] mapped
+		set [paraN: rangeN:] skip tail mapped -2 
+		if n >= 1 [para1/edit [remove! range1]]
+		if n >= 2 [										;-- requires removal of whole paragraphs
+			paraN/edit [remove! rangeN]
+			para1/edit [insert! range1/1 values-of paraN]
+			s: find/same/tail space/content para1
+			e: find/same/tail s paraN
+			remove/part s e
 		]
 	]
 	
-	document/insert: function [space [object!] offset [integer!] side [word!] data [block! string!]] [
-		set [target: offset:] caret-to-child space offset side
-		either block? data [
-			#assert ['rich-content = class? data/1]
-			either single? data [
-				target/edit [insert offset data/1]
-			][
-				target/edit [
-					set [items2: attrs2:] copy range: offset by infxinf/x
-					remove range
-					insert offset data/1
+	document/insert: function [
+		doc    [object!]
+		offset [integer!]
+		data   [block! (parse data [any object!]) string!]
+	][
+		if empty? data [exit]
+		set [para1: pofs:] caret-to-paragraph doc offset
+		case [
+			string? data [para1/edit [insert! pofs data]]
+			single? data [para1/edit [insert! pofs values-of data/1/data]]
+			'multiple [
+				;; edit first paragraph, but remember the after-insertion part
+				para1/edit [							;@@ make another action in edit for this?
+					stashed: copy range: pofs by infxinf/x
+					remove! range
+					insert! pofs values-of data/1/data
 				]
-				; #print "target after insertion (mold target/decoded/items)"
-				;; insert all other paragraphs
-				pos: find/same/tail space/content target
-				; insert/part pos next data top data
-				insert pos next data
-				target: last data
-				; #print "last batch item (mold target/decoded/items)"
-				;; append stashed part to the last inserted
-				target/edit [insert/with infxinf/x items2 attrs2]
-				; #print "last batch item after insertion (mold target/decoded/items)"
-			]
-		][
-			target/edit [insert offset data]
-		]
-	]
-	
-	document/mark: function [space [object!] range [pair!] attr [word!] value] [
-		if range/1 > range/2 [range: reverse range]
-		set [item1: offset1:] caret-to-child space range/1 'right
-		set [item2: offset2:] caret-to-child space range/2 'left
-		#assert [item1]
-		#assert [item2]
-		items: copy/part
-			find/same      space/content item1
-			find/same/tail space/content item2
-		either item1 =? item2 [							;-- within the same paragraph
-			item: items/1
-			range: range - (range/1 - offset1)
-			item/edit [mark range attr :value]
-		][
-			item1: items/1
-			item2: last items
-			range1: clip range - (range/1 - offset1) 0 item1/measure [length]
-			range2: clip range - (range/2 - offset2) 0 item2/measure [length]
-			item1/edit [mark range1 attr :value]
-			item2/edit [mark range2 attr :value]
-			for-each [item | _] next items [
-				range: 0 by item/measure [length]
-				item/edit [mark range attr :value]
+				;; append stashed part to the last inserted paragraph
+				paraN: last data
+				paraN/edit [insert! infxinf/x stashed]
+				;; insert all other paragraphs (doc/content can be edited directly)
+				insert (find/same/tail doc/content para1) next data
 			]
 		]
 	]
 	
-	; document/get-attrs: function [space [object!] index [integer!] attr [word!]] [
+	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
+		foreach [para: prange:] map-range doc range [
+			para/edit [mark! attr :value]
+		]
+	]
+	
 	document/get-attr: function [space [object!] index [integer!] attr [word!]] [
-		set [item: offset:] caret-to-child space index - 1 'right
-		#assert [item]
-		rich/attributes/pick item/decoded/attrs attr offset + 1
+		if set [para: offset:] caret-to-paragraph space index - 1 [
+			rich/attributes/pick para/data/attrs attr offset + 1	;-- may be none esp. on 'new-line' paragraph delimiters
+		]
+	]
+	
+	;@@ need to keep some attr 'state' that can be modified by buttons and applied to new chars
+	document/get-attrs: function [space [object!] index [integer!] attr [word!]] [
+		if set [para: offset:] caret-to-paragraph space index - 1 [
+			if offset = para/measure [length] [offset: max 0 offset - 1]	;-- no attribute at the 'new-line' delimiter
+			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
+		]
 	]
 	
 	document/align: function [
-		doc [object!]
-		range [object!] (all [in range 'start in range 'end])	;-- sides are useful for absent selection (align by caret)
-		align [word!] (find [left right center fill] align)
+		doc   [object!]
+		range [pair!]
+		align [word!] (find [left right center fill scale upscale] align)
 	][
-		#assert [
-			range/start/offset <= range/end/offset
-			0 <= range/start/offset
-			range/end/offset <= get-length doc
+		foreach [para: _:] map-range doc range [para/align: align]
+	]
+	
+	;; used to correct caret and selection offsets after an edit
+	adjust-offsets: function [doc [object!] offset [integer!] shift [integer!]] [
+		sel: doc/selected								;-- can't set components of doc/selected (due to reordering)
+		car: doc/caret
+		foreach path [sel/1 sel/2 car/offset] [
+			if attempt [offset <= value: get path] [	;@@ REP #113
+				set path max offset value + shift
+			]
 		]
-		; range: clip range 0 doc/measure [length]
-		set [item1: _:] caret-to-child doc range/start/offset range/start/side
-		set [item2: _:] caret-to-child doc range/end/offset   range/end/side
-		; ?? item1
-		; ?? item2
-		items: copy/part
-			find/same      doc/content item1
-			find/same/tail doc/content item2
-		foreach item items [
-			item/align: align
-			; #print "Set (index? find/same doc/content item) to (align)"
+		doc/caret:    car								;-- trigger updates
+		doc/selected: sel
+	]
+	
+	;@@ maybe more generalized get-marker smth?
+	bulleted-paragraph?: function [para [object!]] [
+		to logic! all [
+			space? item1: para/data/items/1
+			'bullet = class? item1
+		]
+	]
+	
+	document/bulletify: function [doc [object!] range [pair!]] [
+		if empty? mapped: map-range doc range [exit]
+		already-bulleted?: bulleted-paragraph? mapped/1	;-- already has a bullet? for toggling
+		foreach [para: prange:] mapped [
+			items: para/data/items
+			pofs:  range/1 - prange/1
+			if bulleted-paragraph? para [				;-- get rid of numbers and old bullets
+				para/edit [remove! 0x1]
+				adjust-offsets doc pofs + 1 -1
+			]
+			unless already-bulleted? [
+				para/edit [insert! 0 make-space 'bullet []]
+				adjust-offsets doc pofs 1
+			]
 		]
 	]
 	
 	; override: ...
 	
-	on-selected-change: function [space [object!] word [word!] value [object! none!]] [
-		either value [ 
-			pair: value/range
-			#assert [pair/1 <= pair/2]
-		][
-			pair: -1x-1
-		] 
-		map-selection space pair
-	]
-	
-	caret-base: function [space [object!] item [object!]] [
-		if item =? space [return 0]
-		base: 0
-		foreach child item/parent/content [				;@@ use accumulate, or caching
-			if child =? item [break]
-			base: base + get-length child
+	on-selected-change: function [space [object!] word [word!] value: -1x-1 [pair! none!]] [	;-- -1x-1 acts as deselect-everything
+		;; NxN selection while technically empty, is not forbidden or converted to `none`, to avoid surprises in code
+		if value/1 > value/2 [
+			quietly space/selected: value: reverse value		;-- keep it ordered for simplicity
 		]
-		base
+		map-selection space value
 	]
 	
-	point-to-caret: function [space [object!] point [pair!]] [	;@@ accept path maybe too?
-		path: hittest space point
-		either path/3 [
-			#assert [in path/3 'measure]					;@@ measure is too general name for strictly caret related api?
+	point-to-caret: function [doc [object!] point [pair!]] [	;@@ accept path maybe too?
+		path: hittest doc point
+		set [para: xy:] skip path 2
+		either para [
+			#assert [in para 'measure]							;@@ measure is too general name for strictly caret related api?
 			;; lands directly into text or rich-content
-			set [item: xy:] skip path 2
-			caret: item/measure [point-to-caret xy]
-			base: caret-base space item
+			caret: para/measure [point-to-caret xy]
+			base: get-paragraph-offset doc para
 			caret/offset: caret/offset + base
 			caret
 		][	;; lands outside - need to find nearest
@@ -328,29 +284,29 @@ doc-ctx: context [
 		]
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		;; trick for caret changes to invalidate the document: need to render it once
-		unless space/caret/parent [render space/caret]
+	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
+		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
+		unless doc/caret/parent [render doc/caret]
 		
-		;; child/caret is a space that is moved from child to child, where it gets rendered
-		;; not to be confused with space/caret that is not rendered and only holds the absolute offset
-		set  [child: offset:] caret-to-child space space/caret/offset space/caret/side
-		if child [
-			unless child =? old-holder: space/caret/holder [
+		;; para/caret is a space that is moved from paragraph to paragraph, where it gets rendered
+		;; not to be confused with doc/caret that is not rendered and only holds the absolute offset
+		set [para: offset:] caret-to-paragraph doc doc/caret/offset
+		if para [
+			unless para =? old-holder: doc/caret/holder [
 				either old-holder [
-					child/caret: old-holder/caret
-					child/caret/parent: none
-					old-holder/caret:   none
+					para/caret: old-holder/caret
+					para/caret/parent: none
+					old-holder/caret:  none
 				][
-					child/caret: make-space 'caret []
+					para/caret: make-space 'caret []
 				]
-				space/caret/holder: child
+				doc/caret/holder: para
 			]
-			child/caret/side:   space/caret/side
-			child/caret/offset: offset
+			para/caret/side:   doc/caret/side
+			para/caret/offset: offset
 		]
 		
-		drawn: space/list-draw/on canvas
+		drawn: doc/list-draw/on canvas
 	]
 	
 	declare-template 'document/list [
@@ -363,7 +319,7 @@ doc-ctx: context [
 			holder: none								;-- child that last owned the generated caret space
 		] #type [object!] :invalidates
 		
-		selected: none	#type [object! none!] :on-selected-change
+		selected: none	#type [pair! none!] :on-selected-change
 		
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
@@ -378,7 +334,7 @@ clipboard: context [
 		list: map-each [item [object!]] data [
 			when in item 'format (item/format)
 		]
-		probe to {} delimit list "^/" 
+		to {} delimit list "^/" 
 	]
 	
 	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
@@ -420,6 +376,7 @@ clipboard: context [
 ; ]
 
 declare-template 'bullet/text [
+	text:   "^(2981)"
 	format: does [rejoin [text " "]]
 	limits: 15 .. none
 ]
@@ -535,23 +492,24 @@ lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod 
 append keyboard/focusable 'document
 toggle-attr: function [name] [
 	; doc-ctx/document/toggle-attribute range
-	if doc/selected [
-		range: doc/selected/range
-		if range/1 <> range/2 [
-			old: doc-ctx/document/get-attr doc 1 + range/1 name
-			doc-ctx/document/mark doc range name not old
-		]
+	unless zero? span? range: doc/selected [
+		old: doc-ctx/document/get-attr doc 1 + range/1 name
+		doc-ctx/document/mark doc range name not old
 	]
 ]
 realign: function [name] [
 	range: any [
-		if doc/selected [doc/selected]
-		object [
-			start: end: compose [offset: (o: doc/caret/offset) side: (doc/caret/side)]
-			range: o * 1x1
-		]
+		doc/selected
+		1x1 * doc/caret/offset
 	]
 	doc-ctx/document/align doc range name
+]
+bulletify: function [] [
+	range: any [
+		doc/selected
+		1x1 * doc/caret/offset
+	]
+	doc-ctx/document/bulletify doc range
 ]
 view reshape [
 	host 500x400 [
@@ -569,21 +527,20 @@ view reshape [
 				attr "S" strike [toggle-attr 'strike]
 				attr "𝓕⏷" flags= [1x1 bold] on-click [
 					if all [
-						doc/selected
+						range: doc/selected
 						font: request-font
 					][
-						range: doc/selected/range
 						doc-ctx/document/mark doc range 'font font/name
 						doc-ctx/document/mark doc range 'size font/size
-						foreach style compose [(font/style)] [
+						foreach style compose [(only font/style)] [
 							doc-ctx/document/mark doc range style on
 						]
 					]
 				]
+				; attr "code"							;@@ need inline code and code span (maybe smart) formatter, similar to linkify
 				attr "🎨⏷" on-click [
 					if all [
-						doc/selected
-						range: doc/selected/range
+						range: doc/selected
 						range/1 <> range/2
 						color: request-color/from old: doc-ctx/document/get-attr doc 1 + range/1 'color
 					][
@@ -592,19 +549,15 @@ view reshape [
 				]
 				attr "🔗" on-click [
 					if all [
-						doc/selected
-						range: doc/selected/range
+						range: doc/selected
 						range/1 <> range/2
 						not empty? url: request-url
 					][
+						unless any [
+							find/match url https://
+							find/match url http://
+						] [insert url https://]
 						doc-ctx/document/linkify doc range compose [browse (as url! url)]
-						doc/selected/end/offset: doc/selected/range/2: range/1 + 1
-						; ?? doc/selected
-						if doc/caret/offset >= range/1 [
-							doc/caret/offset: max range/1 doc/caret/offset - (range/2 - range/1) + 1
-						] 
-						doc/selected: none
-						invalidate doc
 					]
 				] 
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 
@@ -613,26 +566,39 @@ view reshape [
 				icon [image 24x20 data= icons/aligns/center] on-click [realign 'center]
 				icon [image 24x20 data= icons/aligns/right]  on-click [realign 'right]
 				icon [image 30x20 data= icons/lists/numbered];  on-click [realign 'right]
-				icon [image 30x20 data= icons/lists/bullet];  on-click [realign 'right]
+				icon [image 30x20 data= icons/lists/bullet]  on-click [bulletify]
 			]
 			scrollable [
-				style code: rich-content font= code-font
+				style code: rich-content ;font= code-font
 				doc: document focus [
 					; #code ["block [^/    of code^/]"]
 					; #paragraph [command: [] size: 20 "prefix^/" /command /size !(copy/part lorem 200)]
 					; code source= ["12" underline bold "34" /bold /underline "56"]
 					; rich-content source= [!(make-space 'bullet [text: "○"]) !(copy skip lorem 200)] indent= [rest: 15] ;align= 'fill
 					
-					code source= ["block ["]
-					code source= ["    of wrapped long long long code"]
-					code source= ["]"]
-					code source= compose ["12" (lay-out-vids [clickable margin= 0x2 command= [print 34] [rich-content [underline bold "34" /bold /underline]]]) "56"]
-					rich-content source= [!(make-space 'bullet [text: "○"]) 
-					@(
-						lay-out-vids [rich-content source= [!(copy skip lorem 200)]]
-					)] indent= [rest: 15]
-					rich-content source= [!(make-space 'bullet [text: ">"]) !(copy skip lorem 220)] indent= [rest: 15]
-				] with [watch 'size] 
+					code [bold font: "Consolas" "block ["]
+					code [bold font: "Consolas" "    of wrapped long long long code"]
+					code [bold font: "Consolas" "]"]
+					code [
+						"12"
+						@(lay-out-vids [
+							clickable command= [print 34] [
+								rich-content [underline bold "34" /bold /underline]
+							]
+						])
+						"56"
+					]
+					rich-content [
+						!(make-space 'bullet [])		;@@ need control over bullet font/size 
+						@(lay-out-vids [
+							rich-content [!(copy skip lorem 200)]
+						])
+					] indent= [rest: 15]
+					rich-content [
+						!(make-space 'bullet [])
+						!(copy skip lorem 220)
+					] indent= [rest: 15]
+				] ;with [watch 'size] 
 				on-down [
 					space/selected: none
 					if caret: doc-ctx/point-to-caret space path/2 [
@@ -646,12 +612,7 @@ view reshape [
 					if dragging?/from space [
 						if caret: doc-ctx/point-to-caret space path/2 [
 							start: drag-parameter
-							range: start/offset by caret/offset
-							if range/1 > range/2 [range: reverse range]
-							;@@ need to design selection API - is it going to use on-change or laziness or what, or just a block?
-							space/selected: construct compose/only [
-								start: (start) end: (caret) range: (range)
-							]
+							space/selected: start/offset by caret/offset
 							set with space/caret [offset side] reduce [caret/offset caret/side]
 						]
 					]
@@ -660,38 +621,33 @@ view reshape [
 						left  [set [side: shift:] [right -1]]
 						right [set [side: shift:] [left   1]]
 					][
-						total: doc-ctx/get-length space			;@@ need to cache it
+						total: doc-ctx/document/length space	;@@ need to cache it
 						new: clip 0 total space/caret/offset + shift
 						set with space/caret [offset side] reduce [new side]
 					]
 					switch probe event/key [
 						#"^C" [
 							if space/selected [
-								clipboard/write doc-ctx/document/clip space space/selected
+								clipboard/write doc-ctx/document/copy space space/selected
 							]
 						]
 						#"^V" [
 							unless empty? data: clipboard/read [
-								doc-ctx/document/insert space space/caret/offset space/caret/side data
+								doc-ctx/document/insert space space/caret/offset data
 							]
 						]
 						#"^X" [
-							if space/selected [
-								clipboard/write doc-ctx/document/clip space space/selected
-								doc-ctx/document/remove space space/selected
-								caret: copy do with space/selected [
-									either start/offset <= end/offset [start][end]
-								]
-								space/selected:     none
-								space/caret/offset: caret/offset
-								space/caret/side:   caret/side
+							if range: space/selected [
+								clipboard/write doc-ctx/document/copy space range
+								doc-ctx/document/remove space range
+								space/selected: none
 							]
 						]
 					]
 				]
 			]
 		]
-	] with [watch in parent 'offset]
+	] ;with [watch in parent 'offset]
 ]
 prof/show
 
