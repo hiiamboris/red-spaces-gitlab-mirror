@@ -99,7 +99,7 @@ rich: context [											;@@ what would be a better name?
 	
 	;; external context allows me to use /copy word without shadowing the global one
 	attributes: context [
-		to-rtd-flag: make-rtd-flags: mark!: pick: copy: remove!: insert!: none
+		to-rtd-flag: make-rtd-flags: mark!: pick: copy: extend: remove!: insert!: none
 	]
 	
 	attributes/to-rtd-flag: function [attr [word!] value [tuple! logic! string! integer!]] [
@@ -175,9 +175,9 @@ rich: context [											;@@ what would be a better name?
 	]
 	
 	; ;; unlike /mark, clears all attributes in the range
-	; attributes/clear!: function ["modifies" attrs [map!] range [pair!]] [
+	; attributes/clear!: function [attrs [map!] range [pair!]] [
 		; foreach [name data] attrs [
-			; masks/mark! data/mask range #"^@"
+			; change/dup skip data/mask range/1 #"^@" span? range
 		; ]
 		; attrs
 	; ]
@@ -203,6 +203,17 @@ rich: context [											;@@ what would be a better name?
 			data/mask: copy/part data/mask range + 1
 		]
 		;@@ should this clean up unused attribute values? probably not worth it
+		slice
+	]
+	
+	;; copies first attribute slot until 'length' slots are occupied
+	attributes/extend: function [attrs [map!] length [integer!]] [
+		slice: copy/deep attrs							;-- this doesn't copy the strings but they will be replaced anyway
+		foreach [attr data] slice [
+			char: any [data/mask/1 #"^@"]
+			data/mask: make {} length
+			append/dup data/mask char length
+		]
 		slice
 	]
 	
