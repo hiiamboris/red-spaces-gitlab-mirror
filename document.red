@@ -114,7 +114,7 @@ doc-ctx: context [
 
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
-	document: context [length: copy: remove: insert: mark: get-attr: get-attrs: align: linkify: bulletify: none]
+	document: context [length: copy: remove: insert: mark: paint: get-attr: get-attrs: align: linkify: bulletify: none]
 	
 	document/length: function [doc] [
 		unless para: last doc/content [return 0]
@@ -207,6 +207,17 @@ doc-ctx: context [
 		]
 	]
 	
+	;; replaces all attributes in the range with first attribute in attrs
+	document/paint: function [doc [object!] range [pair!] attrs [map!]] [
+		foreach [para: prange:] map-range doc range [	;@@ need edit func for this?
+			length: para/measure [length]
+			slice: rich/attributes/extend attrs span: span? range
+			rich/attributes/remove! para/data/attrs prange
+			rich/attributes/insert! para/data/attrs length prange/1 slice span
+			para/data: para/data
+		]
+	]
+	
 	document/get-attr: function [space [object!] index [integer!] attr [word!]] [
 		if set [para: offset:] caret-to-paragraph space index - 1 [
 			rich/attributes/pick para/data/attrs attr offset + 1	;-- may be none esp. on 'new-line' paragraph delimiters
@@ -214,7 +225,7 @@ doc-ctx: context [
 	]
 	
 	;@@ need to keep some attr 'state' that can be modified by buttons and applied to new chars
-	document/get-attrs: function [space [object!] index [integer!] attr [word!]] [
+	document/get-attrs: function [space [object!] index [integer!]] [
 		if set [para: offset:] caret-to-paragraph space index - 1 [
 			if offset = para/measure [length] [offset: max 0 offset - 1]	;-- no attribute at the 'new-line' delimiter
 			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
@@ -501,7 +512,10 @@ lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod 
 append keyboard/focusable 'document
 toggle-attr: function [name] [
 	; doc-ctx/document/toggle-attribute range
-	unless zero? span? range: doc/selected [
+	either zero? span? range: doc/selected [
+		old: rich/attributes/pick paint name 1
+		rich/attributes/mark paint 1 0x1 name not old
+	][
 		old: doc-ctx/document/get-attr doc 1 + range/1 name
 		doc-ctx/document/mark doc range name not old
 	]
@@ -520,6 +534,8 @@ bulletify: function [] [
 	]
 	doc-ctx/document/bulletify doc range
 ]
+;; current attributes (for inserted chars)
+paint: #()
 view reshape [
 	host 500x400 [
 		vlist [
@@ -535,25 +551,36 @@ view reshape [
 				attr "i" italic [toggle-attr 'italic]
 				attr "S" strike [toggle-attr 'strike]
 				attr "𝓕⏷" flags= [1x1 bold] on-click [
-					if all [
-						range: doc/selected
-						font: request-font
-					][
-						doc-ctx/document/mark doc range 'font font/name
-						doc-ctx/document/mark doc range 'size font/size
-						foreach style compose [(only font/style)] [
-							doc-ctx/document/mark doc range style on
+					if font: request-font [
+						either all [
+							range: doc/selected
+							range/1 <> range/2
+						][
+							doc-ctx/document/mark doc range 'font font/name
+							doc-ctx/document/mark doc range 'size font/size
+							foreach style compose [(only font/style)] [
+								doc-ctx/document/mark doc range style on
+							]
+						][
+							rich/attributes/mark paint 1 0x1 'font font/name
+							rich/attributes/mark paint 1 0x1 'size font/size
 						]
 					]
 				]
 				; attr "code"							;@@ need inline code and code span (maybe smart) formatter, similar to linkify
 				attr "🎨⏷" on-click [
-					if all [
+					either all [
 						range: doc/selected
 						range/1 <> range/2
-						color: request-color/from old: doc-ctx/document/get-attr doc 1 + range/1 'color
 					][
-						doc-ctx/document/mark doc range 'color if old <> color [color]	;-- resets color if the same applied
+						old: doc-ctx/document/get-attr doc 1 + range/1 'color
+						if color: request-color/from old [
+							doc-ctx/document/mark doc range 'color if old <> color [color]	;-- resets color if the same applied
+						]
+					][
+						old: rich/attributes/pick paint 1 'color
+						color: request-color/from old
+						rich/attributes/mark paint 1 0x1 'color color
 					]
 				]
 				attr "🔗" on-click [
@@ -613,6 +640,8 @@ view reshape [
 					if caret: doc-ctx/point-to-caret space path/2 [
 						set with space/caret [offset side] reduce [caret/offset caret/side]
 						start-drag/with path copy caret
+						set 'paint doc-ctx/document/get-attrs space space/caret/offset + 1
+						?? paint
 					]
 				] on-up [
 					stop-drag
@@ -623,6 +652,8 @@ view reshape [
 							start: drag-parameter
 							space/selected: start/offset by caret/offset
 							set with space/caret [offset side] reduce [caret/offset caret/side]
+							set 'paint doc-ctx/document/get-attrs space space/caret/offset + 1
+							?? paint
 						]
 					]
 				] on-key [
@@ -634,7 +665,7 @@ view reshape [
 						new: clip 0 total space/caret/offset + shift
 						set with space/caret [offset side] reduce [new side]
 					]
-					switch probe event/key [
+					switch/default probe event/key [
 						#"^C" [
 							if space/selected [
 								clipboard/write doc-ctx/document/copy space space/selected
@@ -653,6 +684,10 @@ view reshape [
 								space/selected: none
 							]
 						]
+					][
+						offset: space/caret/offset
+						doc-ctx/document/insert space offset s: form event/key
+						doc-ctx/document/paint space 0 by (length? s) + offset paint
 					]
 				]
 			]
