@@ -223,7 +223,8 @@ rich: context [											;@@ what would be a better name?
 		other   [map!]
 		length2 [integer!] (length2 >= 0) "inserted items size"	;-- required in case `other` is empty :/
 	][
-		offset: clip offset 0 length
+		#assert [length >= length2  "target items are smaller than inserted slice!"]
+		offset: clip offset 0 length - length2
 		;; insert empty regions into `attrs` - needed for attributes that aren't in `other`
 		foreach [attr data1] attrs [
 			insert/dup skip data1/mask offset #"^@" length2
@@ -234,7 +235,7 @@ rich: context [											;@@ what would be a better name?
 			unless data1: attrs/:attr [
 				attrs/:attr: data1: copy/deep data2
 				insert/dup data1/mask #"^@" offset
-				enlarge data1/mask (length + length2) #"^@"
+				enlarge data1/mask length #"^@"
 				continue
 			]
 			;; otherwise, have to join values and remap the old mask
@@ -257,8 +258,9 @@ rich: context [											;@@ what would be a better name?
 		attrs
 	]
 	#assert [
-		#(x [values: [1]   mask: {^@^A^@^@^A^@}]) =       attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 4 2 #() 2
-		#(x [values: [1 2] mask: {^@^A^@^A^B^A^@^A^@}]) = attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 4 2 #(x [values: [2 1] mask: {^@^B^A^B^@}]) 5
+		#(x [values: [1]   mask: {^@^A^@^@^A^@}]) =       attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 6 2 #() 2
+		#(x [values: [1 2] mask: {^@^A^@^A^B^A^@^A^@}]) = attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 9 2 #(x [values: [2 1] mask: {^@^B^A^B^@}]) 5
+		#(x [values: [1]   mask: {^@^A^A^@^@^@}]) =       attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 6 2000000000 #(x [values: [1] mask: {^@^@}]) 2
 	]
 	
 	;@@ need to make modularity somehow, later
@@ -291,6 +293,12 @@ rich: context [											;@@ what would be a better name?
 		if range/1 > range/2 [range: reverse range]
 		remove/part skip source/1 range/1 span? range
 		attributes/remove! source/2 range
+		#debug [
+			ilen: length? source/1
+			foreach [attr data] source/2 [
+				#assert [ilen = length? data/mask]
+			]
+		]
 		source
 	]
 	
@@ -300,8 +308,10 @@ rich: context [											;@@ what would be a better name?
 		offset [integer!]
 		slice  [block!] "[items attrs] block" (parse slice [block! map!])
 	][
+		; #print "inserting (mold slice/1)/(mold/flat slice/2) into (mold source/1) at (offset)^/attrs=(mold source/2)"
 		insert skip source/1 offset slice/1
 		attributes/insert! source/2 (length? source/1) offset slice/2 (length? slice/1)
+		; #print "=> (mold source/1) ^/attrs=(mold source/2)"
 		source
 	]
 	
