@@ -1699,7 +1699,7 @@ rich-content-ctx: context [								;-- rich content
 	
 	clone: function [space [object!]] [		
 		clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
-		attrs: copy/deep space/data/attrs
+		attrs: make #() copy/deep to [] space/data/attrs	;@@ workaround for map copy bugs, otherwise inner strings are not copied
 		;; items may contain spaces - need special care
 		items: map-each [item [object!]] space/data/items [
 			when select item 'clone (item/clone)		;-- not cloneable spaces are skipped!
