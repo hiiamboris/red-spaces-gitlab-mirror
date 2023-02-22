@@ -846,7 +846,7 @@ paragraph-ctx: context [
 		
 		if all [caret: space/caret  not ellipsize?] [
 		; if all [caret: space/caret  not ellipsize?] [
-			box: space/measure [caret-to-box caret/offset caret/side]
+			box: space/measure [caret->box caret/offset caret/side]
 			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
 			invalidate/only caret
 			cdrawn: render caret
@@ -873,14 +873,14 @@ paragraph-ctx: context [
 			;@@ it also depends if 'length' can be a valid call before space is rendered or not
 			length? space/text
 		]
-		point-to-caret: function [xy [pair!]] with :measure [
+		point->caret: function [xy [pair!]] with :measure [
 			caret: offset-to-caret space/layout xy
 			char:  offset-to-char  space/layout xy
 			side:  pick [left right] caret > char
 			compose [offset: (caret - 1) side: (side)]
 		]
 		;@@ maybe returned box should be the size of the char? to support overwrite mode eventually
-		caret-to-box:   function [offset [integer!] side [word!]] with :measure [
+		caret->box: function [offset [integer!] side [word!]] with :measure [
 			index: offset + pick [0 1] side = 'left
 			if any [
 				;; left caret at offset 0 doesn't exist, so switch to the right one:
@@ -1490,12 +1490,18 @@ rich-content-ctx: context [								;-- rich content
 				index: crange/1     + offset-to-char  child/layout child-xy
 				caret: crange/1 - 1 + offset-to-caret child/layout child-xy
 			]
-			reduce [child child-xy index caret]			;@@ what to return?
+			side: pick [left right] index = caret
+			reduce [child child-xy index caret side]	;@@ what to return?
 		]
 	]
 	
+	; xy->caret: function [space [object!] xy [pair!] "with margin"] [
+		; if found: locate-point space xy [
+			; compose [offset: (found/4) side: (found/5)]
+		; ]
+	; ]
 	xy->caret: function [space [object!] xy [pair!] "with margin"] [
-		last locate-point space xy
+		if found: locate-point space xy [found/4]
 	]
 	
 	;@@ to be used to cycle across row range to draw multiline selection
@@ -1525,14 +1531,18 @@ rich-content-ctx: context [								;-- rich content
 		measure: function [space [object!] plan [block!]] [
 			do with self plan
 		]
-		length: function [/local s] with :measure [length? space/data/items]
-		point-to-caret: function [xy [pair!]] with :measure [
+		length: does with :measure [length? space/data/items]
+		rows:   does with :measure [space/frame/nrows]
+		point->caret: function [xy [pair!]] with :measure [
 			set [_: _: index: offset:] ~/locate-point space xy
 			side: pick [right left] offset < index
 			compose [offset: (offset) side: (side)]
 		]
-		caret-to-box: function [offset [integer!] side [word!]] with :measure [
+		caret->box: function [offset [integer!] side [word!]] with :measure [
 			~/caret->box-2D space offset side
+		]
+		caret->row: function [offset [integer!] side [word!]] with :measure [
+			~/caret->row space offset side
 		]
 	]
 	
@@ -1587,7 +1597,7 @@ rich-content-ctx: context [								;-- rich content
 	
 	draw-caret: function [space [object!]] [
 		unless caret: space/caret [return []]
-		box: space/measure [caret-to-box caret/offset caret/side]
+		box: space/measure [caret->box caret/offset caret/side]
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
 		quietly caret/size: box/2 - box/1 + (caret/width by 0)

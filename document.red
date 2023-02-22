@@ -74,7 +74,7 @@ doc-ctx: context [
 	;; - offset < 0 or offset > doc/length => none
 	;; - offset = 0                        => 0 of first paragraph
 	;; - offset = doc/length               => tail of last paragraph
-	caret-to-paragraph: function [doc [object!] offset [integer!]] [
+	caret->paragraph: function [doc [object!] offset [integer!]] [
 		if offset >= 0 [
 			foreach-paragraph [para: pofs: plen:] doc [
 				if pofs + plen >= offset [return reduce [para offset - pofs plen]]
@@ -175,7 +175,7 @@ doc-ctx: context [
 		data   [block! (parse data [any object!]) string!]
 	][
 		if empty? data [exit]
-		set [para1: pofs:] caret-to-paragraph doc offset
+		set [para1: pofs:] caret->paragraph doc offset
 		case [
 			string? data [
 				para1/edit [insert! pofs data]
@@ -208,7 +208,7 @@ doc-ctx: context [
 		doc    [object!]
 		offset [integer!]
 	][
-		set [para1: pofs:] caret-to-paragraph doc offset
+		set [para1: pofs:] caret->paragraph doc offset
 		para2: para1/clone
 		para1/edit [remove! pofs by infxinf/x]
 		para2/edit [remove! 0 by pofs]
@@ -234,14 +234,14 @@ doc-ctx: context [
 	]
 	
 	document/get-attr: function [space [object!] index [integer!] attr [word!]] [
-		if set [para: offset:] caret-to-paragraph space index - 1 [
+		if set [para: offset:] caret->paragraph space index - 1 [
 			rich/attributes/pick para/data/attrs attr offset + 1	;-- may be none esp. on 'new-line' paragraph delimiters
 		]
 	]
 	
 	;@@ need to keep some attr 'state' that can be modified by buttons and applied to new chars
 	document/get-attrs: function [space [object!] index [integer!]] [
-		if set [para: offset: plen:] caret-to-paragraph space index [
+		if set [para: offset: plen:] caret->paragraph space index [
 			if offset = plen [offset: max 0 plen - 1]			;-- no attribute at the 'new-line' delimiter
 			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
 		]
@@ -303,13 +303,13 @@ doc-ctx: context [
 		map-selection space value
 	]
 	
-	point-to-caret: function [doc [object!] point [pair!]] [	;@@ accept path maybe too?
+	point->caret: function [doc [object!] point [pair!]] [		;@@ accept path maybe too?
 		path: hittest doc point
 		set [para: xy:] skip path 2
 		either para [
 			#assert [in para 'measure]							;@@ measure is too general name for strictly caret related api?
 			;; lands directly into text or rich-content
-			caret: para/measure [point-to-caret xy]
+			caret: para/measure [point->caret xy]
 			base: get-paragraph-offset doc para
 			caret/offset: caret/offset + base
 			caret
@@ -319,13 +319,40 @@ doc-ctx: context [
 		]
 	]
 	
+	;@@ what about no rows case? I need to ensure always at least one row, even empty
+	;; if zero-height rows exist, this func will just skip them
+	caret-row-shift: function [doc [object!] caret [integer!] side [word!] dir [word!] (find [up down] dir)] [
+		set [para: pofs: plen:] caret->paragraph doc caret
+		pgeom: select/same doc/map para
+		pxy: pgeom/offset
+		para/measure [
+			set [pxy1: pxy2:] caret->box pofs side
+			prow: caret->row pofs side
+		]
+		nrows: para/frame/nrows
+		edge-row?: any [
+			all [dir = 'up   prow = 1]					;-- first row in the paragraph
+			all [dir = 'down prow = nrows]				;-- last row in the paragraph
+		]
+		shift: 0 by (1 + either edge-row? [doc/spacing][para/frame/spacing])
+		xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
+		caret': point->caret doc xy
+		if caret' [										;-- may be none if outside the document
+			limits: either dir = 'down					;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
+				[caret + 1 by document/length doc]
+				[0 by (caret - 1)]
+			caret'/offset: clip limits/1 limits/2 caret'/offset
+		]
+		caret'
+	]
+		
 	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
 		unless doc/caret/parent [render doc/caret]
 		
 		;; para/caret is a space that is moved from paragraph to paragraph, where it gets rendered
 		;; not to be confused with doc/caret that is not rendered and only holds the absolute offset
-		set [para: offset:] caret-to-paragraph doc doc/caret/offset
+		set [para: offset:] caret->paragraph doc doc/caret/offset
 		if para [
 			unless para =? old-holder: doc/caret/holder [
 				either old-holder [
@@ -656,7 +683,7 @@ view reshape [
 				] ;with [watch 'size] 
 				on-down [
 					space/selected: none
-					if caret: doc-ctx/point-to-caret space path/2 [
+					if caret: doc-ctx/point->caret space path/2 [
 						set with space/caret [offset side] reduce [caret/offset caret/side]
 						start-drag/with path copy caret
 						pick-paint
@@ -666,7 +693,7 @@ view reshape [
 				] on-over [
 					;@@ need switchable behavior - drag content or select it, /editable flag may control it
 					if dragging?/from space [
-						if caret: doc-ctx/point-to-caret space path/2 [
+						if caret: doc-ctx/point->caret space path/2 [
 							start: drag-parameter
 							space/selected: start/offset by caret/offset
 							set with space/caret [offset side] reduce [caret/offset caret/side]
@@ -709,52 +736,16 @@ view reshape [
 						]
 						home end [
 							offset: space/caret/offset
-							set [para1: pofs: plen:] doc-ctx/caret-to-paragraph doc offset
+							set [para1: pofs: plen:] doc-ctx/caret->paragraph doc offset
 							space/caret/offset: offset - either 'home = event/key [pofs][pofs - plen]
 							pick-paint
 						]
 						up down [
 							;@@ ideally I want to keep the ideal "x" of the line where up/down movement started, only override it on other keys
-							offset: space/caret/offset
-							set [para1: pofs1: p1len:] doc-ctx/caret-to-paragraph doc offset
-							prow: rich-content-ctx/caret->row para1 pofs1 space/caret/side
-							cbox: rich-content-ctx/caret->box-2D para1 pofs1 space/caret/side
-							either event/key = 'up [
-								either prow = 1 [
-									para2: pick (find/same doc/content para1) -1
-									if para2 [
-										pofs2: rich-content-ctx/xy->caret para2 cbox/1/x by para2/size/y - 0x1
-										p2len: para2/measure [length]
-										offset: offset - pofs1 - 1 - p2len + pofs2
-									]
-								][
-									pofs1': rich-content-ctx/xy->caret para1 cbox/1 - 0x1
-									;; 'row above' may not succeed if items spans more than one line
-									;; in this case simplest thing is to skip either row or item
-									pofs1': min pofs1 - 1 pofs1'
-									#assert [pofs1' >= 0]
-									offset: offset + (pofs1' - pofs1)
-								]
-							][
-								;@@ abstract it from frame access!
-								either prow = para1/frame/nrows [
-									para2: select/same doc/content para1
-									if para2 [
-										pofs2: rich-content-ctx/xy->caret para2 cbox/1/x by 0
-										offset: offset - pofs1 + p1len + 1 + pofs2
-									]
-								][
-									;@@ might not work with nonzero row intervals! - add interval too
-									pofs1': rich-content-ctx/xy->caret para1 cbox/2 + 0x1
-									;; 'row above' may not succeed if items spans more than one line
-									;; in this case simplest thing is to skip either row or item
-									pofs1': max pofs1 + 1 pofs1'
-									#assert [pofs1' <= p1len]
-									offset: offset + (pofs1' - pofs1)
-								]
+							if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key [
+								space/caret/offset: caret'/offset
+								space/caret/side:   caret'/side
 							]
-							space/caret/offset: offset
-							; pwidth: para1/frame/size-2D/x
 						]
 					][
 						if char? event/key [
