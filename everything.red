@@ -95,6 +95,7 @@ do/expand [
 				#include %hittest.red
 				#include %tabbing.red
 				#include %single-click.red
+				#include %edit-keys.red
 				#include %standard-handlers.red
 				#include %hovering.red
 				#include %actors.red
