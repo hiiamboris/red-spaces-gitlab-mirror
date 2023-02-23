@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]	
 
-key->edit: none
+key->plan: none
 context [
 	near-moves: #(
 		left      -1
@@ -27,7 +27,7 @@ context [
 		down      down
 	)
 
-	set 'key->edit function [
+	set 'key->plan function [
 		"Turn keyboard event into an edit plan"
 		event    [event! object!]
 		selected [pair! none!] "Current selection state"
