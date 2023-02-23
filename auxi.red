@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs range! range? .. using when only mix clip ortho dump-event boxes-overlap? infxinf opaque]
+exports: [by abs range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [

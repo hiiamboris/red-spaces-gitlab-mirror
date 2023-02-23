@@ -6,7 +6,7 @@ Red [
 
 ;-- requires export, prettify
 
-exports: [dump-tree expand-space-path fix-paths dorc mold probe save ?? ? help debug-draw]
+exports: [dump-event dump-tree expand-space-path fix-paths dorc mold probe save ?? ? help debug-draw]
 
 
 ;-- debug func
