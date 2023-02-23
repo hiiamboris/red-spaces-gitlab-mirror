@@ -3515,7 +3515,8 @@ field-ctx: context [
 				]
 			)
 		|	end
-		|	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
+		; |	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
+		|	skip										;-- some edit commands may not be supported by the field (e.g. up/down)
 		]]
 	]
 	

@@ -259,6 +259,7 @@ define-handlers [
 		]
 		
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
+			;@@ up/down keys may be used for spatial navigation
 			printable?: all [
 				char? char: event/key
 				char >= #" "
