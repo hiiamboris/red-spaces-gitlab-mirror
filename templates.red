@@ -3483,7 +3483,9 @@ field-ctx: context [
 				field/selected: sel: none				;-- `select` should be used to keep selection
 			)
 			
-		|	'insert [set s string!] (
+		|	[	'insert [set s string!]
+			|	'paste (s: read-clipboard) if (string? s)
+			] (
 				unless empty? s [
 					field/caret/offset: co: skip? pos: insert pos s
 					len: length? text
