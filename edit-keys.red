@@ -7,10 +7,10 @@ Red [
 key->plan: none
 context [
 	near-moves: #(
-		left      -1
-		right      1
-		backspace -1
-		delete     1
+		left       [by -1]
+		right      [by  1]
+		backspace  [by -1]
+		delete     [by  1]
 		home       head
 		end        tail
 		up         up
@@ -49,7 +49,7 @@ context [
 			action:   case [removal? ['remove] event/shift? ['select] 'else ['move]]
 			if all [removal? selected] [distance: 'selected]
 			switch/default key [
-				left right home end up down delete backspace [reduce [action distance]]
+				left right home end up down delete backspace [compose [(action) (distance)]]
 				#"A" [[select all]]
 				#"C" [[copy selected]]
 				#"X" [[copy selected  remove selected]]

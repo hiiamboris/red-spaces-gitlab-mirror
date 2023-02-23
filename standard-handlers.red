@@ -7,7 +7,6 @@ Red [
 
 ;-- requires events.red (on load)
 
-
 define-handlers [
 
 	;-- *************************************************************************************
@@ -239,83 +238,34 @@ define-handlers [
 
 	;-- *************************************************************************************
 	field: [
-		;-- `key-down` supports key-combos like Ctrl+Tab, `key` does not seem to
-		;-- OTOH `key` properly reflects Shift state in chars
-		;-- so we have to use both
+		;; `key-down` supports key-combos like Ctrl+Tab, `key` does not seem to
+		;; OTOH `key` properly reflects Shift state in chars
+		;; so we have to use both, just separate who handles what
 		on-key [space path event] [					;-- char keys branch (inserts stuff as you type)
-			char: event/key
-			unless all [
-				char? char
-				char >= #" "							;-- printable char
+			printable?: all [
+				char? char: event/key
+				char >= #" "
 				not event/ctrl?							;-- handled by on-key-down (e.g. ctrl+BS=#"^~")
-			][
+			]
+			unless printable? [ 
 				if char = #"^-" [pass]					;-- let tab pass thru
 				exit									;@@ what about enter key / on-enter event?
 			]
 			;@@ TODO: input validation / filtering
-			space/edit compose [
-				remove selected
-				insert (form char)
-			]
-			quietly space/origin: field-ctx/adjust-origin space
+			space/edit key->plan event space/selected
+			quietly space/origin: field-ctx/adjust-origin space	;@@ should be automatic
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
 			invalidate/only space/caret					;@@ any way to properly invalidate both at once? -- need layout under cache
 		]
 		
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
-			key: event/key
-			if all [
-				char? key								;-- ignore chars without mod keys
-				not any [
-					key = #"^H"							;-- use only BS
-					event/ctrl?
-				]
-			] [pass exit]
-
-			plan: switch/default key: event/key [
-				left   [compose [
-					(pick [select move]      event/shift?)
-					(pick [prev-word [by -1]] event/ctrl?)
-				]]
-				right  [compose [
-					(pick [select move]      event/shift?)
-					(pick [next-word [by 1]] event/ctrl?)
-				]]
-				home   [reduce [
-					pick [select move]  event/shift?
-					'head
-				]]
-				end    [reduce [
-					pick [select move]  event/shift?
-					'tail
-				]]
-				delete [
-					either space/selected [
-						[remove selected]
-					][ 
-						compose [remove (pick [next-word 1] event/ctrl?)]
-					]
-				]
-				#"^H"  [								;-- backspace
-					either space/selected [
-						[remove selected]
-					][ 
-						compose [remove (pick [prev-word -1] event/ctrl?)]
-					]
-				]
-				#"A" [[select all]]
-				#"C" [[copy selected]]
-				#"X" [[copy selected remove selected]]
-				#"V" [
-					if string? new: read-clipboard [
-						new: trim/with new "^/^M"		;-- remove line breaks but not spaces
-						compose [remove selected insert (new)]
-					]
-				]
-				#"Z" [pick [[redo] [undo]] event/shift?]
-			] [exit]									;-- not supported yet key
-			
-			space/edit plan
+			printable?: all [
+				char? char: event/key
+				char >= #" "
+				not event/ctrl?							;-- handled by on-key-down (e.g. ctrl+BS=#"^~")
+			]
+			if printable? [exit]
+			space/edit key->plan event space/selected
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space
 		]
