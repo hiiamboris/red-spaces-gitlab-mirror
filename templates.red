@@ -1731,8 +1731,8 @@ rich-content-ctx: context [								;-- rich content
 		;@@ need to think more on this one - disabled for now
 		; apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		measure: func [plan [block!]] [~/metrics/measure self plan]		#type [function!]
-		edit:    func [plan [block!]] [~/edit/edit       self plan]		#type [function!]
+		measure: func [plan [block!]] [~/metrics/measure self plan]
+		edit:    func [plan [block!]] [~/edit/edit       self plan]
 		clone:   does [~/clone  self]
 		format:  does [~/format self]
 		
@@ -3633,7 +3633,7 @@ field-ctx: context [
 			plan [block!]
 		][
 			~/edit self plan
-		] #type [function!]
+		]
 		
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
