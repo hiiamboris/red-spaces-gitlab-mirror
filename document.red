@@ -77,7 +77,7 @@ doc-ctx: context [
 	caret->paragraph: function [doc [object!] offset [integer!]] [
 		if offset >= 0 [
 			foreach-paragraph [para: pofs: plen:] doc [
-				if pofs + plen >= offset [return reduce [para offset - pofs plen]]
+				if pofs + plen >= offset [return reduce [para pofs plen]]
 			]
 		]												;-- none if out of range or content is empty
 	]
@@ -90,6 +90,7 @@ doc-ctx: context [
 		
 	;; maps doc/selected into /selected facets of individual paragraphs
 	map-selection: function [doc [object!] range [pair!]] [
+		range: order-pair range
 		foreach-paragraph [para: pofs: plen:] doc [
 			prange: clip range - pofs 0 plen
 			para/selected: if prange/2 > prange/1 [prange]
@@ -98,6 +99,7 @@ doc-ctx: context [
 	
 	;; maps range into a [paragraph paragraph-range] list 
 	map-range: function [doc [object!] range [pair!]] [
+		range: order-pair range
 		mapped: clear []
 		foreach-paragraph [para: pofs: plen:] doc [
 			case [
@@ -112,17 +114,199 @@ doc-ctx: context [
 		copy mapped										;-- may be empty
 	]
 
+	;; words are split by word separator chars (space, tab) and paragraph delimiter
+	word-sep:     [#" " | #"^-"]
+	non-word-sep: [not word-sep skip]
+		
+	metrics: context [
+		measure: function [doc [object!] plan [block!]] [
+			do with self plan
+		]
+		
+		length: function ["Get length of the document"] with :measure [	;@@ need to cache it (and maybe put into /length facet?)
+			unless para: last doc/content [return 0]
+			add get-paragraph-offset doc para
+				para/measure [length]
+		]
+		
+		find-prev-word: function ["Get offset of the previous word's start"] with :measure [
+			set [para: pofs: plen:] caret->paragraph doc offset: doc/caret/offset
+			while [offset <= pofs] [					;-- switch to previous paragraph (maybe multiple times)
+				if offset <= 0 [return 0]				;-- no more going left
+				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
+			]
+			#assert [pofs < offset]						;-- limited by paragraph's head
+			before: reverse append/part clear [] para/items skip para/items offset - pofs
+			parse before [any word-sep any non-word-sep before:]
+			offset - skip? before
+		]
+		find-next-word: function ["Get offset of the next word's end"] with :measure [
+			set [para: pofs: plen:] caret->paragraph doc offset: doc/caret/offset
+			length: doc/measure [length]
+			while [offset >= (pofs + plen)] [			;-- switch to next paragraph (maybe multiple times)
+				if offset >= length [return length]		;-- no more going right
+				set [para: pofs: plen:] caret->paragraph doc offset: offset + 1
+			]
+			#assert [pofs + plen > offset]				;-- limited by paragraph's tail
+			after: skip para/items offset - pofs
+			parse pos: after [any word-sep any non-word-sep pos:]
+			offset + offset? after pos
+		]
+		
+		find-line-above: function ["Get caret (offset, side) one line above"] with :measure [
+			caret-row-shift doc doc/caret/offset doc/caret/side 'up 0
+		]
+		find-line-below: function ["Get caret (offset, side) one line below"] with :measure [
+			caret-row-shift doc doc/caret/offset doc/caret/side 'down 0
+		]
+		
+		; find-page-above: function ["Get caret (offset, side) one page above"] with :measure [
+			; caret-page-shift doc doc/caret/offset doc/caret/side 'up
+		; ]
+		; find-page-below: function ["Get caret (offset, side) one page below"] with :measure [
+			; caret-page-shift doc doc/caret/offset doc/caret/side 'down
+		; ]
+	]
+	
+	actions: context [
+		edit: function [doc [object!] plan [block!]] [
+			length: doc/measure [length]
+			offset: doc/caret/offset
+			set [para: pofs: plen:] caret->paragraph doc offset
+			do with self plan
+		]
+		at: select: move: remove: copy: paste: insert: paint: break: none
+	]
+	
+	;@@ undo
+	;@@ redo
+	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
+		switch name [
+			far-head  [0]
+			far-tail  [length]
+			head      [pofs]
+			tail      [pofs + plen]
+			prev-word [doc/measure [find-prev-word]]
+			next-word [doc/measure [find-next-word]]
+			line-up   [doc/measure [find-line-above]]
+			line-down [doc/measure [find-line-below]]
+			; page-up   [doc/measure [find-page-above]]			;@@ these need to know page size
+			; page-down [doc/measure [find-page-below]]
+		]
+	]
+		
+	actions/select: function [
+		"Extend or redefine selection"
+		limit [pair! word! (not by) integer!]
+		/by "Move selection edge by an integer number of caret slots"
+	] with :actions/edit [
+		set [para: pofs: plen:] caret->paragraph doc offset
+		case [
+			by             [ofs: offset + limit]
+			integer? limit [ofs: limit]
+			pair?    limit [sel: clip 0 length limit]
+			'else [
+				switch/default limit [
+					none #[none] [sel: none]
+					all [sel: as-pair 0 length]
+				][
+					ofs: any [actions/at limit  offset]	;-- if `at` fails, assume caret offset
+					if block? ofs [ofs: ofs/offset]		;-- ignores returned side
+				]
+			]
+		]
+		either ofs [									;-- selection extension/contraction
+			sel: any [doc/selected  1x1 * offset]
+			other: case [
+				sel/1 = offset [sel/2]
+				sel/2 = offset [sel/1]
+				'else [offset]							;-- if caret is not at selection's edge, ignore previous selection
+			]
+			sel: as-pair other ofs
+		][												;-- selection override
+			ofs: either sel [sel/2][offset]				;-- 'select none' doesn't move the caret
+		]
+		doc/caret/offset: clip ofs 0 length
+		doc/selected: sel
+	]
+	
+	actions/move: function [
+		"Displace the caret"
+		pos [word! (not by) integer!]
+		/by "Move by a relative integer number of slots"
+	] with :actions/edit [
+		set [para: pofs: plen:] caret->paragraph doc offset
+		either by [pos: pos + offset][if word? pos [pos: actions/at pos]]
+		if block? pos [doc/caret/side: pos/side  pos: pos/offset]	;-- block may be returned by find-line-below/above
+		if integer? pos [doc/caret/offset: clip pos 0 length]	;-- unknown words are silently ignored
+	]
+	
+	actions/remove: function [
+		"Remove range or from caret up to a given limit"
+		limit [word! pair! (not by) integer!]
+		/by "Relative integer number of slots from the caret"
+	] with :actions/edit [
+		;@@ mark history state
+		case/all [
+			limit = 'selected [limit: doc/selected]
+			word?    limit    [limit: actions/at limit]
+			block?   limit    [limit: limit/offset]		;-- ignores returned side
+			by                [limit: offset + limit]
+			integer? limit    [limit: order-pair as-pair limit offset]
+			limit             [document/remove doc limit]
+		]
+	]
+	
+	actions/copy: function [
+		"Copy specified range into clipboard"
+		range [word! pair!] "Offset range or 'selected"
+	] with :actions/edit [
+		switch range [
+			selected [range: doc/selected]
+			all      [range: 0 by length]
+		]
+		slice: when pair? range (document/copy doc range)	;-- silently ignores unsupported range words
+		clipboard/write slice
+		slice
+	]
+	
+	actions/paste: function [
+		"Paste text from clipboard into current caret offset"
+	] with :actions/edit [
+		actions/insert clipboard/read
+	]
+	
+	actions/insert: function [
+		"Insert given data into current caret offset"
+		data [block! string! none!]
+	] with :actions/edit [
+		;@@ mark history state
+		unless empty? data [document/insert doc offset data]	;-- caret gets moved via adjust-offsets
+	]
+	
+	actions/paint: function [
+		"Paint given range with an attribute set (only first item's attribute is used)"
+		range [pair!] attrs [map!]
+	] with :actions/edit [
+		document/paint doc range attrs
+	]
+	
+	actions/break: function [
+		"Break paragraph at current caret offset"
+	] with :actions/edit [
+		document/break doc doc/caret/offset
+	]
+	
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
 	document: context [length: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: none]
 	
 	document/length: function [doc] [
-		unless para: last doc/content [return 0]
-		add get-paragraph-offset doc para
-			para/measure [length]
+		doc/measure [length]
 	]
 	
 	document/copy: function [doc [object!] range [pair!]] [
+		if range/1 = range/2 [return copy []]
 		map-each [para prange] map-range doc range [
 			also para: para/clone
 			para/edit [clip! prange]
@@ -132,6 +316,7 @@ doc-ctx: context [
 	;@@ do auto-linkification on space after url!
 	document/linkify: function [doc [object!] range [pair!] command [block!]] [
 		;; each paragraph becomes a separate link as this is simplest to do
+		range: order-pair clip range 0 doc/measure [length]
 		map-each [para prange] map-range doc range [
 			if zero? span? prange [continue]
 			clone: para/clone
@@ -154,6 +339,7 @@ doc-ctx: context [
 	]
 	
 	document/remove: function [doc [object!] range [pair!]] [
+		range: order-pair clip range 0 doc/measure [length]
 		n: half length? mapped: map-range doc range
 		set [para1: range1:] mapped
 		set [paraN: rangeN:] skip tail mapped -2 
@@ -175,14 +361,15 @@ doc-ctx: context [
 		data   [block! (parse data [any object!]) string!]
 	][
 		if empty? data [exit]
-		set [para1: pofs:] caret->paragraph doc offset
+		set [para1: pofs1:] caret->paragraph doc offset
+		pcar1: offset - pofs1
 		case [
 			string? data [
-				para1/edit [insert! pofs data]
+				para1/edit [insert! pcar1 data]
 				added: length? data
 			]
 			single? data [
-				para1/edit [insert! pofs values-of data/1/data]
+				para1/edit [insert! pcar1 values-of data/1/data]
 				added: data/1/measure [length]
 			]
 			'multiple [
@@ -190,9 +377,9 @@ doc-ctx: context [
 				added: (length? data) - 1 + sum map-each para data [para/measure [length]]
 				;; edit first paragraph, but remember the after-insertion part
 				para1/edit [							;@@ make another action in edit for this?
-					stashed: copy range: pofs by infxinf/x
+					stashed: copy range: pcar1 by infxinf/x
 					remove! range
-					insert! pofs values-of data/1/data
+					insert! pcar1 values-of data/1/data
 				]
 				;; append stashed part to the last inserted paragraph
 				paraN: last data
@@ -208,10 +395,11 @@ doc-ctx: context [
 		doc    [object!]
 		offset [integer!]
 	][
-		set [para1: pofs:] caret->paragraph doc offset
+		set [para1: pofs1:] caret->paragraph doc offset
+		pcar1: offset - pofs1
 		para2: para1/clone
-		para1/edit [remove! pofs by infxinf/x]
-		para2/edit [remove! 0 by pofs]
+		para1/edit [remove! pcar1 by infxinf/x]
+		para2/edit [remove! 0 by pcar1]
 		insert (find/same/tail doc/content para1) para2
 		adjust-offsets doc offset 1
 	]
@@ -224,6 +412,7 @@ doc-ctx: context [
 	
 	;; replaces all attributes in the range with first attribute in attrs
 	document/paint: function [doc [object!] range [pair!] attrs [map!]] [
+		if any [empty? attrs  zero? span? range] [exit]
 		foreach [para: prange:] map-range doc range [	;@@ need edit func for this?
 			length: para/measure [length]
 			slice: rich/attributes/extend attrs span: span? range
@@ -241,9 +430,9 @@ doc-ctx: context [
 	
 	;@@ need to keep some attr 'state' that can be modified by buttons and applied to new chars
 	document/get-attrs: function [space [object!] index [integer!]] [
-		if set [para: offset: plen:] caret->paragraph space index [
-			if offset = plen [offset: max 0 plen - 1]			;-- no attribute at the 'new-line' delimiter
-			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
+		if set [para: pofs: plen:] caret->paragraph space index [
+			offset: clip 0 (max 0 plen - 1) index - 1 - pofs	;-- no attribute at the 'new-line' delimiter
+			rich/attributes/copy para/data/attrs probe 0x1 + offset	;@@ still may be empty - is it ok?
 		]
 	]
 	
@@ -298,7 +487,7 @@ doc-ctx: context [
 	on-selected-change: function [space [object!] word [word!] value: -1x-1 [pair! none!]] [	;-- -1x-1 acts as deselect-everything
 		;; NxN selection while technically empty, is not forbidden or converted to `none`, to avoid surprises in code
 		if value/1 > value/2 [
-			quietly space/selected: value: reverse value		;-- keep it ordered for simplicity
+			quietly space/selected: value: reverse value	;-- keep it ordered for simplicity (not for -1x-1 case)
 		]
 		map-selection space value
 	]
@@ -321,20 +510,27 @@ doc-ctx: context [
 	
 	;@@ what about no rows case? I need to ensure always at least one row, even empty
 	;; if zero-height rows exist, this func will just skip them
-	caret-row-shift: function [doc [object!] caret [integer!] side [word!] dir [word!] (find [up down] dir)] [
+	caret-row-shift: function [
+		doc   [object!]
+		caret [integer!]
+		side  [word!]
+		dir   [word!] (find [up down] dir)
+		shift [integer!] (shift >= 0) "0 for one line, else number of extra pixels (for paging)"
+	][
 		set [para: pofs: plen:] caret->paragraph doc caret
+		pcar: caret - pofs
 		pgeom: select/same doc/map para
 		pxy: pgeom/offset
 		para/measure [
-			set [pxy1: pxy2:] caret->box pofs side
-			prow: caret->row pofs side
+			set [pxy1: pxy2:] caret->box pcar side
+			prow: caret->row pcar side
 		]
 		nrows: para/frame/nrows
 		edge-row?: any [
 			all [dir = 'up   prow = 1]					;-- first row in the paragraph
 			all [dir = 'down prow = nrows]				;-- last row in the paragraph
 		]
-		shift: 0 by (1 + either edge-row? [doc/spacing][para/frame/spacing])
+		shift: 0 by (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
 		xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
 		caret': point->caret doc xy
 		if caret' [										;-- may be none if outside the document
@@ -352,7 +548,7 @@ doc-ctx: context [
 		
 		;; para/caret is a space that is moved from paragraph to paragraph, where it gets rendered
 		;; not to be confused with doc/caret that is not rendered and only holds the absolute offset
-		set [para: offset:] caret->paragraph doc doc/caret/offset
+		set [para: pofs:] caret->paragraph doc offset: doc/caret/offset
 		if para [
 			unless para =? old-holder: doc/caret/holder [
 				either old-holder [
@@ -365,23 +561,36 @@ doc-ctx: context [
 				doc/caret/holder: para
 			]
 			para/caret/side:   doc/caret/side
-			para/caret/offset: offset
+			para/caret/offset: offset - pofs
 		]
 		
 		drawn: doc/list-draw/on canvas
+	]
+	
+	;; document/caret cannot be assigned to it's paragraphs, because it holds absolute offset
+	;; so paragraphs have their own (styled, renderde) caret space, moved from paragraph to paragraph
+	;; while document has a fake caret (not rendered), that is only used for invalidation
+	;; document invalidation -> document/draw -> updates paragraph/caret -> paragraph/draw
+	caret-template: declare-class 'document-caret/caret [
+		type:  'caret
+		holder: none									;-- child that last owned the generated caret space
 	]
 	
 	declare-template 'document/list [
 		axis:   'y		#type (axis = 'y)				;-- protected
 		spacing: 5
 		
-		caret:   make-space 'caret [
-			offset: 0
-			side:   'right
-			holder: none								;-- child that last owned the generated caret space
-		] #type [object!] :invalidates
+		caret:   make-space 'caret caret-template #type [object!] :invalidates
 		
 		selected: none	#type [pair! none!] :on-selected-change
+		
+		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
+		edit: func [
+			"Apply a sequence of edits to the text"
+			plan [block!]
+		][
+			~/actions/edit self plan
+		] #type [function!]
 		
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
@@ -701,6 +910,15 @@ view reshape [
 						]
 					]
 				] on-key [
+					if printable?: all [
+						char? key: event/key
+						key >= #" "
+						not event/ctrl?
+					][
+						space/edit key->plan event space/selected
+						space/edit compose [paint -1x0 + space/caret/offset (paint)]
+					]
+					exit
 					;@@ generalize mapping of edit keys to edit API, so field and area may reuse the same logic
 					switch/default probe event/key [
 						#"^C" [
@@ -724,34 +942,47 @@ view reshape [
 						#"^H" [
 							doc-ctx/document/remove space max 0 space/caret/offset + -1x0
 						]
-						#"^M" #"^/" [
-							doc-ctx/document/break space space/caret/offset
-						]
 						left right [
 							shift: pick [-1 1] 'left = side: event/key 
 							total: doc-ctx/document/length space	;@@ need to cache it
 							new: clip 0 total space/caret/offset + shift
+							; if event/shift? [
+								; doc-ctx/document/expand-selection
 							set with space/caret [offset side] reduce [new side]
 							pick-paint
 						]
 						home end [
 							offset: space/caret/offset
-							set [para1: pofs: plen:] doc-ctx/caret->paragraph doc offset
-							space/caret/offset: offset - either 'home = event/key [pofs][pofs - plen]
+							set [para: pofs: plen:] doc-ctx/caret->paragraph doc offset
+							space/caret/offset: either 'home = event/key [pofs][pofs + plen]
 							pick-paint
 						]
 						up down [
 							;@@ ideally I want to keep the ideal "x" of the line where up/down movement started, only override it on other keys
-							if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key [
+							if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key 0 [
 								space/caret/offset: caret'/offset
 								space/caret/side:   caret'/side
 							]
+							pick-paint
 						]
 					][
 						if char? event/key [
 							offset: space/caret/offset
 							doc-ctx/document/insert space offset s: form event/key
 							doc-ctx/document/paint space 0 by (length? s) + offset paint
+						]
+					]
+				] on-key-down [
+					unless printable?: all [
+						char? key: event/key
+						key >= #" "
+						not event/ctrl?
+					][
+						switch/default event/key [
+							#"^M" #"^/" [doc/edit [break]]
+						][
+							space/edit key->plan event space/selected
+							pick-paint
 						]
 					]
 				]
