@@ -1704,6 +1704,11 @@ rich-content-ctx: context [								;-- rich content
 			quietly space/data: data: object [items: data/1 attrs: data/2]
 		]
 		set with space [content ranges] rich/decoded/to-spaces values-of data	;-- content triggers invalidation
+		if empty? space/content [						;-- let rich-content always have at least one line (mainly for document)
+			obj: make-space 'text []					;@@ use prototype for this?
+			obj/font: space/font
+			append space/content obj
+		]
 	]
 	
 	clone: function [space [object!]] [		
