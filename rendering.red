@@ -5,6 +5,8 @@ Red [
 ]
 
 
+;; uses timers (to prime them) at runtime
+
 render: none				;-- reserve names in the spaces/ctx context
 exports: [render]
 
@@ -249,6 +251,8 @@ context [
 				
 				unless any [xy1 xy2] [cache/commit space canvas drawn]
 				cache/update-generation space 'drawn
+				
+				if select space 'rate [timers/prime space]		;-- render enables timer for this space if /rate facet is set
 				
 				#debug profile [prof/manual/end name]
 				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?

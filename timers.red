@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires events.red (extends them on load), uses traversal.red & rendering.red (get-full-path)
+;; requires events.red (extends them on load), uses traversal.red & rendering.red (get-full-path)
 
 
 timers: context [
@@ -12,23 +12,12 @@ timers: context [
 	;; it is achieved by injecting /rate-tracking code into space/on-change
 	rated-spaces: make hash! 32
 
-	rate-types!: make typeset! [integer! float! time!]
-	on-rate-change: function [space [object!] word [word!] value [any-type!]] [
-		#debug events [#print "rate changes to (value) for (space/size) (skip mold/flat/part space 80 13)"]
-		pos: find/same rated-spaces space
-		either all [
-			find rate-types! type? :value				;@@ should be done using class system!
-			positive? rate: value
-		][												;-- enable timers
-			if number? rate [rate: 0:0:1 / rate]		;-- normalize rate in advance
-			unless pos [
-				#debug events [#print "adding rate=(value) to rated-spaces"]
-				repend rated-spaces [space rate]
-			]
-		][												;-- disable timers
-			if pos [
-				#debug events [#print "removing rate=(old) from rated-spaces"]
-				fast-remove pos 2
+	prime: function [space [object!]] [
+		unless find/same rated-spaces space [
+			append rated-spaces space
+			#debug timer [
+				code: mold/part body-of :space/actors/on-time 60
+				#print "primed timer for (space/type):(space/size) code: (code), total active (length? rated-spaces)"
 			]
 		]
 	]
@@ -85,14 +74,17 @@ timers: context [
 		;; to win performance I maintain a list of all 'armed' timers at the cost of having to explicitly render each timer
 		handlers: events/handlers
 		hpath: as path! []
-		foreach [space rate] rated-spaces [
-			unless path: get-full-path space [
-				;; remove unconnected spaces from rated list, otherwise they won't be GCed
-				;@@ on the bad side, to plug them in again one would need to reset the rate ... any solution?
-				space/rate: none
+		foreach space rated-spaces [
+			unless all [
+				rate: select space 'rate				;-- previously enabled timer has been disabled? don't react on it again
+				path: get-full-path space				;-- space is orphaned (no longer connected to the tree)? remove it so GC can take it
+			][
+				#debug timer [#print "disabling timer for (mold space)"]
+				fast-remove find/same rated-spaces space 1		;-- won't be active until it gets rendered again
 				continue
 			]
 			#debug timer [#print "timer rate (rate) has path (mold path)"]
+			if number? rate [rate: 0:0:1 / rate]
 			pos: find/same/tail marks space
 			set [prev: bias:] any [pos [0:0 0:0]]
 			delay: either pos [difference time prev + rate][0:0]		;-- estimate elapsed delay for this timer

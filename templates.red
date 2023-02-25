@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires `for` loop from auxi.red, layouts.red, export, `timers/on-rate-change` to enable it
+;-- requires `for` loop from auxi.red, layouts.red, export
 exports: [make-space declare-template space?]
 
 ;@@ I need to move out the core functionality from here out, leave only templates
@@ -29,7 +29,7 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
 	parent: none	#type [object! none!]
 	draw:   []   	#type [block! function!]
-	;-- `drawn` is an exception and not held in the space, so just `size`
+	;; `drawn` is an exception and not held in the space, so just `size`:
 	cache:  [size]	#type [block! none!]
 	cached: tail copy [0.0 #[none]]	#type [block!]		;-- used internally to check if space is connected to the tree, and holds cached facets
 	limits: none	#type [object! (range? limits)  none!] =? :invalidates
@@ -41,9 +41,8 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 modify-class 'space [
 	map:     []		#type [block!]
 	into:    none	#type [function!]
-	rate:    none	#type =? :timers/on-rate-change
-					[none! integer! float! time!]
-					(any [rate =? none  rate >= 0])
+	;; rate change -> invalidation -> next render puts it into rated-spaces list
+	rate:    none	#type =  :invalidates-look [integer! float! time! (rate >= 0) none!]
 	color:   none	#type =? :invalidates-look [tuple! none!]
 	margin:  0		#type =? :invalidates [integer! pair!] (0x0 +<= (margin * 1x1))
 	spacing: 0		#type =? :invalidates [integer! pair!] (0x0 +<= (spacing * 1x1))
