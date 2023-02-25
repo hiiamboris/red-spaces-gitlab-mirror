@@ -11,20 +11,20 @@ context [
 		right      [by  1]
 		backspace  [by -1]
 		delete     [by  1]
-		home       head
-		end        tail
-		up         up
-		down       down
+		home       'head
+		end        'tail
+		up         'line-up
+		down       'line-down
+		page-up    'page-up
+		page-down  'page-down
 	)
-	far-moves:  #(
-		left      prev-word
-		right     next-word
-		backspace prev-word
-		delete    next-word
-		home      far-head
-		end       far-tail
-		up        up
-		down      down
+	far-moves:  extend copy near-moves #(
+		left      'prev-word
+		right     'next-word
+		backspace 'prev-word
+		delete    'next-word
+		home      'far-head
+		end       'far-tail
 	)
 
 	set 'key->plan function [
@@ -39,7 +39,7 @@ context [
 			not event/ctrl?
 		][
 			compose [
-				remove selected
+				remove 'selected
 				insert (form key)
 			]
 		][
@@ -47,13 +47,17 @@ context [
 			removal?: find [delete backspace] key
 			distance: select either event/ctrl? [far-moves][near-moves] key
 			action:   case [removal? ['remove] event/shift? ['select] 'else ['move]]
-			if all [removal? selected] [distance: 'selected]
+			if all [removal? selected] [distance: quote 'selected]
+			if block? distance [						;-- [move [by 1]] -> [move/by 1]
+				distance: distance/2
+				action: as path! reduce [action 'by]
+			]
 			switch/default key [
 				left right home end up down delete backspace [compose [(action) (distance)]]
 				#"A" [[select all]]
-				#"C" [[copy selected]]
-				#"X" [[copy selected  remove selected]]
-				#"V" [[remove selected  paste]]
+				#"C" [[copy 'selected]]
+				#"X" [[copy 'selected  remove 'selected]]
+				#"V" [[remove 'selected  paste]]
 				#"Z" [pick [[redo] [undo]] event/shift?]
 			] [[]]										;-- not supported yet key
 		]
