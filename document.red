@@ -560,19 +560,19 @@ doc-ctx: context [
 		;; para/caret is a space that is moved from paragraph to paragraph, where it gets rendered
 		;; not to be confused with doc/caret that is not rendered and only holds the absolute offset
 		set [para: pofs:] caret->paragraph doc offset: doc/caret/offset
-		if para [
-			unless para =? old-holder: doc/caret/holder [
-				either old-holder [
-					para/caret: old-holder/caret
-					para/caret/parent: none
-					old-holder/caret:  none
-				][
-					para/caret: make-space 'caret []
-				]
-				doc/caret/holder: para
+		old-holder: doc/caret/holder
+		new-holder: doc/caret/holder: if focused? [para]		;-- don't draw caret when not in focus
+		shared-caret: if old-holder [old-holder/caret]
+		unless old-holder =? new-holder [				;-- move caret from one paragraph to another
+			if shared-caret [shared-caret/parent: none]
+			if old-holder [old-holder/caret: none]
+			if new-holder [
+				new-holder/caret: any [shared-caret make-space 'caret []]
 			]
-			para/caret/side:   doc/caret/side
-			para/caret/offset: offset - pofs
+		]
+		if new-holder [									;-- update offsets
+			new-holder/caret/side:   doc/caret/side
+			new-holder/caret/offset: offset - pofs
 		]
 		
 		drawn: doc/list-draw/on canvas
@@ -929,59 +929,6 @@ view reshape [
 						space/edit key->plan event space/selected
 						if paint [space/edit compose [paint -1x0 + space/caret/offset (paint)]]
 					]
-					;@@ generalize mapping of edit keys to edit API, so field and area may reuse the same logic
-					; switch/default probe event/key [
-						; #"^C" [
-							; if space/selected [
-								; clipboard/write doc-ctx/document/copy space space/selected
-							; ]
-						; ]
-						; #"^V" [
-							; unless empty? data: clipboard/read [
-								; doc-ctx/document/insert space space/caret/offset data
-								; space/selected: none
-							; ]
-						; ]
-						; #"^X" [
-							; if range: space/selected [
-								; clipboard/write doc-ctx/document/copy space range
-								; doc-ctx/document/remove space range
-								; space/selected: none
-							; ]
-						; ]
-						; #"^H" [
-							; doc-ctx/document/remove space max 0 space/caret/offset + -1x0
-						; ]
-						; left right [
-							; shift: pick [-1 1] 'left = side: event/key 
-							; total: doc-ctx/document/length space	;@@ need to cache it
-							; new: clip 0 total space/caret/offset + shift
-							; if event/shift? [
-								; doc-ctx/document/expand-selection
-							; set with space/caret [offset side] reduce [new side]
-							; pick-paint
-						; ]
-						; home end [
-							; offset: space/caret/offset
-							; set [para: pofs: plen:] doc-ctx/caret->paragraph doc offset
-							; space/caret/offset: either 'home = event/key [pofs][pofs + plen]
-							; pick-paint
-						; ]
-						; up down [
-							; ;@@ ideally I want to keep the ideal "x" of the line where up/down movement started, only override it on other keys
-							; if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key 0 [
-								; space/caret/offset: caret'/offset
-								; space/caret/side:   caret'/side
-							; ]
-							; pick-paint
-						; ]
-					; ][
-						; if char? event/key [
-							; offset: space/caret/offset
-							; doc-ctx/document/insert space offset s: form event/key
-							; doc-ctx/document/paint space 0 by (length? s) + offset paint
-						; ]
-					; ]
 				] on-key-down [
 					unless printable?: all [
 						char? key: event/key
@@ -996,6 +943,7 @@ view reshape [
 						]
 					]
 				]
+				on-focus [invalidate space] on-unfocus [invalidate space]	;-- shows/hides caret
 			]
 		]
 	] ;with [watch in parent 'offset]
