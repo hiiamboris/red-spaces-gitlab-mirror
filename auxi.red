@@ -31,6 +31,8 @@ svf:  system/view/fonts
 svm:  system/view/metrics
 svmc: system/view/metrics/colors
 
+digit!: charset [#"0" - #"9"]
+
 half: func [x] [x / 2]
 round-down: func [x] [to integer! x]
 round-up:   func [x] [round/to/ceiling x 1]

@@ -11,7 +11,7 @@ context [
 		right      [by  1]
 		backspace  [by -1]
 		delete     [by  1]
-		home       'head
+		home       'head 
 		end        'tail
 		up         'line-up
 		down       'line-down

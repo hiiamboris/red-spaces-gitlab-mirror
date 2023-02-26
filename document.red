@@ -98,7 +98,7 @@ doc-ctx: context [
 	]
 	
 	;; maps range into a [paragraph paragraph-range] list 
-	map-range: function [doc [object!] range [pair!]] [
+	map-range: function [doc [object!] range [pair!] /extend "Extend range to full paragraphs"] [
 		range: order-pair range
 		mapped: clear []
 		foreach-paragraph [para: pofs: plen:] doc [
@@ -106,7 +106,9 @@ doc-ctx: context [
 				pofs + plen < range/1 [continue]		;-- empty parts (tail/head) of the paragraph are counted (for remove to work)
 				pofs        > range/2 [break]
 				'else [
-					prange: clip range - pofs 0 plen
+					prange: either extend
+						[0 by plen + pofs]
+						[clip range - pofs 0 plen]
 					repend mapped [para prange]			;-- empty paragraphs are not skipped by design
 				]
 			]
@@ -176,16 +178,17 @@ doc-ctx: context [
 			set [para: pofs: plen:] caret->paragraph doc offset
 			do with self plan
 		]
-		at: select: move: remove: copy: paste: insert: paint: break: none
+		at: select: move: remove: copy: paste: insert: paint: break: auto-bullet: none
 	]
 	
 	;@@ undo
 	;@@ redo
+	
 	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
 		switch name [
 			far-head  [0]
 			far-tail  [length]
-			head      [pofs]
+			head      [pofs]							;-- paragraph's head/tail ;@@ or use row's head/tail? exclude indentation or not?
 			tail      [pofs + plen]
 			prev-word [doc/measure [find-prev-word]]
 			next-word [doc/measure [find-next-word]]
@@ -304,9 +307,15 @@ doc-ctx: context [
 		document/break doc doc/caret/offset
 	]
 	
+	actions/auto-bullet: function [
+		"Automatically assign a bullet to current paragraph if previous one has it"
+	] with :actions/edit [
+		document/auto-bullet doc doc/caret/offset
+	]
+	
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
-	document: context [length: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: none]
+	document: context [length: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: none]
 	
 	document/length: function [doc] [
 		doc/measure [length]
@@ -414,7 +423,7 @@ doc-ctx: context [
 	
 	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
 		foreach [para: prange:] map-range doc range [
-			para/edit [mark! attr :value]
+			para/edit [mark! prange attr :value]
 		]
 	]
 	
@@ -431,8 +440,8 @@ doc-ctx: context [
 	]
 	
 	document/get-attr: function [space [object!] index [integer!] attr [word!]] [
-		if set [para: offset:] caret->paragraph space index - 1 [
-			rich/attributes/pick para/data/attrs attr offset + 1	;-- may be none esp. on 'new-line' paragraph delimiters
+		if set [para: pofs:] caret->paragraph space offset: index - 1 [
+			rich/attributes/pick para/data/attrs attr offset - pofs + 1	;-- may be none esp. on 'new-line' paragraph delimiters
 		]
 	]
 	
@@ -467,32 +476,101 @@ doc-ctx: context [
 		doc/selected: sel
 	]
 	
-	;@@ maybe more generalized get-marker smth?
-	bulleted-paragraph?: function [para [object!]] [
-		to logic! all [
-			space? item1: para/data/items/1
-			'bullet = class? item1
+	get-bullet-text: function [para [object!]] [
+		all [
+			space? bullet: para/data/items/1
+			'bullet = class? bullet
+			bullet/text
 		]
 	]
+	get-bullet-number: function [para [object!]] [
+		all [
+			text: get-bullet-text para
+			parse text [copy num some digit! "."]
+			transcode/one num
+		]
+	]
+	bulleted-paragraph?: function [para [object!]] [
+		to logic! get-bullet-text para
+	]
+	numbered-paragraph?: function [para [object!]] [
+		to logic! get-bullet-number para
+	]
 	
+	;@@ maybe this should be less smart and not remove bullets? only add them?
 	document/bulletify: function [doc [object!] range [pair!]] [
-		if empty? mapped: map-range doc range [exit]
-		already-bulleted?: bulleted-paragraph? mapped/1	;-- already has a bullet? for toggling
+		if empty? mapped: map-range/extend doc range [exit]
+		bulletifying?: any [
+			not bulleted-paragraph? mapped/1			;-- already has a bullet? for toggling
+			numbered-paragraph? mapped/1
+		]
+		fix: 0
 		foreach [para: prange:] mapped [
-			items: para/data/items
-			pofs:  range/1 - prange/1
+			prange: prange + fix						;-- each edit changes next prange
 			if bulleted-paragraph? para [				;-- get rid of numbers and old bullets
 				para/edit [remove! 0x1]
-				adjust-offsets doc pofs + 1 -1
+				adjust-offsets doc prange/1 -1
+				fix: fix - 1
 			]
-			unless already-bulleted? [
+			if bulletifying? [
 				para/edit [insert! 0 make-space 'bullet []]
-				adjust-offsets doc pofs 1
+				adjust-offsets doc prange/1 1
+				fix: fix + 1
 			]
 		]
 	]
 	
-	; override: ...
+	;@@ maybe this should be less smart and not remove bullets? only add them?
+	document/enumerate: function [doc [object!] range [pair!]] [
+		if empty? mapped: map-range/extend doc range [exit]
+		set [para: prange:] mapped
+		if numbering?: not get-bullet-number para [
+			prev-number: all [							;-- fetch number of the previous paragraph
+				last-para: pick find/same doc/content para -1
+				get-bullet-number last-para
+			]
+			number: either prev-number [prev-number][0]
+		]
+		fix: 0
+		foreach [para: prange:] mapped [
+			prange: prange + fix						;-- each edit changes next prange
+			if bulleted-paragraph? para [				;-- remove old bullets/numbers
+				para/edit [remove! 0x1]
+				adjust-offsets doc prange/1 -1
+				fix: fix - 1
+			]
+			if numbering? [								;-- enumerate
+				bullet: make-space 'bullet []
+				bullet/text: rejoin [number: number + 1 "."]
+				para/edit [insert! 0 bullet]
+				adjust-offsets doc prange/1 1
+				fix: fix + 1
+			]
+		]
+	]
+	
+	;@@ maybe functions above should be based on this?
+	;; replaces paragraph's bullet following that of the previous paragraph
+	document/auto-bullet: function [doc [object!] offset [integer!]] [
+		set [para: pofs: plen:] caret->paragraph doc offset
+		if prev: pick find/same doc/content para -1 [
+			text: either num: get-bullet-number prev
+				[rejoin [num + 1 "."]]
+				[get-bullet-text prev]
+			if text [
+				bullet: make-space 'bullet []
+				bullet/text: text
+			]
+		]
+		if bulleted-paragraph? para [
+			para/edit [remove! 0x1]
+			adjust-offsets doc pofs -1
+		]
+		if bullet [
+			para/edit [insert! 0 bullet]
+			adjust-offsets doc pofs 1
+		]
+	]
 	
 	on-selected-change: function [space [object!] word [word!] value: -1x-1 [pair! none!]] [	;-- -1x-1 acts as deselect-everything
 		;; NxN selection while technically empty, is not forbidden or converted to `none`, to avoid surprises in code
@@ -549,7 +627,6 @@ doc-ctx: context [
 				[0 by (caret - 1)]
 			caret'/offset: clip limits/1 limits/2 caret'/offset
 		]
-		; watch 'caret'
 		caret'
 	]
 		
@@ -774,13 +851,15 @@ lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod 
 append keyboard/focusable 'document
 toggle-attr: function [name] [
 	; doc-ctx/document/toggle-attribute range
-	either zero? span? range: doc/selected [
-		old: rich/attributes/pick paint name 1
-		rich/attributes/mark paint 1 0x1 name not old
-	][
+	either all [range: doc/selected  0 < span? range] [
 		old: doc-ctx/document/get-attr doc 1 + range/1 name
+		?? [old range] 
 		doc-ctx/document/mark doc range name not old
+	][
+		old: rich/attributes/pick paint name 1
+		rich/attributes/mark! paint 1 0x1 name not old
 	]
+	probe not old
 ]
 realign: function [name] [
 	range: any [
@@ -795,6 +874,13 @@ bulletify: function [] [
 		1x1 * doc/caret/offset
 	]
 	doc-ctx/document/bulletify doc range
+]
+enumerate: function [] [
+	range: any [
+		doc/selected
+		1x1 * doc/caret/offset
+	]
+	doc-ctx/document/enumerate doc range
 ]
 ;; current attributes (for inserted chars)
 paint: #()
@@ -863,12 +949,12 @@ view reshape [
 					]
 				] 
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 
-				icon [image 24x20 data= icons/aligns/fill]   on-click [realign 'fill]
-				icon [image 24x20 data= icons/aligns/left]   on-click [realign 'left] 
-				icon [image 24x20 data= icons/aligns/center] on-click [realign 'center]
-				icon [image 24x20 data= icons/aligns/right]  on-click [realign 'right]
-				icon [image 30x20 data= icons/lists/numbered];  on-click [realign 'right]
-				icon [image 30x20 data= icons/lists/bullet]  on-click [bulletify]
+				icon [image 24x20 data= icons/aligns/fill]    on-click [realign 'fill]
+				icon [image 24x20 data= icons/aligns/left]    on-click [realign 'left] 
+				icon [image 24x20 data= icons/aligns/center]  on-click [realign 'center]
+				icon [image 24x20 data= icons/aligns/right]   on-click [realign 'right]
+				icon [image 30x20 data= icons/lists/numbered] on-click [enumerate]
+				icon [image 30x20 data= icons/lists/bullet]   on-click [bulletify]
 			]
 			scrollable [
 				style code: rich-content ;font= code-font
@@ -936,7 +1022,7 @@ view reshape [
 						not event/ctrl?
 					][
 						switch/default event/key [
-							#"^M" #"^/" [doc/edit [break]]
+							#"^M" #"^/" [doc/edit [select 'none  break  auto-bullet]]
 						][
 							space/edit key->plan event space/selected
 							pick-paint
