@@ -1250,10 +1250,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		rows-above: to integer! rows-above': x-1D' / frame/size-2D/x
 		if rows-above = rows-above' [					;-- contested pixel
 			rows-above: either side = 'left
-				[max rows-above - 1 0]
+				[rows-above - 1]
 				[min rows-above frame/nrows - 1]
 		]
-		1 + rows-above
+		1 + max 0 rows-above
 	]
 	
 	map-x1D->row: function [
@@ -1421,8 +1421,7 @@ rich-content-ctx: context [								;-- rich content
 			range: select/same ranges child
 			xy2: geom/size * 0x1 + xy1: geom/offset
 			either 1 >= n: span? range [
-				#assert [1 = span? range]
-				repend boxes [xy1 xy2]
+				if n = 1 [repend boxes [xy1 xy2]]		;-- span can be zero (empty text), it's not counted then 
 			][
 				#assert [object? select child 'layout]
 				#assert [1 = rich-text/line-count? child/layout]
@@ -1433,10 +1432,8 @@ rich-content-ctx: context [								;-- rich content
 				]
 			]
 		]
-		unless empty? boxes [
-			offset: 1x0 * geom/size
-			repend boxes [xy1 + offset xy2 + offset]	;-- n+1 carets for n items
-		]
+		offset: 1x0 * geom/size
+		repend boxes [xy1 + offset xy2 + offset]		;-- n+1 carets for n items, always at least 1 caret
 		copy boxes
 	]
 	    
@@ -1599,6 +1596,7 @@ rich-content-ctx: context [								;-- rich content
 		box: space/measure [caret->box caret/offset caret/side]
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
+		#assert [box/1/y < box/2/y]
 		quietly caret/size: box/2 - box/1 + (caret/width by 0)
 		invalidate/only caret
 		drawn: render caret
@@ -1708,6 +1706,7 @@ rich-content-ctx: context [								;-- rich content
 			obj: make-space 'text []					;@@ use prototype for this?
 			obj/font: space/font
 			append space/content obj
+			repend space/ranges [obj 0x0]
 		]
 	]
 	

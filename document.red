@@ -136,7 +136,8 @@ doc-ctx: context [
 				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
 			]
 			#assert [pofs < offset]						;-- limited by paragraph's head
-			before: reverse append/part clear [] para/items skip para/items offset - pofs
+			e: skip s: para/data/items offset - pofs
+			before: reverse append/part clear [] s e
 			parse before [any word-sep any non-word-sep before:]
 			offset - skip? before
 		]
@@ -148,7 +149,7 @@ doc-ctx: context [
 				set [para: pofs: plen:] caret->paragraph doc offset: offset + 1
 			]
 			#assert [pofs + plen > offset]				;-- limited by paragraph's tail
-			after: skip para/items offset - pofs
+			after: skip para/data/items offset - pofs
 			parse pos: after [any word-sep any non-word-sep pos:]
 			offset + offset? after pos
 		]
@@ -237,8 +238,14 @@ doc-ctx: context [
 	] with :actions/edit [
 		set [para: pofs: plen:] caret->paragraph doc offset
 		either by [pos: pos + offset][if word? pos [pos: actions/at pos]]
-		if block? pos [doc/caret/side: pos/side  pos: pos/offset]	;-- block may be returned by find-line-below/above
-		if integer? pos [doc/caret/offset: clip pos 0 length]	;-- unknown words are silently ignored
+		if block? pos [									;-- block may be returned by find-line-below/above
+			doc/caret/side:   pos/side
+			doc/caret/offset: clip 0 length pos/offset
+		]
+		if integer? pos [								;-- unknown words are silently ignored
+			if pos <> offset [doc/caret/side: pick [left right] pos > offset]	;-- only change side if moved
+			doc/caret/offset: clip 0 length pos
+		]
 	]
 	
 	actions/remove: function [
@@ -353,6 +360,7 @@ doc-ctx: context [
 			doc/content: doc/content
 		]
 		adjust-offsets doc range/1 negate span? range
+		if all [doc/selected  0 = span? doc/selected] [doc/selected: none]	;-- normalize emptied selection
 	]
 	
 	document/insert: function [
@@ -428,11 +436,13 @@ doc-ctx: context [
 		]
 	]
 	
-	;@@ need to keep some attr 'state' that can be modified by buttons and applied to new chars
 	document/get-attrs: function [space [object!] index [integer!]] [
-		if set [para: pofs: plen:] caret->paragraph space index [
-			offset: clip 0 (max 0 plen - 1) index - 1 - pofs	;-- no attribute at the 'new-line' delimiter
-			rich/attributes/copy para/data/attrs probe 0x1 + offset	;@@ still may be empty - is it ok?
+		if set [para: pofs: plen:] caret->paragraph space offset: index - 1 [
+			while [all [offset > 0  pofs + plen = offset]] [	;-- no attribute at the 'new-line' delimiter, try above paragraph
+				set [para: pofs: plen:] caret->paragraph space offset: offset - 1
+			]
+			offset: clip 0 (max 0 plen - 1) offset - pofs
+			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
 		]
 	]
 	
@@ -539,6 +549,7 @@ doc-ctx: context [
 				[0 by (caret - 1)]
 			caret'/offset: clip limits/1 limits/2 caret'/offset
 		]
+		; watch 'caret'
 		caret'
 	]
 		
@@ -787,9 +798,9 @@ bulletify: function [] [
 ]
 ;; current attributes (for inserted chars)
 paint: #()
-pick-paint: function [/from index: doc/caret/offset [integer!]] [	;-- use attrs from before the caret by default
+pick-paint: function [/from index: (doc/caret/offset + 1) [integer!]] [	;-- use attrs under the caret by default
 	set 'paint doc-ctx/document/get-attrs doc index
-	?? paint
+	; ?? paint
 ]
 view reshape [
 	host 500x400 [
@@ -916,62 +927,61 @@ view reshape [
 						not event/ctrl?
 					][
 						space/edit key->plan event space/selected
-						space/edit compose [paint -1x0 + space/caret/offset (paint)]
+						if paint [space/edit compose [paint -1x0 + space/caret/offset (paint)]]
 					]
-					exit
 					;@@ generalize mapping of edit keys to edit API, so field and area may reuse the same logic
-					switch/default probe event/key [
-						#"^C" [
-							if space/selected [
-								clipboard/write doc-ctx/document/copy space space/selected
-							]
-						]
-						#"^V" [
-							unless empty? data: clipboard/read [
-								doc-ctx/document/insert space space/caret/offset data
-								space/selected: none
-							]
-						]
-						#"^X" [
-							if range: space/selected [
-								clipboard/write doc-ctx/document/copy space range
-								doc-ctx/document/remove space range
-								space/selected: none
-							]
-						]
-						#"^H" [
-							doc-ctx/document/remove space max 0 space/caret/offset + -1x0
-						]
-						left right [
-							shift: pick [-1 1] 'left = side: event/key 
-							total: doc-ctx/document/length space	;@@ need to cache it
-							new: clip 0 total space/caret/offset + shift
+					; switch/default probe event/key [
+						; #"^C" [
+							; if space/selected [
+								; clipboard/write doc-ctx/document/copy space space/selected
+							; ]
+						; ]
+						; #"^V" [
+							; unless empty? data: clipboard/read [
+								; doc-ctx/document/insert space space/caret/offset data
+								; space/selected: none
+							; ]
+						; ]
+						; #"^X" [
+							; if range: space/selected [
+								; clipboard/write doc-ctx/document/copy space range
+								; doc-ctx/document/remove space range
+								; space/selected: none
+							; ]
+						; ]
+						; #"^H" [
+							; doc-ctx/document/remove space max 0 space/caret/offset + -1x0
+						; ]
+						; left right [
+							; shift: pick [-1 1] 'left = side: event/key 
+							; total: doc-ctx/document/length space	;@@ need to cache it
+							; new: clip 0 total space/caret/offset + shift
 							; if event/shift? [
 								; doc-ctx/document/expand-selection
-							set with space/caret [offset side] reduce [new side]
-							pick-paint
-						]
-						home end [
-							offset: space/caret/offset
-							set [para: pofs: plen:] doc-ctx/caret->paragraph doc offset
-							space/caret/offset: either 'home = event/key [pofs][pofs + plen]
-							pick-paint
-						]
-						up down [
-							;@@ ideally I want to keep the ideal "x" of the line where up/down movement started, only override it on other keys
-							if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key 0 [
-								space/caret/offset: caret'/offset
-								space/caret/side:   caret'/side
-							]
-							pick-paint
-						]
-					][
-						if char? event/key [
-							offset: space/caret/offset
-							doc-ctx/document/insert space offset s: form event/key
-							doc-ctx/document/paint space 0 by (length? s) + offset paint
-						]
-					]
+							; set with space/caret [offset side] reduce [new side]
+							; pick-paint
+						; ]
+						; home end [
+							; offset: space/caret/offset
+							; set [para: pofs: plen:] doc-ctx/caret->paragraph doc offset
+							; space/caret/offset: either 'home = event/key [pofs][pofs + plen]
+							; pick-paint
+						; ]
+						; up down [
+							; ;@@ ideally I want to keep the ideal "x" of the line where up/down movement started, only override it on other keys
+							; if caret': doc-ctx/caret-row-shift space space/caret/offset space/caret/side event/key 0 [
+								; space/caret/offset: caret'/offset
+								; space/caret/side:   caret'/side
+							; ]
+							; pick-paint
+						; ]
+					; ][
+						; if char? event/key [
+							; offset: space/caret/offset
+							; doc-ctx/document/insert space offset s: form event/key
+							; doc-ctx/document/paint space 0 by (length? s) + offset paint
+						; ]
+					; ]
 				] on-key-down [
 					unless printable?: all [
 						char? key: event/key
