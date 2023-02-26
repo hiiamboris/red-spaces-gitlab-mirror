@@ -430,6 +430,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				repend points [x: x + geom/size/x  o: o + 1]
 			]
 			#assert [x < infxinf/x]
+			if points = [0 0 0 1] [points/3: 1]			;-- hack to make it all work with a zero-wide map
 			build-index copy points n: x >> 5 + 1		;-- 1 point per 32 px
 		]
 		
@@ -437,6 +438,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		list-sections: function [map [block!] total [integer!]] [
 	    	generate-sections map total sections: clear []
 	    	;@@ make leading spaces significant?
+	    	if empty? sections [append sections 1]
 	    	copy sections
 		]
 	    
@@ -472,6 +474,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    ]
 	    #assert [
 	    	[] = list-words []
+	    	; [0x1 1 #[true]  0x0] = list-words []
 	    	[0x6 6 #[false] 0x3] = list-words [1 2 3]
 	    	[0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] = list-words [-1 -2 1 2 3 -4]
 	    ]
@@ -700,6 +703,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			x-1D-to-map-offset: index-map map
 			sections: list-sections map total-1D/x
+			#assert [not empty? sections]				;-- too hard to adapt the algorithm for that case
 			words: list-words sections
 			total-2D: 1x0 * ccanvas						;-- without margins
 			if any [
@@ -739,7 +743,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				row-x2-1D:  last-word/1/2				;-- row x1-x2 includes the trailing whitespace, unlike used-width
 				row-x1-1D': nrows     * total-2D/x
 				row-x2-1D': nrows + 1 * total-2D/x
-				#assert [row-x2-1D > row-x1-1D]
+				#assert [any [row-x2-1D > row-x1-1D empty? sections]]	;-- empty row only allowed for empty input
 				
 				;; unify, pad, scale words
 				#assert [not empty? row-words]
@@ -774,7 +778,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				
 				;; measure the row vertically
-				set [map-ofs1: map-ofs2:] reproject-range/truncate x-1D-to-map-offset row-x1-1D row-x2-1D - 1
+				set [map-ofs1: map-ofs2:] reproject-range/truncate x-1D-to-map-offset row-x1-1D max row-x1-1D row-x2-1D - 1
 				set [row-y1-1D: row-y2-1D:] get-row-y1y2 map map-ofs1 map-ofs2
 				row-y2-2D:  row-y1-2D + (row-y2-1D - row-y1-1D)
 				row-y0-2D:  row-y2-2D - row-y2-1D
@@ -796,7 +800,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					row-origin-1D: geom1/offset * 1x0
 					spaces-drawn: clear []
 					for i: map-ofs1 + 1 map-ofs2 + 1 [
-						geom: pick map i * 2
+						geom: pick map i * 2 
 						compose/only/into [
 							translate (geom/offset - row-origin-1D) (geom/drawn)
 						] tail spaces-drawn
@@ -829,17 +833,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				indent: indent2
 				row-y1-2D: row-y2-2D + spacing
 				nrows: nrows + 1
-			]
-			if tail? sections [							;-- no sections special case (zero-thin spaces) ;@@ this case might need more optimization
-				row-y2-2D: second get-row-y1y2 map 0 0
-				#assert [
-					empty? x-1D-1D'-points
-					empty? y-levels
-					empty? y-irow-points
-				]
-				append x-1D-1D'-points    [0 0 0 0]
-				repend y-levels           [0 0 row-y2-2D]
-				repend y-irow-points      [0 0 row-y2-2D 0]
 			]
 			total-2D/y: row-y2-2D
 			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
