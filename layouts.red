@@ -704,6 +704,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			x-1D-to-map-offset: index-map map
 			sections: list-sections map total-1D/x
 			#assert [not empty? sections]				;-- too hard to adapt the algorithm for that case
+			total-1D/x: max 1 total-1D/x				;-- ditto
 			words: list-words sections
 			total-2D: 1x0 * ccanvas						;-- without margins
 			if any [
