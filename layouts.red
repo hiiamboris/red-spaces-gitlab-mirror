@@ -830,6 +830,17 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				row-y1-2D: row-y2-2D + spacing
 				nrows: nrows + 1
 			]
+			if tail? sections [							;-- no sections special case (zero-thin spaces) ;@@ this case might need more optimization
+				row-y2-2D: second get-row-y1y2 map 0 0
+				#assert [
+					empty? x-1D-1D'-points
+					empty? y-levels
+					empty? y-irow-points
+				]
+				append x-1D-1D'-points    [0 0 0 0]
+				repend y-levels           [0 0 row-y2-2D]
+				repend y-irow-points      [0 0 row-y2-2D 0]
+			]
 			total-2D/y: row-y2-2D
 			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
 			total-1D': (last x-1D-1D'-points) by total-1D/y
