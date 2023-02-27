@@ -1616,7 +1616,7 @@ rich-content-ctx: context [								;-- rich content
 		drawn
 	]
 	
-	;@@ can this be unified with metrics?
+	;@@ this edit is incompatible with field/edit & document/edit - should I bother fixing it?
 	edit: context [
 		edit: function [space [object!] plan [block!]] [
 			do with self plan

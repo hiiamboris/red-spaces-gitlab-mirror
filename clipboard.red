@@ -17,7 +17,7 @@ clipboard: context [
 		list: map-each [item [object!]] data [
 			when in item 'format (item/format)
 		]
-		to {} delimit list "^/" 
+		to {} delimit list "^/"
 	]
 	
 	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
@@ -48,11 +48,9 @@ clipboard: context [
 		"Write data to clipboard"
 		content [block! (parse content [any object!]) string!]
 	][
-		content: either string? content [
-			copy content
-		][
-			clone-data content
-		]
+		content: either string? content
+			[copy content]
+			[clone-data content]
 		append clear data content
 		write-clipboard self/text: data-to-text data
 	]
