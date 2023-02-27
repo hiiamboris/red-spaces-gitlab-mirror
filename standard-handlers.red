@@ -7,6 +7,14 @@ Red [
 
 ;-- requires events.red (on load)
 
+is-key-printable?: function [event [event! object!]] [
+	to logic! all [
+		char? char: event/key
+		char >= #" "
+		not event/ctrl?
+	]
+]
+
 define-handlers [
 
 	;-- *************************************************************************************
@@ -242,13 +250,8 @@ define-handlers [
 		;; OTOH `key` properly reflects Shift state in chars
 		;; so we have to use both, just separate who handles what
 		on-key [space path event] [					;-- char keys branch (inserts stuff as you type)
-			printable?: all [
-				char? char: event/key
-				char >= #" "
-				not event/ctrl?							;-- handled by on-key-down (e.g. ctrl+BS=#"^~")
-			]
-			unless printable? [ 
-				if char = #"^-" [pass]					;-- let tab pass thru
+			unless is-key-printable? event [			;-- handled by on-key-down (e.g. ctrl+BS=#"^~") 
+				if event/key = #"^-" [pass]				;-- let tab pass thru
 				exit									;@@ what about enter key / on-enter event?
 			]
 			;@@ TODO: input validation / filtering
@@ -260,12 +263,7 @@ define-handlers [
 		
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
 			;@@ up/down keys may be used for spatial navigation
-			printable?: all [
-				char? char: event/key
-				char >= #" "
-				not event/ctrl?							;-- handled by on-key-down (e.g. ctrl+BS=#"^~")
-			]
-			if printable? [exit]
+			if is-key-printable? event [exit]
 			space/edit key->plan event space/selected
 			quietly space/origin: field-ctx/adjust-origin space
 			invalidate space

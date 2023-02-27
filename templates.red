@@ -3430,99 +3430,140 @@ field-ctx: context [
 		]
 	]
 	
-	edit: function [field [object!] plan [block!] /local n p] [
-		len: length? text: field/text
-		pos: skip text co: field/caret/offset
-		sel: field/selected
-		
-		parse/case plan [any [plan:
-			['undo (undo field) | 'redo (redo field)] (
-				pos: skip text co: field/caret/offset
-				len: length? text: field/text
-			)
-			
-			;@@ special case may be needed for NxN selection (should it become `none`?) need more usage data
-		|	'select [(n: none)
-				'none (sel: none)
-			|	'all  (sel: 0 by co: len)
-			|	'head (n: negate co)
-			|	'tail (n: len - co)
-			|	'prev-word (n: (find-prev-word field co) - co)
-			|	'next-word (n: (find-next-word field co) - co)
-			|	'to set n integer! (n: n - co)
-			|	'by set n integer!
-			|	set p pair! (sel: p  co: p/1)
-			] (
-				if n [									;-- this only works if caret is at selection edge
-					other: case [
-						not sel    [co]
-						co = sel/1 [sel/2]
-						co = sel/2 [sel/1]
-						'else      [co]					;-- shouldn't happen, but just in case
-					]
-					co: clip 0 len co + n
-					sel: (min co other) by (max co other)
-				]
-				field/caret/offset: co
-				field/selected: sel
-			)
-			
-		|	'copy [
-				set p pair! 
-			|	'selected (p: sel)
-			] (if p [write-clipboard copy/part text p + 1])
-			
-		|	'move [
-				'head (co: 0)
-			|	'tail (co: len)
-			|	'prev-word (co: find-prev-word field co)
-			|	'next-word (co: find-next-word field co)
-			|	'sel-bgn   (if sel [co: sel/1])
-			|	'sel-end   (if sel [co: sel/2])
-			|	'to set co integer!
-			|	'by set n  integer! (co: co + n)
-			] (
-				pos: skip text field/caret/offset: co: clip 0 len co
-				field/selected: sel: none				;-- `select` should be used to keep selection
-			)
-			
-		|	[	'insert [set s string!]
-			|	'paste (s: read-clipboard) if (string? s)
-			] (
-				unless empty? s [
-					field/caret/offset: co: skip? pos: insert pos s
-					len: length? text
-					mark-history field
-				]
-			)
-			
-		|	'remove [
-				'prev-word (n: (find-prev-word field co) - co)
-			|	'next-word (n: (find-next-word field co) - co)
-			|	'selected  (n: 0  if sel [
-					n: sel/2 - co: sel/1
-					sel: field/selected: none
-				])
-			|	set n integer!
-			] (
-				if n < 0 [								;-- reverse negative removal
-					co: co - n: abs n
-					if co < 0 [n: n + co  co: 0]		;-- don't let it go past the head
-				]
-				n: min n len - co						;-- don't let it go past the tail
-				if n <> 0 [
-					field/caret/offset: co
-					remove/part pos: skip text co n
-					len: length? text
-					mark-history field
-				]
-			)
-		|	end
-		; |	(ERROR "Unexpected edit command at: (mold/flat/part plan 50)")
-		|	skip										;-- some edit commands may not be supported by the field (e.g. up/down)
-		]]
+	actions: context [
+		edit: function [field [object!] plan [block!]] [
+			plan: with self plan
+			;@@ should info be updated after every function call instead? in case they are chained (if ever)
+			while [not tail? plan] [					;-- info is updated after every call
+				length: length? text: field/text
+				selected: field/selected
+				; pos: skip text offset: field/caret/offset
+				offset: field/caret/offset
+				do/next plan 'plan
+			]
+		]
+		undo: redo: copy: at: move: remove: insert: paste: select: none
 	]
 	
+	actions/undo: does with :actions/edit [~/undo field]
+	actions/redo: does with :actions/edit [~/redo field]
+	
+	actions/copy: function [
+		"Copy specified range into clipboard"
+		range [word! pair!] "Offset range or any of: [selected all]"
+	] with :actions/edit [
+		switch range [
+			selected [range: selected]
+			all      [range: 0 by length]
+		]
+		slice: when pair? range (copy/part text range + 1)		;-- silently ignores unsupported range words
+		clipboard/write slice
+		slice
+	]
+	
+	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
+		switch/default name [
+			head far-head [0]
+			tail far-tail [length]
+			prev-word [~/find-prev-word field offset]
+			next-word [~/find-next-word field offset]
+		] [offset]										;-- don't move on unsupported commands
+	]
+	
+	actions/move: function [
+		"Displace the caret"
+		pos [word! (not by) integer!]
+		/by "Move by a relative integer number of chars"
+	] with :actions/edit [
+		if word? pos [pos: actions/at pos]
+		if by        [pos: offset + pos]
+		field/caret/offset: clip 0 length pos
+	]
+	
+	actions/remove: function [
+		"Remove range or from caret up to a given limit"
+		limit [word! pair! (not by) integer!]
+		/by "Relative integer number of char"
+	] with :actions/edit [
+		case/all [
+			word? limit    [limit: actions/at limit]
+			by             [limit: offset + limit]
+			integer? limit [limit: as-pair offset limit]
+			0 < span? limit: clip 0 length order-pair limit [
+				remove/part  skip text limit/1  span? limit
+				field/caret/offset: limit/1
+				mark-history field
+			]
+		]
+	]
+	
+	actions/insert: function [
+		"Insert given data into current caret offset"
+		data [string!]
+	] with :actions/edit [
+		unless empty? data [
+			insert (skip text offset) data
+			field/caret/offset: offset + length? data
+			mark-history field
+		]
+	]
+	
+	actions/paste: function [
+		"Paste text from clipboard into current caret offset"
+	] with :actions/edit [
+		if str: clipboard/read/text [actions/insert str] 
+	]
+	
+	;; selection anchor to pair converter shared by field and document
+	compute-selection: function [
+		limit     [pair! word! integer!]
+		relative? [logic!]
+		actions   [object!]
+		offset    [integer!]
+		length    [integer!]
+		selected  [pair! none!]
+	][
+		;@@ special case may be needed for NxN selection (should it become `none`?) need more usage data
+		case [
+			relative?      [ofs: offset + limit]
+			integer? limit [ofs: limit]
+			pair?    limit [sel: limit]
+			'else [
+				switch/default limit [
+					none #[none] [sel: none]
+					all [sel: as-pair 0 length]
+				][
+					ofs: actions/at limit				;-- document's action/at can return a block
+					if block? ofs [ofs: ofs/offset]		;-- ignores returned side
+				]
+			]
+		]
+		either ofs [									;-- selection extension/contraction
+			ofs: clip ofs 0 length
+			sel: any [selected  1x1 * offset]
+			other: case [
+				sel/1 = offset [sel/2]
+				sel/2 = offset [sel/1]
+				'else [offset]							;-- if caret is not at selection's edge, ignore previous selection
+			]
+			sel: other by ofs
+		][												;-- selection override
+			if sel [sel: clip sel 0 length]
+			ofs: either sel [sel/2][offset]				;-- 'select none' doesn't move the caret
+		]
+		reduce [ofs  if sel [order-pair sel]]
+	]
+	
+	actions/select: function [
+		"Extend or redefine selection"
+		limit [pair! word! (not by) integer!]
+		/by "Move selection edge by an integer number of chars"
+	] with :actions/edit [
+		set [ofs: sel:] compute-selection limit by actions offset length selected
+		field/caret/offset: ofs
+		field/selected: sel
+	]
+			
 	adjust-origin: function [
 		"Return field/origin adjusted so that caret is visible"
 		field [object!]
@@ -3635,7 +3676,7 @@ field-ctx: context [
 			"Apply a sequence of edits to the text"
 			plan [block!]
 		][
-			~/edit self plan
+			~/actions/edit self plan
 		]
 		
 		draw: func [/on canvas [pair!]] [~/draw self canvas]

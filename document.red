@@ -185,7 +185,7 @@ doc-ctx: context [
 	;@@ redo
 	
 	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
-		switch name [
+		switch/default name [
 			far-head  [0]
 			far-tail  [length]
 			head      [pofs]							;-- paragraph's head/tail ;@@ or use row's head/tail? exclude indentation or not?
@@ -196,7 +196,7 @@ doc-ctx: context [
 			line-down [doc/measure [find-line-below]]
 			; page-up   [doc/measure [find-page-above]]			;@@ these need to know page size
 			; page-down [doc/measure [find-page-below]]
-		]
+		] [offset]										;-- on unknown anchors assume current offset
 	]
 		
 	actions/select: function [
@@ -204,33 +204,8 @@ doc-ctx: context [
 		limit [pair! word! (not by) integer!]
 		/by "Move selection edge by an integer number of caret slots"
 	] with :actions/edit [
-		set [para: pofs: plen:] caret->paragraph doc offset
-		case [
-			by             [ofs: offset + limit]
-			integer? limit [ofs: limit]
-			pair?    limit [sel: clip 0 length limit]
-			'else [
-				switch/default limit [
-					none #[none] [sel: none]
-					all [sel: as-pair 0 length]
-				][
-					ofs: any [actions/at limit  offset]	;-- if `at` fails, assume caret offset
-					if block? ofs [ofs: ofs/offset]		;-- ignores returned side
-				]
-			]
-		]
-		either ofs [									;-- selection extension/contraction
-			sel: any [doc/selected  1x1 * offset]
-			other: case [
-				sel/1 = offset [sel/2]
-				sel/2 = offset [sel/1]
-				'else [offset]							;-- if caret is not at selection's edge, ignore previous selection
-			]
-			sel: as-pair other ofs
-		][												;-- selection override
-			ofs: either sel [sel/2][offset]				;-- 'select none' doesn't move the caret
-		]
-		doc/caret/offset: clip ofs 0 length
+		set [ofs: sel:] field-ctx/compute-selection limit by actions offset length doc/selected
+		doc/caret/offset: ofs
 		doc/selected: sel
 	]
 	
@@ -269,7 +244,7 @@ doc-ctx: context [
 	
 	actions/copy: function [
 		"Copy specified range into clipboard"
-		range [word! pair!] "Offset range or 'selected"
+		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
 	] with :actions/edit [
 		switch range [
 			selected [range: doc/selected]
@@ -283,12 +258,12 @@ doc-ctx: context [
 	actions/paste: function [
 		"Paste text from clipboard into current caret offset"
 	] with :actions/edit [
-		actions/insert clipboard/read
+		if data: clipboard/read [actions/insert data]
 	]
 	
 	actions/insert: function [
 		"Insert given data into current caret offset"
-		data [block! string! none!]
+		data [block! string!]
 	] with :actions/edit [
 		;@@ mark history state
 		unless empty? data [document/insert doc offset data]	;-- caret gets moved via adjust-offsets
@@ -550,6 +525,8 @@ doc-ctx: context [
 	]
 	
 	;@@ maybe functions above should be based on this?
+	;@@ maybe they should also inherit font/size/flags from the first char of the first paragraph?
+	;@@ also ideally on break/remove/cut/paste paragraph numbers should auto-update, but I'm too lazy
 	;; replaces paragraph's bullet following that of the previous paragraph
 	document/auto-bullet: function [doc [object!] offset [integer!]] [
 		set [para: pofs: plen:] caret->paragraph doc offset
@@ -682,49 +659,6 @@ doc-ctx: context [
 		
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
-	]
-]
-
-clipboard: context [
-	data: []											;-- last copied data
-	text: ""											;-- text version of the last copied data
-	
-	data-to-text: function [data [block!]] [
-		list: map-each [item [object!]] data [
-			when in item 'format (item/format)
-		]
-		to {} delimit list "^/" 
-	]
-	
-	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
-	clone-data: function [data [block! string!]] [
-		either string? data [
-			copy data
-		][
-			map-each item data [
-				only all [
-					space? :item
-					function? select item 'clone
-					item/clone
-				]
-			]
-		]
-	]
-	
-	read: function [] [
-		read: read-clipboard
-		unless read == text [self/data: self/text: read]		;-- last copy comes from outside the running script
-		clone-data data
-	]
-	
-	write: function [content [block! (parse content [any object!]) string!]] [
-		content: either string? content [
-			copy content
-		][
-			clone-data content
-		]
-		append clear data content
-		write-clipboard self/text: data-to-text data
 	]
 ]
 
@@ -1007,20 +941,12 @@ view reshape [
 						]
 					]
 				] on-key [
-					if printable?: all [
-						char? key: event/key
-						key >= #" "
-						not event/ctrl?
-					][
+					if is-key-printable? event [
 						space/edit key->plan event space/selected
 						if paint [space/edit compose [paint -1x0 + space/caret/offset (paint)]]
 					]
 				] on-key-down [
-					unless printable?: all [
-						char? key: event/key
-						key >= #" "
-						not event/ctrl?
-					][
+					unless is-key-printable? event [
 						switch/default event/key [
 							#"^M" #"^/" [doc/edit [select 'none  break  auto-bullet]]
 						][
