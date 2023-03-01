@@ -96,6 +96,7 @@ do/expand [
 				#include %tabbing.red
 				#include %single-click.red
 				#include %clipboard.red
+				#include %timelines.red
 				#include %edit-keys.red
 				#include %standard-handlers.red
 				#include %hovering.red
