@@ -3,6 +3,12 @@ Red [
 	purpose: "Allow copy/paste of rich content within document"
 	author:  @hiiamboris
 	license: BSD-3
+	notes: {
+		Data is cloned twice, when:
+		- it's put into clipboard - so any change in the source does not affect clipped contents
+		- it's fetched from clipboard - so any change in the pasted data does not affect clipped contents
+		  and also so spaces can be pasted multiple times without any effort on the pasting code's side
+	}
 ]	
 
 clipboard: context [
@@ -25,16 +31,18 @@ clipboard: context [
 		either string? data [
 			copy data
 		][
-			map-each item data [
-				only all [
-					space? :item
-					function? select item 'clone
-					item/clone
-				]
+			#assert [parse data [block! map!]]
+			items: map-each [obj [object!]] data/1 [
+				either function? select obj 'clone [obj/clone][#" "]	;-- fill unsupported items with space, to preserve attr mapping
+			]
+			reduce [
+				items
+				make map! copy/deep to [] data/2		;@@ cannot use copy/deep on maps
 			]
 		]
 	]
 	
+	;@@ TODO: /as refinement with 'text and 'rich-text formats for more abstraction?
 	read: function [
 		"Get clipboard contents"
 		/text "Return text even if data is non-textual"
@@ -46,7 +54,7 @@ clipboard: context [
 	
 	write: function [
 		"Write data to clipboard"
-		content [block! (parse content [any object!]) string!]
+		content [block! (parse content [block! map!]) string!]
 	][
 		content: either string? content
 			[copy content]

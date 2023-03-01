@@ -297,11 +297,17 @@ doc-ctx: context [
 	]
 	
 	document/copy: function [doc [object!] range [pair!]] [
-		if range/1 = range/2 [return copy []]
-		map-each [para prange] map-range doc range [
-			also para: para/clone
-			para/edit [clip! prange]
+		rowbreak: [[#"^/"] #()]
+		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
+		ofs:      0
+		for-each [p: para prange] map-range doc range [
+			data: para/edit [copy prange]
+			len: length? para/data/items
+			rich/decoded/insert! result ofs data
+			if 2 < length? p [rich/decoded/insert! result ofs + len rowbreak]
+			ofs: ofs + len + 1
 		]
+		probe result
 	]
 		
 	;@@ do auto-linkification on space after url!
@@ -350,37 +356,43 @@ doc-ctx: context [
 	document/insert: function [
 		doc    [object!]
 		offset [integer!]
-		data   [block! (parse data [any object!]) string!]
+		data   [block! (parse data [block! map!]) string!]
+		/local _
 	][
-		if empty? data [exit]
+		either block? data [set [items: attrs:] data][items: data]
+		if empty? items [exit]
 		set [para1: pofs1:] caret->paragraph doc offset
 		pcar1: offset - pofs1
-		case [
-			string? data [
-				para1/edit [insert! pcar1 data]
-				added: length? data
-			]
-			single? data [
-				para1/edit [insert! pcar1 values-of data/1/data]
-				added: data/1/measure [length]
-			]
-			'multiple [
-				;; account for both paragraphs text and new-line slot
-				added: (length? data) - 1 + sum map-each para data [para/measure [length]]
+		either string? data [
+			para1/edit [insert! pcar1 data]
+		][
+			rows: parse items [collect [any [keep copy _ to #"^/" skip] keep copy _ to end]]	;@@ split doesn't work on blocks yet
+			slice: rich/decoded/copy data 0 by len: length? rows/1
+			either single? rows [
+				para1/edit [insert! pcar1 slice]
+			][
 				;; edit first paragraph, but remember the after-insertion part
 				para1/edit [							;@@ make another action in edit for this?
 					stashed: copy range: pcar1 by infxinf/x
 					remove! range
-					insert! pcar1 values-of data/1/data
+					insert! pcar1 slice 
 				]
+				;; convert other rows into paragraphs and insert them into doc/content
+				ofs: len + 1
+				rest: map-each row next rows [
+					#assert [items/:ofs = #"^/"]
+					len: length? row
+					slice: rich/decoded/copy data 0 by len + ofs
+					ofs: ofs + len + 1
+					make-space 'rich-content [data: slice]
+				]
+				insert (find/same/tail doc/content para1) rest
 				;; append stashed part to the last inserted paragraph
-				paraN: last data
+				paraN: last rest
 				paraN/edit [insert! infxinf/x stashed]
-				;; insert all other paragraphs (doc/content can be edited directly)
-				insert (find/same/tail doc/content para1) next data
 			]
 		]
-		adjust-offsets doc offset added
+		adjust-offsets doc offset length? items
 	]
 	
 	document/break: function [
