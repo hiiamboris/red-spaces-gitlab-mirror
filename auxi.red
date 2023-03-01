@@ -69,10 +69,10 @@ without-GC: func [
 ]
 
 
-;@@ copy/deep does not copy inner maps unfortunately, so have to use this in %events.red
-;@@ bug: this also doesn't copy nested strings
+;@@ copy/deep does not copy inner maps unfortunately, so have to use this everywhere
+;@@ need more generally applicable version (e.g. for block with blocks with maps), but seems to complex/slow for now
 copy-deep-map: function [m [map!]] [
-	m: copy/deep m
+	m: make map! copy/deep to [] m						;@@ workaround for copy/deep #(map) not copying nested strings/blocks
 	foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
 	m
 ]
