@@ -2,6 +2,11 @@ Red [
 	title:   "Actors support for Draw-based widgets"
 	author:  @hiiamboris
 	license: BSD-3
+	notes: {
+		A defined actor does NOT by default stop the evaluation of standard event handler.
+		This is so actors don't accidentally disable any internal functionality.
+		When required though, they can use STOP, e.g. for stopping tabbing. 
+	}
 ]
 
 
