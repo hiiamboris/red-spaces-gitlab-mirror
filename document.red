@@ -48,7 +48,7 @@ context [
 	]
 ]
 
-code-font: make font! [name: system/view/fonts/fixed]
+code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
 doc-ctx: context [
 	~: self
 	
@@ -368,7 +368,7 @@ doc-ctx: context [
 	
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
-	document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: indent: none]
+	document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: codify: bulletify: enumerate: auto-bullet: indent: none]
 	
 	document/length: function [doc [object!]] [
 		doc/measure [length]
@@ -421,6 +421,42 @@ doc-ctx: context [
 		]
 		adjust-offsets doc range/1 1 - span? range
 		; print mold/deep items
+	]
+	
+	;@@ some of these funcs are rather non-essential, maybe I should move them somewhere else
+	;@@ this in particular also depends on custom templates
+	document/codify: function [doc [object!] range [pair!]] [
+		range: order-pair clip range 0 doc/measure [length]
+		if range/1 = range/2 [exit]
+		mapped: map-range doc range
+		either 2 = length? mapped [						;-- single line code span
+			set [para: prange:] mapped
+			text: para/edit [copy/text prange]
+			code: make-space 'code compose [text: (text)]
+			para/edit [
+				remove! prange
+				insert! prange/1 code
+			]
+		][												;-- code block
+			#assert [2 < length? mapped]
+			;; remove empty paragraphs from the range
+			set [para1: prange1:] mapped
+			set [paraN: prangeN:] mapped << 2
+			if zero? span? prange1 [range/1: range/1 + 1]
+			if zero? span? prangeN [range/2: max range/1 range/2 - 1]
+			;; remap to full paragraphs and replace
+			mapped: map-range/extend doc range
+			range: prange1/1 by second last mapped		;-- include full paragraphs into range (for adjust-offsets)
+			lines: map-each [para prange] mapped [para/format]	;-- ignores range
+			text: to string! delimit lines "^/"
+			code: make-space 'pre compose [text: (text)]
+			remove/part find/same/tail doc/content para1 -1 + half length? mapped
+			para1/edit [
+				remove! prange1
+				insert! 0 code
+			]
+		]
+		adjust-offsets doc range/1 negate span? range
 	]
 	
 	document/remove: function [doc [object!] range [pair!]] [
@@ -761,6 +797,9 @@ doc-ctx: context [
 	; below: [push [line-width 1 fill-pen off pen red box 0x0 (size)]]
 ; ]
 
+declare-template 'code/text []
+declare-template 'pre/paragraph []
+
 declare-template 'bullet/text [
 	text:   "^(2981)"
 	format: does [rejoin [text " "]]
@@ -812,11 +851,40 @@ icons: object [
 	]
 ]
 
+;@@ can I make code templates generic enough to separate them?
+underbox: function [
+	"Draw a box to highlight code parts"
+	size       [pair!]
+	line-width [integer!]
+	rounding   [integer!]
+][
+	compose/deep [
+		push [										;-- solid box under code areas
+			line-width (line-width)
+			pen (opaque 'text 10%)
+			fill-pen (opaque 'text 5%)
+			box 0x0 (size) (rounding)
+		]
+	]
+]
+
 define-styles [
 	drop-button: [
 		below: when select self 'color [push [pen off fill-pen (color) box 0x0 (size)]]
 	]
+	code: using [pen] [
+		font: code-font
+		margin: 4x0
+		pen: when color (compose [pen (color)])
+		below: [(underbox size 1 3) (pen)]
+	]
+	pre: [
+		margin: 10
+		font: code-font
+		below: [(underbox size 2 5)]
+	]
 ]
+
 define-handlers [
 	drop-button: [
 		face: [
@@ -922,6 +990,15 @@ indent: function [offset [integer!]] [
 	]
 	doc-ctx/document/indent doc range offset
 ]
+codify: function [] [
+	if all [
+		range: doc/selected
+		range/1 <> range/2
+	][
+		doc-ctx/document/codify doc range
+		doc/selected: none
+	]
+] 
 view reshape [
 	host 500x400 [
 		vlist [
@@ -982,7 +1059,7 @@ view reshape [
 						doc-ctx/document/linkify doc range compose [browse (as url! url)]
 					]
 				] 
-				;@@ code
+				attr "[c]" font= make code-font [size: 20] on-click [codify]
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 
 				attr "⤆" on-click [indent -20]
 				attr "⤇" on-click [indent  20]
@@ -1046,10 +1123,20 @@ view reshape [
 						]
 					]
 				] on-key [
-					;@@ TODO: support actual tabulation when not at the paragraph's head
-					if event/key = #"^-" [indent 20 * pick [-1 1] event/shift? stop]
-					if is-key-printable? event [
-						space/edit key->plan event space/selected
+					case [
+						is-key-printable? event [
+							space/edit key->plan event space/selected
+						]
+						event/key = #"^-" [
+							either all [doc/selected 0 < span? doc/selected] [
+								indent 20 * pick [-1 1] event/shift?
+							][
+								;@@ tabs support is "accidental" for now - only correct within a single text span
+								;@@ if something splits the text, it's incorrect - need special case for it in paragraph layout
+								space/edit [insert "^-"]
+							]
+							stop
+						]
 					]
 				] on-key-down [
 					unless is-key-printable? event [
