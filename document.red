@@ -806,20 +806,6 @@ declare-template 'bullet/text [
 	limits: 15 .. none
 ]
 
-;; this should automatically invalidate the parent, since child facet change will lead to it
-#macro [#mirror-into [path! | into [some path!]]] func [[manual] s e /local paths target] [
-	either path? target: e/-1 [
-		paths: reduce [to set-path! compose [space (to block! target)]]
-	][
-		paths: target
-		forall paths [paths/1: to set-path! compose [space (to block! paths/1)]]
-	]
-	remove/part s e
-	insert s compose/deep [#on-change [space word value] [(paths) :value]]
-	s
-]
-
-
 icons: object [
 	lists: object [
 		numbered: bands/named 30x20 [25% 1  25% 1  25% 1] "123"
