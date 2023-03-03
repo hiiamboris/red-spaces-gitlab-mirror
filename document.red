@@ -173,16 +173,20 @@ doc-ctx: context [
 	
 	actions: context [
 		edit: function [doc [object!] plan [block!]] [
-			length: doc/measure [length]
-			offset: doc/caret/offset
-			set [para: pofs: plen:] caret->paragraph doc offset
-			do with self plan
+			;@@ should info be updated after every function call instead? in case they are chained (if ever)
+			plan: with self plan
+			while [not tail? plan] [					;-- info is updated after every call
+				length: doc/measure [length]
+				offset: doc/caret/offset
+				set [para: pofs: plen:] caret->paragraph doc offset
+				do/next plan 'plan
+			]
 		]
-		at: select: move: remove: copy: paste: insert: paint: break: auto-bullet: none
+		undo: redo: at: select: move: remove: copy: paste: insert: paint: break: auto-bullet: none
 	]
 	
-	;@@ undo
-	;@@ redo
+	actions/undo: function [] with :actions/edit [doc/timeline/undo]
+	actions/redo: function [] with :actions/edit [doc/timeline/redo]
 	
 	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
 		switch/default name [
@@ -226,6 +230,62 @@ doc-ctx: context [
 		]
 	]
 	
+	;; this func simplifies undo/redo code a bit
+	make-actions: function [doc [object!] rem [block!] ins [block!] eval [block!]] [
+		edit: reduce [doc/selected doc/caret/offset rem]
+		do eval
+		repend edit [ins doc/caret/offset doc/selected]
+		compose/only/deep [
+			[document/atomic-edit (doc) (edit) (false)]
+			[document/atomic-edit (doc) (edit) (true)]	;-- edit block is shared, so only has to be grouped once when grouping
+		]
+	]
+		
+	;; action format: [selection offset [removed] [inserted] offset selection]
+	;; so it combines removal with insertion, and is reversible, and contains offset & selection at both ends
+	;; can be (easily) grouped if:
+	;; - both actions have only [insert] and end-offset2 = start-offset1
+	;; - both actions have only [remove] and end-offset2 = start-offset1
+	group-actions: function [action1 [block!] "modified" action2 [block!] /local obj obj2 data1 data2 fwd] [
+		if all [
+			parse action1 ['document/atomic-edit set obj  object! set data1 block! set fwd logic!]
+			parse action2 ['document/atomic-edit set obj2 object! set data2 block! fwd]		;-- tests if direction matches
+			obj =? obj2									;-- cannot test sameness within parse
+			set [sel1-: ofs1-: rem1: ins1: ofs1+: sel1+:] data1
+			set [sel2-: ofs2-: rem2: ins2: ofs2+: sel2+:] data2
+			ofs2- = ofs1+
+			i: case [									;-- index of ins/rem block to modify
+				all [empty? rem1 empty? rem2] [4]		;@@ TODO: more grouping cases possible with more complex logic
+				all [empty? ins1 empty? ins2] [3]
+			]
+		][
+			#assert [not empty? data2/:i]
+			either empty? data1/:i [
+				append data1/:i data2/:i
+			][
+				pos: either ofs2+ >= ofs2- [infxinf/x][0]
+				rich/decoded/insert! data1/:i pos data2/:i
+			]
+			data1/5: data2/5							;-- copy selection & offset over
+			data1/6: data2/6
+			action1
+		]												;-- none if can't group - didn't modify
+	]
+	
+	record-in-timeline: function [doc [object!] rem [block!] ins [block!] eval [block!]] [
+		set [left: right:] make-actions doc rem ins eval
+		either all [
+			doc/timeline/fresh?
+			set [doc': left': right':] doc/timeline/last-event
+			group-actions right' right					;-- since edit is shared, only one side needs to be modified
+		][
+			doc/timeline/put/last doc left' right'
+		][
+			doc/timeline/put doc left right
+		]
+	]
+
+	
 	actions/remove: function [
 		"Remove range or from caret up to a given limit"
 		limit [word! pair! (not by) integer!]
@@ -238,7 +298,13 @@ doc-ctx: context [
 			block?   limit    [limit: limit/offset]		;-- ignores returned side
 			by                [limit: offset + limit]
 			integer? limit    [limit: order-pair as-pair limit offset]
-			limit             [document/remove doc limit]
+			limit [
+				slice: document/copy doc limit
+				#assert [any [limit/1 = offset limit/2 = offset]]	;-- otherwise need to update caret/offset
+				record-in-timeline doc slice [] [
+					document/remove doc limit
+				]
+			]
 		]
 	]
 	
@@ -266,7 +332,19 @@ doc-ctx: context [
 		data [block! string!]
 	] with :actions/edit [
 		;@@ mark history state
-		unless empty? data [document/insert doc offset data]	;-- caret gets moved via adjust-offsets
+		unless empty? data [
+			if string? data [
+				len: length? data
+				attrs: rich/attributes/extend doc/paint len
+				data: reduce [explode data attrs]
+			]
+			range: 0 by (length? data/1) + offset
+			#assert [doc/caret/offset = offset]			;-- otherwise need to update caret/offset
+			record-in-timeline doc [] data [
+				document/insert doc offset data			;-- caret gets moved via adjust-offsets
+				if doc/paint [document/paint doc offset + 0x1 doc/paint]
+			]
+		]
 	]
 	
 	actions/paint: function [
@@ -279,7 +357,7 @@ doc-ctx: context [
 	actions/break: function [
 		"Break paragraph at current caret offset"
 	] with :actions/edit [
-		document/break doc doc/caret/offset
+		actions/insert "^/"
 	]
 	
 	actions/auto-bullet: function [
@@ -290,12 +368,22 @@ doc-ctx: context [
 	
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
-	document: context [length: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: none]
+	document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: none]
 	
-	document/length: function [doc] [
+	document/length: function [doc [object!]] [
 		doc/measure [length]
 	]
 	
+	document/atomic-edit: function [doc [object!] edit [block!] forward? [logic!]] [	;-- used by undo/redo
+		unless forward? [edit: reverse copy edit]
+		set [sel-: ofs-: rem: ins: ofs+: sel+:] edit
+		ofs: min ofs- ofs+								;-- if offset reduces during action, this is where it starts
+		if len: length? rem/1 [document/remove doc 0 by len + ofs]
+		if len: length? ins/1 [document/insert doc ofs ins]
+		doc/selected:     sel+
+		doc/caret/offset: ofs+							;@@ should I restore the side too?
+	]
+
 	document/copy: function [doc [object!] range [pair!]] [
 		rowbreak: [[#"^/"] #()]
 		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
@@ -356,58 +444,41 @@ doc-ctx: context [
 	document/insert: function [
 		doc    [object!]
 		offset [integer!]
-		data   [block! (parse data [block! map!]) string!]
+		data   [block!] (parse data [block! map!])
 		/local _
 	][
-		either block? data [set [items: attrs:] data][items: data]
+		set [items: attrs:] data
 		if empty? items [exit]
 		set [para1: pofs1:] caret->paragraph doc offset
 		pcar1: offset - pofs1
-		either string? data [
-			para1/edit [insert! pcar1 data]
+		rows: parse items [collect [any [keep copy _ to #"^/" skip] keep copy _ to end]]	;@@ split doesn't work on blocks yet
+		slice: rich/decoded/copy data 0 by len: length? rows/1
+		either single? rows [
+			para1/edit [insert! pcar1 slice]
 		][
-			rows: parse items [collect [any [keep copy _ to #"^/" skip] keep copy _ to end]]	;@@ split doesn't work on blocks yet
-			slice: rich/decoded/copy data 0 by len: length? rows/1
-			either single? rows [
-				para1/edit [insert! pcar1 slice]
-			][
-				;; edit first paragraph, but remember the after-insertion part
-				para1/edit [							;@@ make another action in edit for this?
-					stashed: copy range: pcar1 by infxinf/x
-					remove! range
-					insert! pcar1 slice 
-				]
-				;; convert other rows into paragraphs and insert them into doc/content
-				ofs: len + 1
-				rest: map-each row next rows [
-					#assert [items/:ofs = #"^/"]
-					len: length? row
-					slice: rich/decoded/copy data 0 by len + ofs
-					ofs: ofs + len + 1
-					make-space 'rich-content [data: slice]
-				]
-				insert (find/same/tail doc/content para1) rest
-				;; append stashed part to the last inserted paragraph
-				paraN: last rest
-				paraN/edit [insert! infxinf/x stashed]
+			;; edit first paragraph, but remember the after-insertion part
+			para1/edit [								;@@ make another action in edit for this?
+				stashed: copy range: pcar1 by infxinf/x
+				remove! range
+				insert! pcar1 slice 
 			]
+			;; convert other rows into paragraphs and insert them into doc/content
+			ofs: len + 1
+			rest: map-each row next rows [
+				#assert [items/:ofs = #"^/"]
+				len: length? row
+				slice: rich/decoded/copy data 0 by len + ofs
+				ofs: ofs + len + 1
+				make-space 'rich-content [data: slice]
+			]
+			insert (find/same/tail doc/content para1) rest
+			;; append stashed part to the last inserted paragraph
+			paraN: last rest
+			paraN/edit [insert! infxinf/x stashed]
 		]
 		adjust-offsets doc offset length? items
 	]
-	
-	document/break: function [
-		doc    [object!]
-		offset [integer!]
-	][
-		set [para1: pofs1:] caret->paragraph doc offset
-		pcar1: offset - pofs1
-		para2: para1/clone
-		para1/edit [remove! pcar1 by infxinf/x]
-		para2/edit [remove! 0 by pcar1]
-		insert (find/same/tail doc/content para1) para2
-		adjust-offsets doc offset 1
-	]
-	
+		
 	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
 		foreach [para: prange:] map-range doc range [
 			para/edit [mark! prange attr :value]
@@ -419,7 +490,7 @@ doc-ctx: context [
 		if any [empty? attrs  zero? span? range] [exit]
 		foreach [para: prange:] map-range doc range [	;@@ need edit func for this?
 			length: para/measure [length]
-			slice: rich/attributes/extend attrs span: span? range
+			slice: rich/attributes/extend attrs span: span? prange
 			rich/attributes/remove! para/data/attrs prange
 			rich/attributes/insert! para/data/attrs length prange/1 slice span
 			para/data: para/data
@@ -657,9 +728,10 @@ doc-ctx: context [
 		axis:   'y		#type (axis = 'y)				;-- protected
 		spacing: 5
 		
-		caret:   make-space 'caret caret-template #type [object!] :invalidates
-		
+		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none	#type [pair! none!] :on-selected-change
+		timeline: copy timeline!
+		paint:    make map! []	#type [map!]			;-- current set of attributes (for newly inserted chars)
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
 		edit: func [
@@ -829,9 +901,9 @@ enumerate: function [] [
 	doc-ctx/document/enumerate doc range
 ]
 ;; current attributes (for inserted chars)
-paint: #()
+;@@ this must be part of the document, somehow, and automated
 pick-paint: function [/from index: (doc/caret/offset + 1) [integer!]] [	;-- use attrs under the caret by default
-	set 'paint doc-ctx/document/get-attrs doc index
+	doc/paint: any [doc-ctx/document/get-attrs doc index  copy #()]
 	; ?? paint
 ]
 view reshape [
@@ -955,7 +1027,6 @@ view reshape [
 				] on-key [
 					if is-key-printable? event [
 						space/edit key->plan event space/selected
-						if paint [space/edit compose [paint -1x0 + space/caret/offset (paint)]]
 					]
 				] on-key-down [
 					unless is-key-printable? event [
