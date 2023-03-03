@@ -819,24 +819,6 @@ declare-template 'bullet/text [
 	s
 ]
 
-declare-template 'color-wheel/space [
-	color: white
-]
-
-;@@ how to organize it?
-;@@ popup UI needs improvements: touch-sized buttons, scrollbars and wheel scrolling, automatic limitation of scrollable size
-;@@ also on-change event
-declare-template 'drop-button/list [
-	axis: 'x
-	spaces: object [
-		box:    make-space 'data-clickable [type: 'face]		;@@ how to name the type for styling consistency?
-		button: make-space 'data-clickable [type: 'side-button data: "⏷"]	;-- don't want 'button' style to apply to it
-	]
-	content: reduce [spaces/box spaces/button]
-	command: []		#mirror-into spaces/box/command
-	data:    none	#mirror-into spaces/box/data
-	font:    none	#mirror-into [spaces/box/font spaces/button/font]
-]
 
 icons: object [
 	lists: object [
@@ -882,36 +864,6 @@ define-styles [
 		margin: 10
 		font: code-font
 		below: [(underbox size 2 5)]
-	]
-]
-
-define-handlers [
-	drop-button: [
-		face: [
-		]
-		side-button: [
-			on-down [space path event] [
-				offset: -1x-1 + face-to-window event/offset event/face
-				menu: lay-out-menu items: [
-					"1" (print "1")
-					"2" (print "2")
-					"3" (print "3")
-					"Font" (print "hehe found it")
-					"hello" (print "HELL")
-				]
-				drop-button: space/parent
-				picked: 1 + half any [skip? find items drop-button/data  0]
-				face: make-popup event/window 1
-				face/rate:  10										;-- reduced timer pressure
-				face/space: menu
-				face/size:  none									;-- to make render set face/size
-				face/draw:  render face
-				?? menu/content
-				picked-geom: pick menu/content/map picked * 2
-				offset: offset - picked-geom/offset - (picked-geom/size / 2)
-				show-popup event/window 1 offset face
-			]
-		]
 	]
 ]
 
