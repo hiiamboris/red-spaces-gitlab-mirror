@@ -791,11 +791,6 @@ doc-ctx: context [
 	]
 ]
 
-; declare-template 'item/list [axis: 'y weight: 1]
-; set-style 'item [
-	; margin: 10x1
-	; below: [push [line-width 1 fill-pen off pen red box 0x0 (size)]]
-; ]
 
 declare-template 'code/text []
 declare-template 'pre/paragraph []
@@ -850,6 +845,19 @@ define-styles [
 		margin: 10
 		font: code-font
 		below: [(underbox size 2 5)]
+	]
+	grid: [
+		heights/min: 20
+		below: [
+			push [
+				pen off
+				fill-pen (opaque 'text 50%)
+				box 0x0 (size)
+			]
+		]
+	]
+	document: [
+		below: [push [fill-pen green box 0x0 (size)]]
 	]
 ]
 
@@ -936,6 +944,39 @@ codify: function [] [
 		doc-ctx/document/codify doc range
 		doc/selected: none
 	]
+]
+request-grid-size: function [] [
+	accept: [if pair? attempt [loaded: load entry/text] [unview result: loaded]]
+	view/flags [
+		title "Enter desired grid size"
+		host [
+			vlist [
+				row [
+					text "Size:" entry: field 300 text= "2x2" focus on-key [
+						if event/key = #"^M" accept
+					]
+				]
+				row [
+					button 80 "OK"     [do accept]
+					<->
+					button 80 "Cancel" [unview]
+				]
+			]
+		]
+	] 'modal
+	result
+]
+
+insert-grid: function [] [
+	if size: request-grid-size [
+		grid: make-space 'grid []
+		grid/bounds: size
+		for-each xy size [
+			grid/content/:xy: first lay-out-vids [document [rich-content ["123"]]]
+		]
+		data: reduce [reduce [grid] #()]
+		doc/edit [insert data]
+	] 
 ] 
 view reshape [
 	host 500x400 [
@@ -1007,17 +1048,11 @@ view reshape [
 				icon [image 24x20 data= icons/aligns/right  ] on-click [realign 'right]
 				icon [image 30x20 data= icons/lists/numbered] on-click [enumerate]
 				icon [image 30x20 data= icons/lists/bullet  ] on-click [bulletify]
-				attr "▦" on-cllick []
-				;@@ table
+				attr "▦" on-click [insert-grid]
 			]
 			scrollable [
 				style code: rich-content ;font= code-font
 				doc: document focus [
-					; #code ["block [^/    of code^/]"]
-					; #paragraph [command: [] size: 20 "prefix^/" /command /size !(copy/part lorem 200)]
-					; code source= ["12" underline bold "34" /bold /underline "56"]
-					; rich-content source= [!(make-space 'bullet [text: "○"]) !(copy skip lorem 200)] indent= [rest: 15] ;align= 'fill
-					
 					code [bold font: "Consolas" "block ["]
 					code [bold font: "Consolas" "    of wrapped long long long code"]
 					code [bold font: "Consolas" "]"]
