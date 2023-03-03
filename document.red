@@ -368,7 +368,7 @@ doc-ctx: context [
 	
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
-	document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: none]
+	document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: linkify: bulletify: enumerate: auto-bullet: indent: none]
 	
 	document/length: function [doc [object!]] [
 		doc/measure [length]
@@ -629,6 +629,15 @@ doc-ctx: context [
 		if bullet [
 			para/edit [insert! 0 bullet]
 			adjust-offsets doc pofs 1
+		]
+	]
+	
+	document/indent: function [doc [object!] range [pair!] offset [integer!]] [
+		if offset = 0 [exit]
+		foreach [para: prange:] map-range doc range [
+			first: max 0 offset + any [if para/indent [para/indent/first] 0]
+			rest:  max 0 offset + any [if para/indent [para/indent/rest]  0]
+			para/indent: compose [first: (first) rest: (rest)]
 		]
 	]
 	
@@ -906,6 +915,13 @@ pick-paint: function [/from index: (doc/caret/offset + 1) [integer!]] [	;-- use 
 	doc/paint: any [doc-ctx/document/get-attrs doc index  copy #()]
 	; ?? paint
 ]
+indent: function [offset [integer!]] [
+	range: any [
+		doc/selected
+		1x1 * doc/caret/offset
+	]
+	doc-ctx/document/indent doc range offset
+]
 view reshape [
 	host 500x400 [
 		vlist [
@@ -966,13 +982,18 @@ view reshape [
 						doc-ctx/document/linkify doc range compose [browse (as url! url)]
 					]
 				] 
+				;@@ code
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 
-				icon [image 24x20 data= icons/aligns/fill]    on-click [realign 'fill]
-				icon [image 24x20 data= icons/aligns/left]    on-click [realign 'left] 
-				icon [image 24x20 data= icons/aligns/center]  on-click [realign 'center]
-				icon [image 24x20 data= icons/aligns/right]   on-click [realign 'right]
+				attr "⤆" on-click [indent -20]
+				attr "⤇" on-click [indent  20]
+				icon [image 24x20 data= icons/aligns/fill   ] on-click [realign 'fill]
+				icon [image 24x20 data= icons/aligns/left   ] on-click [realign 'left] 
+				icon [image 24x20 data= icons/aligns/center ] on-click [realign 'center]
+				icon [image 24x20 data= icons/aligns/right  ] on-click [realign 'right]
 				icon [image 30x20 data= icons/lists/numbered] on-click [enumerate]
-				icon [image 30x20 data= icons/lists/bullet]   on-click [bulletify]
+				icon [image 30x20 data= icons/lists/bullet  ] on-click [bulletify]
+				attr "▦" on-cllick []
+				;@@ table
 			]
 			scrollable [
 				style code: rich-content ;font= code-font
@@ -1025,6 +1046,8 @@ view reshape [
 						]
 					]
 				] on-key [
+					;@@ TODO: support actual tabulation when not at the paragraph's head
+					if event/key = #"^-" [indent 20 * pick [-1 1] event/shift? stop]
 					if is-key-printable? event [
 						space/edit key->plan event space/selected
 					]
