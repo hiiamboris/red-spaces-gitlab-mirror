@@ -1415,7 +1415,7 @@ rich-content-ctx: context [								;-- rich content
 	;; returns all xy1-xy2 boxes of carets on 1D space - only empty if no spaces / caret locations, otherwise 2+ boxes
 	;@@ or should it just put them into frame?
 	;@@ can this be part of the layout? probably not, since uses source data
-	list-carets: function [map [block!] ranges [hash!]] [
+	list-carets: function [map [block!] ranges [hash! block!]] [
 		boxes: clear []
 		foreach [child geom] map [
 			range: select/same ranges child
@@ -1539,6 +1539,9 @@ rich-content-ctx: context [								;-- rich content
 		]
 		caret->row: function [offset [integer!] side [word!]] with :measure [
 			~/caret->row space offset side
+		]
+		row->box: function [row [integer!]] with :measure [
+			~/row->box space row
 		]
 	]
 	

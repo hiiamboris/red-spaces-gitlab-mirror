@@ -685,7 +685,10 @@ doc-ctx: context [
 		para/measure [
 			set [pxy1: pxy2:] caret->box pcar side
 			prow: caret->row pcar side
+			set [rxy1: rxy2:] row->box prow
 		]
+		pxy1/y: rxy1/y									;-- extend caret box to the full row
+		pxy2/y: rxy2/y
 		nrows: para/frame/nrows
 		edge-row?: any [
 			all [dir = 'up   prow = 1]					;-- first row in the paragraph
