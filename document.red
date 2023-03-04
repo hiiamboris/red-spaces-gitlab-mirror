@@ -297,21 +297,15 @@ doc-ctx: context [
 	
 	actions/insert: function [
 		"Insert given data into current caret offset"
-		data [block! string!]
+		data [block! (parse data [block! map!]) string!]
 	] with :actions/edit [
 		;@@ mark history state
-		unless empty? data [
-			if string? data [
-				len: length? data
-				attrs: rich/attributes/extend doc/paint len
-				data: reduce [explode data attrs]
-			]
-			range: 0 by (length? data/1) + offset
-			#assert [doc/caret/offset = offset]			;-- otherwise need to update caret/offset
-			record-in-timeline doc [] data [
-				document/insert doc offset data			;-- caret gets moved via adjust-offsets
-				if doc/paint [document/paint doc offset + 0x1 doc/paint]
-			]
+		if empty? data [exit]
+		if string? data [data: paint-string doc data]
+		range: 0 by (length? data/1) + offset
+		#assert [doc/caret/offset = offset]				;-- otherwise need to update caret/offset
+		record-in-timeline doc [] data [
+			document/insert doc offset data				;-- caret gets moved via adjust-offsets
 		]
 	]
 	
@@ -654,7 +648,7 @@ doc-ctx: context [
 	on-selected-change: function [space [object!] word [word!] value: -1x-1 [pair! none!]] [	;-- -1x-1 acts as deselect-everything
 		;; NxN selection while technically empty, is not forbidden or converted to `none`, to avoid surprises in code
 		if value/1 > value/2 [
-			quietly space/selected: value: reverse value	;-- keep it ordered for simplicity (not for -1x-1 case)
+			quietly space/selected: value: reverse value		;-- keep it ordered for simplicity (not for -1x-1 case)
 		]
 		map-selection space value
 	]
@@ -712,6 +706,12 @@ doc-ctx: context [
 		caret'
 	]
 		
+	paint-string: function [doc [object!] string [string!]] [	;-- automatically fills string with attributes
+		attrs: rich/attributes/extend doc/paint length? string
+		items: explode string
+		reduce [items attrs]
+	]
+			
 	pick-paint: function [doc [object!] /from offset: doc/caret/offset [integer!]] [	;-- use attrs near the caret by default
 		doc/paint: any [
 			;; question is, should it pick the attribute from before the caret or after?
