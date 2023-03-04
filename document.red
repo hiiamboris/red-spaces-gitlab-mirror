@@ -762,6 +762,13 @@ doc-ctx: context [
 	]
 ]
 
+context [
+	;@@ pageup/down keys events
+	declare-template 'editor/scrollable [
+		content: make-space 'document []
+	]
+]
+
 
 ;@@ can I make code templates generic enough to separate them?
 declare-template 'code/text []
