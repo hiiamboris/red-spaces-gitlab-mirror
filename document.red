@@ -363,7 +363,7 @@ doc-ctx: context [
 			if 2 < length? p [rich/decoded/insert! result ofs + len rowbreak]
 			ofs: ofs + len + 1
 		]
-		probe result
+		result
 	]
 		
 	;@@ do auto-linkification on space after url!
@@ -508,12 +508,18 @@ doc-ctx: context [
 	]
 	
 	document/get-attrs: function [space [object!] index [integer!]] [
-		if set [para: pofs: plen:] caret->paragraph space offset: index - 1 [
-			while [all [offset > 0  pofs + plen = offset]] [	;-- no attribute at the 'new-line' delimiter, try above paragraph
+		offset: clip index - 1 0 space/measure [length]
+		if set [para: pofs: plen:] caret->paragraph space offset [
+			;; no attribute at the 'new-line' delimiter, so it tries to get them from:
+			;; - last char of this paragraph (if not empty)
+			;; - last char of some non-empty above paragraph
+			;@@ maybe unify all paragraph/data into single document/data so newlines will have attrs?
+			while [all [offset > 0  pofs + plen = offset]] [	
 				set [para: pofs: plen:] caret->paragraph space offset: offset - 1
 			]
-			offset: clip 0 (max 0 plen - 1) offset - pofs
-			rich/attributes/copy para/data/attrs 0x1 + offset	;@@ still may be empty - is it ok?
+			if pofs + plen > offset [
+				rich/attributes/copy para/data/attrs 0x1 + offset - pofs
+			]											;-- none if cannot pick the attribute
 		]
 	]
 	
@@ -706,6 +712,16 @@ doc-ctx: context [
 		caret'
 	]
 		
+	pick-paint: function [doc [object!] /from offset: doc/caret/offset [integer!]] [	;-- use attrs near the caret by default
+		doc/paint: any [
+			;; question is, should it pick the attribute from before the caret or after?
+			;; before probably makes more sense for appending, then if that fails it also tries after
+			document/get-attrs doc offset
+			document/get-attrs doc offset + 1
+			clear doc/paint								;-- no attributes if can't pick up
+		]
+	]
+
 	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
 		unless doc/caret/parent [render doc/caret]
@@ -731,6 +747,11 @@ doc-ctx: context [
 		drawn: doc/list-draw/on canvas
 	]
 	
+	on-caret-move: function [caret [object!] word [word!] offset [integer!]] [
+		if caret/parent [pick-paint caret/parent]
+		invalidate caret
+	]
+	
 	;; document/caret cannot be assigned to it's paragraphs, because it holds absolute offset
 	;; so paragraphs have their own (styled, rendered) caret space, moved from paragraph to paragraph
 	;; while document has a fake caret (not rendered), that is only used for invalidation
@@ -738,6 +759,7 @@ doc-ctx: context [
 	caret-template: declare-class 'document-caret/caret [
 		type:  'caret
 		holder: none									;-- child that last owned the generated caret space
+		offset: 0	#on-change :on-caret-move			;-- on top of invalidation, also updates the paint
 	]
 	
 	declare-template 'document/list [
@@ -747,7 +769,7 @@ doc-ctx: context [
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none	#type [pair! none!] :on-selected-change
 		timeline: copy timeline!
-		paint:    make map! []	#type [map!]			;-- current set of attributes (for newly inserted chars)
+		paint:    make map! []	#type [map!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
 		edit: func [

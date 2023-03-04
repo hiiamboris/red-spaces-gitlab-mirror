@@ -81,10 +81,10 @@ toggle-attr: function [name] [
 		?? [old range] 
 		doc-ctx/document/mark doc range name not old
 	][
-		old: rich/attributes/pick paint name 1
-		rich/attributes/mark! paint 1 0x1 name not old
+		old: rich/attributes/pick doc/paint name 1
+		rich/attributes/mark! doc/paint 1 0x1 name not old
 	]
-	probe not old
+	not old
 ]
 realign: function [name] [
 	range: any [
@@ -106,12 +106,6 @@ enumerate: function [] [
 		1x1 * doc/caret/offset
 	]
 	doc-ctx/document/enumerate doc range
-]
-;; current attributes (for inserted chars)
-;@@ this must be part of the document, somehow, and automated
-pick-paint: function [/from index: (doc/caret/offset + 1) [integer!]] [	;-- use attrs under the caret by default
-	doc/paint: any [doc-ctx/document/get-attrs doc index  copy #()]
-	; ?? paint
 ]
 indent: function [offset [integer!]] [
 	range: any [
@@ -144,7 +138,7 @@ insert-grid: function [] [
 view reshape [
 	host 500x400 [
 		vlist [
-			formatting: row tight weight= 0 [
+			row tight weight= 0 [
 				; drop-button data= "Font" font= font-20 color= none
 					; on-over [space/color: if path/2 inside? space [opaque 'text 20%]]
 				style attr: data-clickable 0 .. none weight= 0 margin= 4x2 font= font-20 color= none
@@ -183,9 +177,9 @@ view reshape [
 							doc-ctx/document/mark doc range 'color if old <> color [color]	;-- resets color if the same applied
 						]
 					][
-						old: rich/attributes/pick paint 1 'color
+						old: rich/attributes/pick doc/paint 1 'color
 						color: request-color/from old
-						rich/attributes/mark paint 1 0x1 'color color
+						rich/attributes/mark doc/paint 1 0x1 'color color
 					]
 				]
 				attr "🔗" on-click [
@@ -244,7 +238,6 @@ view reshape [
 					if caret: doc-ctx/point->caret space path/2 [
 						set with space/caret [offset side] reduce [caret/offset caret/side]
 						start-drag/with path copy caret
-						pick-paint
 					]
 				] on-up [
 					stop-drag
@@ -255,7 +248,6 @@ view reshape [
 							start: drag-parameter
 							space/selected: start/offset by caret/offset
 							set with space/caret [offset side] reduce [caret/offset caret/side]
-							pick-paint
 						]
 					]
 				] on-key [
@@ -280,7 +272,6 @@ view reshape [
 							#"^M" #"^/" [doc/edit [select 'none  break  auto-bullet]]
 						][
 							space/edit key->plan event space/selected
-							pick-paint
 						]
 					]
 				]
