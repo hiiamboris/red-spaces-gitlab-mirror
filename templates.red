@@ -1391,7 +1391,8 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		align:       'left	#type = [word!] :invalidates		;-- horizontal alignment
 		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
 		weight:      1									;-- non-zero default so tube can stretch it
-		indent:      none	#type = [block! none!] :invalidates	;-- indent of the paragraph: [first: integer! rest: integer!]
+		indent:      none								;-- indent of the paragraph: [first: integer! rest: integer!]
+			#type = [block! (parse indent [2 [set-word! integer!]]) none!] :invalidates
 		force-wrap?: no		#type =? [logic!] :invalidates		;-- allow splitting words at *any pixel* to ensure canvas is not exceeded
 		
 		frame:       []		#type  [object! block!]				;-- internal frame data used by /into
@@ -2573,7 +2574,7 @@ grid-ctx: context [
 		append hmin any [grid/heights/min 0]
 		for x: 1 xlim [
 			canvas: encode-canvas (as-pair grid/col-width? x infxinf/y) 1x1		;-- fill the cell
-			span: grid/get-span xy: as-pair x y
+			span: grid/get-span xy: x by y
 			if span/x < 0 [continue]					;-- skip cells of negative x span (counted at span = 0 or more)
 			cell1: grid/get-first-cell xy
 			height1: 0
@@ -3534,7 +3535,7 @@ field-ctx: context [
 			'else [
 				switch/default limit [
 					none #[none] [sel: none]
-					all [sel: as-pair 0 length]
+					all [sel: 0 by length]
 				][
 					ofs: actions/at limit				;-- document's action/at can return a block
 					if block? ofs [ofs: ofs/offset]		;-- ignores returned side

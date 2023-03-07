@@ -46,6 +46,11 @@ context [
 			elapsed < timeline/interval
 		]
 	]
+	
+	unwind: function [timeline [object!]] [				;-- unlike undo, does not evaluate anything
+		also timeline/last-event
+		timeline/events: skip timeline/events negate period
+	]
 		
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
@@ -54,6 +59,8 @@ context [
 		last-event: does [copy/part events -3]			;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]
 		redo:       does [~/redo self]
+		mark:       does [events]
+		unwind:     does [~/unwind self]
 		put: func [space [object!] left [block!] right [block!] /last] [
 			~/put self space left right last
 		]

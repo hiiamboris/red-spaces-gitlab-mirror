@@ -87,11 +87,7 @@ toggle-attr: function [name] [
 	not old
 ]
 realign: function [name] [
-	range: any [
-		doc/selected
-		1x1 * doc/caret/offset
-	]
-	doc-ctx/document/align doc range name
+	doc/edit [align name]
 ]
 bulletify: function [] [
 	range: any [
@@ -108,11 +104,7 @@ enumerate: function [] [
 	doc-ctx/document/enumerate doc range
 ]
 indent: function [offset [integer!]] [
-	range: any [
-		doc/selected
-		1x1 * doc/caret/offset
-	]
-	doc-ctx/document/indent doc range offset
+	doc/edit [indent offset]
 ]
 codify: function [] [
 	if all [
@@ -177,6 +169,7 @@ view reshape [
 							doc-ctx/document/mark doc range 'color if old <> color [color]	;-- resets color if the same applied
 						]
 					][
+						focus-space doc					;-- focus was destroyed by request-color
 						old: rich/attributes/pick doc/paint 1 'color
 						color: request-color/from old
 						rich/attributes/mark doc/paint 1 0x1 'color color
@@ -188,11 +181,12 @@ view reshape [
 						range/1 <> range/2
 						not empty? url: request-url
 					][
+						focus-space doc					;-- focus was destroyed by request-url
 						unless any [
 							find/match url https://
 							find/match url http://
 						] [insert url https://]
-						doc-ctx/document/linkify doc range compose [browse (as url! url)]
+						doc-ctx/linkify doc range compose [browse (as url! url)]
 					]
 				] 
 				attr "[c]" font= make code-font [size: 20] on-click [codify]
@@ -227,11 +221,11 @@ view reshape [
 						@(lay-out-vids [
 							rich-content [!(copy skip lorem 200)]
 						])
-					] indent= [rest: 15]
+					] indent= [first: 0 rest: 15]
 					rich-content [
 						!(make-space 'bullet [])
 						!(copy skip lorem 220)
-					] indent= [rest: 15]
+					] indent= [first: 0 rest: 15]
 				] ;with [watch 'size] 
 				on-down [
 					space/selected: none
