@@ -127,6 +127,30 @@ insert-grid: function [] [
 		doc/edit [insert data]
 	] 
 ] 
+
+tools: context [
+	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
+	linkify: function [doc [object!] range [pair!] command [block!]] [
+		;; each paragraph becomes a separate link as this is simplest to do
+		range: order-pair clip range 0 doc/length
+		links: map-each/eval [para prange] doc/map-range/no-empty range [
+			slice: doc/edit [slice prange]
+			len: length? slice/1
+			rich/attributes/mark! slice/2 len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
+			rich/attributes/mark! slice/2 len 0 by len 'underline on
+			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
+			[prange link]
+		]
+		doc/edit [
+			for-each/reverse [prange link] links [
+				remove prange
+				insert/at link prange/1
+			]
+			select 'none
+		]
+	]
+]
+	
 view reshape [
 	host 500x400 [
 		vlist [
@@ -186,7 +210,7 @@ view reshape [
 							find/match url https://
 							find/match url http://
 						] [insert url https://]
-						doc-ctx/linkify doc range compose [browse (as url! url)]
+						tools/linkify doc range compose [browse (as url! url)]
 					]
 				] 
 				attr "[c]" font= make code-font [size: 20] on-click [codify]
@@ -263,7 +287,7 @@ view reshape [
 				] on-key-down [
 					unless is-key-printable? event [
 						switch/default event/key [
-							#"^M" #"^/" [doc/edit [select 'none  break  auto-bullet]]
+							#"^M" #"^/" [doc/edit [select 'none  insert "^/"  auto-bullet]]
 						][
 							space/edit key->plan event space/selected
 						]

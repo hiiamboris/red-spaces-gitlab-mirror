@@ -67,11 +67,11 @@ doc-ctx: context [
 	
 	;; maps range into a [paragraph paragraph-range] list, where range is document-relative
 	map-range: function [
-		doc [object!]
-		range [pair!]
-		/extend   "Extend range to full paragraphs"
-		/no-empty "Exclude empty intersections"
-		/relative "Return ranges relative to paragraphs themselves"
+		doc      [object!]
+		range    [pair!]
+		extend   [logic!]
+		no-empty [logic!]
+		relative [logic!]
 	][
 		range:  order-pair range
 		mapped: clear []
@@ -242,7 +242,7 @@ doc-ctx: context [
 	]
 	
 	actions: context [
-		edit: function [doc [object!] plan [block!]] [
+		edit: function [doc [object!] plan [block!] /local result] [
 			left:  make [] 10							;-- history for undo/redo
 			right: make [] 10
 			;@@ unfortunately I have to manually call this 'update' in every action - how to automate?
@@ -251,9 +251,10 @@ doc-ctx: context [
 				offset: doc/caret/offset
 				set [para: pofs: plen:] caret->paragraph doc offset
 			]
-			do with self plan
+			set/any 'result do with self plan
 			; ?? left ?? right
 			push-to-timeline doc left right
+			:result
 		]
 		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: align: indent: auto-bullet: none
 	]
@@ -388,7 +389,7 @@ doc-ctx: context [
 	] with :actions/edit [
 		do update
 		range:  any [doc/selected  offset * 1x1]
-		mapped: map-range doc range
+		mapped: doc/map-range range
 		base:   skip? find/same doc/content mapped/1
 		for-each [/i para prange] mapped [
 			 actions/record
@@ -404,7 +405,7 @@ doc-ctx: context [
 	] with :actions/edit [
 		do update
 		range:  any [doc/selected  offset * 1x1]
-		mapped: map-range doc range
+		mapped: doc/map-range range
 		base:   skip? find/same doc/content mapped/1
 		for-each [/i para prange] mapped [
 			unless block? pindent: indent [
@@ -443,7 +444,7 @@ doc-ctx: context [
 		rowbreak: [[#"^/"] #()]
 		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
 		ofs:      0
-		for-each [p: para prange] map-range/relative doc range [
+		for-each [p: para prange] doc/map-range/relative range [
 			data: para/edit [copy prange]
 			len: length? para/data/items
 			rich/decoded/insert! result ofs data
@@ -465,33 +466,12 @@ doc-ctx: context [
 		; underline (on)
 	; ]
 		
-	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
-	linkify: function [doc [object!] range [pair!] command [block!]] [
-		;; each paragraph becomes a separate link as this is simplest to do
-		range: order-pair clip range 0 doc/length
-		links: map-each/eval [para prange] map-range/no-empty doc range [
-			slice: copy-range doc prange
-			len: length? slice/1
-			rich/attributes/mark! slice/2 len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
-			rich/attributes/mark! slice/2 len 0 by len 'underline on
-			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
-			[prange link]
-		]
-		doc/edit [
-			for-each/reverse [prange link] links [
-				remove prange
-				insert/at link prange/1
-			]
-			select 'none
-		]
-	]
-	
 	;@@ some of these funcs are rather non-essential, maybe I should move them somewhere else
 	;@@ this in particular also depends on custom templates
 	document/codify: function [doc [object!] range [pair!]] [
 		range: order-pair clip range 0 doc/measure [length]
 		if range/1 = range/2 [exit]
-		mapped: map-range/relative doc range
+		mapped: doc/map-range/relative range
 		either 2 = length? mapped [						;-- single line code span
 			set [para: prange:] mapped
 			text: para/edit [copy/text prange]
@@ -508,7 +488,7 @@ doc-ctx: context [
 			if zero? span? prange1 [range/1: range/1 + 1]
 			if zero? span? prangeN [range/2: max range/1 range/2 - 1]
 			;; remap to full paragraphs and replace
-			mapped: map-range/relative/extend doc range
+			mapped: doc/map-range/relative/extend range
 			range: prange1/1 by second last mapped		;-- include full paragraphs into range (for adjust-offsets)
 			lines: map-each [para prange] mapped [para/format]	;-- ignores range
 			text: to string! delimit lines "^/"
@@ -524,7 +504,7 @@ doc-ctx: context [
 	
 	document/remove: function [doc [object!] range [pair!]] [
 		range: order-pair clip range 0 doc/measure [length]
-		n: half length? mapped: map-range/relative doc range
+		n: half length? mapped: doc/map-range/relative range
 		set [para1: range1:] mapped
 		set [paraN: rangeN:] skip tail mapped -2 
 		if n >= 1 [para1/edit [remove! range1]]
@@ -578,7 +558,7 @@ doc-ctx: context [
 	]
 		
 	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
-		foreach [para: prange:] map-range/relative doc range [
+		foreach [para: prange:] doc/map-range/relative range [
 			para/edit [mark! prange attr :value]
 		]
 	]
@@ -586,7 +566,7 @@ doc-ctx: context [
 	;; replaces all attributes in the range with first attribute in attrs
 	document/paint: function [doc [object!] range [pair!] attrs [map!]] [
 		if any [empty? attrs  zero? span? range] [exit]
-		foreach [para: prange:] map-range/relative doc range [	;@@ need edit func for this?
+		foreach [para: prange:] doc/map-range/relative range [	;@@ need edit func for this?
 			length: para/measure [length]
 			slice: rich/attributes/extend attrs span: span? prange
 			rich/attributes/remove! para/data/attrs prange
@@ -616,14 +596,6 @@ doc-ctx: context [
 			]											;-- none if cannot pick the attribute
 		]
 	]
-	
-	; document/align: function [
-		; doc   [object!]
-		; range [pair!]
-		; align [word!] (find [left right center fill scale upscale] align)
-	; ][
-		; foreach [para: _:] map-range/no-empty doc range [para/align: align]
-	; ]
 	
 	;; used to correct caret and selection offsets after an edit
 	adjust-offsets: function [doc [object!] offset [integer!] shift [integer!]] [
@@ -659,7 +631,7 @@ doc-ctx: context [
 	
 	;@@ maybe this should be less smart and not remove bullets? only add them?
 	document/bulletify: function [doc [object!] range [pair!]] [
-		if empty? mapped: map-range/extend/no-empty doc range [exit]
+		if empty? mapped: doc/map-range/extend/no-empty range [exit]
 		bulletifying?: any [
 			not bulleted-paragraph? mapped/1			;-- already has a bullet? for toggling
 			numbered-paragraph? mapped/1
@@ -682,7 +654,7 @@ doc-ctx: context [
 	
 	;@@ maybe this should be less smart and not remove bullets? only add them?
 	document/enumerate: function [doc [object!] range [pair!]] [
-		if empty? mapped: map-range/extend/no-empty doc range [exit]
+		if empty? mapped: doc/map-range/extend/no-empty range [exit]
 		set [para: prange:] mapped
 		if numbering?: not get-bullet-number para [
 			prev-number: all [							;-- fetch number of the previous paragraph
@@ -869,6 +841,7 @@ doc-ctx: context [
 		timeline: copy timeline!
 		paint:    make map! []	#type [map!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
 		
+		;; high-level functions
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
 		edit: func [
 			"Apply a sequence of edits to the text and store it on the timeline"
@@ -876,6 +849,17 @@ doc-ctx: context [
 		][
 			~/actions/edit self plan
 		] #type [function!]
+		
+		;; lower-level functions
+		map-range: function [
+			"Get a list of [paragraph range] intersecting the given document range"
+			range [pair!]
+			/extend   "Extend range to full paragraphs"
+			/no-empty "Exclude empty intersections"
+			/relative "Return ranges relative to paragraphs themselves"
+		][
+			~/map-range doc range extend no-empty relative
+		]
 		
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
