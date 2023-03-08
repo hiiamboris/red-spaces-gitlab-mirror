@@ -129,22 +129,21 @@ insert-grid: function [] [
 ] 
 
 tools: context [
-	extract: function [
-		"Extract paragraphs intersecting the document range"
-		doc [object!]
+	extend-range: function [							;@@ put this into document itself?
+		"Extend given range to cover instersected paragraphs fully"
 		range [pair!]
 	][
-		range: order-pair clip range 0 doc/length
-		map-each [para prange] doc/map-range/relative range [
-			also para: para/clone
-			para/edit [clip! prange]
-		]
+		mapped: doc/map-range/extend/no-empty range
+		range1: mapped/2
+		range2: last mapped
+		range1/1 by range2/2
 	]
-
+	
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
+		if range/1 = range/2 [exit]
 		;; each paragraph becomes a separate link as this is simplest to do
-		take/last items: map-each para extract doc range [
+		take/last items: map-each para doc/extract range [
 			len: length? para/data/items
 			link: when len > 0 (
 				rich/attributes/mark! para/data/attrs len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
@@ -163,37 +162,21 @@ tools: context [
 	]
 	
 	codify: function [doc [object!] range [pair!]] [
-		range: order-pair clip range 0 doc/length
 		if range/1 = range/2 [exit]
-		mapped: doc/map-range/relative range
-		either 2 = length? mapped [						;-- single line code span
-			set [para: prange:] mapped
-			text: para/edit [copy/text prange]
-			code: make-space 'code compose [text: (text)]
-			para/edit [
-				remove! prange
-				insert! prange/1 code
-			]
-		][												;-- code block
-			#assert [2 < length? mapped]
-			;; remove empty paragraphs from the range
-			set [para1: prange1:] mapped
-			set [paraN: prangeN:] mapped << 2
-			if zero? span? prange1 [range/1: range/1 + 1]
-			if zero? span? prangeN [range/2: max range/1 range/2 - 1]
-			;; remap to full paragraphs and replace
-			mapped: doc/map-range/relative/extend range
-			range: prange1/1 by second last mapped		;-- include full paragraphs into range (for adjust-offsets)
-			lines: map-each [para prange] mapped [para/format]	;-- ignores range
+		set [items: attrs:] slice: doc/edit [slice range]
+		either find items #"^/" [						;-- multiline code block
+			slice: doc/edit [slice range: extend-range range]
+			lines: map-each para doc/extract range [para/format]
 			text: to string! delimit lines "^/"
-			code: make-space 'pre compose [text: (text)]
-			remove/part find/same/tail doc/content para1 -1 + half length? mapped
-			para1/edit [
-				remove! prange1
-				insert! 0 code
-			]
+			code: make-space 'pre compose [text: (text) sections: none]		;-- prevent block from being dissected
+		][
+			text: doc/edit [slice/text range]
+			code: make-space 'code compose [text: (text)]
 		]
-		adjust-offsets doc range/1 negate span? range
+		doc/edit [
+			remove range
+			insert/at code range/1
+		]
 	]
 	
 ]

@@ -91,6 +91,13 @@ doc-ctx: context [
 		copy mapped										;-- may be empty
 	]
 
+	extract: function [doc [object!] range [pair!]] [
+		map-each [para prange] doc/map-range/relative range [
+			also para: para/clone
+			para/edit [clip! prange]
+		]
+	]
+
 	;; words are split by word separator chars (space, tab) and paragraph delimiter
 	word-sep:     [#" " | #"^-"]
 	non-word-sep: [not word-sep skip]
@@ -335,7 +342,7 @@ doc-ctx: context [
 			by                [limit: offset + limit]
 			integer? limit    [limit: order-pair as-pair limit offset]
 			limit [
-				slice: copy-range doc limit
+				slice: copy-range doc limit no
 				actions/record [insert (limit) (slice)] [remove (limit)]
 			]
 		]
@@ -344,13 +351,15 @@ doc-ctx: context [
 	actions/slice: function [
 		"Extract specified range"
 		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
+		/text "Return it as plain text"
 	] with :actions/edit [
 		do update
 		switch range [
 			selected [range: doc/selected]
 			all      [range: 0 by doc/length]
 		]
-		when pair? range (copy-range doc range)			;-- silently ignores unsupported range words
+		unless pair? range [return copy pick ["" []] text]		;-- silently ignores unsupported range words
+		copy-range doc range text
 	]
 	
 	actions/copy: function [
@@ -426,18 +435,24 @@ doc-ctx: context [
 	
 	document: context [remove: insert: break: mark: paint: get-attr: get-attrs: bulletify: enumerate: none]
 	
-	copy-range: function [doc [object!] range [pair!]] [
-		rowbreak: [[#"^/"] #()]
-		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
-		ofs:      0
-		for-each [p: para prange] doc/map-range/relative range [
-			data: para/edit [copy prange]
-			len: length? para/data/items
-			rich/decoded/insert! result ofs data
-			if 2 < length? p [rich/decoded/insert! result ofs + len rowbreak]
-			ofs: ofs + len + 1
+	copy-range: function [doc [object!] range [pair!] plain-text? [logic!]] [
+		mapped: doc/map-range/relative range
+		either plain-text? [
+			lines: map-each para extract doc range [para/format]
+			to string! delimit lines "^/"
+		][
+			rowbreak: [[#"^/"] #()]
+			result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
+			ofs:      0
+			for-each [p: para prange] mapped [
+				data: para/edit [copy prange]
+				len: length? para/data/items
+				rich/decoded/insert! result ofs data
+				if 2 < length? p [rich/decoded/insert! result ofs + len rowbreak]
+				ofs: ofs + len + 1
+			]
+			result
 		]
-		result
 	]
 		
 	document/remove: function [doc [object!] range [pair!]] [
@@ -775,9 +790,9 @@ doc-ctx: context [
 		
 		length:   0		#type [integer!]				;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
-		selected: none	#type [pair! none!] :on-selected-change
-		timeline: copy timeline!
-		paint:    make map! []	#type [map!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
+		selected: none				#type [pair! none!] :on-selected-change
+		timeline: copy timeline!	#type [object!]
+		paint:    make map! []		#type [map!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
 		
 		;; high-level functions
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
@@ -796,8 +811,15 @@ doc-ctx: context [
 			/no-empty "Exclude empty intersections"
 			/relative "Return ranges relative to paragraphs themselves"
 		][
-			~/map-range doc range extend no-empty relative
-		]
+			~/map-range self range extend no-empty relative
+		] #type [function!]
+		
+		extract: function [
+			"Extract paragraphs intersecting the document range"
+			range [pair!]
+		][
+			~/extract self range
+		] #type [function!]
 		
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
