@@ -999,6 +999,9 @@ rechange: function [
     skip tail data negate offset
 ]
 
+; abs-pick: func [series [series!] index [integer!]] [	;@@ what's a better name?
+	; pick either index < 0 [tail series] [series] index
+; ]
 
 ;-- faster than for-each/reverse, but only correct if series length is a multiple of skip
 ;@@ use for-each when becomes available
@@ -1085,7 +1088,7 @@ generate-sections: function [
 			append buffer skipped
 		]
 		case [
-			in space 'sections [append buffer space/sections]	;-- calls if a function, may return none
+			select space 'sections [append buffer space/sections]	;-- calls if a function, may return none
 			geom/size/x > 0    [append buffer geom/size/x]		;-- don't add empty (0) spaces
 		]
 		offset: offset - skipped + geom/size/x
