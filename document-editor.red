@@ -111,7 +111,7 @@ codify: function [] [
 		range: doc/selected
 		range/1 <> range/2
 	][
-		doc-ctx/document/codify doc range
+		tools/codify doc range
 		doc/selected: none
 	]
 ]
@@ -129,26 +129,73 @@ insert-grid: function [] [
 ] 
 
 tools: context [
+	extract: function [
+		"Extract paragraphs intersecting the document range"
+		doc [object!]
+		range [pair!]
+	][
+		range: order-pair clip range 0 doc/length
+		map-each [para prange] doc/map-range/relative range [
+			also para: para/clone
+			para/edit [clip! prange]
+		]
+	]
+
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
 		;; each paragraph becomes a separate link as this is simplest to do
-		range: order-pair clip range 0 doc/length
-		links: map-each/eval [para prange] doc/map-range/no-empty range [
-			slice: doc/edit [slice prange]
-			len: length? slice/1
-			rich/attributes/mark! slice/2 len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
-			rich/attributes/mark! slice/2 len 0 by len 'underline on
-			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
-			[prange link]
+		take/last items: map-each para extract doc range [
+			len: length? para/data/items
+			link: when len > 0 (
+				rich/attributes/mark! para/data/attrs len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
+				rich/attributes/mark! para/data/attrs len 0 by len 'underline on
+				para/data: para/data
+				first lay-out-vids [clickable content= para command= command]
+			)
+			compose [(link) #"^/"]
 		]
+		data: reduce [items copy #()]
 		doc/edit [
-			for-each/reverse [prange link] links [
-				remove prange
-				insert/at link prange/1
-			]
+			remove range
+			insert/at data range/1
 			select 'none
 		]
 	]
+	
+	codify: function [doc [object!] range [pair!]] [
+		range: order-pair clip range 0 doc/length
+		if range/1 = range/2 [exit]
+		mapped: doc/map-range/relative range
+		either 2 = length? mapped [						;-- single line code span
+			set [para: prange:] mapped
+			text: para/edit [copy/text prange]
+			code: make-space 'code compose [text: (text)]
+			para/edit [
+				remove! prange
+				insert! prange/1 code
+			]
+		][												;-- code block
+			#assert [2 < length? mapped]
+			;; remove empty paragraphs from the range
+			set [para1: prange1:] mapped
+			set [paraN: prangeN:] mapped << 2
+			if zero? span? prange1 [range/1: range/1 + 1]
+			if zero? span? prangeN [range/2: max range/1 range/2 - 1]
+			;; remap to full paragraphs and replace
+			mapped: doc/map-range/relative/extend range
+			range: prange1/1 by second last mapped		;-- include full paragraphs into range (for adjust-offsets)
+			lines: map-each [para prange] mapped [para/format]	;-- ignores range
+			text: to string! delimit lines "^/"
+			code: make-space 'pre compose [text: (text)]
+			remove/part find/same/tail doc/content para1 -1 + half length? mapped
+			para1/edit [
+				remove! prange1
+				insert! 0 code
+			]
+		]
+		adjust-offsets doc range/1 negate span? range
+	]
+	
 ]
 	
 view reshape [

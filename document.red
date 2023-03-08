@@ -120,9 +120,8 @@ doc-ctx: context [
 		]
 		find-next-word: function ["Get offset of the next word's end"] with :measure [
 			set [para: pofs: plen:] caret->paragraph doc offset: doc/caret/offset
-			length: doc/measure [length]
 			while [offset >= (pofs + plen)] [			;-- switch to next paragraph (maybe multiple times)
-				if offset >= length [return length]		;-- no more going right
+				if offset >= doc/length [return doc/length]		;-- no more going right
 				set [para: pofs: plen:] caret->paragraph doc offset: offset + 1
 			]
 			#assert [pofs + plen > offset]				;-- limited by paragraph's tail
@@ -210,13 +209,11 @@ doc-ctx: context [
 		not parse edit [any [['move | 'select | 'side] skip]]
 	]
 	
-	push-to-timeline: function [doc [object!] left [block!] right [block!]] [
+	push-to-timeline: function [doc [object!] left [block!] right [block!] init [block!]] [
+		unless any [undo-worthy? left  undo-worthy? right] [exit]
 		left:  reduce ['playback doc left]
 		right: reduce ['playback doc right]
-		car': doc/caret/offset
-		sel': doc/selected
-		do right
-		unless any [undo-worthy? left/3  undo-worthy? right/3] [exit]
+		set [sel': car':] init
 		if car' <> car: doc/caret/offset [				;@@ remember side or not worth it?
 			repend left/3  ['move car']
 			repend right/3 ['move car]
@@ -241,19 +238,20 @@ doc-ctx: context [
 		]
 	]
 	
+	;@@ add ! to destructive actions for consistency with rich-content?
 	actions: context [
 		edit: function [doc [object!] plan [block!] /local result] [
+			init:  reduce [doc/selected doc/caret/offset]	;-- remember them before the edit
 			left:  make [] 10							;-- history for undo/redo
 			right: make [] 10
 			;@@ unfortunately I have to manually call this 'update' in every action - how to automate?
 			update: [
-				length: doc/measure [length]
 				offset: doc/caret/offset
 				set [para: pofs: plen:] caret->paragraph doc offset
 			]
 			set/any 'result do with self plan
 			; ?? left ?? right
-			push-to-timeline doc left right
+			push-to-timeline doc left right init
 			:result
 		]
 		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: align: indent: auto-bullet: none
@@ -265,7 +263,8 @@ doc-ctx: context [
 		redo-action [block!]
 	] with :actions/edit [
 		insert left  compose/deep/only undo-action 
-		append right compose/deep/only redo-action 
+		append right todo: compose/deep/only redo-action
+		playback doc todo 
 	]
 
 	actions/undo: function [] with :actions/edit [doc/timeline/undo]
@@ -275,7 +274,7 @@ doc-ctx: context [
 		do update
 		switch/default name [
 			far-head  [0]
-			far-tail  [length]
+			far-tail  [doc/length]
 			head      [pofs]							;-- paragraph's head/tail ;@@ or use row's head/tail? exclude indentation or not?
 			tail      [pofs + plen]
 			prev-word [doc/measure [find-prev-word]]
@@ -293,7 +292,7 @@ doc-ctx: context [
 		/by "Move selection edge by an integer number of caret slots"
 	] with :actions/edit [
 		do update
-		set [ofs: sel:] field-ctx/compute-selection limit by actions offset length doc/selected
+		set [ofs: sel:] field-ctx/compute-selection limit by actions offset doc/length doc/selected
 		actions/record
 			[move (offset) select (doc/selected)]
 			[move (ofs) select (sel)]
@@ -311,12 +310,12 @@ doc-ctx: context [
 				pos: actions/at pos
 				if block? pos [							;-- block may be returned by find-line-below/above
 					side: pos/side
-					pos:  clip 0 length pos/offset
+					pos:  clip 0 doc/length pos/offset
 				]
 			]
 			integer? pos [								;-- unknown words are silently ignored
 				default side: case [pos > offset ['left] pos < offset ['right]]	;-- only change side if moved
-				pos: clip 0 length pos
+				pos: clip 0 doc/length pos
 				actions/record [move (offset)] [move (pos)]
 				if side [actions/record [side (doc/caret/side)] [side (side)]]
 			]
@@ -349,7 +348,7 @@ doc-ctx: context [
 		do update
 		switch range [
 			selected [range: doc/selected]
-			all      [range: 0 by length]
+			all      [range: 0 by doc/length]
 		]
 		when pair? range (copy-range doc range)			;-- silently ignores unsupported range words
 	]
@@ -425,21 +424,8 @@ doc-ctx: context [
 		auto-bullet doc doc/caret/offset
 	]
 	
-	;@@ rename this to edit, bind `doc` argument
-	;@@ 'length' should be under 'measure' context
-	; document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: codify: bulletify: enumerate: auto-bullet: indent: none]
-	document: context [remove: insert: break: mark: paint: get-attr: get-attrs: codify: bulletify: enumerate: none]
+	document: context [remove: insert: break: mark: paint: get-attr: get-attrs: bulletify: enumerate: none]
 	
-	; document/atomic-edit: function [doc [object!] edit [block!] forward? [logic!]] [	;-- used by undo/redo
-		; unless forward? [edit: reverse copy edit]
-		; set [sel-: ofs-: rem: ins: ofs+: sel+:] edit
-		; ofs: min ofs- ofs+								;-- if offset reduces during action, this is where it starts
-		; if len: length? rem/1 [document/remove doc 0 by len + ofs]
-		; if len: length? ins/1 [document/insert doc ofs ins]
-		; doc/selected:     sel+
-		; doc/caret/offset: ofs+							;@@ should I restore the side too?
-	; ]
-
 	copy-range: function [doc [object!] range [pair!]] [
 		rowbreak: [[#"^/"] #()]
 		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
@@ -454,56 +440,8 @@ doc-ctx: context [
 		result
 	]
 		
-	; ;; easy attribute constructor
-	; make-attrs: function [attrs [block!] "Key/value pairs of attribute name & value"] [
-		; make map! map-each/eval [name value] attrs [[
-			; name compose/deep/only [values: [(:value)] mask: (copy "^A")]
-		; ]]
-	; ]
-		
-	; link-attrs: make-attrs compose/deep [
-		; color (hex-to-rgb #35F)							;@@ I shouldn't hardcode the color like this
-		; underline (on)
-	; ]
-		
-	;@@ some of these funcs are rather non-essential, maybe I should move them somewhere else
-	;@@ this in particular also depends on custom templates
-	document/codify: function [doc [object!] range [pair!]] [
-		range: order-pair clip range 0 doc/measure [length]
-		if range/1 = range/2 [exit]
-		mapped: doc/map-range/relative range
-		either 2 = length? mapped [						;-- single line code span
-			set [para: prange:] mapped
-			text: para/edit [copy/text prange]
-			code: make-space 'code compose [text: (text)]
-			para/edit [
-				remove! prange
-				insert! prange/1 code
-			]
-		][												;-- code block
-			#assert [2 < length? mapped]
-			;; remove empty paragraphs from the range
-			set [para1: prange1:] mapped
-			set [paraN: prangeN:] mapped << 2
-			if zero? span? prange1 [range/1: range/1 + 1]
-			if zero? span? prangeN [range/2: max range/1 range/2 - 1]
-			;; remap to full paragraphs and replace
-			mapped: doc/map-range/relative/extend range
-			range: prange1/1 by second last mapped		;-- include full paragraphs into range (for adjust-offsets)
-			lines: map-each [para prange] mapped [para/format]	;-- ignores range
-			text: to string! delimit lines "^/"
-			code: make-space 'pre compose [text: (text)]
-			remove/part find/same/tail doc/content para1 -1 + half length? mapped
-			para1/edit [
-				remove! prange1
-				insert! 0 code
-			]
-		]
-		adjust-offsets doc range/1 negate span? range
-	]
-	
 	document/remove: function [doc [object!] range [pair!]] [
-		range: order-pair clip range 0 doc/measure [length]
+		range: order-pair clip range 0 doc/length
 		n: half length? mapped: doc/map-range/relative range
 		set [para1: range1:] mapped
 		set [paraN: rangeN:] skip tail mapped -2 
@@ -575,21 +513,21 @@ doc-ctx: context [
 		]
 	]
 	
-	document/get-attr: function [space [object!] index [integer!] attr [word!]] [
-		if set [para: pofs:] caret->paragraph space offset: index - 1 [
+	document/get-attr: function [doc [object!] index [integer!] attr [word!]] [
+		if set [para: pofs:] caret->paragraph doc offset: index - 1 [
 			rich/attributes/pick para/data/attrs attr offset - pofs + 1	;-- may be none esp. on 'new-line' paragraph delimiters
 		]
 	]
 	
-	document/get-attrs: function [space [object!] index [integer!]] [
-		offset: clip index - 1 0 space/measure [length]
-		if set [para: pofs: plen:] caret->paragraph space offset [
+	document/get-attrs: function [doc [object!] index [integer!]] [
+		offset: clip index - 1 0 doc/length
+		if set [para: pofs: plen:] caret->paragraph doc offset [
 			;; no attribute at the 'new-line' delimiter, so it tries to get them from:
 			;; - last char of this paragraph (if not empty)
 			;; - last char of some non-empty above paragraph
 			;@@ maybe unify all paragraph/data into single document/data so newlines will have attrs?
 			while [all [offset > 0  pofs + plen = offset]] [	
-				set [para: pofs: plen:] caret->paragraph space offset: offset - 1
+				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
 			]
 			if pofs + plen > offset [
 				rich/attributes/copy para/data/attrs 0x1 + offset - pofs
