@@ -146,8 +146,105 @@ doc-ctx: context [
 		; ]
 	]
 	
+	
+	;; basis for all timeline actions - the rest is built on top of it
+	playback: function [doc [object!] plan [block!] /local par val rng] [
+		parse plan [any [
+			'move   set val integer! (doc/caret/offset: val)
+		|	'side   set val word! (doc/caret/side: val)
+		|	'select set val [none! | pair!] (doc/selected: val)
+		|	'indent set par integer! set val [none! | block!] (doc/content/:par/indent: val)
+		|	'align  set par integer! set val word! (doc/content/:par/align: val)
+		|	'insert set rng pair! set val block! (document/insert doc rng/1 val)
+		|	'remove set rng pair! (document/remove doc rng)
+		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
+		]]
+	]
+	
+	group-edits: function [edit1 [block!] edit2 [block!] /local word par rng2 data2] [
+		;; to avoid having "do-nothing" undo blocks it forbids grouping insert & remove into single action
+		;; indents & aligns are never grouped out of UX considerations
+		if any [
+			find edit1 'indent
+			find edit2 'indent
+			find edit1 'align
+			find edit2 'align
+			all [find edit1 'insert  find edit2 'remove]
+			all [find edit1 'remove  find edit2 'insert]
+		] [return no]
+		
+		#print "grouping (mold edit1) + (mold edit2)"
+		parse edit2 [any [s:
+			set word ['move | 'select | 'side] skip e: (
+				mapparse compose [quote (word) skip] edit1 [[]]
+				append/part edit1 s e
+			)
+		|	set word 'insert set rng2 pair! set data2 block! e: (
+				either all [
+					set [_: rng1: data1:] p: find/last edit1 'insert
+					rng1/2 = rng2/1
+				][
+					p/2: rng1/1 by rng2/2
+					rich/decoded/insert! data1 infxinf/x data2
+				][
+					append/part edit1 s e
+				]
+			)
+		|	set word 'remove set rng2 pair! e: (
+				either all [
+					set [_: rng1:] p: find/last edit1 'remove
+					any [rng1/1 = rng2/1  rng1/1 = rng2/2]
+				][
+					p/2: (min rng1/1 rng2/1) + (0 by add span? rng1 span? rng2)
+				][
+					append/part edit1 s e
+				]
+			)
+		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
+		]]
+		#print "=> (mold edit1)"
+		edit1
+	];group-edits: function [edit1 [block!] edit2 [block!] /local word par rng2 data2] [
+	
+	undo-worthy?: function [edit [block!]] [
+		not parse edit [any [['move | 'select | 'side] skip]]
+	]
+	
+	push-to-timeline: function [doc [object!] left [block!] right [block!]] [
+		left:  reduce ['playback doc left]
+		right: reduce ['playback doc right]
+		car': doc/caret/offset
+		sel': doc/selected
+		do right
+		unless any [undo-worthy? left/3  undo-worthy? right/3] [exit]
+		if car' <> car: doc/caret/offset [				;@@ remember side or not worth it?
+			repend left/3  ['move car']
+			repend right/3 ['move car]
+		]
+		if sel' <> sel: doc/selected [
+			repend left/3  ['select sel']
+			repend right/3 ['select sel]
+		]
+		; ?? left ?? right
+		either all [
+			doc/timeline/fresh?
+			set [doc': left': right':] doc/timeline/last-event
+			doc' =? doc									;-- last event must come from the same document in a shared timeline
+			parse left'  ['playback object! block!]
+			parse right' ['playback object! block!]
+			group-edits right'/3 right/3
+			group-edits left/3   left'/3				;-- left edit is grouped in reverse order
+		][
+			doc/timeline/put/last doc left right'		;-- refreshes the event timer, even though actions are modifed in place
+		][
+			doc/timeline/put doc left right
+		]
+	]
+	
 	actions: context [
 		edit: function [doc [object!] plan [block!]] [
+			left:  make [] 10							;-- history for undo/redo
+			right: make [] 10
 			;@@ unfortunately I have to manually call this 'update' in every action - how to automate?
 			update: [
 				length: doc/measure [length]
@@ -155,32 +252,23 @@ doc-ctx: context [
 				set [para: pofs: plen:] caret->paragraph doc offset
 			]
 			do with self plan
+			; ?? left ?? right
+			push-to-timeline doc left right
 		]
-		; undo: redo: at: select: move: remove: copy: paste: insert: paint: break: auto-bullet: none
-		undo: redo: group: at: select: move: remove: copy: paste: insert: break: align: indent: auto-bullet: none
+		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: align: indent: auto-bullet: none
 	]
 	
+	actions/record: function [
+		"Record an undo/redo action pair in timeline. Input is composed"
+		undo-action [block!]
+		redo-action [block!]
+	] with :actions/edit [
+		insert left  compose/deep/only undo-action 
+		append right compose/deep/only redo-action 
+	]
+
 	actions/undo: function [] with :actions/edit [doc/timeline/undo]
 	actions/redo: function [] with :actions/edit [doc/timeline/redo]
-	
-	;; unlike group-actions this is intended for grouping big enough changes, not single chars
-	actions/group: function [
-		"Evaluate code and group resulting events on the timeline"
-		code [block!]
-	] with :actions/edit [
-		do update
-		begin: doc/timeline/mark
-		do code
-		end:   doc/timeline/mark
-		#assert [0 < offset? begin end]					;-- not intended for grouping undos
-		set [_: left: right:] doc/timeline/unwind
-		while [not same? begin doc/timeline/mark] [
-			set [_: left': right':] doc/timeline/unwind
-			append left  left'
-			insert right right'
-		]
-		doc/timeline/put doc left right
-	]
 	
 	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
 		do update
@@ -205,8 +293,9 @@ doc-ctx: context [
 	] with :actions/edit [
 		do update
 		set [ofs: sel:] field-ctx/compute-selection limit by actions offset length doc/selected
-		doc/caret/offset: ofs
-		doc/selected: sel
+		actions/record
+			[move (offset) select (doc/selected)]
+			[move (ofs) select (sel)]
 	]
 	
 	actions/move: function [
@@ -215,105 +304,23 @@ doc-ctx: context [
 		/by "Move by a relative integer number of slots"
 	] with :actions/edit [
 		do update
-		either by [pos: pos + offset][if word? pos [pos: actions/at pos]]
-		if block? pos [									;-- block may be returned by find-line-below/above
-			doc/caret/side:   pos/side
-			doc/caret/offset: clip 0 length pos/offset
-		]
-		if integer? pos [								;-- unknown words are silently ignored
-			if pos <> offset [doc/caret/side: pick [left right] pos > offset]	;-- only change side if moved
-			doc/caret/offset: clip 0 length pos
-		]
-	]
-	
-	
-	playback: function [doc [object!] plan [block!] /local par val rng] [
-		parse plan [any [
-			'move   set val integer! (doc/caret/offset: val)
-		|	'select set val [none! | pair!] (doc/selected: val)
-		|	'indent set par integer! set val [none! | block!] (doc/content/:par/indent: val)
-		|	'align  set par integer! set val word! (doc/content/:par/align: val)
-		|	'insert set rng pair! set val block! (document/insert doc rng/1 val)
-		|	'remove set rng pair! (document/remove doc rng)
-		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
-		]]
-	]
-	
-	group-actions: function [action1 [block!] action2 [block!] /local word par rng2 data2] [
-		;; to avoid having "do-nothing" undo blocks it forbids grouping insert & remove into single action
-		;; indents & aligns are never grouped out of UX considerations
-		if any [
-			find action1 'indent
-			find action2 'indent
-			find action1 'align
-			find action2 'align
-			all [find action1 'insert  find action2 'remove]
-			all [find action1 'remove  find action2 'insert]
-		] [return no]
-		
-		#print "grouping (mold action1) + (mold action2)"
-		parse action2 [any [s:
-			set word ['move | 'select] skip e: (
-				mapparse compose [quote (word) skip] action1 [[]]
-				append/part action1 s e
-			)
-		|	set word 'insert set rng2 pair! set data2 block! e: (
-				either all [
-					set [_: rng1: data1:] p: find/last action1 'insert
-					rng1/2 = rng2/1
-				][
-					p/2: rng1/1 by rng2/2
-					rich/decoded/insert! data1 infxinf/x data2
-				][
-					append/part action1 s e
+		case/all [
+			by [pos: pos + offset]
+			word? pos [
+				pos: actions/at pos
+				if block? pos [							;-- block may be returned by find-line-below/above
+					side: pos/side
+					pos:  clip 0 length pos/offset
 				]
-			)
-		|	set word 'remove set rng2 pair! e: (
-				either all [
-					set [_: rng1:] p: find/last action1 'remove
-					any [rng1/1 = rng2/1  rng1/1 = rng2/2]
-				][
-					p/2: (min rng1/1 rng2/1) + (0 by add span? rng1 span? rng2)
-				][
-					append/part action1 s e
-				]
-			)
-		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
-		]]
-		#print "=> (mold action1)"
-		action1
-	]
-	
-	record-in-timeline: function [doc [object!] left [block!] right [block!]] [
-		left:  reduce ['playback doc compose/deep/only left]
-		right: reduce ['playback doc compose/deep/only right]
-		car': doc/caret/offset
-		sel': doc/selected
-		do right
-		if car' <> car: doc/caret/offset [
-			repend left/3  ['move car']
-			repend right/3 ['move car]
-		]
-		if sel' <> sel: doc/selected [
-			repend left/3  ['select sel']
-			repend right/3 ['select sel]
-		]
-		; ?? left ?? right
-		either all [
-			doc/timeline/fresh?
-			set [doc': left': right':] doc/timeline/last-event
-			doc' =? doc									;-- last event must come from the same document in a shared timeline
-			parse left'  ['playback object! block!]
-			parse right' ['playback object! block!]
-			group-actions right'/3 right/3
-			group-actions left/3 left'/3				;-- left action is grouped in reverse order
-		][
-			doc/timeline/put/last doc left right'		;-- refreshes the event timer, even though actions are modifed in place
-		][
-			doc/timeline/put doc left right
+			]
+			integer? pos [								;-- unknown words are silently ignored
+				default side: case [pos > offset ['left] pos < offset ['right]]	;-- only change side if moved
+				pos: clip 0 length pos
+				actions/record [move (offset)] [move (pos)]
+				if side [actions/record [side (doc/caret/side)] [side (side)]]
+			]
 		]
 	]
-
 	
 	actions/remove: function [
 		"Remove range or from caret up to a given limit"
@@ -328,15 +335,14 @@ doc-ctx: context [
 			by                [limit: offset + limit]
 			integer? limit    [limit: order-pair as-pair limit offset]
 			limit [
-				slice: document/copy doc limit
-				record-in-timeline doc [insert (limit) (slice)] [remove (limit)]
+				slice: copy-range doc limit
+				actions/record [insert (limit) (slice)] [remove (limit)]
 			]
 		]
 	]
 	
-	;@@ with 'copy' name it is too easy to forget that it writes to clipboard - need a better name
-	actions/copy: function [
-		"Copy specified range into clipboard"
+	actions/slice: function [
+		"Extract specified range"
 		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
 	] with :actions/edit [
 		do update
@@ -344,8 +350,14 @@ doc-ctx: context [
 			selected [range: doc/selected]
 			all      [range: 0 by length]
 		]
-		slice: when pair? range (document/copy doc range)	;-- silently ignores unsupported range words
-		clipboard/write slice
+		when pair? range (copy-range doc range)			;-- silently ignores unsupported range words
+	]
+	
+	actions/copy: function [
+		"Copy specified range into clipboard"
+		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
+	] with :actions/edit [
+		if slice: actions/slice range [clipboard/write slice]
 		slice
 	]
 	
@@ -358,32 +370,16 @@ doc-ctx: context [
 	actions/insert: function [
 		"Insert given data into current caret offset"
 		data [block! (parse data [block! map!]) object! (space? data) string!]
+		/at pos [integer!] 
 	] with :actions/edit [
 		do update
-		;@@ mark history state
 		case [
 			object? data [data: reduce [reduce [data] copy #()]]
 			empty?  data [exit]
 			string? data [data: paint-string doc data]
 		]
-		range: 0 by (length? data/1) + offset
-		#assert [doc/caret/offset = offset]				;-- otherwise need to update caret/offset
-		record-in-timeline doc [remove (range)] [insert (range) (data)]
-	]
-	
-	; actions/paint: function [
-		; "Paint given range with an attribute set (only first item's attribute is used)"
-		; range [pair!] attrs [map!]
-	; ] with :actions/edit [
-		; slice: copy orig: document/copy doc range
-		; slice/2: rich/attributes/extend attrs length? slice/1
-		; record-in-timeline doc [remove (range) insert (range) (orig)] [remove (range) insert (range) (slice)]
-	; ]
-	
-	actions/break: function [
-		"Break paragraph at current caret offset"
-	] with :actions/edit [
-		actions/insert "^/"
+		range: 0 by (length? data/1) + any [pos offset]
+		actions/record [remove (range)] [insert (range) (data)]
 	]
 	
 	actions/align: function [
@@ -391,12 +387,14 @@ doc-ctx: context [
 		align [word!]
 	] with :actions/edit [
 		do update
-		range:  any [selected  offset * 1x1]
+		range:  any [doc/selected  offset * 1x1]
 		mapped: map-range doc range
 		base:   skip? find/same doc/content mapped/1
-		left:   map-each/eval [/i para prange] mapped [['align base + i para/align]]
-		right:  map-each/eval [/i para prange] mapped [['align base + i align]]
-		record-in-timeline doc left right
+		for-each [/i para prange] mapped [
+			 actions/record
+			 	[align (base + i) (para/align)]
+			 	[align (base + i) (align)]
+		]
 	]
 	
 	actions/indent: function [
@@ -405,19 +403,19 @@ doc-ctx: context [
 			"Relative integer offset or absolute [first: int! rest: integer!] block"
 	] with :actions/edit [
 		do update
-		range:  any [selected  offset * 1x1]
+		range:  any [doc/selected  offset * 1x1]
 		mapped: map-range doc range
 		base:   skip? find/same doc/content mapped/1
-		left:   map-each/eval [/i para prange] mapped [['indent base + i para/indent]]
-		right:  map-each/eval [/i para prange] mapped [
+		for-each [/i para prange] mapped [
 			unless block? pindent: indent [
 				first: max 0 indent + any [if para/indent [para/indent/first] 0]
 				rest:  max 0 indent + any [if para/indent [para/indent/rest]  0]
 				pindent: compose [first: (first) rest: (rest)]
 			]
-			['indent base + i pindent]
+			actions/record
+				[indent (base + i) (para/indent)]
+				[indent (base + i) (pindent)]
 		]
-		record-in-timeline doc left right
 	]
 	
 	actions/auto-bullet: function [
@@ -429,11 +427,7 @@ doc-ctx: context [
 	;@@ rename this to edit, bind `doc` argument
 	;@@ 'length' should be under 'measure' context
 	; document: context [length: atomic-edit: copy: remove: insert: break: mark: paint: get-attr: get-attrs: align: codify: bulletify: enumerate: auto-bullet: indent: none]
-	document: context [length: copy: remove: insert: break: mark: paint: get-attr: get-attrs: codify: bulletify: enumerate: none]
-	
-	document/length: function [doc [object!]] [
-		doc/measure [length]
-	]
+	document: context [remove: insert: break: mark: paint: get-attr: get-attrs: codify: bulletify: enumerate: none]
 	
 	; document/atomic-edit: function [doc [object!] edit [block!] forward? [logic!]] [	;-- used by undo/redo
 		; unless forward? [edit: reverse copy edit]
@@ -445,7 +439,7 @@ doc-ctx: context [
 		; doc/caret/offset: ofs+							;@@ should I restore the side too?
 	; ]
 
-	document/copy: function [doc [object!] range [pair!]] [
+	copy-range: function [doc [object!] range [pair!]] [
 		rowbreak: [[#"^/"] #()]
 		result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
 		ofs:      0
@@ -474,26 +468,21 @@ doc-ctx: context [
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
 		;; each paragraph becomes a separate link as this is simplest to do
-		range: order-pair clip range 0 doc/measure [length]
+		range: order-pair clip range 0 doc/length
 		links: map-each/eval [para prange] map-range/no-empty doc range [
-			slice: document/copy doc prange
+			slice: copy-range doc prange
 			len: length? slice/1
 			rich/attributes/mark! slice/2 len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
 			rich/attributes/mark! slice/2 len 0 by len 'underline on
 			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
 			[prange link]
 		]
-		sel: doc/selected
 		doc/edit [
-			group [										;-- combine all edits into a single undo
-				for-each/reverse [prange link] links [
-					remove prange
-					move prange/1
-					insert link
-				]
-				;@@ how to expose more high level `record`?
-				record-in-timeline doc [select (sel)] [select (none)]
+			for-each/reverse [prange link] links [
+				remove prange
+				insert/at link prange/1
 			]
+			select 'none
 		]
 	]
 	
@@ -545,7 +534,6 @@ doc-ctx: context [
 			s: find/same/tail doc/content para1
 			e: find/same/tail s paraN
 			remove/part s e
-			doc/content: doc/content
 		]
 		adjust-offsets doc range/1 negate span? range
 		if all [doc/selected  0 = span? doc/selected] [doc/selected: none]	;-- normalize emptied selection
@@ -640,14 +628,12 @@ doc-ctx: context [
 	;; used to correct caret and selection offsets after an edit
 	adjust-offsets: function [doc [object!] offset [integer!] shift [integer!]] [
 		sel: doc/selected								;-- can't set components of doc/selected (due to reordering)
-		car: doc/caret
-		foreach path [sel/1 sel/2 car/offset] [
+		foreach path [sel/1 sel/2 doc/length doc/caret/offset] [
 			if attempt [offset <= value: get path] [	;@@ REP #113
 				set path max offset value + shift
 			]
 		]
-		doc/caret:    car								;-- trigger updates
-		doc/selected: sel
+		doc/selected: sel								;-- trigger update of /selected
 	]
 	
 	get-bullet-text: function [para [object!]] [
@@ -802,7 +788,7 @@ doc-ctx: context [
 		caret': point->caret doc xy
 		if caret' [										;-- may be none if outside the document
 			limits: either dir = 'down					;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
-				[caret + 1 by document/length doc]
+				[caret + 1 by doc/length]
 				[0 by (caret - 1)]
 			caret'/offset: clip limits/1 limits/2 caret'/offset
 		]
@@ -850,6 +836,12 @@ doc-ctx: context [
 		drawn: doc/list-draw/on canvas
 	]
 	
+	on-content-change: function [doc [object!] word [word!] content [block!]] [
+		if unset? :doc/measure [exit]					;-- wait for init
+		doc/length: doc/measure [length]
+		invalidate doc
+	]
+	
 	on-caret-move: function [caret [object!] word [word!] offset [integer!]] [
 		if caret/parent [pick-paint caret/parent]
 		invalidate caret
@@ -865,10 +857,13 @@ doc-ctx: context [
 		offset: 0	#on-change :on-caret-move			;-- on top of invalidation, also updates the paint
 	]
 	
+	;@@ should it support /items override? what will be the use case? spoilers? (for now length accounts for every paragraph)
 	declare-template 'document/list [
+		content: []		#type :on-content-change
 		axis:   'y		#type (axis = 'y)				;-- protected
 		spacing: 5
 		
+		length:   0		#type [integer!]				;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none	#type [pair! none!] :on-selected-change
 		timeline: copy timeline!
@@ -876,7 +871,7 @@ doc-ctx: context [
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
 		edit: func [
-			"Apply a sequence of edits to the text"
+			"Apply a sequence of edits to the text and store it on the timeline"
 			plan [block!]
 		][
 			~/actions/edit self plan
@@ -917,13 +912,13 @@ underbox: function [
 
 define-styles [
 	;@@ leave only document style here!
-	code: using [pen] [
+	code: using [pen] [	;@@ code-span?
 		font: code-font
 		margin: 4x0
 		pen: when color (compose [pen (color)])
 		below: [(underbox size 1 3) (pen)]
 	]
-	;@@ how to name it better? code-paragraph?
+	;@@ how to name it better? code-paragraph? code-block?
 	pre: [
 		margin: 10
 		font: code-font
