@@ -161,8 +161,8 @@ doc-ctx: context [
 		|	'select set val [none! | pair!] (doc/selected: val)
 		|	'indent set par integer! set val [none! | block!] (doc/content/:par/indent: val)
 		|	'align  set par integer! set val word! (doc/content/:par/align: val)
-		|	'insert set rng pair! set val block! (document/insert doc rng/1 val)
-		|	'remove set rng pair! (document/remove doc rng)
+		|	'insert set rng pair! set val block! (insert-data doc rng/1 val)
+		|	'remove set rng pair! (remove-range doc rng)
 		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
 		]]
 	]
@@ -245,13 +245,14 @@ doc-ctx: context [
 		]
 	]
 	
-	;@@ add ! to destructive actions for consistency with rich-content?
+	;@@ add ! to destructive actions for consistency with rich-content? or remove it instead?
 	actions: context [
 		edit: function [doc [object!] plan [block!] /local result] [
 			init:  reduce [doc/selected doc/caret/offset]	;-- remember them before the edit
 			left:  make [] 10							;-- history for undo/redo
 			right: make [] 10
 			;@@ unfortunately I have to manually call this 'update' in every action - how to automate?
+			;@@ or maybe get rid of it? paragraph is rarely used anyway
 			update: [
 				offset: doc/caret/offset
 				set [para: pofs: plen:] caret->paragraph doc offset
@@ -261,7 +262,7 @@ doc-ctx: context [
 			push-to-timeline doc left right init
 			:result
 		]
-		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: align: indent: auto-bullet: none
+		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent: auto-bullet: none
 	]
 	
 	actions/record: function [
@@ -391,6 +392,26 @@ doc-ctx: context [
 		actions/record [remove (range)] [insert (range) (data)]
 	]
 	
+	actions/mark: function [
+		"Mark given range with an attribute and value"
+		range [pair!]
+		attr  [word!]
+		value [none! logic! scalar! any-string!]		;@@ what other types to allow? words?
+			"When false or none, attribute is cleared"
+	] with :actions/edit [
+		do update
+		unless zero? span: span? range: clip order-pair range 0 doc/length [
+			slice:  copy-range doc range no				;@@ use copy once I change decoded format
+			marked: copy-range doc range no
+			rich/attributes/mark! marked/2 span 0 by span attr :value
+			; ?? slice ?? marked
+			sel: doc/selected
+			actions/record
+				[remove (range) insert (range) (slice)  select (sel)]
+				[remove (range) insert (range) (marked) select (sel)]
+		]
+	]
+	
 	actions/align: function [
 		"Realign selected paragraph(s)"
 		align [word!]
@@ -433,7 +454,7 @@ doc-ctx: context [
 		auto-bullet doc doc/caret/offset
 	]
 	
-	document: context [remove: insert: break: mark: paint: get-attr: get-attrs: bulletify: enumerate: none]
+	document: context [paint: get-attr: get-attrs: bulletify: enumerate: none]
 	
 	copy-range: function [doc [object!] range [pair!] plain-text? [logic!]] [
 		mapped: doc/map-range/relative range
@@ -455,7 +476,7 @@ doc-ctx: context [
 		]
 	]
 		
-	document/remove: function [doc [object!] range [pair!]] [
+	remove-range: function [doc [object!] range [pair!]] [
 		range: order-pair clip range 0 doc/length
 		n: half length? mapped: doc/map-range/relative range
 		set [para1: range1:] mapped
@@ -472,7 +493,7 @@ doc-ctx: context [
 		if all [doc/selected  0 = span? doc/selected] [doc/selected: none]	;-- normalize emptied selection
 	]
 	
-	document/insert: function [
+	insert-data: function [
 		doc    [object!]
 		offset [integer!]
 		data   [block!] (parse data [block! map!])
@@ -510,11 +531,12 @@ doc-ctx: context [
 		adjust-offsets doc offset length? items
 	]
 		
-	document/mark: function [doc [object!] range [pair!] attr [word!] value] [
-		foreach [para: prange:] doc/map-range/relative range [
-			para/edit [mark! prange attr :value]
-		]
-	]
+	;; unused because not undo-capable
+	; mark-range: function [doc [object!] range [pair!] attr [word!] value] [
+		; foreach [para: prange:] doc/map-range/relative range [
+			; para/edit [mark! prange attr :value]
+		; ]
+	; ]
 	
 	;; replaces all attributes in the range with first attribute in attrs
 	document/paint: function [doc [object!] range [pair!] attrs [map!]] [

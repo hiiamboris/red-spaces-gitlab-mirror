@@ -79,7 +79,7 @@ toggle-attr: function [name] [
 	either all [range: doc/selected  0 < span? range] [
 		old: doc-ctx/document/get-attr doc 1 + range/1 name
 		?? [old range] 
-		doc-ctx/document/mark doc range name not old
+		doc/edit [mark range name not old]
 	][
 		old: rich/attributes/pick doc/paint name 1
 		rich/attributes/mark! doc/paint 1 0x1 name not old
@@ -201,10 +201,12 @@ view reshape [
 							range: doc/selected
 							range/1 <> range/2
 						][
-							doc-ctx/document/mark doc range 'font font/name
-							doc-ctx/document/mark doc range 'size font/size
-							foreach style compose [(only font/style)] [
-								doc-ctx/document/mark doc range style on
+							doc/edit [
+								mark range 'font font/name
+								mark range 'size font/size
+								foreach style compose [(only font/style)] [
+									doc/mark range style on
+								]
 							]
 						][
 							rich/attributes/mark paint 1 0x1 'font font/name
@@ -220,7 +222,8 @@ view reshape [
 					][
 						old: doc-ctx/document/get-attr doc 1 + range/1 'color
 						if color: request-color/from old [
-							doc-ctx/document/mark doc range 'color if old <> color [color]	;-- resets color if the same applied
+							color: if old <> color [color]		;-- resets color if the same one applied
+							doc/edit [mark range 'color color]
 						]
 					][
 						focus-space doc					;-- focus was destroyed by request-color
