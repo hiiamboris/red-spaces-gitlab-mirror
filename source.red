@@ -46,60 +46,99 @@ Red [
 
 ;; this context proceeds from lowest level (ranges) to highest level (source) below
 rich: context [											;@@ what would be a better name?
+	~: self
+
+	;; catalog holds every attribute combo ever encountered
+	;; format: [hash [attr value ...] ...] - hash is used to look up by attribute combo (binary is hashed by hash! type)
+	;; but normally attributes are indexed by integer (half offset, zero-based), since it's more readable on mold
+	;; attrs are in a block because there usually aren't many anyway, no reason to use a map
+	;; attr names must always all be lowercase or hashing would have to be slowed down with auto-lowecasing
+	;@@ test lowercase in high-level funcs
+	catalog: make hash! 1024
+	
+	hash-attrs: function [attrs [block!]] [
+		attrs: sort/skip append clear [] attrs 2				;-- sort to guarantee uniqueness of the combo
+		checksum (native-mold/all/flat/only attrs) 'sha1		;-- native mold is much faster than save into redbin
+	]
+	
+	store-attrs: function [attrs [block!]] [
+		#assert [any [empty? attrs  all extract next attrs 2]]		;-- only truthy values are allowed for attrs
+		hash: hash-attrs attrs
+		unless pos: find catalog hash [
+			pos: tail catalog 
+			repend catalog [hash copy/deep attrs]
+		]
+		half skip? pos
+	]
+	
+	index->attrs: function [index [integer!]] [
+		pick catalog index + 1 * 2
+	]
+	
+	attrs->index: function [attrs [block!]] [
+		hash: hash-attrs attrs
+		if pos: find catalog hash [half skip? pos]
+	]
+	
+	store-attrs []										;-- empty attribute set is always present and has zero index
+	#assert [											;-- other attributes are added for testing purposes
+		1 = store-attrs [bold #[true]]
+		2 = store-attrs [bold #[true] underline #[true]]
+		3 = store-attrs [size 8]
+		4 = store-attrs [size 12]
+		4 = store-attrs [size 12]
+		3 = attrs->index [size 8]
+		[bold #[true]] = index->attrs 1
+	]
+	
 	
 	ranges: context [
 		to-rtd-pair: function [
 			"Convert source range into RTD range"
 			range [pair!]
 		][
-			range/1 + 1 by (range/2 - range/1)
+			range/1 + 1 by span? range
 		]
 	
 		from-rtd-pair: function [
 			"Convert RTD range into source range"
 			range [pair!]
 		][
-			range/1 - 1 by (range/2 + range/1 - 1)
+			0 by range/2 + range/1 - 1
 		]
 		
 		#assert [2x5 = to-rtd-pair   1x6]
 		#assert [1x6 = from-rtd-pair 2x5]
 	]
 		
-	zero!:    charset "^@"								;-- charset is about 10x faster than using a char
-	nonzero!: complement zero!
-	
-	mask-to-ranges: function [values [block!] mask [string!] /local c] [
+	extract-ranges: function [data [block!] (even? length? data)] [
 		ranges: clear []
-		parse mask [
-			any [
-				any zero! s: set c nonzero! any c e: (
-					value: pick values to integer! c
-					append append ranges :value as-pair skip? s skip? e
-				)
+		range-code: 0
+		offset:     0
+		flush: [
+			if range-code > 0 [
+				range: range-start by offset
+				attrs: index->attrs range-code
+				repend ranges [range attrs]
 			]
 		]
+		foreach [item code] data [						;@@ use for-each
+			if code <> range-code [
+				do flush
+				range-start: offset
+				range-code:  code
+			]
+			offset: offset + 1
+		]
+		do flush
 		copy ranges
 	]
 	
-	{
-		MEMO: mask length should always equal items length! otherwise would need to pass length separately anyway
-		attrs format: #(
-			name [										;-- attribute name
-				values: [value1 value2 ...]				;-- block of allowed values
-				mask:   "mask"							;-- string mapping items to values (zero char = no value)
-			]
-			...
-		)
+	#assert [ [0x3 [bold #[true]]] = extract-ranges [_ 1 _ 1 _ 1] ]
 
-		I do not add #length into attrs as that would complicate foreach [attr data] loop
-		unfortunate result is that length has to be passed as argument together with attributes
-		;@@ for-each loop could help this by filtering #length out
-	}
-	
 	;; external context allows me to use /copy word without shadowing the global one
 	attributes: context [
-		to-rtd-flag: make-rtd-flags: mark!: pick: copy: extend: remove!: insert!: none
+		to-rtd-flag: make-rtd-flags: change: mark: pick: exclude: none
 	]
 	
 	attributes/to-rtd-flag: function [attr [word!] value [tuple! logic! string! integer!]] [
@@ -113,65 +152,70 @@ rich: context [											;@@ what would be a better name?
 		
 	rtd-attrs: make hash! [bold italic underline strike color backdrop size font]
 	attributes/make-rtd-flags: function [
-		"Make an RTD flags block out of given attributes"
-		attrs [map!] limits [pair!] "segment to extract"
+		"Make an RTD flags block out of data attributes"
+		data [block!] limits [pair!] "segment to extract"		;-- segment used in to-spaces to create individual paragraphs
 	][
-		flags:  clear []
-		length: span? limits
-		foreach [attr data] attrs [
-			unless find rtd-attrs attr [continue]		;-- attribute not supported by RTD
-			set [_: values: _: mask:] data
-			foreach [value range] mask-to-ranges values mask [	;@@ use map-each
-				range: clip 0 length range - limits/1
-				if zero? span? range [continue]
-				pair: ranges/to-rtd-pair range
-				flag: attributes/to-rtd-flag to word! attr value
-				append append flags pair flag
+		data:   append/part clear [] (skip data limits/1 * 2) (2 * span? limits)
+		result: clear []
+		ranges: extract-ranges data
+		foreach [range attrs] ranges [ 
+			flags: clear []
+			foreach [attr value] attrs [						;@@ use map-each
+				append flags only attributes/to-rtd-flag to word! attr value	;-- only collects attributes supported by RTD
+			]
+			unless empty? flags [
+				pair: ~/ranges/to-rtd-pair range
+				append append result pair flags
 			]
 		]
-		copy flags
-	]
-	#assert [
-		[1x8  bold] = attributes/make-rtd-flags #(bold [values: [#[true]] mask: "^@^@^@^@^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^@^@^@^@"]) 4x12
-		[5x8  bold] = attributes/make-rtd-flags #(bold [values: [#[true]] mask: "^@^@^@^@^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^@^@^@^@"]) 0x12
-		[5x16 bold] = attributes/make-rtd-flags #(bold [values: [#[true]] mask: "^@^@^@^@^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^A^@^@^@^@"]) 0x20
+		copy result
 	]
 	
-	attributes/mark!: function [						;@@ maybe rename to set! ?
-		attrs  [map!]
-		length [integer!] (length >= 0) "target items size"		;-- required to insert missing attributes
-		range  [pair!]
-		attr   [word!]
+	#assert [
+		[1x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 2x5
+		[3x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 0x5
+		[3x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 0x10
+	]
+	
+	attributes/change: function [
+		attrs [block!] "modified"
+		attr  [word!]
 		value
 	][
-		if zero? span: span? range [return attrs]
-		either not empty? data: attrs/:attr [			;-- existing attr
-			#assert [parse data [any-word! block! any-word! string!]]
-			set [_: values: _: mask:] data
-			#assert [length = length? mask]
-			char: #"^@"
-			if :value [
-				unless pos: find/only/case values :value [
-					append/only pos: tail values :value
-				]
-				char: to char! index? pos
-			]
-			change/dup (skip mask range/1) char span
-		][												;-- new attr
-			if :value [									;-- not added if value is falsey
-				values: reduce [:value]
-				enlarge (mask: make {} length) length #"^@"
-				change/dup (skip mask range/1) #"^A" span
-				attrs/:attr: compose/only [values: (values) mask: (mask)]
-			]
+		pos: find/skip attrs attr 2
+		either :value [
+			change/only change any [pos tail attrs] attr :value
+		][
+			remove/part pos 2
 		]
 		attrs
 	]
+	
+	attributes/mark: function [							;@@ maybe rename to set! ?
+		data  [block!] "modified"
+		range [pair!]
+		attr  [word!]
+		value
+	][
+		range: clip range 0 half length? data			;-- avoid runaway repeat if range is infinite
+		repeat i span? range [							;@@ use for-each!
+			code: pick data i2: range/1 + i * 2
+			either last-code = code [					;-- streaming optimization
+				code: new-code
+			][
+				attrs: copy index->attrs last-code: code
+				attributes/change attrs attr :value
+				new-code: code: store-attrs attrs
+			]
+			data/:i2: code 
+		]
+		data
+	]
 	#assert [
-		#(x [values: [1] mask: "^@^@^@^@^A^A^A^A^A^A^A^A"  ]) = attributes/mark! #() 12 4x12 'x 1
-		#(x [values: [1] mask: "^@^@^@^@^A^A^A^A^A^A^A^A^@"]) = attributes/mark! #() 13 4x12 'x 1
-		#(x [values: [1] mask: "^@^@^A^A^A^A^@^@"          ]) = attributes/mark! #(x [values: [1] mask: "^@^@^@^@^@^@^@^@"]) 8 2x6 'x 1
-		#(x [values: [1] mask: "^A^A^@^@^@^@^A^A"          ]) = attributes/mark! #(x [values: [1] mask: "^A^A^A^A^A^A^A^A"]) 8 2x6 'x none
+		[] = attributes/mark [] 4x12 'x 1
+		[_ 0 _ 1 _ 1 _ 1 _ 0] = attributes/mark [_ 0 _ 0 _ 1 _ 0 _ 0] 1x4 'bold on
+		[_ 0 _ 0 _ 0 _ 0 _ 0] = attributes/mark [_ 0 _ 1 _ 0 _ 1 _ 0] 1x4 'bold off
+		[_ 0 _ 0 _ 0 _ 0 _ 0] = attributes/mark [_ 0 _ 1 _ 1 _ 1 _ 0] 1x4 'bold off
 	]
 	
 	; ;; unlike /mark, clears all attributes in the range
@@ -182,170 +226,38 @@ rich: context [											;@@ what would be a better name?
 		; attrs
 	; ]
 	
-	attributes/pick: function [attrs [map!] attr [word!] index [integer!]] [
-		all [
-			set [_: values: _: mask:] attrs/:attr
-			i: mask/:index
-			pick values to integer! i
-		]
+	attributes/pick: function [code [integer!] attr [word!]] [
+		select/skip index->attrs code attr 2 
 	]
 	#assert [
-		on =  attributes/pick #(bold [values: [#[true]] mask: {^A^A^@^@^A}]) 'bold 1
-		on =  attributes/pick #(bold [values: [#[true]] mask: {^A^A^@^@^A}]) 'bold 2
-		on =  attributes/pick #(bold [values: [#[true]] mask: {^A^A^@^@^A}]) 'bold 5
-		none? attributes/pick #(bold [values: [#[true]] mask: {^A^A^@^@^A}]) 'bold 0
-		none? attributes/pick #(bold [values: [#[true]] mask: {^A^A^@^@^A}]) 'bold 3
+		on =  attributes/pick 1 'bold
+		none? attributes/pick 0 'bold
+		none? attributes/pick 3 'bold
+		8  =  attributes/pick 3 'size
 	]
 	
-	attributes/copy: function [attrs [map!] range [pair!] (range/2 >= range/1)] [
-		slice: copy/deep attrs							;-- this doesn't copy the strings but they will be replaced anyway
-		foreach [attr data] slice [
-			data/mask: copy/part data/mask range + 1
+	attributes/exclude: function [set1 [block!] set2 [block!]] [
+		result: copy set1
+		remove-each [name value] result [
+			:value == select/case/skip set2 name 2
 		]
-		;@@ should this clean up unused attribute values? probably not worth it
-		slice
-	]
-	
-	;; copies first attribute slot until 'length' slots are occupied
-	attributes/extend: function [attrs [map!] length [integer!]] [
-		slice: copy/deep attrs							;-- this doesn't copy the strings but they will be replaced anyway
-		foreach [attr data] slice [
-			char: any [data/mask/1 #"^@"]
-			data/mask: make {} length
-			append/dup data/mask char length
-		]
-		slice
-	]
-	
-	attributes/remove!: function [attrs [map!] range [pair!] (range/2 >= range/1)] [
-		if 0 <> span: span? range [
-			foreach [attr data] attrs [
-				remove/part skip data/mask range/1 span
-			]
-		]
-		;@@ should this clean up unused attribute values? probably not worth it
-		attrs
-	]
-	
-	attributes/insert!: function [
-		attrs   [map!]
-		length  [integer!] (length >= 0) "target items size"	;-- required to insert missing attributes
-		offset  [integer!]
-		other   [map!]
-		length2 [integer!] (length2 >= 0) "inserted items size"	;-- required in case `other` is empty :/
-	][
-		#assert [length >= length2  "target items are smaller than inserted slice!"]
-		offset: clip offset 0 length - length2
-		;; insert empty regions into `attrs` - needed for attributes that aren't in `other`
-		foreach [attr data1] attrs [
-			insert/dup skip data1/mask offset #"^@" length2
-		]
-		;; merge `other` into `attrs`
-		foreach [attr data2] other [
-			;; if attr is absent from the target, may just copy it over
-			unless data1: attrs/:attr [
-				attrs/:attr: data1: copy/deep data2
-				insert/dup data1/mask #"^@" offset
-				enlarge data1/mask length #"^@"
-				continue
-			]
-			;; otherwise, have to join values and remap the old mask
-			values1: make hash! data1/values
-			values2: append clear [] data2/values
-			forall values2 [							;@@ use map-each
-				values2/1: to char! index? any [
-					find/only/case        values1 :values2/1
-					back insert/only tail values1 :values2/1
-				]
-			]
-			insert values2 #"^@"						;-- null always maps to itself
-			mask2: data2/mask
-			forall mask2 [								;@@ use map-each
-				mask2/1: pick values2 1 + to integer! mask2/1
-			]
-			data1/values: to [] values1
-			change (skip data1/mask offset) mask2		;-- mask2 now has values1-compatible indices
-		]
-		attrs
+		result
 	]
 	#assert [
-		#(x [values: [1]   mask: {^@^A^@^@^A^@}]) =       attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 6 2 #() 2
-		#(x [values: [1 2] mask: {^@^A^@^A^B^A^@^A^@}]) = attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 9 2 #(x [values: [2 1] mask: {^@^B^A^B^@}]) 5
-		#(x [values: [1]   mask: {^@^A^A^@^@^@}]) =       attributes/insert! #(x [values: [1] mask: {^@^A^A^@}]) 6 2000000000 #(x [values: [1] mask: {^@^@}]) 2
+		[a 1] = attributes/exclude [a 1 b 2] [b 2]
+		[a 1] = attributes/exclude [a 1 b 2] [b 2 a 3]
+		[a 3] = attributes/exclude [b 2 a 3] [a 1 b 2]
 	]
 	
-	;@@ need to make modularity somehow, later
-	; datatypes: make map! reduce [
-		; string! object [
-		; ]
-	; ]
 	
-	decoded: context [copy: remove!: insert!: normalize!: format: to-spaces: none]
-	
-	decoded/copy: function [
-		"Copy a slice of decoded source"
-		source [block!] "[items attrs] block to copy from" (parse source [block! map!])
-		range  [pair!]  "head x tail"
-	][
-		range: clip range 0 length? source/1			;@@ workaround for #5263 here as well
-		if range/1 > range/2 [range: reverse range]
-		reduce [
-			copy/part source/1 range + 1
-			attributes/copy source/2 range
-		]
-	]
-	
-	decoded/remove!: function [
-		"Remove a range from the decoded source"
-		source [block!] "[items attrs] block" (parse source [block! map!])
-		range  [pair!]  "head x tail"
-	][
-		range: clip range 0 length? source/1
-		if range/1 > range/2 [range: reverse range]
-		remove/part skip source/1 range/1 span? range
-		attributes/remove! source/2 range
-		#debug [
-			ilen: length? source/1
-			foreach [attr data] source/2 [
-				#assert [ilen = length? data/mask]
-			]
-		]
-		source
-	]
-	
-	decoded/insert!: function [
-		"Insert a slice into the decoded source"
-		source [block!] "[items attrs] block" (parse source [block! map!])
-		offset [integer!]
-		slice  [block!] "[items attrs] block" (parse slice [block! map!])
-	][
-		; #print "inserting (mold slice/1)/(mold/flat slice/2) into (mold source/1) at (offset)^/attrs=(mold source/2)"
-		insert skip source/1 offset slice/1
-		attributes/insert! source/2 (length? source/1) offset slice/2 (length? slice/1)
-		; #print "=> (mold source/1) ^/attrs=(mold source/2)"
-		source
-	]
-	
-	decoded/normalize!: function [
-		"Clean up empty attributes from decoded data"
-		source [block!] "[items attrs] block" (parse source [block! map!])
-	][
-		len: length? source/1
-		foreach [attr data] source/2 [
-			#assert [len = length? data/mask]
-			unless find/case data/mask nonzero! [
-				remove/key source/2 attr
-			]
-		]
-		source
-	]
+	source: context [deserialize: serialize: format: to-spaces: none]
 
-	decoded/format: function [
+	source/format: function [
 		"Convert decoded source into plain text"
-		source [block!] "[items attrs] block" (parse source [block! map!])
+		data [block!] "[item attr ...] block" (even? length? data)
 	][
-		result: make {} length? items: source/1
-		foreach item items [							;@@ use map-each
+		result: make {} half length? data
+		foreach [item attr] data [						;@@ use map-each
 			case [
 				char?  :item [append result item]
 				space? :item [if in item 'format [append result item/format]]
@@ -353,28 +265,31 @@ rich: context [											;@@ what would be a better name?
 		]
 		result
 	]
+	#assert ["abc" = source/format [#"a" 1 #"b" 0 #"c" 1]]
 	
 	;@@ leverage prototypes for this
-	decoded/to-spaces: function [
-		"Transform decoded source into a list of spaces (for use in rich-content), return [content ranges]"
-		source [block!] "[items attrs] block" (parse source [block! map!])
+	source/to-spaces: function [
+		"Transform decoded source into a list of spaces (for use in rich-content)"
+		data [block!] "[item attr ...] block" (even? length? data)
+		; return: [block!] "[content ranges]"
+		/local char
 	][
-		;@@ should I clip attrs to items/length?
 		content: clear []
 		ranges:  clear []								;-- range spans of items that caret can dive into
-		set [items: attrs:] source
 		;@@ or trim linefeed? or silently split into multiple paragraphs (hard)?
-		#assert [not find items #"^/"  "line breaks are not allowed inside paragraph text"]
-		parse items [any [
-			[	s: some char! e: (
+		#assert [not find data #"^/"  "line breaks are not allowed inside paragraph text"]
+		buf:     clear {}
+		parse data [any [
+			[	s: copy slice some [set char char! integer! (append buf char)] e: (
 					append content obj: make-space 'text []
-					append/part obj/text s e
-					range: as-pair skip? s skip? e
-					obj/flags: attributes/make-rtd-flags attrs range
+					append obj/text buf
+					clear buf
+					range: half as-pair skip? s skip? e
+					obj/flags: attributes/make-rtd-flags slice range
 				)
-			|	set obj object! (
+			|	set obj [object! integer!] (			;@@ apply attribute to the object?
 					append content obj
-					range: 0x1 + skip? s
+					range: 0x1 + half skip? s
 				)
 			] (repend ranges [obj range])
 		|	end
@@ -383,89 +298,82 @@ rich: context [											;@@ what would be a better name?
 		reduce [copy content  make hash! ranges]
 	]
 		
-	source: context [deserialize: serialize: none]
-	
 	source/deserialize: function [
-		"Split source into [items attributes]"
+		"Split source into decoded block of [item code ...]"
 		source [block!]
 		/local attr value item
 	][
-		items:   clear []							;@@ should items be just chars and objects? other types support, e.g. image?
-		attrs:   clear #()
-		queue:   clear []
-		pending: clear #()
-		;; first need to build items list: each attr mask will have to have the same length
+		result: clear []								;@@ should items be just chars and objects? other types support, e.g. image?
+		attrs:  clear []
 		parse source [any [
 			set attr [
 				word! (value: on)
 			|	set-word! p: (value: do/next p 'p) :p	;-- reduce words (color names) to their values
-			] (
-				attr:  to word! attr
-				stack: any [pending/:attr  pending/:attr: make [] 4]
-				repend stack [length? items :value]
-			)
-		|	set attr refinement! (						;-- attributes work stack-like and do not close automatically
-				attr:  to word! attr
-				unless empty? stack: pending/:attr [	;-- extra closings are silently ignored
-					value: take/last stack
-					start: take/last stack
-					repend queue [attr (start by length? items) :value]
-				]
-			)
-		|	set item string! (explode/into item items)	;@@ make it a module
-		|	set item skip    (append/only items item)
-		]]
-		length: length? items							;-- length is fixed now
-		;; auto-close unclosed ranges
-		foreach [attr stack] pending [
-			foreach [start value] stack [
-				repend queue [to word! attr (start by length? items) :value]
 			]
-		]
-		;; mark attribute ranges
-		foreach [attr range value] queue [
-			attributes/mark! attrs length range attr :value
-		]
-		reduce [copy items copy attrs]
+			(attributes/change attrs to word! attr :value)
+		|	set attr refinement!						;-- attributes work stack-like and do not close automatically
+			(attributes/change attrs to word! attr none)
+		|	set item string! (							;@@ make it a module
+				code: store-attrs attrs
+				zip/into explode item code result
+			)
+		|	set item skip (
+				code: store-attrs attrs
+				repend result [item code]
+			)
+		]]
+		copy result
+	]
+	#assert [
+		[#"1" 0 #"2" 0 #"3" 1 #"4" 1 #"5" 1 #"6" 1 #"7" 0] = source/deserialize ["12" bold "3456" /bold "7"]
 	]
 	
 	source/serialize: function [
-		"Create a source block out of items and attributes"
-		items [block!] attrs [map!]
-		/local part
+		"Create a source block out of decoded data"
+		data [block!] "[item attr ...] block" (even? length? data)
 	][
-		queue: clear []
-		foreach [attr data] attrs [
-			set [_: values: _: mask:] data
-			closing: to refinement! attr
-			foreach [value range] mask-to-ranges values mask [
-				opening: either true = :value [to word! attr][reduce [to set-word! attr :value]]
-				;; order is important: close then open, that's why I add 0.1
-				;; e.g. to avoid output like `color: 1 "x" color: 2 /color "x" /color`
-				;; when it should have been  `color: 1 "x" /color color: 2 "x" /color`
-				repend queue [range/1 + 0.1 opening range/2 closing]
+		result:     clear []
+		string:     clear {}
+		last-attrs: clear []
+		last-code:  0
+		flush-string: [
+			unless empty? string [
+				append result copy string
+				clear string
 			]
 		]
-		sort/stable/skip queue 2
-		
-		result: clear []								;-- flush the queue
-		foreach [offset marker] queue [
-			append/part result items items: skip head items to integer! offset
-			append result marker
+		foreach [item code] data [
+			if last-code <> code [
+				do flush-string
+				attrs: index->attrs last-code: code
+				opened: attributes/exclude attrs last-attrs 2	;-- native 'exclude' is useless since it ignores value slot
+				closed: attributes/exclude last-attrs attrs 2
+				last-attrs: attrs
+				foreach [name value] closed [			;@@ use map-each
+					append result to refinement! name
+				]
+				foreach [name value] opened [			;@@ use map-each
+					repend result either true = :value [[name]] [[to set-word! name :value]]
+				]
+			]
+			either char? :item [
+				append string item
+			][
+				do flush-string
+				append/only result :item
+			]
 		]
-		append result items
-		
-		parse result [any [								;-- unify chars into strings
-			change copy part some char! (to string! part)
-		|	skip
-		]]
+		do flush-string
+		;@@ no reason to auto-close opened attributes?
 		copy result
 	]
 	
 	#assert [
-		["x"] = source/serialize [#"x"] #()
-		["12" bold "3456" /bold "7"] = source/serialize [#"1" #"2" #"3" #"4" #"5" #"6" #"7"] #(bold [values: [#[true]] mask: "^@^@^A^A^A^A"])
-		["12" bold underline "3" /bold /underline] = source/serialize [#"1" #"2" #"3"] #(bold [values: [#[true]] mask: "^@^@^A^@"] underline [values: [#[true]] mask: "^@^@^A^A"])
-		["1" x: 1 "2" /x x: 2 "3" /x "4"] = source/serialize [#"1" #"2" #"3" #"4"] #(x [values: [1 2] mask: "^@^A^B"])
+		["x"] = source/serialize [#"x" 0]
+		["12" bold "3456" /bold "7"] = source/serialize [#"1" 0 #"2" 0 #"3" 1 #"4" 1 #"5" 1 #"6" 1 #"7" 0]
+		; ["12" bold underline "3" /bold /underline] = source/serialize [#"1" 0 #"2" 0 #"3" 2]
+		["12" bold underline "3"] = source/serialize [#"1" 0 #"2" 0 #"3" 2]
+		["12" bold underline "3" /bold /underline "4"] = source/serialize [#"1" 0 #"2" 0 #"3" 2 #"4" 0]
+		["1" size: 8 "2" /size size: 12 "3" /size "4"] = source/serialize [#"1" 0 #"2" 3 #"3" 4 #"4" 0]
 	]
 ]
