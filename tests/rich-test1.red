@@ -18,7 +18,7 @@ Red [
 				; ] align= 'left
 				
 source: [
-	italic "12 " bold "34^/ "
+	italic "12 " bold "34 "
 	(make-space 'text [text: "ab cde f" color: cyan])
 	(make-space 'text [text: "ab cde f " color: cyan margin: 10x0])
 	(make-space 'text [text: "ab cde f" color: cyan])
@@ -42,12 +42,12 @@ view/no-wait/options/flags [
 		; ]
 		row tight [
 			column tight weight= 1 [
-				box left forest [rich-content source= compose source align= 'left]
-				box right blue  [rich-content source= compose source align= 'right]
+				box left forest [rich-content with [decode compose source] align= 'left]
+				box right blue  [rich-content with [decode compose source] align= 'right]
 			]
 			column tight weight= 1 [
-				box center blue [rich-content source= compose source align= 'center]
-				box left forest [rich-content source= compose source align= 'fill]
+				box center blue [rich-content with [decode compose source] align= 'center]
+				box left forest [rich-content with [decode compose source] align= 'fill]
 			]
 		]
 	] react [

@@ -23,7 +23,7 @@ source: does [compose [
 	(make-space 'image [data: capital])
 	font: (svf/serif) size: 20 {o} size: 17 {r} size: 15 {e} size: 13 {m} size: 9
 	{ ipsum dolor sit amet, consectetur adipiscing elit, }
-	command: [print "test"] "♥ command " bold "test" /bold " ♥ " /command
+	(first lay-out-vids [clickable command=[print "test"] [rich-content ["♥ command " bold "test" /bold " ♥ "]]])
 	italic {sed do eiusmod tempor incididunt ut labore et dolore magna } underline {aliqua.} /underline
 	{ Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.}
 	{ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.}
@@ -32,8 +32,8 @@ source: does [compose [
 
 view/no-wait/options/flags [
 	below
-	b: host 500x500 [
-		style rich-content: rich-content source= source
+	b: host 1000x500 [
+		style rich-content: rich-content with [decode source] spacing= 5
 		style cell: cell margin= 3
 		row tight [
 			column tight weight= 1 [
@@ -41,8 +41,12 @@ view/no-wait/options/flags [
 				cell center [rich-content align= 'center]
 			]
 			column tight weight= 1 [
-				cell left   [rich-content align= 'fill]
 				cell right  [rich-content align= 'right]
+				cell left   [rich-content align= 'fill]
+			]
+			column tight weight= 1 [
+				cell right  [rich-content align= 'upscale]
+				cell left   [rich-content align= 'scale]
 			]
 		]
 	] react [
@@ -52,6 +56,6 @@ view/no-wait/options/flags [
 	]
 	on-over [status/text: mold hittest face/space event/offset]
 	status: text 400x60
-] [offset: 10x10] 'resize
+] [offset: 220x10] 'resize
 
 either system/build/config/gui-console? [halt][do-events]
