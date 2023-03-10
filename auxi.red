@@ -188,20 +188,6 @@ box-distance?: function [
 	; (y2 - y1) / (x2 - x1)
 ; ]
 
-; zip: function [
-	; "Interleave a list of series of equal length"
-	; list [block!]
-; ][
-	; case [
-		; tail?   list [copy []]
-		; single? list [copy :list/1]
-		; 'else [
-			; r: make :list/1 (w: length? list) * h: length? :list/1
-			; repeat y h [repeat x w [append/only r :list/:y/:x]]
-		; ]
-	; ]
-; ]
-
 
 ;; need this to be able to call event functions recursively with minimum allocations
 ;; can't use a static block but can use one block per recursion level
@@ -377,23 +363,36 @@ explode: function [										;@@ use split or map-each when fast
 	buffer
 ]
 
+zip: function [
+	"Interleave a list with another list or scalar"
+	list1 [series!]
+	list2 [any-type!]
+][
+	#assert [any [not series? :list2  equal? length? list1 length? list2]]
+	result: make list1 2 * len: length? list1
+	if len > 0 [
+		repeat i len pick
+			[append/only append/only result :list1/:i :list2/:i]
+			[append/only append/only result :list1/:i :list2]
+			series? :list2
+	]
+	result
+]
+#assert [
+	""              = zip "" []
+	[]              = zip [] []
+	[1 2 3 4]       = zip [1 3] [2 4]
+	[1 #"2" 3 #"4"] = zip [1 3] "24"
+	"1234"          = zip "13" [2 4]
+	"1-3-"          = zip "13" #"-"
+]
+
+;; cannot be based on zip, because delimiter may be series too :(
 delimit: function [
 	"Return copy of LIST with items separated by a DELIMITER"	;-- modifying version would be O(n^2) slow
 	list      [series!]
 	delimiter [any-type!]
 ][
-	; if case [
-		; all [
-			; any-string? list
-			; any-string? :delimiter not tag? delimiter
-			; empty? delimiter
-		; ]
-		; all [
-			; any-block? list
-			; any-block? :delimiter
-			; empty? delimiter
-		; ]
-	; ] [return copy list]										;-- optimization
 	result: make list 2 * length? list					;-- hard to estimate delimiter size e.g. in block to string conversion :(
 	unless tail? list [									;@@ use map-each
 		append/only result :list/1
@@ -1018,10 +1017,8 @@ foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 
 ;; O(1) remove that doesn't preserve the order (useful for hashes)
 fast-remove: function [block [any-block!] length [integer!]] [
-	any [
-		block =? other: skip tail block negate length
-		change block other
-	]
+	last-entry: skip tail block negate length
+	unless block =? last-entry [change block other]
 	clear other
 ]
 
