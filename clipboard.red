@@ -13,7 +13,7 @@ Red [
 
 clipboard: context [
 	;; prototype for custom clipboard formats
-	format!: declare-class 'clipboard-format [
+	text!: make classy-object! format!: declare-class 'clipboard-format [
 		name:   'text				#type [word!]
 		data:   {}
 		clone:  does [copy self]	#type [function!]
@@ -24,7 +24,7 @@ clipboard: context [
 	;; if read text = last written text, we can use `data`
 	;; otherwise data is invalid and clipboard is read as plain text string
 	
-	data: object format!								;-- last copied data
+	data: copy text!									;-- last copied data
 	
 	read: function [
 		"Get clipboard contents"
@@ -32,8 +32,7 @@ clipboard: context [
 	][
 		read: read-clipboard
 		unless read == as-text: data/format [			;-- last copy comes from outside the running script
-			self/data: object format!
-			data/data: read
+			self/data: make text! [data: read]
 			if text [as-text: data/format]
 		]
 		either text [as-text][data/clone]
@@ -44,8 +43,7 @@ clipboard: context [
 		content [object! ('clipboard-format = class? content) string!]
 	][
 		write-clipboard either string? content [
-			self/data: object format!
-			data/data: copy content
+			self/data: make text! [data: copy content]
 		][
 			self/data: content/clone
 			data/format

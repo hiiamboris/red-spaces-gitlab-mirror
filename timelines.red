@@ -37,6 +37,10 @@ context [
 			with space left
 			with space right
 		]
+		if timeline/limit * period < length? timeline/events [	;-- trim the head
+			n: round/to timeline/limit * 5% 1
+			remove/part timeline/events n * period
+		]
 	]
 	
 	fresh?: function [timeline [object!]] [
@@ -54,7 +58,8 @@ context [
 		
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
-		interval:   0:0:1								;-- time needs to elapse before event group is finished
+		limit:      1000	#type [integer!] (limit >= 20)		;-- max number of events to keep
+		interval:   0:0:1	#type [time!]				;-- time needs to elapse before event group is finished
 		fresh?:     does [~/fresh? self]
 		last-event: does [copy/part events -3]			;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]

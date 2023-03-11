@@ -1741,7 +1741,7 @@ rich-content-ctx: context [								;-- rich content
 ]
 
 
-rich-text-span!: make object clipboard/format! [
+rich-text-span!: make clipboard/text! [
 	name:   'rich-text-span
 	data:   []
 	format: does [
