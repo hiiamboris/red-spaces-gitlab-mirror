@@ -1544,6 +1544,12 @@ rich-content-ctx: context [								;-- rich content
 		row->box: function [row [integer!]] with :measure [
 			~/row->box space row
 		]
+		get-attrs: function [index [integer!]] with :measure [
+			if code: pick space/data index * 2 [rich/index->attrs code]
+		]
+		pick-attr: function [index [integer!] attr [word!]] with :measure [
+			if code: pick space/data index * 2 [rich/attributes/pick code attr]
+		]
 	]
 	
 	; ;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
@@ -1637,7 +1643,8 @@ rich-content-ctx: context [								;-- rich content
 		zero? span? clip range 0 half length? space/data
 	]
 	
-	edit/copy: function [range [pair!] /text] with :edit/edit [
+	edit/copy: function [range [pair!] /text] with :edit/edit [	;@@ rename to slice?
+		range: clip range 0 half length? space/data		;-- avoid overflow on inf * 2
 		slice: copy/part space/data range * 2 + 1
 		if text [slice: rich/source/format slice]
 		slice
@@ -1648,6 +1655,7 @@ rich-content-ctx: context [								;-- rich content
 	]
 	
 	edit/clip: function ["modifies" range [pair!]] with :edit/edit [
+		range: clip range 0 half length? space/data
 		unless edit/full-range? range [
 			space/data: copy/part space/data range * 2 + 1
 		]
@@ -1655,6 +1663,7 @@ rich-content-ctx: context [								;-- rich content
 	]
 	
 	edit/remove: function ["modifies" range [pair!]] with :edit/edit [
+		range: clip range 0 half length? space/data
 		remove/part skip space/data range/1 * 2 2 * span? range
 		space/data: space/data							;-- trigger on-data-change
 	]
@@ -1673,6 +1682,7 @@ rich-content-ctx: context [								;-- rich content
 			object? items [items: reduce [items 0]]	
 			string? items [items: zip explode items 0]
 		]
+		offset: clip offset 0 half length? space/data
 		insert skip space/data offset * 2 items
 		space/data: space/data							;-- trigger on-data-change
 	]
@@ -1746,15 +1756,16 @@ rich-text-span!: make clipboard/text! [
 	data:   []
 	length: does [half length? data]
 	format: does [
-		to {} map-each [item [object!]] data [
+		to {} map-each [item [object!]] extract data 2 [
 			when in item 'format (item/format)
 		]
 	]
 	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
 	clone: function [] [
-		map-each/eval [item [object!] code] data [
+		data: map-each/eval [item [object!] code] self/data [
 			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
 		]
+		make rich-text-span! compose/only [data: (data)]
 	]
 ]
 

@@ -155,6 +155,7 @@ rich: context [											;@@ what would be a better name?
 		"Make an RTD flags block out of data attributes"
 		data [block!] limits [pair!] "segment to extract"		;-- segment used in to-spaces to create individual paragraphs
 	][
+		limits: clip limits 0 half length? data
 		data:   append/part clear [] (skip data limits/1 * 2) (2 * span? limits)
 		result: clear []
 		ranges: extract-ranges data
@@ -229,7 +230,7 @@ rich: context [											;@@ what would be a better name?
 	
 	attributes/pick: function [attrs [integer! block!] attr [word!]] [
 		if integer? attrs [attrs: index->attrs attrs]
-		select/skip attrs code attr 2 
+		select/skip attrs attr 2 
 	]
 	#assert [
 		on =  attributes/pick 1 'bold

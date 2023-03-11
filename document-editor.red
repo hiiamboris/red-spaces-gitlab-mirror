@@ -75,14 +75,13 @@ define-styles [
 lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
 append keyboard/focusable 'document
 toggle-attr: function [name] [
-	; doc-ctx/document/toggle-attribute range
 	either all [range: doc/selected  0 < span? range] [
-		old: doc-ctx/document/get-attr doc 1 + range/1 name
+		old: doc-ctx/pick-attr doc 1 + range/1 name
 		?? [old range] 
 		doc/edit [mark range name not old]
 	][
-		old: rich/attributes/pick doc/paint name 1
-		rich/attributes/mark! doc/paint 1 0x1 name not old
+		old: rich/attributes/pick doc/paint name
+		rich/attributes/change doc/paint name not old
 	]
 	not old
 ]
@@ -139,39 +138,41 @@ tools: context [
 		range1/1 by range2/2
 	]
 	
+	linkify-data: function [data [block!]] [
+		rich/attributes/mark data 'all 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this 
+		rich/attributes/mark data 'all 'underline on 
+	]
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
 		if range/1 = range/2 [exit]
 		;; each paragraph becomes a separate link as this is simplest to do
-		take/last items: map-each para doc/extract range [
-			len: length? para/data/items
-			link: when len > 0 (
-				rich/attributes/mark! para/data/attrs len 0 by len 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this
-				rich/attributes/mark! para/data/attrs len 0 by len 'underline on
-				para/data: para/data
-				first lay-out-vids [clickable content= para command= command]
-			)
-			compose [(link) #"^/"]
+		slice: doc/edit [slice range]
+		either slice/name = 'rich-text-span [
+			linkify-data slice/data
+			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
+			slice/data: reduce [link 0]
+		][
+			foreach para slice/data [
+				linkify-data para/data
+				link: first lay-out-vids [clickable [rich-content data= para/data] command= command]
+				para/data: reduce [link 0]
+			]
 		]
-		data: reduce [items copy #()]
 		doc/edit [
 			remove range
-			insert/at data range/1
+			insert/at slice range/1
 			select 'none
 		]
 	]
 	
 	codify: function [doc [object!] range [pair!]] [
 		if range/1 = range/2 [exit]
-		set [items: attrs:] slice: doc/edit [slice range]
-		either find items #"^/" [						;-- multiline code block
-			slice: doc/edit [slice range: extend-range range]
-			lines: map-each para doc/extract range [para/format]
-			text: to string! delimit lines "^/"
-			code: make-space 'pre compose [text: (text) sections: none]		;-- prevent block from being dissected
+		slice: doc/edit [slice range]
+		either slice/name = 'rich-text-span [
+			code: make-space 'code compose [text: (slice/format)]
 		][
-			text: doc/edit [slice/text range]
-			code: make-space 'code compose [text: (text)]
+			slice: doc/edit [slice range: extend-range range]
+			code: make-space 'pre compose [text: (slice/format) sections: none]	;-- prevent block from being dissected
 		]
 		doc/edit [
 			remove range
@@ -220,17 +221,17 @@ view reshape [
 						range: doc/selected
 						range/1 <> range/2
 					][
-						old: doc-ctx/document/get-attr doc 1 + range/1 'color
+						old: doc-ctx/pick-attr doc 1 + range/1 'color
 						if color: request-color/from old [
 							color: if old <> color [color]		;-- resets color if the same one applied
 							doc/edit [mark range 'color color]
 						]
 					][
-						focus-space doc					;-- focus was destroyed by request-color
 						old: rich/attributes/pick doc/paint 1 'color
 						color: request-color/from old
 						rich/attributes/mark doc/paint 1 0x1 'color color
 					]
+					focus-space doc						;-- focus was destroyed by request-color
 				]
 				attr "🔗" on-click [
 					if all [
@@ -238,13 +239,13 @@ view reshape [
 						range/1 <> range/2
 						not empty? url: request-url
 					][
-						focus-space doc					;-- focus was destroyed by request-url
 						unless any [
 							find/match url https://
 							find/match url http://
 						] [insert url https://]
 						tools/linkify doc range compose [browse (as url! url)]
 					]
+					focus-space doc						;-- focus was destroyed by request-url
 				] 
 				attr "[c]" font= make code-font [size: 20] on-click [codify]
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 

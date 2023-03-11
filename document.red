@@ -91,12 +91,19 @@ doc-ctx: context [
 		copy mapped										;-- may be empty
 	]
 
-	;; extraction has to copy paragraphs, not plain data!
-	;; because paragraphs carry alignment and indentation attributes, data does not!
-	extract: function [doc [object!] range [pair!]] [
-		map-each [para prange] doc/map-range/relative range [
-			also para: para/clone
-			para/edit [clip! prange]
+	;; extraction has to copy paragraphs to carry alignment and indentation attributes
+	extract: function [doc [object!] range [pair!] /block "Always extract as paragraph list"] [
+		mapped: doc/map-range/relative range
+		either any [block  2 < length? mapped] [		;-- extract paragraphs
+			block: map-each [para prange] mapped [
+				also para: para/clone
+				para/edit [clip prange]
+			]
+			make rich-text-block! [data: block]
+		][												;-- extract text span
+			set [para: prange:] mapped
+			span: para/edit [copy prange]
+			make rich-text-span! [data: span]
 		]
 	]
 
@@ -122,8 +129,8 @@ doc-ctx: context [
 				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
 			]
 			#assert [pofs < offset]						;-- limited by paragraph's head
-			e: skip s: para/data/items offset - pofs
-			before: reverse append/part clear [] s e
+			e: skip s: para/data offset - pofs * 2
+			before: reverse system/words/extract (copy/part s e) 2
 			parse before [any word-sep any non-word-sep before:]
 			offset - skip? before
 		]
@@ -134,9 +141,9 @@ doc-ctx: context [
 				set [para: pofs: plen:] caret->paragraph doc offset: offset + 1
 			]
 			#assert [pofs + plen > offset]				;-- limited by paragraph's tail
-			after: skip para/data/items offset - pofs
-			parse pos: after [any word-sep any non-word-sep pos:]
-			offset + offset? after pos
+			after: skip para/data offset - pofs * 2
+			parse pos: after [any [word-sep skip] any [non-word-sep skip] pos:]
+			offset + half offset? after pos
 		]
 		
 		find-line-above: function ["Get caret (offset, side) one line above"] with :measure [
@@ -163,7 +170,7 @@ doc-ctx: context [
 		|	'select set val [none! | pair!] (doc/selected: val)
 		|	'indent set par integer! set val [none! | block!] (doc/content/:par/indent: val)
 		|	'align  set par integer! set val word! (doc/content/:par/align: val)
-		|	'insert set rng pair! set val block! (insert-data doc rng/1 val)
+		|	'insert set rng pair! set val object! (insert-data doc rng/1 val)
 		|	'remove set rng pair! (remove-range doc rng)
 		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
 		]]
@@ -187,13 +194,15 @@ doc-ctx: context [
 				mapparse compose [quote (word) skip] edit1 [[]]
 				append/part edit1 s e
 			)
-		|	set word 'insert set rng2 pair! set data2 block! e: (
+		|	set word 'insert set rng2 pair! set data2 object! e: (
 				either all [
 					set [_: rng1: data1:] p: find/last edit1 'insert
 					rng1/2 = rng2/1
+					'rich-text-span = data1/name
+					'rich-text-span = data2/name
 				][
 					p/2: rng1/1 by rng2/2
-					rich/decoded/insert! data1 infxinf/x data2
+					append data1/data data2/data
 				][
 					append/part edit1 s e
 				]
@@ -262,6 +271,7 @@ doc-ctx: context [
 			set/any 'result do with self plan
 			; ?? left ?? right
 			push-to-timeline doc left right init
+			; probe head doc/timeline/events
 			:result
 		]
 		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent: auto-bullet: none
@@ -354,22 +364,24 @@ doc-ctx: context [
 	actions/slice: function [
 		"Extract specified range"
 		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
-		/text "Return it as plain text"
+		/text  "Return it as plain text"
+		/block "Always return paragraph list"
 	] with :actions/edit [
 		do update
 		switch range [
 			selected [range: doc/selected]
 			all      [range: 0 by doc/length]
 		]
-		unless pair? range [return copy pick ["" []] text]		;-- silently ignores unsupported range words
-		copy-range doc range text
+		unless pair? range [range: offset * 1x1]		;-- silently ignores unsupported range words
+		either block [extract/block doc range][extract doc range]	;@@ use apply
 	]
 	
 	actions/copy: function [
 		"Copy specified range into clipboard"
 		range [word! (find [all selected] range) pair!] "Offset range or any of: [selected all]"
 	] with :actions/edit [
-		if slice: actions/slice range [clipboard/write slice]
+		slice: actions/slice range
+		unless empty? slice/data [clipboard/write slice]
 		slice
 	]
 	
@@ -381,16 +393,19 @@ doc-ctx: context [
 	
 	actions/insert: function [
 		"Insert given data into current caret offset"
-		data [block! (parse data [block! map!]) object! (space? data) string!]
+		data [object! (any [space? data  'clipboard-format = class? data]) string!]
 		/at pos [integer!] 
 	] with :actions/edit [
 		do update
 		case [
-			object? data [data: reduce [reduce [data] copy #()]]
-			empty?  data [exit]
 			string? data [data: paint-string doc data]
+			space?  data [data: make rich-text-span! compose/deep [data: [(data) 0]]]
+			not find [rich-text-span rich-text-block] data/name [	;-- unsupported clipboard format (incl. text) inserted as text
+				data: paint-string doc data/format
+			]
 		]
-		range: 0 by (length? data/1) + any [pos offset]
+		if 0 = data/length [exit]
+		range: 0 by data/length + any [pos offset]
 		actions/record [remove (range)] [insert (range) (data)]
 	]
 	
@@ -403,11 +418,16 @@ doc-ctx: context [
 	] with :actions/edit [
 		do update
 		unless zero? span: span? range: clip order-pair range 0 doc/length [
-			slice:  copy-range doc range no				;@@ use copy once I change decoded format
-			marked: copy-range doc range no
-			rich/attributes/mark! marked/2 span 0 by span attr :value
+			;; for undoability this has to remove then insert whole paragraphs
+			slice:  extract doc range
+			marked: extract doc range
+			either marked/name = 'rich-text-block [
+				foreach para marked/data [para/edit [mark 'all attr :value]]
+			][
+				rich/attributes/mark marked/data 'all attr :value
+			]
 			; ?? slice ?? marked
-			sel: doc/selected
+			sel: doc/selected							;-- remember selection to restore it afterwards
 			actions/record
 				[remove (range) insert (range) (slice)  select (sel)]
 				[remove (range) insert (range) (marked) select (sel)]
@@ -453,40 +473,21 @@ doc-ctx: context [
 	actions/auto-bullet: function [
 		"Automatically assign a bullet to current paragraph if previous one has it"
 	] with :actions/edit [
-		auto-bullet doc doc/caret/offset
+		auto-bullet doc offset
 	]
 	
-	document: context [paint: get-attr: get-attrs: bulletify: enumerate: none]
+	document: context [bulletify: enumerate: none]
 	
-	copy-range: function [doc [object!] range [pair!] plain-text? [logic!]] [
-		mapped: doc/map-range/relative range
-		either plain-text? [
-			lines: map-each para extract doc range [para/format]
-			to string! delimit lines "^/"
-		][
-			rowbreak: [[#"^/"] #()]
-			result:   reduce [make [] span? range  make map! 4]	;@@ cannot use copy/deep since it won't copy literal map
-			ofs:      0
-			for-each [p: para prange] mapped [
-				data: para/edit [copy prange]
-				len: length? para/data/items
-				rich/decoded/insert! result ofs data
-				if 2 < length? p [rich/decoded/insert! result ofs + len rowbreak]
-				ofs: ofs + len + 1
-			]
-			result
-		]
-	]
-		
+	;; these are low level functions bypassing undo mechanism
 	remove-range: function [doc [object!] range [pair!]] [
 		range: order-pair clip range 0 doc/length
 		n: half length? mapped: doc/map-range/relative range
 		set [para1: range1:] mapped
 		set [paraN: rangeN:] skip tail mapped -2 
-		if n >= 1 [para1/edit [remove! range1]]
+		if n >= 1 [para1/edit [remove range1]]
 		if n >= 2 [										;-- requires removal of whole paragraphs
-			paraN/edit [remove! rangeN]
-			para1/edit [insert! range1/1 values-of paraN/data]
+			paraN/edit [remove rangeN]
+			para1/edit [insert range1/1 paraN/data]
 			s: find/same/tail doc/content para1
 			e: find/same/tail s paraN
 			remove/part s e
@@ -498,80 +499,57 @@ doc-ctx: context [
 	insert-data: function [
 		doc    [object!]
 		offset [integer!]
-		data   [block!] (parse data [block! map!])
+		data   [object!] (find [rich-text-span rich-text-block] select data 'name)
 		/local _
 	][
-		set [items: attrs:] data
-		if empty? items [exit]
-		set [para1: pofs1:] caret->paragraph doc offset
-		pcar1: offset - pofs1
-		rows: parse items [collect [any [keep copy _ to #"^/" skip] keep copy _ to end]]	;@@ split doesn't work on blocks yet
-		slice: rich/decoded/copy data 0 by len: length? rows/1
-		either single? rows [
-			para1/edit [insert! pcar1 slice]
-		][
-			;; edit first paragraph, but remember the after-insertion part
-			para1/edit [								;@@ make another action in edit for this?
-				stashed: copy range: pcar1 by infxinf/x
-				remove! range
-				insert! pcar1 slice 
+		if empty? list: data/data [exit]
+		set [dst-para: dst-ofs:] caret->paragraph doc offset
+		dst-loc: offset - dst-ofs
+		len: data/length
+		case [
+			data/name = 'rich-text-span [
+				#assert [not find list #"^/"]
+				dst-para/edit [insert dst-loc list]
 			]
-			;; convert other rows into paragraphs and insert them into doc/content
-			ofs: len + 1
-			rest: map-each row next rows [
-				#assert [items/:ofs = #"^/"]
-				len: length? row
-				slice: rich/decoded/copy data 0 by len + ofs
-				ofs: ofs + len + 1
-				make-space 'rich-content [data: slice]
+			single? data/data [
+				dst-para/edit [insert dst-loc list/1/data]
 			]
-			insert (find/same/tail doc/content para1) rest
-			;; append stashed part to the last inserted paragraph
-			paraN: last rest
-			paraN/edit [insert! infxinf/x stashed]
+			'multiline [
+				;; edit first paragraph, but remember the after-insertion part
+				dst-para/edit [							;@@ make another action in edit for this?
+					stashed: copy range: dst-loc by infxinf/x
+					remove range
+					insert dst-loc list/1/data 
+				]
+				;; insert other paragraphs into doc/content
+				insert (find/same/tail doc/content dst-para) next list
+				;; append stashed part to the last inserted paragraph
+				paraN: last list
+				paraN/edit [insert infxinf/x stashed]
+			]
 		]
-		adjust-offsets doc offset length? items
+		adjust-offsets doc offset len
 	]
 		
-	;; unused because not undo-capable
-	; mark-range: function [doc [object!] range [pair!] attr [word!] value] [
-		; foreach [para: prange:] doc/map-range/relative range [
-			; para/edit [mark! prange attr :value]
-		; ]
-	; ]
-	
-	;; replaces all attributes in the range with first attribute in attrs
-	document/paint: function [doc [object!] range [pair!] attrs [map!]] [
-		if any [empty? attrs  zero? span? range] [exit]
-		foreach [para: prange:] doc/map-range/relative range [	;@@ need edit func for this?
-			length: para/measure [length]
-			slice: rich/attributes/extend attrs span: span? prange
-			rich/attributes/remove! para/data/attrs prange
-			rich/attributes/insert! para/data/attrs length prange/1 slice span
-			para/data: para/data
-		]
-	]
-	
-	document/get-attr: function [doc [object!] index [integer!] attr [word!]] [
+	pick-attr: function [doc [object!] index [integer!] attr [word!]] [
 		if set [para: pofs:] caret->paragraph doc offset: index - 1 [
-			rich/attributes/pick para/data/attrs attr offset - pofs + 1	;-- may be none esp. on 'new-line' paragraph delimiters
-		]
+			para/measure [pick-attr offset - pofs + 1 attr]
+		]												;-- none on 'new-line' delimiters, or if attr is not set
 	]
 	
-	document/get-attrs: function [doc [object!] index [integer!]] [
+	get-attrs: function [doc [object!] index [integer!]] [
 		offset: clip index - 1 0 doc/length
 		if set [para: pofs: plen:] caret->paragraph doc offset [
 			;; no attribute at the 'new-line' delimiter, so it tries to get them from:
 			;; - last char of this paragraph (if not empty)
 			;; - last char of some non-empty above paragraph
 			;@@ maybe unify all paragraph/data into single document/data so newlines will have attrs?
+			;@@ but this data won't contain paragraph alignment/indentation
 			while [all [offset > 0  pofs + plen = offset]] [	
 				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
 			]
-			if pofs + plen > offset [
-				rich/attributes/copy para/data/attrs 0x1 + offset - pofs
-			]											;-- none if cannot pick the attribute
-		]
+			para/measure [get-attrs offset - pofs + 1]
+		]												;-- may return none if can't find any attrs
 	]
 	
 	;; used to correct caret and selection offsets after an edit
@@ -587,7 +565,7 @@ doc-ctx: context [
 	
 	get-bullet-text: function [para [object!]] [
 		all [
-			space? bullet: para/data/items/1
+			space? bullet: para/data/1
 			'bullet = class? bullet
 			bullet/text
 		]
@@ -617,12 +595,12 @@ doc-ctx: context [
 		foreach [para: prange:] mapped [
 			prange: prange + fix						;-- each edit changes next prange
 			if bulleted-paragraph? para [				;-- get rid of numbers and old bullets
-				para/edit [remove! 0x1]
+				para/edit [remove 0x1]
 				adjust-offsets doc prange/1 -1
 				fix: fix - 1
 			]
 			if bulletifying? [
-				para/edit [insert! 0 make-space 'bullet []]
+				para/edit [insert 0 make-space 'bullet []]
 				adjust-offsets doc prange/1 1
 				fix: fix + 1
 			]
@@ -644,14 +622,14 @@ doc-ctx: context [
 		foreach [para: prange:] mapped [
 			prange: prange + fix						;-- each edit changes next prange
 			if bulleted-paragraph? para [				;-- remove old bullets/numbers
-				para/edit [remove! 0x1]
+				para/edit [remove 0x1]
 				adjust-offsets doc prange/1 -1
 				fix: fix - 1
 			]
 			if numbering? [								;-- enumerate
 				bullet: make-space 'bullet []
 				bullet/text: rejoin [number: number + 1 "."]
-				para/edit [insert! 0 bullet]
+				para/edit [insert 0 bullet]
 				adjust-offsets doc prange/1 1
 				fix: fix + 1
 			]
@@ -674,11 +652,11 @@ doc-ctx: context [
 			]
 		]
 		if bulleted-paragraph? para [
-			para/edit [remove! 0x1]
+			para/edit [remove 0x1]
 			adjust-offsets doc pofs -1
 		]
 		if bullet [
-			para/edit [insert! 0 bullet]
+			para/edit [insert 0 bullet]
 			adjust-offsets doc pofs 1
 		]
 	]
@@ -744,18 +722,29 @@ doc-ctx: context [
 		caret'
 	]
 		
-	paint-string: function [doc [object!] string [string!]] [	;-- automatically fills string with attributes
-		attrs: rich/attributes/extend doc/paint length? string
-		items: explode string
-		reduce [items attrs]
+	;; automatically fills string with attributes and converts to supported clipboard format
+	paint-string: function [doc [object!] string [string!]] [
+		lines: split string #"^/"
+		code:  rich/store-attrs doc/paint
+		either single? lines [
+			result: make rich-text-span! []
+			result/data: zip explode lines/1 code
+		][
+			result: make rich-text-block! []
+			result/data: map-each line lines [
+				also obj: make-space 'rich-content []
+				obj/data: zip explode line code
+			]
+		]
+		result
 	]
 			
 	pick-paint: function [doc [object!] /from offset: doc/caret/offset [integer!]] [	;-- use attrs near the caret by default
 		doc/paint: any [
 			;; question is, should it pick the attribute from before the caret or after?
 			;; before probably makes more sense for appending, then if that fails it also tries after
-			document/get-attrs doc offset
-			document/get-attrs doc offset + 1
+			get-attrs doc offset
+			get-attrs doc offset + 1
 			clear doc/paint								;-- no attributes if can't pick up
 		]
 	]
@@ -816,7 +805,7 @@ doc-ctx: context [
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none				#type [pair! none!] :on-selected-change
 		timeline: copy timeline!	#type [object!]
-		paint:    make map! []		#type [map!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
+		paint:    []				#type [block!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
 		
 		;; high-level functions
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
@@ -854,10 +843,12 @@ doc-ctx: context [
 rich-text-block!: make rich-text-span! [
 	name:   'rich-text-block
 	data:   []
-	format: does [
-		to {} map-each/eval item data [[when in item 'format (item/format) #"^/"]]
+	length: does [max 0 (length? data) - 1 + sum map-each item data [item/measure [length]]]
+	format: does [to {} map-each/eval item data [[when in item 'format (item/format) #"^/"]]]
+	clone:  function [] [
+		data: map-each item self/data [when select item 'clone (item/clone)]
+		make rich-text-block! compose/only [data: (data)]
 	]
-	clone:  does [map-each item data [when select item 'clone (item/clone)]]
 ]
 
 
