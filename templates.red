@@ -1744,6 +1744,7 @@ rich-content-ctx: context [								;-- rich content
 rich-text-span!: make clipboard/text! [
 	name:   'rich-text-span
 	data:   []
+	length: does [half length? data]
 	format: does [
 		to {} map-each [item [object!]] data [
 			when in item 'format (item/format)

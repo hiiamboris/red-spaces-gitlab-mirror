@@ -16,6 +16,7 @@ clipboard: context [
 	text!: make classy-object! format!: declare-class 'clipboard-format [
 		name:   'text				#type [word!]
 		data:   {}
+		length: does [length? data]	#type [function!]
 		clone:  does [copy self]	#type [function!]
 		format: does [copy data]	#type [function!]
 	]
