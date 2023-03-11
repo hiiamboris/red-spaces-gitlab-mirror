@@ -1664,7 +1664,7 @@ rich-content-ctx: context [								;-- rich content
 		offset [integer!]
 		items  [
 			object! (space? items)						;-- not inlined! for inlining use `insert! ofs values-of para/data`
-			block!  (event? length? items)
+			block!  (even? length? items)
 			string!
 		]
 	] with :edit/edit [
