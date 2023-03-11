@@ -193,10 +193,11 @@ rich: context [											;@@ what would be a better name?
 	
 	attributes/mark: function [							;@@ maybe rename to set! ?
 		data  [block!] "modified"
-		range [pair!]
+		range [word! ('all = range) pair!]
 		attr  [word!]
 		value
 	][
+		if range = 'all [range: 0 by infxinf/x]
 		range: clip range 0 half length? data			;-- avoid runaway repeat if range is infinite
 		repeat i span? range [							;@@ use for-each!
 			code: pick data i2: range/1 + i * 2

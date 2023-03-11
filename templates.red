@@ -1679,7 +1679,7 @@ rich-content-ctx: context [								;-- rich content
 	
 	edit/mark: function [
 		"modifies"
-		range [pair!]
+		range [word! ('all = range) pair!]
 		attr  [word!]
 		value "If falsey, attribute is cleared"
 	] with :edit/edit [
