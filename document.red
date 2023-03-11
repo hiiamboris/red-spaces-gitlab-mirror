@@ -91,6 +91,8 @@ doc-ctx: context [
 		copy mapped										;-- may be empty
 	]
 
+	;; extraction has to copy paragraphs, not plain data!
+	;; because paragraphs carry alignment and indentation attributes, data does not!
 	extract: function [doc [object!] range [pair!]] [
 		map-each [para prange] doc/map-range/relative range [
 			also para: para/clone
@@ -343,7 +345,7 @@ doc-ctx: context [
 			by                [limit: offset + limit]
 			integer? limit    [limit: order-pair as-pair limit offset]
 			limit [
-				slice: copy-range doc limit no
+				slice: extract doc limit
 				actions/record [insert (limit) (slice)] [remove (limit)]
 			]
 		]
@@ -847,6 +849,17 @@ doc-ctx: context [
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 ]
+
+;; data format that holds whole paragraphs, together with their facets (alignment, indentation)
+rich-text-block!: make rich-text-span! [
+	name:   'rich-text-block
+	data:   []
+	format: does [
+		to {} map-each/eval item data [[when in item 'format (item/format) #"^/"]]
+	]
+	clone:  does [map-each item data [when select item 'clone (item/clone)]]
+]
+
 
 context [
 	;@@ pageup/down keys events
