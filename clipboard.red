@@ -12,55 +12,44 @@ Red [
 ]	
 
 clipboard: context [
+	;; prototype for custom clipboard formats
+	format!: declare-class 'clipboard-format [
+		name:   'text				#type [word!]
+		data:   {}
+		clone:  does [copy self]	#type [function!]
+		format: does [copy data]	#type [function!]
+	]
+	
 	;; text is used to detect if some other program wrote to clipboard
 	;; if read text = last written text, we can use `data`
 	;; otherwise data is invalid and clipboard is read as plain text string
 	
-	data: []											;-- last copied data
-	text: ""											;-- text version of the last copied data
+	data: object format!								;-- last copied data
 	
-	data-to-text: function [data [block!]] [
-		list: map-each [item [object!]] data [
-			when in item 'format (item/format)
-		]
-		to {} delimit list "^/"
-	]
-	
-	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
-	clone-data: function [data [block! string!]] [
-		either string? data [
-			copy data
-		][
-			#assert [parse data [block! map!]]
-			items: map-each [obj [object!]] data/1 [
-				either function? select obj 'clone [obj/clone][#" "]	;-- fill unsupported items with space, to preserve attr mapping
-			]
-			reduce [
-				items
-				make map! copy/deep to [] data/2		;@@ cannot use copy/deep on maps
-			]
-		]
-	]
-	
-	;@@ TODO: /as refinement with 'text and 'rich-text formats for more abstraction?
 	read: function [
 		"Get clipboard contents"
 		/text "Return text even if data is non-textual"
 	][
 		read: read-clipboard
-		unless read == self/text [self/data: self/text: read]	;-- last copy comes from outside the running script
-		clone-data either text [self/text][data]
+		unless read == as-text: data/format [			;-- last copy comes from outside the running script
+			self/data: object format!
+			data/data: read
+			if text [as-text: data/format]
+		]
+		either text [as-text][data/clone]
 	]
 	
 	write: function [
 		"Write data to clipboard"
-		content [block! (parse content [block! map!]) string!]
+		content [object! ('clipboard-format = class? content) string!]
 	][
-		content: either string? content
-			[copy content]
-			[clone-data content]
-		append clear data content
-		write-clipboard self/text: data-to-text data
+		write-clipboard either string? content [
+			self/data: object format!
+			data/data: copy content
+		][
+			self/data: content/clone
+			data/format
+		]
 	]
 ]
 
