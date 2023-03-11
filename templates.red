@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;-- requires `for` loop from auxi.red, layouts.red, export
+;-- requires `for` loop from auxi.red, layouts.red, clipboard.red, export
 exports: [make-space declare-template space?]
 
 ;@@ I need to move out the core functionality from here out, leave only templates
@@ -1194,17 +1194,6 @@ tube-ctx: context [
 rich-paragraph-ctx: context [							;-- rich paragraph
 	~: self
 
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		space/sec-cache: copy []						;-- reset computed sections
-		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
-		frame: make-layout 'paragraph :space/items settings
-		size: space/margin * 2x2 + frame/size-2D
-		quietly space/frame: frame
-		quietly space/size:  constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
-		quietly space/map:   frame/map
-		frame/drawn
-	]
-	
 	;; returned point always belongs to the nearest space
 	;; 2D: x<0 and x>size/x: projected onto x=0 and x=size/x
 	;;     y<0 and y>size/y: these points cannot be meaningfully "unrolled" into x, since height of non-existing rows is unset
@@ -1384,6 +1373,17 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		cache
 	]
 	
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+		space/sec-cache: copy []						;-- reset computed sections
+		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
+		frame: make-layout 'paragraph :space/items settings
+		size: space/margin * 2x2 + frame/size-2D
+		quietly space/frame: frame
+		quietly space/size:  constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
+		quietly space/map:   frame/map
+		frame/drawn
+	]
+	
 	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
 	declare-template 'rich-paragraph/container [
 		margin:      0
@@ -1528,7 +1528,7 @@ rich-content-ctx: context [								;-- rich content
 		measure: function [space [object!] plan [block!]] [
 			do with self plan
 		]
-		length: does with :measure [length? space/data/items]
+		length: does with :measure [half length? space/data]
 		rows:   does with :measure [space/frame/nrows]
 		point->caret: function [xy [pair!]] with :measure [
 			set [_: _: index: offset:] ~/locate-point space xy
@@ -1567,7 +1567,7 @@ rich-content-ctx: context [								;-- rich content
 	draw-selection: function [space [object!]] [
 		if any [
 			not sel: space/selected
-			empty? space/data/items
+			empty? space/data
 		] [return []]
 		if sel/1 > sel/2 [sel: reverse sel]
 		;@@ this calls fill-row-ranges so many times that it must be super slow
@@ -1626,74 +1626,65 @@ rich-content-ctx: context [								;-- rich content
 			do with self plan
 		]
 		;; NOTE: modifying operations must explicitly set `space/data:` to trigger content/ranges update!
-		full-range?: empty-range?: copy: serialize: clip!: remove!: insert!: mark!: none
+		full-range?: empty-range?: copy: serialize: clip: remove: insert: mark: none
 	]
 	
 	edit/full-range?: function [range [pair!]] with :edit/edit [
-		n: length? space/data/items
-		0 by n = range
+		range = as-pair 0 half length? space/data
 	]
 
 	edit/empty-range?: function [range [pair!]] with :edit/edit [
-		zero? span? clip range 0 length? space/data/items
+		zero? span? clip range 0 half length? space/data
 	]
 	
 	edit/copy: function [range [pair!] /text] with :edit/edit [
-		slice: rich/decoded/copy values-of space/data range
-		either text [rich/decoded/format slice][slice]
+		slice: copy/part space/data range * 2 + 1
+		if text [slice: rich/source/format slice]
+		slice
 	]
 	
 	edit/serialize: function [] with :edit/edit [
-		rich/source/serialize space/data/items space/data/attrs
+		rich/source/serialize space/data
 	]
 	
-	edit/clip!: function [range [pair!]] with :edit/edit [
+	edit/clip: function ["modifies" range [pair!]] with :edit/edit [
 		unless edit/full-range? range [
-			space/data: rich/decoded/normalize! rich/decoded/copy values-of space/data range
+			space/data: copy/part space/data range * 2 + 1
 		]
 		space/data
 	]
 	
-	edit/remove!: function [range [pair!]] with :edit/edit [
-		unless edit/empty-range? range [
-			space/data: rich/decoded/normalize! rich/decoded/remove! values-of space/data range
-		]
-		space/data
+	edit/remove: function ["modifies" range [pair!]] with :edit/edit [
+		remove/part skip space/data range/1 * 2 2 * span? range
+		space/data: space/data							;-- trigger on-data-change
 	]
 	
-	edit/insert!: function [
+	edit/insert: function [
+		"modifies"
 		offset [integer!]
 		items  [
 			object! (space? items)						;-- not inlined! for inlining use `insert! ofs values-of para/data`
-			block!  (parse items [block! map!])
+			block!  (event? length? items)
 			string!
 		]
 	] with :edit/edit [
 		case [
 			;@@ should inserted objects be copied/cloned automatically? (document does that atm)
-			object? items [items: reduce [reduce [items] #()]]	
-			string? items [items: reduce [explode items  #()]]
+			object? items [items: reduce [items 0]]	
+			string? items [items: zip explode items 0]
 		]
-		unless empty? items [
-			space/data: rich/decoded/insert! values-of space/data offset items
-		]
-		space/data
+		insert skip space/data offset * 2 items
+		space/data: space/data							;-- trigger on-data-change
 	]
 	
-	edit/mark!: function [
+	edit/mark: function [
+		"modifies"
 		range [pair!]
 		attr  [word!]
 		value "If falsey, attribute is cleared"
 	] with :edit/edit [
-		unless edit/empty-range? range [
-			rich/attributes/mark! space/data/attrs (length? space/data/items) range attr :value
-			space/data: rich/decoded/normalize! values-of space/data
-		]
-		space/data
-	]
-	
-	format: function [space [object!]] [
-		rich/decoded/format values-of space/data
+		rich/attributes/mark space/data range attr :value
+		space/data: space/data							;-- trigger on-data-change
 	]
 	
 	;@@ should source support image! in it's content? url! ? anything else?
@@ -1701,11 +1692,8 @@ rich-content-ctx: context [								;-- rich content
 		space/data: rich/source/deserialize source		;-- trigger on-data-change
 	]
 	
-	on-data-change: function [space [object!] word [word!] data [block! (parse data [block! map!]) object!]] [
-		if block? data [								;-- auto convert to object from [block map] block
-			quietly space/data: data: object [items: data/1 attrs: data/2]
-		]
-		set with space [content ranges] rich/decoded/to-spaces values-of data	;-- content triggers invalidation
+	on-data-change: function [space [object!] word [word!] data [block!]] [
+		set with space [content ranges] rich/source/to-spaces data	;-- /content triggers invalidation
 		if empty? space/content [						;-- let rich-content always have at least one line (mainly for document)
 			obj: make-space 'text []					;@@ use prototype for this?
 			obj/font: space/font
@@ -1716,12 +1704,9 @@ rich-content-ctx: context [								;-- rich content
 	
 	clone: function [space [object!]] [		
 		clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
-		attrs: make #() copy/deep to [] space/data/attrs	;@@ workaround for map copy bugs, otherwise inner strings are not copied
-		;; items may contain spaces - need special care
-		items: map-each [item [object!]] space/data/items [
-			when select item 'clone (item/clone)		;-- not cloneable spaces are skipped!
-		]
-		clone/data: reduce [items attrs]				;-- trigger on-data-change
+		clone/data: map-each/eval [item [object!] code] space/data [	;-- data may contain spaces
+			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
+		]												;-- triggers on-data-change
 		clone
 	]
 		
@@ -1740,22 +1725,35 @@ rich-content-ctx: context [								;-- rich content
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]
 		edit:    func [plan [block!]] [~/edit/edit       self plan]
-		clone:   does [~/clone  self]
-		format:  does [~/format self]
+		clone:   does [~/clone self]
+		format:  does [rich/source/format data]
 		
-		decode:  func ["Set up paragraph with high-level dialected data" source [block!]] [~/decode self source]
-		data: context [									;-- internal data, generated by decode or from edit operations
-			;; items is the list of all things caret can skip: chars and spaces
-			items: []
-			;; attrs describes attribute mapping onto items: #(name [value mask ...] ...) 
-			attrs: #()									;-- okay to have literal map (that's not copied) - will be overridden
-		] #type [object! block!] :on-data-change		;-- block [block map] gets converted into object
+		decode:  func ["Set up paragraph with high-level dialected data" source [block!]] [~/decode self source]	#type [function!]
+		;; internal data [item code ...], generated by decode or from edit operations
+		data:    []	#type [block!] (even? length? data) :on-data-change		
 		;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
 		;; so caret can skip the single ones but dive into the created ones
 		ranges: [] #type [block! hash!]					;-- filled by on-data-change
 		
 		rich-paragraph-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
+	]
+]
+
+
+rich-text-span!: make clipboard/format! [
+	name:   'rich-text-span
+	data:   []
+	format: does [
+		to {} map-each [item [object!]] data [
+			when in item 'format (item/format)
+		]
+	]
+	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
+	clone: function [] [
+		map-each/eval [item [object!] code] data [
+			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
+		]
 	]
 ]
 
