@@ -41,14 +41,14 @@ add-indent: function [text [string!] size [integer!]] [
 
 mold: :system/words/mold								;-- let it always be available in Spaces context
 if action? :mold [
+	native-mold: :mold
+	
 	;; this monstrosity is adjusted to make more user-friendly output
 	;; without /all it will not expand inner objects/maps, and will output spaces in compact form type:size
 	;; and generally will be closer to `help` output
 	;; mold/all will output loadable info in format acceptable by %load-anything.red
 	context [
 		; system/words/native-mold: :mold
-		native-mold: :mold
-		
 		decor*: [[
 			block!    ["[" "]"]
 			paren!    ["(" ")"]
