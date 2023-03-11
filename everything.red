@@ -87,7 +87,8 @@ do/expand [
 				#include %events.red
 				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %source.red
-				#include %templates.red
+				#include %clipboard.red
+				#include %templates.red					;-- requires clipboard on inclusion
 				#include %vid.red
 				#include %popups.red
 				#include %traversal.red
@@ -95,7 +96,6 @@ do/expand [
 				#include %hittest.red
 				#include %tabbing.red
 				#include %single-click.red
-				#include %clipboard.red
 				#include %timelines.red
 				#include %edit-keys.red
 				#include %standard-handlers.red
