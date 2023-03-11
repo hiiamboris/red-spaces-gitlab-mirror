@@ -367,15 +367,13 @@ zip: function [
 	"Interleave a list with another list or scalar"
 	list1 [series!]
 	list2 [any-type!]
+	/into result: (make list1 2 * length? list1) [series!]
 ][
 	#assert [any [not series? :list2  equal? length? list1 length? list2]]
-	result: make list1 2 * len: length? list1
-	if len > 0 [
-		repeat i len pick
-			[append/only append/only result :list1/:i :list2/:i]
-			[append/only append/only result :list1/:i :list2]
-			series? :list2
-	]
+	repeat i length? list1 pick [
+		[append/only append/only result :list1/:i :list2/:i]
+		[append/only append/only result :list1/:i :list2]
+	] series? :list2
 	result
 ]
 #assert [
