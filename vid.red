@@ -116,9 +116,7 @@ VID: context [
 				template: rich-content
 				facets: [
 					percent! baseline
-					block! !(func [block] [				;-- high level source dialect support for VID
-						compose/only [decode (block)]
-					])
+					block! !(func [block] [reduce ['decode block]])		;-- high level source dialect support for VID
 					#text-align
 				]
 			]
