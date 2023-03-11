@@ -227,8 +227,9 @@ rich: context [											;@@ what would be a better name?
 		; attrs
 	; ]
 	
-	attributes/pick: function [code [integer!] attr [word!]] [
-		select/skip index->attrs code attr 2 
+	attributes/pick: function [attrs [integer! block!] attr [word!]] [
+		if integer? attrs [attrs: index->attrs attrs]
+		select/skip attrs code attr 2 
 	]
 	#assert [
 		on =  attributes/pick 1 'bold

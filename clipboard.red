@@ -30,9 +30,10 @@ clipboard: context [
 	read: function [
 		"Get clipboard contents"
 		/text "Return text even if data is non-textual"
+		/extern data
 	][
 		read: read-clipboard
-		unless read == as-text: data/format [			;-- last copy comes from outside the running script
+		unless read == as-text: data/format [		;-- last copy comes from outside the running script
 			self/data: make text! [data: read]
 			if text [as-text: data/format]
 		]
@@ -47,7 +48,7 @@ clipboard: context [
 			self/data: make text! [data: copy content]
 		][
 			self/data: content/clone
-			data/format
+			self/data/format
 		]
 	]
 ]
