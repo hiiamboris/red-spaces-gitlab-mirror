@@ -532,7 +532,8 @@ doc-ctx: context [
 		data   [object!] (find [rich-text-span rich-text-block] select data 'name)
 		/local _
 	][
-		if empty? list: data/data [exit]
+		if empty? data/data [exit]
+		list: select (data: data/clone) 'data
 		set [dst-para: dst-ofs:] caret->paragraph doc offset
 		dst-loc: offset - dst-ofs
 		len: data/length
@@ -553,7 +554,6 @@ doc-ctx: context [
 					insert dst-loc list/1/data 
 				]
 				;; insert other paragraphs into doc/content
-				list: map-each para list [para/clone]
 				insert (find/same/tail doc/content dst-para) next list
 				;; append stashed part to the last inserted paragraph
 				paraN: last list

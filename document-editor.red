@@ -147,29 +147,27 @@ tools: context [
 		extract doc/map-range range 2
 	]
 	
-	linkify-data: function [data [block!]] [
+	linkify-data: function [data [block!] command [block!]] [
 		rich/attributes/mark data 'all 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this 
 		rich/attributes/mark data 'all 'underline on 
+		link: first lay-out-vids [clickable [rich-content data= data] command= command]
+		reduce [link 0]
 	]
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
 		if range/1 = range/2 [exit]
 		;; each paragraph becomes a separate link as this is simplest to do
-		slice: doc/edit [slice range]
-		either slice/name = 'rich-text-span [
-			linkify-data slice/data
-			link: first lay-out-vids [clickable [rich-content data= slice] command= command]
-			slice/data: reduce [link 0]
+		data: doc/edit [slice range]
+		either data/name = 'rich-text-span [
+			data/data: linkify-data data/data command
 		][
-			foreach para slice/data [
-				linkify-data para/data
-				link: first lay-out-vids [clickable [rich-content data= para/data] command= command]
-				para/data: reduce [link 0]
+			foreach para data/data [
+				para/data: linkify-data para/data command
 			]
 		]
 		doc/edit [
 			remove range
-			insert/at slice range/1
+			insert/at data range/1
 			select 'none
 		]
 	]
