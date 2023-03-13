@@ -465,6 +465,7 @@ doc-ctx: context [
 			]
 			; ?? slice ?? marked
 			sel: doc/selected							;-- remember selection to restore it afterwards
+			; ?? slice ?? marked
 			actions/record
 				[remove (range) insert (range) (slice)  select (sel)]
 				[remove (range) insert (range) (marked) select (sel)]
@@ -544,6 +545,7 @@ doc-ctx: context [
 				dst-para/edit [insert dst-loc list/1/data]
 			]
 			'multiline [
+			; ?? data ?? data/data/1 ?? data/data/2
 				;; edit first paragraph, but remember the after-insertion part
 				dst-para/edit [							;@@ make another action in edit for this?
 					stashed: copy range: dst-loc by infxinf/x
@@ -551,6 +553,7 @@ doc-ctx: context [
 					insert dst-loc list/1/data 
 				]
 				;; insert other paragraphs into doc/content
+				list: map-each para list [para/clone]
 				insert (find/same/tail doc/content dst-para) next list
 				;; append stashed part to the last inserted paragraph
 				paraN: last list

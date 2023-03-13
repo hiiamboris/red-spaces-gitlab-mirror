@@ -77,7 +77,6 @@ append keyboard/focusable 'document
 toggle-attr: function [name] [
 	either all [range: doc/selected  0 < span? range] [
 		old: doc-ctx/pick-attr doc 1 + range/1 name
-		?? [old range] 
 		doc/edit [mark range name not old]
 	][
 		old: rich/attributes/pick doc/paint name
