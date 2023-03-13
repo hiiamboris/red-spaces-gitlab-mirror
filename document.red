@@ -122,11 +122,17 @@ doc-ctx: context [
 				para/measure [length]
 		]
 		
+		caret->paragraph: function ["Get paragraph and it's range at given offset" offset [integer!]] with :measure [
+			if set [para: pofs: plen:] ~/caret->paragraph doc offset [
+				reduce [para 0 by plen + pofs]			;@@ use range for the other func too?
+			]
+		]
+		
 		find-prev-word: function ["Get offset of the previous word's start"] with :measure [
-			set [para: pofs: plen:] caret->paragraph doc offset: doc/caret/offset
+			set [para: pofs: plen:] ~/caret->paragraph doc offset: doc/caret/offset
 			while [offset <= pofs] [					;-- switch to previous paragraph (maybe multiple times)
 				if offset <= 0 [return 0]				;-- no more going left
-				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
+				set [para: pofs: plen:] ~/caret->paragraph doc offset: offset - 1
 			]
 			#assert [pofs < offset]						;-- limited by paragraph's head
 			e: skip s: para/data offset - pofs * 2
@@ -135,10 +141,10 @@ doc-ctx: context [
 			offset - skip? before
 		]
 		find-next-word: function ["Get offset of the next word's end"] with :measure [
-			set [para: pofs: plen:] caret->paragraph doc offset: doc/caret/offset
+			set [para: pofs: plen:] ~/caret->paragraph doc offset: doc/caret/offset
 			while [offset >= (pofs + plen)] [			;-- switch to next paragraph (maybe multiple times)
 				if offset >= doc/length [return doc/length]		;-- no more going right
-				set [para: pofs: plen:] caret->paragraph doc offset: offset + 1
+				set [para: pofs: plen:] ~/caret->paragraph doc offset: offset + 1
 			]
 			#assert [pofs + plen > offset]				;-- limited by paragraph's tail
 			after: skip para/data offset - pofs * 2
@@ -176,22 +182,51 @@ doc-ctx: context [
 		]]
 	]
 	
-	group-edits: function [edit1 [block!] edit2 [block!] /local word par rng2 data2] [
-		;; to avoid having "do-nothing" undo blocks it forbids grouping insert & remove into single action
-		;; indents & aligns are never grouped out of UX considerations
-		if any [
-			find edit1 'indent
-			find edit2 'indent
-			find edit1 'align
-			find edit2 'align
-			all [find edit1 'insert  find edit2 'remove]
-			all [find edit1 'remove  find edit2 'insert]
-		] [return no]
+	robot-time: 0:0:0.02								;-- human can't do things faster than every 20ms, so these are always grouped
+	human-time: 0:0:1									;-- when human pauses for this period, group is guaranteed to close
 		
-		#print "grouping (mold edit1) + (mold edit2)"
+	;; returns modifying action (word) if it's not mixed with other modifying actions
+	primary-action?: function [edit [block!]] [
+		any-action: ['indent | 'align | 'insert | 'remove]
+		parse edit [
+			to any-action set action skip (action: to lit-word! action)		;@@ extra headache - see REP 142
+			any [action | not any-action skip]
+			(return action)
+		]
+		none
+	]
+		
+	;; used to check grouping possibility before doing any destructive changes
+	groupable?: function [edit1 [block!] edit2 [block!] elapsed [time!]] [
+		groupable?: case [
+			elapsed <= robot-time [yes]
+			elapsed >= human-time [no]
+			;; to avoid having "do-nothing" undo blocks I have to forbid grouping insert & remove into single action
+			;; indents & aligns are also never grouped out of UX considerations, so that leaves equality of actions
+			'else [
+				all [
+					action1: primary-action? edit1
+					action1 = action2: primary-action? edit2
+				]
+			] 
+		]
+	]
+		
+	group-edits: function [edit1 [block!] edit2 [block!] elapsed [time!] /local word par rng2 data2] [
+		#assert [groupable? edit1 edit2 elapsed]
+		;; there can be dumb grouping (append/insert) or more sophisticated - modification of insert/remove data
+		;; latter is used solely to make undo data smaller in the face of lots of single character insertions/removals
+		;; smart grouping rules are:
+		;;   move/select/side: latter overrides the former
+		;;   insert: same data format + latter inserts starts where former ends
+		;;   remove: latter removal either ends or starts where the former starts
+		; #print "grouping (mold edit1) + (mold edit2)"
 		parse edit2 [any [s:
 			set word ['move | 'select | 'side] skip e: (
-				mapparse compose [quote (word) skip] edit1 [[]]
+				mapparse compose [quote (word) skip] edit1 [[]]	;-- removes all previous actions of the same kind
+				append/part edit1 s e
+			)
+		|	set word ['align | 'indent] 2 skip e: (		;-- no reason for smart grouping
 				append/part edit1 s e
 			)
 		|	set word 'insert set rng2 pair! set data2 object! e: (
@@ -219,8 +254,8 @@ doc-ctx: context [
 			)
 		|	end | p: (ERROR "Invalid plan action at (mold/flat/part p 100)")
 		]]
-		#print "=> (mold edit1)"
-		edit1
+		; #print "=> (mold edit1)"
+		edit1											;-- when succeeds, edit1 is modified in place
 	];group-edits: function [edit1 [block!] edit2 [block!] /local word par rng2 data2] [
 	
 	undo-worthy?: function [edit [block!]] [
@@ -242,14 +277,16 @@ doc-ctx: context [
 		]
 		; ?? left ?? right
 		either all [
-			doc/timeline/fresh?
+			elapsed: doc/timeline/elapsed?				;-- returns none if timeline is empty
 			set [doc': left': right':] doc/timeline/last-event
 			doc' =? doc									;-- last event must come from the same document in a shared timeline
 			parse left'  ['playback object! block!]
 			parse right' ['playback object! block!]
-			group-edits right'/3 right/3
-			group-edits left/3   left'/3				;-- left edit is grouped in reverse order
+			groupable? right'/3 right/3 elapsed			;-- check groupability before modifying in place
+			groupable? left/3   left'/3 elapsed
 		][
+			group-edits right'/3 right/3 elapsed
+			group-edits left/3   left'/3 elapsed		;-- left edit is grouped in reverse order
 			doc/timeline/put/last doc left right'		;-- refreshes the event timer, even though actions are modifed in place
 		][
 			doc/timeline/put doc left right
@@ -274,7 +311,7 @@ doc-ctx: context [
 			; probe head doc/timeline/events
 			:result
 		]
-		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent: auto-bullet: none
+		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent: none
 	]
 	
 	actions/record: function [
@@ -470,14 +507,6 @@ doc-ctx: context [
 		]
 	]
 	
-	actions/auto-bullet: function [
-		"Automatically assign a bullet to current paragraph if previous one has it"
-	] with :actions/edit [
-		auto-bullet doc offset
-	]
-	
-	document: context [bulletify: enumerate: none]
-	
 	;; these are low level functions bypassing undo mechanism
 	remove-range: function [doc [object!] range [pair!]] [
 		range: order-pair clip range 0 doc/length
@@ -561,104 +590,6 @@ doc-ctx: context [
 			]
 		]
 		doc/selected: sel								;-- trigger update of /selected
-	]
-	
-	get-bullet-text: function [para [object!]] [
-		all [
-			space? bullet: para/data/1
-			'bullet = class? bullet
-			bullet/text
-		]
-	]
-	get-bullet-number: function [para [object!]] [
-		all [
-			text: get-bullet-text para
-			parse text [copy num some digit! "."]
-			transcode/one num
-		]
-	]
-	bulleted-paragraph?: function [para [object!]] [
-		to logic! get-bullet-text para
-	]
-	numbered-paragraph?: function [para [object!]] [
-		to logic! get-bullet-number para
-	]
-	
-	;@@ maybe this should be less smart and not remove bullets? only add them?
-	document/bulletify: function [doc [object!] range [pair!]] [
-		if empty? mapped: doc/map-range/extend/no-empty range [exit]
-		bulletifying?: any [
-			not bulleted-paragraph? mapped/1			;-- already has a bullet? for toggling
-			numbered-paragraph? mapped/1
-		]
-		fix: 0
-		foreach [para: prange:] mapped [
-			prange: prange + fix						;-- each edit changes next prange
-			if bulleted-paragraph? para [				;-- get rid of numbers and old bullets
-				para/edit [remove 0x1]
-				adjust-offsets doc prange/1 -1
-				fix: fix - 1
-			]
-			if bulletifying? [
-				para/edit [insert 0 make-space 'bullet []]
-				adjust-offsets doc prange/1 1
-				fix: fix + 1
-			]
-		]
-	]
-	
-	;@@ maybe this should be less smart and not remove bullets? only add them?
-	document/enumerate: function [doc [object!] range [pair!]] [
-		if empty? mapped: doc/map-range/extend/no-empty range [exit]
-		set [para: prange:] mapped
-		if numbering?: not get-bullet-number para [
-			prev-number: all [							;-- fetch number of the previous paragraph
-				last-para: pick find/same doc/content para -1
-				get-bullet-number last-para
-			]
-			number: either prev-number [prev-number][0]
-		]
-		fix: 0
-		foreach [para: prange:] mapped [
-			prange: prange + fix						;-- each edit changes next prange
-			if bulleted-paragraph? para [				;-- remove old bullets/numbers
-				para/edit [remove 0x1]
-				adjust-offsets doc prange/1 -1
-				fix: fix - 1
-			]
-			if numbering? [								;-- enumerate
-				bullet: make-space 'bullet []
-				bullet/text: rejoin [number: number + 1 "."]
-				para/edit [insert 0 bullet]
-				adjust-offsets doc prange/1 1
-				fix: fix + 1
-			]
-		]
-	]
-	
-	;@@ maybe functions above should be based on this?
-	;@@ maybe they should also inherit font/size/flags from the first char of the first paragraph?
-	;@@ also ideally on break/remove/cut/paste paragraph numbers should auto-update, but I'm too lazy
-	;; replaces paragraph's bullet following that of the previous paragraph
-	auto-bullet: function [doc [object!] offset [integer!]] [
-		set [para: pofs: plen:] caret->paragraph doc offset
-		if prev: pick find/same doc/content para -1 [
-			text: either num: get-bullet-number prev
-				[rejoin [num + 1 "."]]
-				[get-bullet-text prev]
-			if text [
-				bullet: make-space 'bullet []
-				bullet/text: text
-			]
-		]
-		if bulleted-paragraph? para [
-			para/edit [remove 0x1]
-			adjust-offsets doc pofs -1
-		]
-		if bullet [
-			para/edit [insert 0 bullet]
-			adjust-offsets doc pofs 1
-		]
 	]
 	
 	on-selected-change: function [space [object!] word [word!] value: -1x-1 [pair! none!]] [	;-- -1x-1 acts as deselect-everything
@@ -821,7 +752,7 @@ doc-ctx: context [
 			"Get a list of [paragraph range] intersecting the given document range"
 			range [pair!]
 			/extend   "Extend range to full paragraphs"
-			/no-empty "Exclude empty intersections"
+			/no-empty "Exclude empty intersections (may return empty list)"
 			/relative "Return ranges relative to paragraphs themselves"
 		][
 			~/map-range self range extend no-empty relative

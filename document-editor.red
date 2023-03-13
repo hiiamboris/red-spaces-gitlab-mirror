@@ -116,8 +116,7 @@ codify: function [] [
 ]
 insert-grid: function [] [
 	if size: request-grid-size [
-		grid: make-space 'grid []
-		grid/bounds: size
+		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
 		for-each xy size [
 			grid/content/:xy: first lay-out-vids [document [rich-content ["123"]]]
@@ -128,14 +127,25 @@ insert-grid: function [] [
 ] 
 
 tools: context [
+	selected-range: function [doc [object!]] [
+		any [doc/selected  doc/caret/offset * 1x1]
+	]
+	
 	extend-range: function [							;@@ put this into document itself?
 		"Extend given range to cover instersected paragraphs fully"
-		range [pair!]
+		doc [object!] range [pair!]
 	][
 		mapped: doc/map-range/extend/no-empty range
 		range1: mapped/2
 		range2: last mapped
 		range1/1 by range2/2
+	]
+	
+	range->paragraphs: function [
+		"Return a list of paragraphs intersecting the given range"
+		doc [object!] range [pair!]
+	][
+		extract doc/map-range range 2
 	]
 	
 	linkify-data: function [data [block!]] [
@@ -169,15 +179,100 @@ tools: context [
 		if range/1 = range/2 [exit]
 		slice: doc/edit [slice range]
 		either slice/name = 'rich-text-span [
-			code: make-space 'code compose [text: (slice/format)]
+			code: remake-space 'code [text: (slice/format)]
 		][
-			slice: doc/edit [slice range: extend-range range]
-			code: make-space 'pre compose [text: (slice/format) sections: none]	;-- prevent block from being dissected
+			slice: doc/edit [slice range: extend-range doc range]
+			code: remake-space 'pre [text: (slice/format) sections: (none)]	;-- prevent block from being dissected
 		]
 		doc/edit [
 			remove range
 			insert/at code range/1
 		]
+	]
+	
+	get-bullet-text: function [para [object!]] [
+		all [
+			space? bullet: para/data/1
+			'bullet = class? bullet
+			bullet/text
+		]
+	]
+	get-bullet-number: function [para [object!]] [
+		all [
+			text: get-bullet-text para
+			parse text [copy num some digit! "."]
+			transcode/one num
+		]
+	]
+	bulleted-paragraph?: function [para [object!]] [
+		to logic! get-bullet-text para
+	]
+	numbered-paragraph?: function [para [object!]] [
+		to logic! get-bullet-number para
+	]
+	
+	;@@ maybe bullets should also inherit font/size/flags from the first char of the first paragraph?
+	;@@ also ideally on break/remove/cut/paste paragraph numbers should auto-update, but I'm too lazy
+	
+	;; replaces paragraph's bullet following that of the previous paragraph
+	auto-bullet: function [doc [object!] para [object!]] [
+		pindex: index? find/same doc/content para
+		if prev: pick doc/content pindex - 1 [
+			text: either num: get-bullet-number prev
+				[rejoin [num + 1 "."]]
+				[get-bullet-text prev]
+			if text [new-bullet: remake-space 'bullet [text: (text)]]
+		]
+		old-bullet: bulleted-paragraph? para
+		offset: doc-ctx/get-paragraph-offset doc para	;@@ need to put it into measure
+		base-indent: any [if para/indent [para/indent/first] 0]	;@@ REP 113
+		doc/edit [
+			if old-bullet [remove 0x1 + offset]
+			if new-bullet [
+				move offset insert new-bullet
+				indent compose [first: (base-indent) rest: (base-indent + 15)]
+			]
+		]
+	]
+	
+	auto-bullet-caret: function [doc [object!]] [
+		para: first doc/measure [caret->paragraph doc/caret/offset]
+		auto-bullet doc para
+	]
+	
+	debulletify: function [doc [object!] para [object!]] [
+		if bulleted-paragraph? para [
+			offset: doc-ctx/get-paragraph-offset doc para
+			new-indent: if para/indent [compose [first: (i: para/indent/first) rest: (i)]]
+			doc/edit [
+				remove 0x1 + offset
+				if new-indent [indent new-indent]
+			]
+		]
+	]
+	
+	bulletify: function [doc [object!] para [object!] /as number [integer!]] [
+		offset: doc-ctx/get-paragraph-offset doc para
+		bullet: make-space 'bullet []
+		if number [bullet/text: rejoin [number "."]]
+		if bulleted-paragraph? para [doc/edit [remove 0x1 + offset]]
+		base-indent: any [if para/indent [para/indent/first] 0]	;@@ REP 113
+		doc/edit [
+			move offset insert bullet
+			indent compose [first: (base-indent) rest: (base-indent + 15)]
+		]
+	]
+	
+	bulletify-selected: function [doc [object!]] [
+		list: range->paragraphs doc selected-range doc
+		action: either bulleted-paragraph? list/1 [:debulletify][:bulletify]
+		foreach para list [action doc para]
+	]
+	
+	enumerate-selected: function [doc [object!]] [
+		list: range->paragraphs doc selected-range doc
+		either num: get-bullet-number list/1 [debulletify doc list/1][bulletify/as doc list/1 1]
+		foreach para next list [auto-bullet doc para]
 	]
 	
 ]
@@ -255,8 +350,8 @@ view reshape [
 				icon [image 24x20 data= icons/aligns/left   ] on-click [realign 'left] 
 				icon [image 24x20 data= icons/aligns/center ] on-click [realign 'center]
 				icon [image 24x20 data= icons/aligns/right  ] on-click [realign 'right]
-				icon [image 30x20 data= icons/lists/numbered] on-click [enumerate]
-				icon [image 30x20 data= icons/lists/bullet  ] on-click [bulletify]
+				icon [image 30x20 data= icons/lists/numbered] on-click [tools/enumerate-selected doc]
+				icon [image 30x20 data= icons/lists/bullet  ] on-click [tools/bulletify-selected doc]
 				attr "▦" on-click [insert-grid]
 			]
 			scrollable [
@@ -321,7 +416,7 @@ view reshape [
 				] on-key-down [
 					unless is-key-printable? event [
 						switch/default event/key [
-							#"^M" #"^/" [doc/edit [select 'none  insert "^/"  auto-bullet]]
+							#"^M" #"^/" [doc/edit [select 'none  insert "^/"] tools/auto-bullet-caret doc]
 						][
 							space/edit key->plan event space/selected
 						]
