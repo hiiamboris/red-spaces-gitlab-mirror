@@ -174,6 +174,7 @@ rich: context [											;@@ what would be a better name?
 	
 	#assert [
 		[1x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 2x5
+		[1x1 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 4x5
 		[3x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 0x5
 		[3x3 bold] = attributes/make-rtd-flags [_ 0 _ 0 _ 1 _ 1 _ 1 _ 0 _ 0] 0x10
 	]
@@ -283,12 +284,12 @@ rich: context [											;@@ what would be a better name?
 		#assert [not find data #"^/"  "line breaks are not allowed inside paragraph text"]
 		buf:     clear {}
 		parse data [any [
-			[	s: copy slice some [set char char! integer! (append buf char)] e: (
+			[	s: some [set char char! integer! (append buf char)] e: (
 					append content obj: make-space 'text []
 					append obj/text buf
 					clear buf
 					range: half as-pair skip? s skip? e
-					obj/flags: attributes/make-rtd-flags slice range
+					obj/flags: attributes/make-rtd-flags data range
 				)
 			|	set obj [object! integer!] (			;@@ apply attribute to the object?
 					append content obj
