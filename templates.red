@@ -102,6 +102,15 @@ make-space: function [
 	r
 ]
 
+remake-space: function [
+	"Safely create a space from a template TYPE"
+	type [word!]  "Looked up in templates"
+	spec [block!] "Extension code - composed, not evaluated"
+][
+	also r: make-space type []
+	do bind compose/only spec r
+]
+
 ;; doesn't copy objects: font should be shared and child spaces can't be just copied like that ;@@ but /limits?
 ;; used mainly for copy/paste functionality
 copied!: make typeset! [series! bitset! map!]
