@@ -43,11 +43,9 @@ context [
 		]
 	]
 	
-	fresh?: function [timeline [object!]] [
-		to logic! all [
-			last-time: pick timeline/events negate period
-			elapsed: difference now/utc/precise last-time
-			elapsed < timeline/interval
+	elapsed?: function [timeline [object!]] [
+		if last-time: pick timeline/events negate period [
+			difference now/utc/precise last-time
 		]
 	]
 	
@@ -59,8 +57,7 @@ context [
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
 		limit:      1000	#type [integer!] (limit >= 20)		;-- max number of events to keep
-		interval:   0:0:1	#type [time!]				;-- time needs to elapse before event group is finished
-		fresh?:     does [~/fresh? self]
+		elapsed?:   does [~/elapsed? self]				;-- can return none if timeline is empty
 		last-event: does [copy/part events -3]			;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]
 		redo:       does [~/redo self]
