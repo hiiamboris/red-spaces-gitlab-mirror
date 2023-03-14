@@ -182,21 +182,21 @@ events: context [
 		=style-def=: [
 			set name set-word! (name: to word! name)
 			['extends
-				;@@ TODO: allow paths here too
-				set base #expect [lit-word! | word!] (base: to word! base)
+				set base #expect [lit-word! | word! | lit-path! | path!] (
+					if lit-word? base [base: to word! base]
+					;; I'm not inserting whole prefix as then it would need a workaround to remove smth from it
+					base: as path! compose [handlers (to [] base)]
+				)
 			|	(base: none)
 			]
 			set body #expect block!
 			(add-style/from name body base)
 		]
-		add-style: function [name body /from base] [
+		add-style: function [name body /from base [none! path!]] [
 			append prefix name
 			#debug events [print ["Defining" mold as path! prefix when base ("from") when base (base)]]
 			path: as path! prefix
-			map: either base [
-				copy-deep-map get as path! compose [handlers (to [] base)]
-			][	copy #()
-			]
+			map: either base [copy-deep-map get base][copy #()]
 			set path map
 			fill-body body map
 			take/last prefix
