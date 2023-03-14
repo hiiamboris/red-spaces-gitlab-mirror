@@ -533,7 +533,7 @@ doc-ctx: context [
 		/local _
 	][
 		if empty? data/data [exit]
-		list: select (data: data/clone) 'data
+		list: select (data: data/copy) 'data			;-- will modify paragraphs data in place!
 		set [dst-para: dst-ofs:] caret->paragraph doc offset
 		dst-loc: offset - dst-ofs
 		len: data/length
@@ -546,7 +546,6 @@ doc-ctx: context [
 				dst-para/edit [insert dst-loc list/1/data]
 			]
 			'multiline [
-			; ?? data ?? data/data/1 ?? data/data/2
 				;; edit first paragraph, but remember the after-insertion part
 				dst-para/edit [							;@@ make another action in edit for this?
 					stashed: copy range: dst-loc by infxinf/x
@@ -779,7 +778,15 @@ rich-text-block!: make rich-text-span! [
 	data:   []
 	length: does [max 0 (length? data) - 1 + sum map-each item data [item/measure [length]]]
 	format: does [to {} map-each/eval item data [[when in item 'format (item/format) #"^/"]]]
-	copy:   function [] [remake rich-text-block! [data: (system/words/copy data)]]
+	copy:   function [] [
+		;; tricky! need to clone paragraphs but not their inner spaces! (see notes)
+		data: system/words/copy self/data
+		data: map-each para data [
+			also para': para/clone
+			para'/data: system/words/copy para/data
+		]
+		remake rich-text-block! [data: (data)]
+	]
 	clone:  function [] [
 		data: map-each item self/data [when select item 'clone (item/clone)]
 		remake rich-text-block! [data: (data)]
