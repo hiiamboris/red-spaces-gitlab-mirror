@@ -122,7 +122,7 @@ insert-grid: function [] [
 		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
 		for-each xy size [
-			grid/content/:xy: first lay-out-vids [editor [rich-content []]]
+			grid/content/:xy: first lay-out-vids [editor [rich-content]]
 		]
 		doc/edit [insert grid]
 	] 
