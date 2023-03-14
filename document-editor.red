@@ -121,7 +121,10 @@ insert-grid: function [] [
 	if size: request-grid-size [
 		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
-		for-each xy size [grid/content/:xy: first lay-out-vids [editor]]
+		for-each xy size [
+			grid/content/:xy: ed: first lay-out-vids [editor]
+			ed/content/timeline: doc/timeline			;-- share undo/redo timeline
+		]
 		doc/edit [insert grid]
 	] 
 ] 
