@@ -688,6 +688,7 @@ doc-ctx: context [
 
 	lay-out-editor: function [spec [block!] /styles sheet [map! none!]] [	;-- only used to pass styles down to content/document
 		doc: first lay-out-vids/styles compose/only [document (spec)] sheet
+		if empty? doc/content [doc/content: lay-out-vids [rich-content]]	;-- don't let document be empty
 		compose [content: (doc)]
 	]
 
@@ -806,7 +807,9 @@ rich-text-block!: make rich-text-span! [
 context [
 	;@@ pageup/down keys events
 	declare-template 'editor/scrollable [
-		content: make-space 'document []
+		content: make-space 'document [
+			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
+		]
 		content-flow: 'planar
 	]
 ]

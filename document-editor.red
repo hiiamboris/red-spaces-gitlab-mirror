@@ -121,9 +121,7 @@ insert-grid: function [] [
 	if size: request-grid-size [
 		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
-		for-each xy size [
-			grid/content/:xy: first lay-out-vids [editor [rich-content]]
-		]
+		for-each xy size [grid/content/:xy: first lay-out-vids [editor]]
 		doc/edit [insert grid]
 	] 
 ] 
