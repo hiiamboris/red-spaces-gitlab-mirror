@@ -440,7 +440,7 @@ doc-ctx: context [
 		do update
 		case [
 			string? data [data: paint-string doc data]
-			space?  data [probe data: make rich-text-span! compose/deep [data: [(data) 0]]]
+			space?  data [data: make rich-text-span! compose/deep [data: [(data) 0]]]
 			not find [rich-text-span rich-text-block] data/name [	;-- unsupported clipboard format (incl. text) inserted as text
 				data: paint-string doc data/format
 			]
@@ -686,6 +686,11 @@ doc-ctx: context [
 		]
 	]
 
+	lay-out-editor: function [spec [block!] /styles sheet [map! none!]] [	;-- only used to pass styles down to content/document
+		doc: first lay-out-vids/styles compose/only [document (spec)] sheet
+		compose [content: (doc)]
+	]
+
 	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
 		unless doc/caret/parent [render doc/caret]
@@ -802,6 +807,7 @@ context [
 	;@@ pageup/down keys events
 	declare-template 'editor/scrollable [
 		content: make-space 'document []
+		content-flow: 'planar
 	]
 ]
 
@@ -841,6 +847,13 @@ define-styles [
 		below: [(underbox size 2 5)]
 	]
 	; document: [below: [push [pen off fill-pen box 0x0 (size)]]]
+]
+
+extend VID/styles reshape [
+	editor [
+		template: editor
+		layout: !(in doc-ctx 'lay-out-editor)
+	]
 ]
 
 ;; basic editing functions mandatory for every editor widget

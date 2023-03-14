@@ -122,11 +122,7 @@ insert-grid: function [] [
 		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
 		for-each xy size [
-			grid/content/:xy: first lay-out-vids [
-				editor with [
-					content/content: lay-out-vids [rich-content []]	;@@ simplify this!
-				]
-			]
+			grid/content/:xy: first lay-out-vids [editor [rich-content []]]
 		]
 		doc/edit [insert grid]
 	] 
@@ -373,34 +369,32 @@ view reshape [
 				icon [image 30x20 data= icons/lists/bullet  ] on-click [tools/bulletify-selected doc]
 				attr "▦" on-click [insert-grid]
 			]
-			editor 50x50 .. 500x300 with [
-				set 'doc content
-				content/content: lay-out-vids [
-					style code: rich-content ;font= code-font
-					code [bold font: "Consolas" "block ["]
-					code [bold font: "Consolas" "    of wrapped long long long code"]
-					code [bold font: "Consolas" "]"]
-					code [
-						"12"
-						@(lay-out-vids [
-							clickable command= [print 34] [
-								rich-content [underline bold "34" /bold /underline]
-							]
-						])
-						"56"
-					]
-					rich-content [
-						!(make-space 'bullet [])		;@@ need control over bullet font/size 
-						@(lay-out-vids [
-							rich-content [!(copy skip lorem 200)]
-						])
-					] indent= [first: 0 rest: 15]
-					rich-content [
-						!(make-space 'bullet [])
-						!(copy skip lorem 220)
-					] indent= [first: 0 rest: 15]
-				] ;with [watch 'size] 
-			]
+			editor: editor 50x50 .. 500x300 [
+				style code: rich-content ;font= code-font
+				code [bold font: "Consolas" "block ["]
+				code [bold font: "Consolas" "    of wrapped long long long code"]
+				code [bold font: "Consolas" "]"]
+				code [
+					"12"
+					@(lay-out-vids [
+						clickable command= [print 34] [
+							rich-content [underline bold "34" /bold /underline]
+						]
+					])
+					"56"
+				]
+				rich-content [
+					!(make-space 'bullet [])		;@@ need control over bullet font/size 
+					@(lay-out-vids [
+						rich-content [!(copy skip lorem 200)]
+					])
+				] indent= [first: 0 rest: 15]
+				rich-content [
+					!(make-space 'bullet [])
+					!(copy skip lorem 220)
+				] indent= [first: 0 rest: 15]
+			] ;with [watch 'size] 
+			do [set 'doc editor/content]
 		]
 	] ;with [watch in parent 'offset]
 ]
