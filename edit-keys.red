@@ -59,7 +59,7 @@ context [
 					compose [(deselect?) (action) (distance)]
 				] 
 				delete backspace [compose [(action) (distance)]]
-				#"A" [[select all]]
+				#"A" [[select 'all]]
 				#"C" [[copy 'selected]]
 				#"X" [[copy 'selected  remove 'selected]]
 				#"V" [[remove 'selected  paste]]
