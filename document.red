@@ -436,7 +436,7 @@ doc-ctx: context [
 		do update
 		case [
 			string? data [data: paint-string doc data]
-			space?  data [data: make rich-text-span! compose/deep [data: [(data) 0]]]
+			space?  data [probe data: make rich-text-span! compose/deep [data: [(data) 0]]]
 			not find [rich-text-span rich-text-block] data/name [	;-- unsupported clipboard format (incl. text) inserted as text
 				data: paint-string doc data/format
 			]
@@ -779,9 +779,10 @@ rich-text-block!: make rich-text-span! [
 	data:   []
 	length: does [max 0 (length? data) - 1 + sum map-each item data [item/measure [length]]]
 	format: does [to {} map-each/eval item data [[when in item 'format (item/format) #"^/"]]]
+	copy:   function [] [remake rich-text-block! [data: (system/words/copy data)]]
 	clone:  function [] [
 		data: map-each item self/data [when select item 'clone (item/clone)]
-		make rich-text-block! compose/only [data: (data)]
+		remake rich-text-block! [data: (data)]
 	]
 ]
 

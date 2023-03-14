@@ -16,6 +16,7 @@ request-url: function [
 	"Show a dialog to request URL input"
 	/from url "Initial (default) result"
 ][
+	focus:  keyboard/focus								;-- remember focus (changed by new window)
 	view/flags [
 		title "Enter an URL"
 		host [
@@ -33,10 +34,12 @@ request-url: function [
 			]
 		]
 	] 'modal
+	focus-space focus									;@@ TODO: need separate focus per window!
 	url
 ]
 
 request-grid-size: function [] [
+	focus:  keyboard/focus								;-- remember focus (changed by new window)
 	accept: [if pair? attempt [loaded: load entry/text] [unview result: loaded]]
 	view/flags [
 		title "Enter desired grid size"
@@ -55,6 +58,7 @@ request-grid-size: function [] [
 			]
 		]
 	] 'modal
+	focus-space focus									;@@ TODO: need separate focus per window!
 	result
 ]
 
@@ -120,8 +124,7 @@ insert-grid: function [] [
 		for-each xy size [
 			grid/content/:xy: first lay-out-vids [document [rich-content ["123"]]]
 		]
-		data: reduce [reduce [grid] #()]
-		doc/edit [insert data]
+		doc/edit [insert grid]
 	] 
 ] 
 
@@ -337,7 +340,6 @@ view reshape [
 						] [insert url https://]
 						tools/linkify doc range compose [browse (as url! url)]
 					]
-					focus-space doc						;-- focus was destroyed by request-url
 				] 
 				attr "[c]" font= make code-font [size: 20] on-click [codify]
 				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 

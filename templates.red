@@ -1769,12 +1769,12 @@ rich-text-span!: make clipboard/text! [
 			when in item 'format (item/format)
 		]
 	]
-	;; spaces are cloned so they become "data", not active objects that can change inside clipboard
+	copy:  does [remake rich-text-span! [data: (system/words/copy data)]]
 	clone: function [] [
 		data: map-each/eval [item [object!] code] self/data [
 			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
 		]
-		make rich-text-span! compose/only [data: (data)]
+		remake rich-text-span! [data: (data)]
 	]
 ]
 

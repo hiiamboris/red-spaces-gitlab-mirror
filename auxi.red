@@ -439,9 +439,9 @@ wrap: func [
 	reduce [:value]
 ]
 
-; remake: function [proto [object! datatype!] spec [block!]] [
-	; construct/only/with compose/only spec proto
-; ]
+remake: function [proto [object! datatype!] spec [block!]] [
+	construct/only/with compose/only spec proto
+]
 
 area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
 span?: func [xy [pair!]] [abs xy/y - xy/x]				;@@ or range? but range? tests for range! class
