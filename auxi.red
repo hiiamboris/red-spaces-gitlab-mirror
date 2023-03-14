@@ -1020,8 +1020,8 @@ foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 ;; O(1) remove that doesn't preserve the order (useful for hashes)
 fast-remove: function [block [any-block!] length [integer!]] [
 	last-entry: skip tail block negate length
-	unless block =? last-entry [change block other]
-	clear other
+	unless block =? last-entry [change block last-entry]
+	clear last-entry
 ]
 
 ;@@ extend & expand are taken already, maybe prolong?
