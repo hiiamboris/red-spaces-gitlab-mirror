@@ -122,7 +122,11 @@ insert-grid: function [] [
 		grid: remake-space 'grid [bounds: (size)]
 		grid/heights/min: 20
 		for-each xy size [
-			grid/content/:xy: first lay-out-vids [document [rich-content ["123"]]]
+			grid/content/:xy: first lay-out-vids [
+				editor with [
+					content/content: lay-out-vids [rich-content []]	;@@ simplify this!
+				]
+			]
 		]
 		doc/edit [insert grid]
 	] 
@@ -276,6 +280,22 @@ tools: context [
 	]
 	
 ]
+
+define-handlers [
+	editor: extends 'editor [
+		document: extends 'editor/document [
+			on-key [doc path event] [
+				if find [#"^/" #"^M"] event/key [
+					tools/auto-bullet-caret doc
+				]
+			]
+		]
+	]
+]
+
+;@@ need styles for document(there) and editor(here)
+; extend VID/styles [
+; ]
 	
 view reshape [
 	host 500x400 [
@@ -353,9 +373,10 @@ view reshape [
 				icon [image 30x20 data= icons/lists/bullet  ] on-click [tools/bulletify-selected doc]
 				attr "▦" on-click [insert-grid]
 			]
-			scrollable [
-				style code: rich-content ;font= code-font
-				doc: document focus [
+			editor 50x50 .. 500x300 with [
+				set 'doc content
+				content/content: lay-out-vids [
+					style code: rich-content ;font= code-font
 					code [bold font: "Consolas" "block ["]
 					code [bold font: "Consolas" "    of wrapped long long long code"]
 					code [bold font: "Consolas" "]"]
@@ -379,49 +400,6 @@ view reshape [
 						!(copy skip lorem 220)
 					] indent= [first: 0 rest: 15]
 				] ;with [watch 'size] 
-				on-down [
-					space/selected: none
-					if caret: doc-ctx/point->caret space path/2 [
-						set with space/caret [offset side] reduce [caret/offset caret/side]
-						start-drag/with path copy caret
-					]
-				] on-up [
-					stop-drag
-				] on-over [
-					;@@ need switchable behavior - drag content or select it, /editable flag may control it
-					if dragging?/from space [
-						if caret: doc-ctx/point->caret space path/2 [
-							start: drag-parameter
-							space/selected: start/offset by caret/offset
-							set with space/caret [offset side] reduce [caret/offset caret/side]
-						]
-					]
-				] on-key [
-					case [
-						is-key-printable? event [
-							space/edit key->plan event space/selected
-						]
-						event/key = #"^-" [
-							either all [doc/selected 0 < span? doc/selected] [
-								indent 20 * pick [-1 1] event/shift?
-							][
-								;@@ tabs support is "accidental" for now - only correct within a single text span
-								;@@ if something splits the text, it's incorrect - need special case for it in paragraph layout
-								space/edit [insert "^-"]
-							]
-							stop
-						]
-					]
-				] on-key-down [
-					unless is-key-printable? event [
-						switch/default event/key [
-							#"^M" #"^/" [doc/edit [select 'none  insert "^/"] tools/auto-bullet-caret doc]
-						][
-							space/edit key->plan event space/selected
-						]
-					]
-				]
-				on-focus [invalidate space] on-unfocus [invalidate space]	;-- shows/hides caret
 			]
 		]
 	] ;with [watch in parent 'offset]

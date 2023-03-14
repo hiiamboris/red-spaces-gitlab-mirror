@@ -122,6 +122,10 @@ doc-ctx: context [
 				para/measure [length]
 		]
 		
+		point->caret: function ["Get info for caret location closest to given point" point [pair!]] with :measure [
+			~/point->caret doc point
+		]
+		
 		caret->paragraph: function ["Get paragraph and it's range at given offset" offset [integer!]] with :measure [
 			if set [para: pofs: plen:] ~/caret->paragraph doc offset [
 				reduce [para 0 by plen + pofs]			;@@ use range for the other func too?
@@ -836,10 +840,72 @@ define-styles [
 		font: code-font
 		below: [(underbox size 2 5)]
 	]
-	document: [
-		below: [push [pen off fill-pen green box 0x0 (size)]]
+	; document: [below: [push [pen off fill-pen box 0x0 (size)]]]
+]
+
+;; basic editing functions mandatory for every editor widget
+;@@ move out?
+define-handlers [
+	editor: extends 'scrollable [
+		document: [
+			;@@ need dragging when click is on selected area
+			;@@ need selection to work on any document, not just in the editor (or pan it instead?)
+			;@@ maybe some modularity is required to select what feature does what, e.g. /config or /options facet
+			on-down [doc path event] [
+				doc/selected: none
+				caret: doc/measure [point->caret path/2]
+				if caret [
+					set with doc/caret [offset side] reduce [caret/offset caret/side]
+					start-drag/with path copy caret
+				]
+			]
+			on-up [doc path event] [
+				stop-drag
+			]
+			;@@ need double-click selection mode (whole words)
+			on-over [doc path event] [
+				if dragging?/from doc [
+					caret: doc/measure [point->caret path/2]
+					if caret [
+						start: drag-parameter
+						doc/selected: start/offset by caret/offset
+						set with doc/caret [offset side] reduce [caret/offset caret/side]
+					]
+				]
+			]
+			on-key [doc path event] [
+				case [
+					is-key-printable? event [
+						doc/edit key->plan event doc/selected
+					]
+					event/key = #"^-" [					;-- on tab - don't lose focus, insert tab char or reindent
+						either all [doc/selected 0 < span? doc/selected] [
+							indent 20 * pick [-1 1] event/shift?
+						][
+							;@@ tabs support is "accidental" for now - only correct within a single text span
+							;@@ if something splits the text, it's incorrect
+							;@@ need special case for it in paragraph layout, for which section size=0 is reserved
+							doc/edit [insert "^-"]
+						]
+					]
+					find [#"^M" #"^/"] event/key [		;-- enter is not handled by key->plan
+						unless event/ctrl? [			;-- ctrl+enter is probably some special key
+							doc/edit [select 'none  insert "^/"]
+						]
+					]
+				]
+			]
+			on-key-down [doc path event] [
+				if is-key-printable? event [exit]
+				doc/edit key->plan event doc/selected
+			]
+			;; these show/hide the caret - /draw will check if document is focused or not
+			on-focus   [doc path event] [invalidate doc]
+			on-unfocus [doc path event] [invalidate doc]
+		]
 	]
 ]
+
 
 
 ]
