@@ -54,7 +54,7 @@ context [
 				action: as path! reduce [action 'by]
 			]
 			switch/default key [
-				left right home end up down [
+				left right home end up down page-up page-down [
 					deselect?: when all [selected not event/shift?] [select 'none]
 					compose [(deselect?) (action) (distance)]
 				] 
