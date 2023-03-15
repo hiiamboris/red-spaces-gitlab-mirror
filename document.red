@@ -10,6 +10,8 @@ do/expand with spaces/ctx [
 doc-ctx: context [
 	~: self
 	
+	append keyboard/focusable 'document
+
 	;@@ scalability problem: convenience of integer caret/selection offsets leads to linear increase of caret-to-offset calculation
 	;@@ don't wanna optimize this prematurely but for big texts a b-tree index should be implemented
 	;@@ another unoptimized area is paragraph to caret offset calculation

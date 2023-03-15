@@ -7,11 +7,11 @@ Red [
 #include %everything.red
 #include %widgets/color-picker.red
 #include %document.red
-#include %document-toolbar.red
+#include %editor-toolbar.red
 
 do/expand with spaces/ctx [
 
-	;@@ pageup/down keys events
+;@@ pageup/down keys events
 
 ;; used for numbering paragraph lists
 declare-template 'bullet/text [
@@ -21,6 +21,7 @@ declare-template 'bullet/text [
 ]
 
 ;@@ can I make code templates generic enough to separate them?
+;@@ better names: code-span and code-block
 declare-template 'code/text []
 declare-template 'pre/paragraph []
 
@@ -43,39 +44,50 @@ underbox: function [
 code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
 
 define-styles [
-	;@@ leave only document style here!
-	code: using [pen] [	;@@ code-span?
+	code: using [pen] [
 		font: code-font
 		margin: 4x0
 		pen: when color (compose [pen (color)])
 		below: [(underbox size 1 3) (pen)]
 	]
-	;@@ how to name it better? code-paragraph? code-block?
 	pre: [
 		margin: 10
 		font: code-font
 		below: [(underbox size 2 5)]
 	]
+	
+	;; makes grid cells outline visible
+	grid: [
+		spacing: margin: 1x1
+		below: [
+			push [
+				pen off
+				fill-pen (opaque 'text 50%)
+				box 0x0 (size)
+			]
+		]
+	]
 ]
+
 
 ;@@ auto determine URLs during edit, after a space
 ;@@ need to build a generic requester instead of adhoc ones
 request-url: function [
 	"Show a dialog to request URL input"
-	/from url "Initial (default) result"
+	/from url [url!] "Initial (default) result"
 ][
-	focus:  keyboard/focus								;-- remember focus (changed by new window)
+	focus: keyboard/focus								;-- remember focus (changed by new window)
 	view/flags [
 		title "Enter an URL"
 		host [
 			vlist [
 				row [
 					text "URL:" entry: field 300 focus on-key [
-						if event/key = #"^M" [unview set 'url entry/text]
+						if event/key = #"^M" [unview set 'url as url! entry/text]
 					]
 				]
 				row [
-					button 80 "OK"     [unview set 'url entry/text]
+					button 80 "OK"     [unview set 'url as url! entry/text]
 					<->
 					button 80 "Cancel" [unview]
 				]
@@ -110,74 +122,9 @@ request-grid-size: function [] [
 	result
 ]
 
-font-20: make font! [size: 20]
 				
-define-styles [
-	grid: [
-		below: [
-			push [
-				pen off
-				fill-pen (opaque 'text 50%)
-				box 0x0 (size)
-			]
-		]
-	]
-]
-
 lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
-append keyboard/focusable 'document
-toggle-attr: function [name] [
-	either all [range: doc/selected  0 < span? range] [
-		old: doc-ctx/pick-attr doc 1 + range/1 name
-		doc/edit [mark range name not old]
-	][
-		old: rich/attributes/pick doc/paint name
-		rich/attributes/change doc/paint name not old
-	]
-	not old
-]
-realign: function [name] [
-	doc/edit [align name]
-]
-bulletify: function [] [
-	range: any [
-		doc/selected
-		1x1 * doc/caret/offset
-	]
-	doc-ctx/document/bulletify doc range
-]
-enumerate: function [] [
-	range: any [
-		doc/selected
-		1x1 * doc/caret/offset
-	]
-	doc-ctx/document/enumerate doc range
-]
-indent: function [offset [integer!]] [
-	doc/edit [indent offset]
-]
-codify: function [] [
-	if all [
-		range: doc/selected
-		range/1 <> range/2
-	][
-		tools/codify doc range
-		doc/selected: none
-	]
-]
-insert-grid: function [] [
-	if size: request-grid-size [
-		grid: remake-space 'grid [bounds: (size)]
-		grid/heights/min: 20
-		for-each xy size [
-			grid/content/:xy: ed: first lay-out-vids [editor]
-			ed/content/timeline: doc/timeline			;-- share undo/redo timeline
-		]
-		doc/edit [insert grid]
-	] 
-] 
-
-tools: context [
+editor-tools: context [
 	selected-range: function [doc [object!]] [
 		any [doc/selected  doc/caret/offset * 1x1]
 	]
@@ -199,12 +146,26 @@ tools: context [
 		extract doc/map-range range 2
 	]
 	
+	toggle-flag: function [
+		"Toggle the state of one of logic text attributes"
+		doc [object!] name [word!] (find [bold italic underline strike] name)
+	][
+		either zero? span? range: selected-range doc [
+			old: rich/attributes/pick doc/paint name
+			rich/attributes/change doc/paint name not old
+		][
+			old: doc-ctx/pick-attr doc 1 + range/1 name
+			doc/edit [mark range name not old]
+		]
+	]
+
 	linkify-data: function [data [block!] command [block!]] [
 		rich/attributes/mark data 'all 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this 
 		rich/attributes/mark data 'all 'underline on 
 		link: first lay-out-vids [clickable [rich-content data= data] command= command]
 		reduce [link 0]
 	]
+	
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
 	linkify: function [doc [object!] range [pair!] command [block!]] [
 		if range/1 = range/2 [exit]
@@ -224,6 +185,19 @@ tools: context [
 		]
 	]
 	
+	linkify-selected: function [doc [object!] command [word! (command = 'pick) block!]] [
+		if zero? span? range: selected-range [exit]
+		if command = 'pick [
+			if empty? url: request-url [exit]
+			unless any [
+				find/match url https://
+				find/match url http://
+			] [insert url https://]
+			command: compose [browse (url)]
+		]
+		linkify doc range command
+	]
+					
 	codify: function [doc [object!] range [pair!]] [
 		if range/1 = range/2 [exit]
 		slice: doc/edit [slice range]
@@ -236,6 +210,13 @@ tools: context [
 		doc/edit [
 			remove range
 			insert/at code range/1
+		]
+	]
+	
+	codify-selected: function [doc [object!]] [
+		unless zero? span? range: selected-range [
+			codify doc range
+			doc/selected: none
 		]
 	]
 	
@@ -324,100 +305,66 @@ tools: context [
 		foreach para next list [auto-bullet doc para]
 	]
 	
-]
+	insert-grid: function [doc [object!] size [word! (size = 'pick) pair!]] [
+		if size = 'pick [size: request-grid-size]
+		unless size [exit]
+		grid: remake-space 'grid [bounds: (size)]
+		for-each xy size [
+			grid/content/:xy: cell: first lay-out-vids [editor]
+			cell/content/timeline: doc/timeline			;-- share undo/redo timeline
+		]
+		doc/edit [insert grid]
+	]
+	
+	change-selected-font: function [doc [object!] font [word! (font = 'pick) none! object!]] [ 
+		if font = 'pick [font: request-font]
+		default font: [name: #[none] size: #[none]]
+		either zero? span? range: selected-range [
+			rich/attributes/mark paint 1 0x1 'font font/name
+			rich/attributes/mark paint 1 0x1 'size font/size
+		][
+			doc/edit [
+				mark range 'font font/name
+				mark range 'size font/size
+				foreach style compose [(only font/style)] [
+					doc/mark range style on
+				]
+			]
+		]
+	]
+	
+	change-selected-color: function [doc [object!] color [word! (color = 'pick) none! tuple!]] [ 
+		selected?: zero? span? range: selected-range
+		if color = 'pick [
+			old: either selected?
+				[doc-ctx/pick-attr doc 1 + range/1 'color]
+				[rich/attributes/pick doc/paint 'color]
+			color: request-color/from old
+		]
+		either selected?
+			[doc/edit [mark range 'color color]]
+			[rich/attributes/mark doc/paint 1 0x1 'color color]
+		focus-space doc									;-- focus was destroyed by request-color ;@@ FIX it
+	]
+	
+];editor-tools: context [
 
 define-handlers [
 	editor: extends 'editor [
 		document: extends 'editor/document [
 			on-key [doc path event] [
 				if find [#"^/" #"^M"] event/key [
-					tools/auto-bullet-caret doc
+					editor-tools/auto-bullet-caret doc
 				]
 			]
 		]
 	]
 ]
 
-;@@ need styles for document(there) and editor(here)
-; extend VID/styles [
-; ]
-	
 view reshape [
-	host 500x400 [
+	host 640x400 [
 		vlist [
-			row tight weight= 0 [
-				; drop-button data= "Font" font= font-20 color= none
-					; on-over [space/color: if path/2 inside? space [opaque 'text 20%]]
-				style attr: data-clickable 0 .. none weight= 0 margin= 4x2 font= font-20 color= none
-					on-over [space/color: if path/2 inside? space [opaque 'text 20%]]
-				style icon: clickable 0 .. none weight= 0 margin= 5x10 font= font-20 color= none
-					on-over [space/color: if path/2 inside? space [opaque 'text 20%]]
-				attr "B" bold on-click [toggle-attr 'bold]
-				attr "U" underline [toggle-attr 'underline]
-				attr "i" italic [toggle-attr 'italic]
-				attr "S" strike [toggle-attr 'strike]
-				attr "𝓕⏷" flags= [1x1 bold] on-click [
-					if font: request-font [
-						either all [
-							range: doc/selected
-							range/1 <> range/2
-						][
-							doc/edit [
-								mark range 'font font/name
-								mark range 'size font/size
-								foreach style compose [(only font/style)] [
-									doc/mark range style on
-								]
-							]
-						][
-							rich/attributes/mark paint 1 0x1 'font font/name
-							rich/attributes/mark paint 1 0x1 'size font/size
-						]
-					]
-				]
-				; attr "code"							;@@ need inline code and code span (maybe smart) formatter, similar to linkify
-				attr "🎨⏷" on-click [
-					either all [
-						range: doc/selected
-						range/1 <> range/2
-					][
-						old: doc-ctx/pick-attr doc 1 + range/1 'color
-						if color: request-color/from old [
-							color: if old <> color [color]		;-- resets color if the same one applied
-							doc/edit [mark range 'color color]
-						]
-					][
-						old: rich/attributes/pick doc/paint 1 'color
-						color: request-color/from old
-						rich/attributes/mark doc/paint 1 0x1 'color color
-					]
-					focus-space doc						;-- focus was destroyed by request-color
-				]
-				attr "🔗" on-click [
-					if all [
-						range: doc/selected
-						range/1 <> range/2
-						not empty? url: request-url
-					][
-						unless any [
-							find/match url https://
-							find/match url http://
-						] [insert url https://]
-						tools/linkify doc range compose [browse (as url! url)]
-					]
-				] 
-				attr "[c]" font= make code-font [size: 20] on-click [codify]
-				; attr content= probe first lay-out-vids [image 30x20 data= icons/aligns/left] 
-				attr "⤆" on-click [indent -20]
-				attr "⤇" on-click [indent  20]
-				icon [image 24x20 data= icons/aligns/fill   ] on-click [realign 'fill]
-				icon [image 24x20 data= icons/aligns/left   ] on-click [realign 'left] 
-				icon [image 24x20 data= icons/aligns/center ] on-click [realign 'center]
-				icon [image 24x20 data= icons/aligns/right  ] on-click [realign 'right]
-				icon [image 30x20 data= icons/lists/numbered] on-click [tools/enumerate-selected doc]
-				icon [image 30x20 data= icons/lists/bullet  ] on-click [tools/bulletify-selected doc]
-				attr "▦" on-click [insert-grid]
-			]
+			editor-toolbar
 			editor: editor 50x50 .. 500x300 [
 				style code: rich-content ;font= code-font
 				code [bold font: "Consolas" "block ["]

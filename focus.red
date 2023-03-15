@@ -20,6 +20,7 @@ keyboard: object [
 
 	focus: []	;-- a path (descending list of spaces)
 	;@@ DOC: focus is a path because we want to be able to go up the tree when tabbing
+	;@@ but now that there's a /parent facet it will be easier to just use a space!
 
 	history: []	;-- previous focus paths, including current
 	;@@ DOC: history is used when focused face is no longer there
