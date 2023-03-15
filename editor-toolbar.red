@@ -109,7 +109,7 @@ extend VID/styles reshape [
 			attr "𝓕⏷"         [editor-tools/change-selected-font last-focused-document 'pick] flags= [1x1 bold] hint="Change font"
 			attr "🎨⏷"         [editor-tools/change-selected-color last-focused-document 'pick] hint="Change color"
 			attr "🔗"          [editor-tools/linkify-selected last-focused-document 'pick] hint="Convert into an URL"
-			attr "[c]"         [editor-tools/codify last-focused-document] font= make code-font [size: 20] hint="Convert into code"
+			attr "[c]"         [editor-tools/codify-selected last-focused-document] font= make code-font [size: 20] hint="Convert into code"
 			attr "⤆"           [last-focused-document/edit [indent -20]]                   hint="Decrease indentation"
 			attr "⤇"           [last-focused-document/edit [indent  20]]                   hint="Increase indentation"
 			attr "▦"           [editor-tools/insert-grid last-focused-document 'pick]      hint="Insert table"

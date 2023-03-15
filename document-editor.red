@@ -186,7 +186,7 @@ editor-tools: context [
 	]
 	
 	linkify-selected: function [doc [object!] command [word! (command = 'pick) block!]] [
-		if zero? span? range: selected-range [exit]
+		if zero? span? range: selected-range doc [exit]
 		if command = 'pick [
 			if empty? url: request-url [exit]
 			unless any [
@@ -214,7 +214,7 @@ editor-tools: context [
 	]
 	
 	codify-selected: function [doc [object!]] [
-		unless zero? span? range: selected-range [
+		unless zero? span? range: selected-range doc [
 			codify doc range
 			doc/selected: none
 		]
@@ -319,7 +319,7 @@ editor-tools: context [
 	change-selected-font: function [doc [object!] font [word! (font = 'pick) none! object!]] [ 
 		if font = 'pick [font: request-font]
 		default font: [name: #[none] size: #[none]]
-		either zero? span? range: selected-range [
+		either zero? span? range: selected-range doc [
 			rich/attributes/mark paint 1 0x1 'font font/name
 			rich/attributes/mark paint 1 0x1 'size font/size
 		][
@@ -334,7 +334,7 @@ editor-tools: context [
 	]
 	
 	change-selected-color: function [doc [object!] color [word! (color = 'pick) none! tuple!]] [ 
-		selected?: zero? span? range: selected-range
+		selected?: zero? span? range: selected-range doc
 		if color = 'pick [
 			old: either selected?
 				[doc-ctx/pick-attr doc 1 + range/1 'color]
