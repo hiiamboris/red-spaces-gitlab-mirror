@@ -101,27 +101,25 @@ extend VID/styles reshape [
 	editor-toolbar [
 		template: tube
 		spec:     [axes: [e s] weight: 0]
-		payload:  [
-			[
-				attr "B" bold on-click [editor-tools/toggle-flag last-focused-document 'bold]
-				attr "U" underline [editor-tools/toggle-flag last-focused-document 'underline]
-				attr "i" italic [editor-tools/toggle-flag last-focused-document 'italic]
-				attr "S" strike [editor-tools/toggle-flag last-focused-document 'strike]
-				attr "𝓕⏷" flags= [1x1 bold] on-click [editor-tools/change-selected-font last-focused-document 'pick]
-				attr "🎨⏷" on-click [editor-tools/change-selected-color last-focused-document 'pick]
-				attr "🔗" on-click [editor-tools/linkify-selected last-focused-document 'pick]
-				attr "[c]" font= make code-font [size: 20] on-click [editor-tools/codify last-focused-document]
-				attr "⤆" on-click [last-focused-document/edit [indent -20]]
-				attr "⤇" on-click [last-focused-document/edit [indent  20]]
-				icon [image 24x20 data= icons/aligns/fill   ] on-click [last-focused-document/edit [align 'fill]]
-				icon [image 24x20 data= icons/aligns/left   ] on-click [last-focused-document/edit [align 'left]] 
-				icon [image 24x20 data= icons/aligns/center ] on-click [last-focused-document/edit [align 'center]]
-				icon [image 24x20 data= icons/aligns/right  ] on-click [last-focused-document/edit [align 'right]]
-				icon [image 30x20 data= icons/lists/numbered] on-click [editor-tools/enumerate-selected last-focused-document]
-				icon [image 30x20 data= icons/lists/bullet  ] on-click [editor-tools/bulletify-selected last-focused-document]
-				attr "▦" on-click [editor-tools/insert-grid last-focused-document 'pick]
-			]
-		]
+		payload:  [[
+			attr "B" bold      [editor-tools/toggle-flag last-focused-document 'bold]      hint="Toggle bold"
+			attr "U" underline [editor-tools/toggle-flag last-focused-document 'underline] hint="Toggle underline"
+			attr "i" italic    [editor-tools/toggle-flag last-focused-document 'italic]    hint="Toggle italic"
+			attr "S" strike    [editor-tools/toggle-flag last-focused-document 'strike]    hint="Toggle strikethrough"
+			attr "𝓕⏷"         [editor-tools/change-selected-font last-focused-document 'pick] flags= [1x1 bold] hint="Change font"
+			attr "🎨⏷"         [editor-tools/change-selected-color last-focused-document 'pick] hint="Change color"
+			attr "🔗"          [editor-tools/linkify-selected last-focused-document 'pick] hint="Convert into an URL"
+			attr "[c]"         [editor-tools/codify last-focused-document] font= make code-font [size: 20] hint="Convert into code"
+			attr "⤆"           [last-focused-document/edit [indent -20]]                   hint="Decrease indentation"
+			attr "⤇"           [last-focused-document/edit [indent  20]]                   hint="Increase indentation"
+			attr "▦"           [editor-tools/insert-grid last-focused-document 'pick]      hint="Insert table"
+			icon [image 24x20 data= icons/aligns/fill   ] on-click [last-focused-document/edit [align 'fill]]   hint="Align to fill the row"
+			icon [image 24x20 data= icons/aligns/left   ] on-click [last-focused-document/edit [align 'left]]   hint="Align to the left"
+			icon [image 24x20 data= icons/aligns/center ] on-click [last-focused-document/edit [align 'center]] hint="Align to the center"
+			icon [image 24x20 data= icons/aligns/right  ] on-click [last-focused-document/edit [align 'right]]  hint="Align to the right"
+			icon [image 30x20 data= icons/lists/numbered] on-click [editor-tools/enumerate-selected last-focused-document] hint="Numbered list"
+			icon [image 30x20 data= icons/lists/bullet  ] on-click [editor-tools/bulletify-selected last-focused-document] hint="Unordered list"
+		]]
 	]
 	
 ]; extend VID/styles [
