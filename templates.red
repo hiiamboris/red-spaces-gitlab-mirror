@@ -499,7 +499,7 @@ scrollable-space: context [
 		box: space/viewport
 		mrg: clip 0x0 mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
 		xy1: mrg - space/origin							;-- left top margin point in content's coordinates
-		xy2: xy1 + box - mrg							;-- right bottom margin point
+		xy2: xy1 + box - (mrg * 2)						;-- right bottom margin point
 		dxy: 0x0
 		foreach x [x y] [
 			case [
