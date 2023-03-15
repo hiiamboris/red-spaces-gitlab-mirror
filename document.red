@@ -123,6 +123,15 @@ doc-ctx: context [
 			]
 		]
 		
+		caret->box: function ["Get box [xy1 xy2] of the caret at given offset" offset [integer!] side [word!]] with :measure [
+			all [
+				set [para: prange:] caret->paragraph offset
+				geom: select/same doc/map para
+				box: para/measure [caret->box offset - prange/1 side]
+				map-each xy box [geom/offset + xy]
+			]
+		]
+		
 		find-prev-word: function ["Get offset of the previous word's start"] with :measure [
 			set [para: pofs: plen:] ~/caret->paragraph doc offset: doc/caret/offset
 			while [offset <= pofs] [					;-- switch to previous paragraph (maybe multiple times)
@@ -154,12 +163,12 @@ doc-ctx: context [
 			caret-row-shift doc doc/caret/offset doc/caret/side 'down 0
 		]
 		
-		; find-page-above: function ["Get caret (offset, side) one page above"] with :measure [
-			; caret-page-shift doc doc/caret/offset doc/caret/side 'up
-		; ]
-		; find-page-below: function ["Get caret (offset, side) one page below"] with :measure [
-			; caret-page-shift doc doc/caret/offset doc/caret/side 'down
-		; ]
+		find-page-above: function ["Get caret (offset, side) one page above"] with :measure [
+			caret-row-shift doc doc/caret/offset doc/caret/side 'up doc/page-size
+		]
+		find-page-below: function ["Get caret (offset, side) one page below"] with :measure [
+			caret-row-shift doc doc/caret/offset doc/caret/side 'down doc/page-size
+		]
 	]
 	
 	
@@ -333,8 +342,8 @@ doc-ctx: context [
 			next-word [doc/measure [find-next-word]]
 			line-up   [doc/measure [find-line-above]]
 			line-down [doc/measure [find-line-below]]
-			; page-up   [doc/measure [find-page-above]]			;@@ these need to know page size
-			; page-down [doc/measure [find-page-below]]
+			page-up   [doc/measure [find-page-above]]			;@@ these need to know page size
+			page-down [doc/measure [find-page-below]]
 		] [offset]										;-- on unknown anchors assume current offset
 	]
 		
@@ -640,6 +649,7 @@ doc-ctx: context [
 		]
 		shift: 0 by (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
 		xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
+		xy: clip xy 0x0 doc/size - 0x1
 		caret': point->caret doc xy
 		if caret' [										;-- may be none if outside the document
 			limits: either dir = 'down					;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
@@ -737,11 +747,15 @@ doc-ctx: context [
 	
 	;@@ should it support /items override? what will be the use case? spoilers? (for now length accounts for every paragraph)
 	declare-template 'document/list [
-		content: []		#type :on-content-change
-		axis:   'y		#type (axis = 'y)				;-- protected
-		spacing: 5
+		content:   []		#type :on-content-change
+		axis:     'y		#type (axis = 'y)				;-- protected
+		spacing:   5
+		page-size: function [] [
+			vp: any [all [parent parent/viewport] 0x0]		;@@ REP 113
+			max 0 to integer! vp/y * 90%
+		] #type [integer! function!] (page-size >= 0)		;-- needs access to the parent viewport
 		
-		length:   0		#type [integer!]				;-- read-only, auto-updated on edits
+		length:   0			#type [integer!]				;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none				#type [pair! none!] :on-selected-change
 		timeline: copy timeline!	#type [object!]
@@ -777,6 +791,21 @@ doc-ctx: context [
 		list-draw: :draw
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
+	
+	declare-template 'editor/scrollable [
+		content: make-space 'document [
+			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
+		]
+		content-flow: 'planar
+		adjust-origin: function [] [
+			doc: content
+			cbox: doc/measure [caret->box doc/caret/offset doc/caret/side]
+			if cbox [
+				height: cbox/2/y - cbox/1/y
+				move-to/margin (cbox/1 + cbox/2 / 2) 0 by height / 2 + 30
+			]
+		]
+	]
 ]
 
 
@@ -798,16 +827,6 @@ rich-text-block!: make rich-text-span! [
 	clone:  function [] [
 		data: map-each item self/data [when select item 'clone (item/clone)]
 		remake rich-text-block! [data: (data)]
-	]
-]
-
-
-context [
-	declare-template 'editor/scrollable [
-		content: make-space 'document [
-			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
-		]
-		content-flow: 'planar
 	]
 ]
 
@@ -866,11 +885,13 @@ define-handlers [
 			on-key-down [doc path event] [
 				if is-key-printable? event [exit]
 				doc/edit key->plan event doc/selected
+				editor: path/-1
+				editor/adjust-origin					;-- move the viewport to make caret visible
 			]
 			;; these show/hide the caret - /draw will check if document is focused or not
 			on-focus   [doc path event] [invalidate doc]
 			on-unfocus [doc path event] [invalidate doc]
-		]
-	]
-];doc-ctx: context [
-];do/expand with spaces/ctx [
+		]; document: [
+	]; editor: extends 'scrollable [
+]; doc-ctx: context [
+]; do/expand with spaces/ctx [
