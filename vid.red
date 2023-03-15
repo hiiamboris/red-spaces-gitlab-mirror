@@ -19,136 +19,142 @@ VID: context [
 		; ]
 	; ]
 	
-	#local [
-		;; these help avoid repetition:
-		#macro [#spacious] func [s e] [[ margin: spacing: 10x10 ]]
-		#macro [#tight]    func [s e] [[ tight [margin: spacing: 0x0] ]]
-		#macro [#align]    func [s e] [[				;-- used by box and tube
+	;; these help avoid repetition:
+	props: #(
+		spacious [margin: spacing: 10x10]
+		tight    [tight [margin: spacing: 0x0]]
+		align [											;-- used by box and tube
 			left   [align/x: -1]
 			right  [align/x:  1]
 			center [align/x:  0]
 			top    [align/y: -1]
 			bottom [align/y:  1]
 			middle [align/y:  0]
-		]]
-		#macro [#text-align]  func [s e] [[				;-- used by rich-paragraph and co
+		]
+		text-align [									;-- used by rich-paragraph and co
 			left   [align: 'left]
 			center [align: 'center]
 			right  [align: 'right]
 			fill   [align: 'fill]
-		]]
-		#macro [#font-styles] func [s e] [[
+		]
+		font-styles [
 			bold      [flags: append flags 'bold]
 			italic    [flags: append flags 'italic]
 			underline [flags: append flags 'underline]
 			strike    [flags: append flags 'strike]
 			ellipsize [flags: append flags 'ellipsize]
 			; wrap      [flags: append flags 'wrap]		;-- no wrap flag by design, choose text vs paragraph instead 
-		]]
+		]
+	)
 		
-		;; specifications for VID/S styles available in `lay-out-vids`
-		styles: make map! reshape [
-			scrollable [
-				template: scrollable
-				facets:   [
-					vertical   [content-flow: 'vertical]
-					horizontal [content-flow: 'horizontal]
-				]
+	;; specifications for VID/S styles available in `lay-out-vids`
+	styles: make map! reshape [
+		scrollable [
+			template: scrollable
+			facets:   [
+				vertical   [content-flow: 'vertical]
+				horizontal [content-flow: 'horizontal]
 			]
-			hlist [
-				template: list
-				spec:     [#spacious axis: 'x]
-				facets:   [#tight]						;@@ all these should be maps, but see REP #111
+		]
+		hlist [
+			template: list
+			spec:     [@(props/spacious) axis: 'x]
+			facets:   [@(props/tight)]					;@@ all these should be maps, but see REP #111
+		]
+		vlist [
+			template: list
+			spec:     [@(props/spacious) axis: 'y]
+			facets:   [@(props/tight)]
+		]
+		row [
+			template: tube
+			spec:     [@(props/spacious) axes: [e s]]
+			facets:   [@(props/tight) @(props/align)]
+		]
+		column [
+			template: tube
+			spec:     [@(props/spacious) axes: [s e]]
+			facets:   [@(props/tight) @(props/align)]
+		]
+		list-view [										;@@ is there ever a need for horizontal list-view?
+			template: list-view
+			spec:     [list/spacing: 5x5 list/axis: 'y]
+			facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
+		]
+		label [
+			template: label
+			spec:     [limits: 80 .. none]
+			facets:   [
+				image!  image
+				char!   image
+				string! text
+				@(props/font-styles)
 			]
-			vlist [
-				template: list
-				spec:     [#spacious axis: 'y]
-				facets:   [#tight]
+		]
+		paragraph [template: paragraph facets: [string! text @(props/font-styles)]]
+		text   [template: text   facets: [string! text @(props/font-styles)]]
+		link   [template: link   facets: [string! text url! text block! command]]
+		button [
+			template: button
+			facets: [string! data image! data block! command @(props/font-styles)]
+			spec: [limits: 40 .. none]
+		]
+		data-clickable [
+			template: data-clickable
+			facets: [string! data image! data block! command @(props/font-styles)]
+		]
+		field  [
+			template: field
+			facets: [string! text @(props/font-styles)]
+			;@@ unfortunately without deep reactivity there's no way changes in caret can be recognized in owning field
+			;@@ so any reactions placed upon field/caret/stuff will not fire unless I explicitly make caret reactive
+			;@@ #4529 could solve this for all spaces
+			spec: [
+				insert body-of :caret/on-change*
+					with [caret :caret/on-change*] [			;-- newlines are imporant here for mold readability
+						system/reactivity/check/only self word
+					]
 			]
-			row [
-				template: tube
-				spec:     [#spacious axes: [e s]]
-				facets:   [#tight #align]
+		]
+		rich-paragraph [
+			template: rich-paragraph
+			facets:   [percent! baseline @(props/text-align)]
+		]
+		rich-content [
+			template: rich-content
+			facets: [
+				percent! baseline
+				block! !(func [block] [reduce ['decode block]])	;-- high level source dialect support for VID
+				@(props/text-align)
 			]
-			column [
-				template: tube
-				spec:     [#spacious axes: [s e]]
-				facets:   [#tight #align]
-			]
-			list-view [									;@@ is there ever a need for horizontal list-view?
-				template: list-view
-				spec:     [list/spacing: 5x5 list/axis: 'y]
-				facets:   [tight [list/margin: list/spacing: 0x0]]	;-- different from #tight macro
-			]
-			label [
-				template: label
-				spec:     [limits: 80 .. none]
-				facets:   [
-					image!  image
-					char!   image
-					string! text
-					#font-styles
-				]
-			]
-			paragraph [template: paragraph facets: [string! text #font-styles]]
-			text   [template: text   facets: [string! text #font-styles]]
-			link   [template: link   facets: [string! text url! text block! command]]
-			button [template: button facets: [string! data image! data block! command #font-styles] spec: [limits: 40 .. none]]
-			data-clickable [template: data-clickable facets: [string! data image! data block! command #font-styles] spec: [limits: 40 .. none]]
-			field  [
-				template: field
-				facets: [string! text #font-styles]
-				;@@ unfortunately without deep reactivity there's no way changes in caret can be recognized in owning field
-				;@@ so any reactions placed upon field/caret/stuff will not fire unless I explicitly make caret reactive
-				;@@ #4529 could solve this for all spaces
-				spec: [
-					insert body-of :caret/on-change*
-						with [caret :caret/on-change*] [		;-- newlines are imporant here for mold readability
-							system/reactivity/check/only self word
+		]
+		
+		box    [template: box    facets: [@(props/align)]]
+		cell   [template: cell   facets: [@(props/align)]]
+		timer [
+			template: timer
+			facets:   [
+				integer! rate
+				float!   rate
+				time!    rate
+				block!   !(func [block] [
+					compose/deep/only [
+						actors: object [
+							on-time: function [space path event delay] (block)
 						]
-				]
+					]
+				])
 			]
-			rich-paragraph [
-				template: rich-paragraph
-				facets:   [percent! baseline #text-align]
-			]
-			rich-content [
-				template: rich-content
-				facets: [
-					percent! baseline
-					block! !(func [block] [reduce ['decode block]])		;-- high level source dialect support for VID
-					#text-align
-				]
-			]
-			
-			box    [template: box    facets: [#align]]
-			cell   [template: cell   facets: [#align]]
-			timer [
-				template: timer
-				facets:   [
-					integer! rate
-					float!   rate
-					time!    rate
-					block!   !(func [block] [
-						compose/deep/only [
-							actors: object [
-								on-time: function [space path event delay] (block)
-							]
-						]
-					])
-				]
-			]
-			grid [
-				template: grid
-				layout:   lay-out-grid					;-- uses custom layout function
-				facets:   [pair! bounds  #tight]
-			]
-		];; styles
-		
-		for-each [name spec] styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111
-		
-	];; #local
+		]
+		grid [
+			template: grid
+			layout:   lay-out-grid						;-- uses custom layout function
+			facets:   [pair! bounds  @(props/tight)]
+		]
+	];; styles
 	
+	for-each [name spec] styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111
+		
 	;@@ grid-view
 	
 	

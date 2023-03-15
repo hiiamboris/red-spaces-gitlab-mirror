@@ -1,29 +1,18 @@
 Red [
-	title:   "Document template for Spaces"
+	title:   "Document and basic editor template for Spaces"
 	author:  @hiiamboris
 	license: BSD-3
 ]
 
-; #include %everything.red
-; #include %watch.red
 
 do/expand with spaces/ctx [
-
-;@@ get rid of this font here!
-code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
-
-;; used for numbering paragraph lists
-declare-template 'bullet/text [
-	text:   "^(2981)"
-	format: does [rejoin [text " "]]
-	limits: 15 .. none
-]
 
 doc-ctx: context [
 	~: self
 	
 	;@@ scalability problem: convenience of integer caret/selection offsets leads to linear increase of caret-to-offset calculation
 	;@@ don't wanna optimize this prematurely but for big texts a b-tree index should be implemented
+	;@@ another unoptimized area is paragraph to caret offset calculation
 	
 	foreach-paragraph: function [spec [block!] "[paragraph offset length]" doc [object!] code [block!]] [
 		if empty? doc/content [return none]				;-- case for loop never entered
@@ -691,6 +680,12 @@ doc-ctx: context [
 		if empty? doc/content [doc/content: lay-out-vids [rich-content]]	;-- don't let document be empty
 		compose [content: (doc)]
 	]
+	extend VID/styles [
+		editor [
+			template: editor
+			layout: lay-out-editor
+		]
+	]
 
 	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
@@ -782,6 +777,7 @@ doc-ctx: context [
 	]
 ]
 
+
 ;; data format that holds whole paragraphs, together with their facets (alignment, indentation)
 rich-text-block!: make rich-text-span! [
 	name:   'rich-text-block
@@ -805,7 +801,6 @@ rich-text-block!: make rich-text-span! [
 
 
 context [
-	;@@ pageup/down keys events
 	declare-template 'editor/scrollable [
 		content: make-space 'document [
 			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
@@ -815,52 +810,7 @@ context [
 ]
 
 
-;@@ can I make code templates generic enough to separate them?
-declare-template 'code/text []
-declare-template 'pre/paragraph []
-
-underbox: function [
-	"Draw a box to highlight code parts"
-	size       [pair!]
-	line-width [integer!]
-	rounding   [integer!]
-][
-	compose/deep [
-		push [										;-- solid box under code areas
-			line-width (line-width)
-			pen (opaque 'text 10%)
-			fill-pen (opaque 'text 5%)
-			box 0x0 (size) (rounding)
-		]
-	]
-]
-
-define-styles [
-	;@@ leave only document style here!
-	code: using [pen] [	;@@ code-span?
-		font: code-font
-		margin: 4x0
-		pen: when color (compose [pen (color)])
-		below: [(underbox size 1 3) (pen)]
-	]
-	;@@ how to name it better? code-paragraph? code-block?
-	pre: [
-		margin: 10
-		font: code-font
-		below: [(underbox size 2 5)]
-	]
-	; document: [below: [push [pen off fill-pen box 0x0 (size)]]]
-]
-
-extend VID/styles reshape [
-	editor [
-		template: editor
-		layout: !(in doc-ctx 'lay-out-editor)
-	]
-]
-
 ;; basic editing functions mandatory for every editor widget
-;@@ move out?
 define-handlers [
 	editor: extends 'scrollable [
 		document: [
@@ -920,8 +870,5 @@ define-handlers [
 			on-unfocus [doc path event] [invalidate doc]
 		]
 	]
-]
-
-
-
-]
+];doc-ctx: context [
+];do/expand with spaces/ctx [

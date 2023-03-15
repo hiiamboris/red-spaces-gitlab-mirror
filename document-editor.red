@@ -11,7 +11,55 @@ Red [
 
 do/expand with spaces/ctx [
 
+	;@@ pageup/down keys events
+
+;; used for numbering paragraph lists
+declare-template 'bullet/text [
+	text:   "^(2981)"
+	format: does [rejoin [text " "]]
+	limits: 15 .. none
+]
+
+;@@ can I make code templates generic enough to separate them?
+declare-template 'code/text []
+declare-template 'pre/paragraph []
+
+underbox: function [
+	"Draw a box to highlight code parts"
+	size       [pair!]
+	line-width [integer!]
+	rounding   [integer!]
+][
+	compose/deep [
+		push [										;-- solid box under code areas
+			line-width (line-width)
+			pen (opaque 'text 10%)
+			fill-pen (opaque 'text 5%)
+			box 0x0 (size) (rounding)
+		]
+	]
+]
+
+code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
+
+define-styles [
+	;@@ leave only document style here!
+	code: using [pen] [	;@@ code-span?
+		font: code-font
+		margin: 4x0
+		pen: when color (compose [pen (color)])
+		below: [(underbox size 1 3) (pen)]
+	]
+	;@@ how to name it better? code-paragraph? code-block?
+	pre: [
+		margin: 10
+		font: code-font
+		below: [(underbox size 2 5)]
+	]
+]
+
 ;@@ auto determine URLs during edit, after a space
+;@@ need to build a generic requester instead of adhoc ones
 request-url: function [
 	"Show a dialog to request URL input"
 	/from url "Initial (default) result"
