@@ -205,7 +205,8 @@ editor-tools: context [
 			code: remake-space 'code [text: (slice/format)]
 		][
 			slice: doc/edit [slice range: extend-range doc range]
-			code: remake-space 'pre [text: (slice/format) sections: (none)]	;-- prevent block from being dissected
+			trim/tail text: slice/format
+			code: remake-space 'pre [text: (text) sections: (none)]	;-- prevent block from being dissected
 		]
 		doc/edit [
 			remove range
