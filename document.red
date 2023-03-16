@@ -691,15 +691,17 @@ doc-ctx: context [
 		]
 	]
 
+	;; this should not replace the document, only content! e.g. if 'focus' comes before block in VID, it should stay focused
 	lay-out-editor: function [spec [block!] /styles sheet [map! none!]] [	;-- only used to pass styles down to content/document
-		doc: first lay-out-vids/styles compose/only [document (spec)] sheet
-		if empty? doc/content [doc/content: lay-out-vids [rich-content]]	;-- don't let document be empty
-		compose [content: (doc)]
+		content: lay-out-vids/styles spec sheet
+		if empty? content [content: lay-out-vids [rich-content]]	;-- don't let document be empty
+		compose/only [content/content: (content)]
 	]
 	extend VID/styles [
 		editor [
 			template: editor
 			layout: lay-out-editor
+			facets: [focus [focus-space content]]
 		]
 	]
 
