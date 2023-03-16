@@ -752,18 +752,19 @@ doc-ctx: context [
 	;@@ should it support /items override? what will be the use case? spoilers? (for now length accounts for every paragraph)
 	declare-template 'document/list [
 		content:   []		#type :on-content-change
-		axis:     'y		#type (axis = 'y)				;-- protected
-		spacing:   5
+		axis:     'y		#type (axis = 'y)			;-- protected
+		spacing:   5									;-- interval between paragraphs
+		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
 		page-size: function [] [
-			vp: any [all [parent parent/viewport] 0x0]		;@@ REP 113
+			vp: any [all [parent parent/viewport] 0x0]	;@@ REP 113
 			max 0 to integer! vp/y * 90%
-		] #type [integer! function!] (page-size >= 0)		;-- needs access to the parent viewport
+		] #type [integer! function!] (page-size >= 0)	;-- needs access to the parent viewport
 		
-		length:   0			#type [integer!]				;-- read-only, auto-updated on edits
+		length:   0			#type [integer!]			;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
 		selected: none				#type [pair! none!] :on-selected-change
 		timeline: copy timeline!	#type [object!]
-		paint:    []				#type [block!]			;-- current set of attributes (for newly inserted chars), updated on caret movement
+		paint:    []				#type [block!]		;-- current set of attributes (for newly inserted chars), updated on caret movement
 		
 		;; high-level functions
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
