@@ -35,7 +35,7 @@ clipboard: context [
 		/extern data
 	][
 		read: read-clipboard
-		unless read == as-text: data/format [		;-- last copy comes from outside the running script
+		unless read == as-text: data/format [			;-- last copy comes from outside the running script
 			self/data: make text! [data: read]
 			if text [as-text: data/format]
 		]
@@ -46,12 +46,10 @@ clipboard: context [
 		"Write data to clipboard"
 		content [object! ('clipboard-format = class? content) string!]
 	][
-		write-clipboard either string? content [
-			self/data: make text! [data: copy content]
-		][
-			self/data: content/clone
-			self/data/format
-		]
+		self/data: either string? content
+			[make text! [data: system/words/copy content]]
+			[content/clone]
+		write-clipboard self/data/format
 	]
 ]
 
