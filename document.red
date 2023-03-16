@@ -800,7 +800,7 @@ doc-ctx: context [
 		content: make-space 'document [
 			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
 		]
-		content-flow: 'planar
+		content-flow: 'vertical
 		adjust-origin: function [] [
 			doc: content
 			cbox: doc/measure [caret->box doc/caret/offset doc/caret/side]
