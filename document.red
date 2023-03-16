@@ -609,16 +609,20 @@ doc-ctx: context [
 	point->caret: function [doc [object!] point [pair!]] [		;@@ accept path maybe too?
 		path: hittest doc point
 		set [para: xy:] skip path 2
-		either para [
-			#assert [in para 'measure]							;@@ measure is too general name for strictly caret related api?
-			;; lands directly into text or rich-content
+		if all [not para  not empty? doc/map] [					;-- doesn't land on a paragraph - need to find nearest
+			points: map-each/eval [para geom] doc/map [
+				closest: closest-box-point?/to 0x0 geom/size ppoint: point - geom/offset
+				dist: distance? closest ppoint 
+				[dist closest para]
+			]
+			set [_: xy: para:] sort/skip points 3
+		]
+		if para [
+			#assert [in para 'measure]
 			caret: para/measure [point->caret xy]
 			base: get-paragraph-offset doc para
 			caret/offset: caret/offset + base
 			caret
-		][	;; lands outside - need to find nearest
-			;@@ add space box computation to foreach-space ? and ability to skip branches based on that?
-			none
 		]
 	]
 	
