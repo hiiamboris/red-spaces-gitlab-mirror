@@ -220,8 +220,13 @@ VID: context [
 		#debug draw [prin "host/draw: " probe drawn] 
 		face/draw: drawn
 		
-		unless old-focus =? focus/current [				;-- this layout wants to focus a space
-			set-focus face								;-- not linked to the screen yet, so focus-space couldn't handle it
+		;; focus is tricky too: templates could call focus-space (e.g. editor focuses document)
+		;; but focus-space could not create an on-focus event because there was no path before it all got rendered
+		;; so I have to refocus the same space again, and also tell View to focus the host
+		unless old-focus =? target: focus/current [
+			clear focus/history							;-- this forces focus-space to take the same target
+			focus-space target
+			set-focus face								;-- wasn't linked to the host, so focus-space couldn't focus it
 		]
 	]
 	
