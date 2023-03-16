@@ -108,7 +108,7 @@ do/expand [
 			templates: ctx/templates
 			styles:    ctx/styles
 			layouts:   ctx/layouts
-			keyboard:  ctx/keyboard
+			focus:     ctx/focus
 			VID:       ctx/VID
 		]
 	]
