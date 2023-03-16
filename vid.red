@@ -452,7 +452,7 @@ VID: context [
 			|	set-word!								;-- set-words are reserved for space names
 			|	set w word! if (any [sheet/:w VID/styles/:w templates/:w])	;-- style names mark the end of modifiers
 			]; p: (#print "modifier at: (mold/part p 80)")
-			[=with= | =reaction= | =action= | =focus= | =facet= | =flag= | =auto-facet= | =color= | =pane= | =size=]
+			[=with= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =focus= | =color= | =pane= | =size=]
 			; p: (#print "modifier finished at: (mold/part p 80)")
 		]
 		
