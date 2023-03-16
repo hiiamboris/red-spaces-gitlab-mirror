@@ -3457,15 +3457,12 @@ field-ctx: context [
 	
 	actions: context [
 		edit: function [field [object!] plan [block!]] [
-			plan: with self plan
-			;@@ should info be updated after every function call instead? in case they are chained (if ever)
-			while [not tail? plan] [					;-- info is updated after every call
-				length: length? text: field/text
+			update: [
+				length:   length? text: field/text
 				selected: field/selected
-				; pos: skip text offset: field/caret/offset
-				offset: field/caret/offset
-				do/next plan 'plan
+				offset:   field/caret/offset
 			]
+			do with self plan
 		]
 		undo: redo: copy: at: move: remove: insert: paste: select: none
 	]
@@ -3477,7 +3474,8 @@ field-ctx: context [
 		"Copy specified range into clipboard"
 		range [word! pair!] "Offset range or any of: [selected all]"
 	] with :actions/edit [
-		switch range [
+		do update
+		switch range [    	
 			selected [range: selected]
 			all      [range: 0 by length]
 		]
@@ -3487,11 +3485,13 @@ field-ctx: context [
 	]
 	
 	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
+		do update
 		switch/default name [
 			head far-head [0]
 			tail far-tail [length]
 			prev-word [~/find-prev-word field offset]
 			next-word [~/find-next-word field offset]
+			selected [field/selected]
 		] [offset]										;-- don't move on unsupported commands
 	]
 	
@@ -3500,6 +3500,7 @@ field-ctx: context [
 		pos [word! (not by) integer!]
 		/by "Move by a relative integer number of chars"
 	] with :actions/edit [
+		do update
 		if word? pos [pos: actions/at pos]
 		if by        [pos: offset + pos]
 		field/caret/offset: clip 0 length pos
@@ -3510,14 +3511,18 @@ field-ctx: context [
 		limit [word! pair! (not by) integer!]
 		/by "Relative integer number of char"
 	] with :actions/edit [
+		do update
 		case/all [
 			word? limit    [limit: actions/at limit]
 			by             [limit: offset + limit]
 			integer? limit [limit: as-pair offset limit]
-			0 < span? limit: clip 0 length order-pair limit [
-				remove/part  skip text limit/1  span? limit
-				field/caret/offset: limit/1
-				mark-history field
+			pair? limit [
+				if 0 < span? limit: clip 0 length order-pair limit [
+					remove/part  skip text limit/1  span? limit
+					field/caret/offset: limit/1
+					field/selected: none
+					mark-history field
+				]
 			]
 		]
 	]
@@ -3526,9 +3531,11 @@ field-ctx: context [
 		"Insert given data into current caret offset"
 		data [string!]
 	] with :actions/edit [
+		do update
 		unless empty? data [
 			insert (skip text offset) data
 			field/caret/offset: offset + length? data
+			field/selected: none
 			mark-history field
 		]
 	]
@@ -3584,6 +3591,7 @@ field-ctx: context [
 		limit [pair! word! (not by) integer!]
 		/by "Move selection edge by an integer number of chars"
 	] with :actions/edit [
+		do update
 		set [ofs: sel:] compute-selection limit by actions offset length selected
 		field/caret/offset: ofs
 		field/selected: sel
