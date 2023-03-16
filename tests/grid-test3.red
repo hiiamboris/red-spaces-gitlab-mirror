@@ -7,8 +7,6 @@ Red [
 
 #include %../everything.red
 
-append spaces/keyboard/focusable 'grid-view
-
 view/no-wait/options [
 	below
 	b: host [

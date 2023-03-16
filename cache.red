@@ -204,8 +204,9 @@ get-full-path: function [
 	space  [object!] (space? space)
 	; return: [path! none!]
 ][
-	#assert [space/parent]
+	; #assert [space/parent]
 	unless all [										;-- fails on self-containing grid
+		space/parent
 		host: first parents: reverse cache/list-parents space
 		host? host
 	] [return none]

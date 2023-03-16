@@ -261,7 +261,7 @@ events: context [
 
 	;; fundamentally there are 3 types of events here:
 	;; - events tied to a coordinate (mouse, touch) - then hittest is used to obtain path
-	;; - events tied to focus (keyboard, focus changes) - these use keyboard/focus path in the tree
+	;; - events tied to focus (keyboard, focus changes) - these use focus/current path in the tree
 	;; - events without both (timer) - but timer has path too, and also delay
 	;; coordinate events' path includes pairs of coordinates (hittest format)
 	;; other events' path does not (tree node format)
@@ -283,10 +283,7 @@ events: context [
 				]
 				key key-down key-up enter [
 					focused?: yes								;-- event should not be detected by parent spaces
-					if empty? f: keyboard/focus [				;-- when focused by `set-focus`, keyboard/focus is not set, also see #3808 numerous bugs
-						keyboard/focus: f: as f path-from-face face
-					]
-					f
+					if focus/current [as [] get-full-path focus/current]
 				]
 				; focus unfocus ;-- generated internally by focus.red
 				time [

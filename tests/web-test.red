@@ -64,7 +64,7 @@ define-handlers [
 		; on-time [space path event] [space/roll update]
 	]
 ]
-append spaces/keyboard/focusable 'web
+append spaces/focus/focusable 'web
 
 view/no-wait/options [
 	below

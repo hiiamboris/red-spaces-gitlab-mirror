@@ -202,7 +202,7 @@ VID: context [
 		spec: body-of :spec
 		if empty? spec [exit]
 		
-		set 'focused none								;-- reset focus flag
+		old-focus: focus/current
 		pane: lay-out-vids spec
 		if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 		face/space: pane/1
@@ -220,14 +220,8 @@ VID: context [
 		#debug draw [prin "host/draw: " probe drawn] 
 		face/draw: drawn
 		
-		if object? focused [							;-- has to be focused after render creates the tree
-			path: get-full-path focused
-			#assert [path]
-			focus-space compose [
-				(system/view/screens/1)
-				(face/parent)							;-- not linked to the screen yet, has no /parent
-				(as [] path)
-			] 
+		unless old-focus =? focus/current [				;-- this layout wants to focus a space
+			set-focus face								;-- not linked to the screen yet, so focus-space couldn't handle it
 		]
 	]
 	
@@ -304,7 +298,6 @@ VID: context [
 	]
 	
 	datatype-names: to block! any-type!					;-- used to screen datatypes from flags
-	focused: none										;-- used to make `focus` flag work
 			
 	lay-out-vids: function [
 		"Turn VID/S specification block into a forest of spaces"
@@ -383,7 +376,7 @@ VID: context [
 						]
 					]
 				]
-				if def/focused? [set 'focused space]
+				if def/focused? [focus-space space]
 				
 				if object? actors: select space 'actors [
 					foreach actor values-of actors [

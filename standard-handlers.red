@@ -273,7 +273,7 @@ define-handlers [
 
 		on-down [space path event] [
 			new-ofs: space/offset-to-caret path/2
-			space/edit compose [select none move to (new-ofs)]
+			space/edit compose [select 'none move (new-ofs)]
 			start-drag path
 		]
 		
@@ -282,7 +282,7 @@ define-handlers [
 			dpath: drag-path
 			if all [dpath dpath/1 =? path/1] [			;-- if started dragging also on this field
 				new-ofs: space/offset-to-caret path/2
-				space/edit compose [select to (new-ofs)]
+				space/edit compose [select (new-ofs)]
 				quietly space/origin: field-ctx/adjust-origin space
 			]
 		]

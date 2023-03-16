@@ -23,7 +23,7 @@ Red [
 #process on
 
 import/only spaces/ctx [top]
-append spaces/keyboard/focusable 'tube
+append spaces/focus/focusable 'tube
 
 context [
 
@@ -314,13 +314,7 @@ context [
 			if stop? [exit]
 			; dump-event event
 			case [
-				event/key = #"^L" [
-					;@@ TODO: more straightforward focusing function
-					focus-space compose [
-						(copy/part spaces/keyboard/focus 3)			;-- screen/window/base
-						(first spaces/ctx/paths-from-space entry)	;-- part after base
-					]
-				]
+				event/key = #"^L" [focus-space entry]
 				any [
 					event/key = #"^H"					;-- backspace
 					all [event/key = 'left  find event/flags 'alt]

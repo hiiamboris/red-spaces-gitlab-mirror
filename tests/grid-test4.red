@@ -8,7 +8,6 @@ Red [
 #do [disable-space-cache?: yes]
 #include %../everything.red
 
-append spaces/keyboard/focusable 'grid-view
 ;@@ use (wrapped) data!
 ;@@ make set up grid spaces for common scenarios
 

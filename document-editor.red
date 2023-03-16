@@ -76,7 +76,7 @@ request-url: function [
 	"Show a dialog to request URL input"
 	/from url [url!] "Initial (default) result"
 ][
-	focus: keyboard/focus								;-- remember focus (changed by new window)
+	focus: spaces/ctx/focus/current						;-- remember focus (changed by new window)
 	view/flags [
 		title "Enter an URL"
 		host [
@@ -99,7 +99,7 @@ request-url: function [
 ]
 
 request-grid-size: function [] [
-	focus:  keyboard/focus								;-- remember focus (changed by new window)
+	focus: spaces/ctx/focus/current						;-- remember focus (changed by new window)
 	accept: [if pair? attempt [loaded: load entry/text] [unview result: loaded]]
 	view/flags [
 		title "Enter desired grid size"
@@ -366,7 +366,7 @@ view reshape [
 	host 640x400 [
 		vlist [
 			editor-toolbar
-			editor: editor 50x50 .. 500x300 [
+			editor: editor 50x50 .. 500x300 focus [
 				style code: rich-content ;font= code-font
 				code [bold font: "Consolas" "block ["]
 				code [bold font: "Consolas" "    of wrapped long long long code"]

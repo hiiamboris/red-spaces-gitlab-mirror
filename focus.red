@@ -5,165 +5,152 @@ Red [
 ]
 
 
-;-- provides focusing by clicking
-;-- requires: export and window-of
+;; provides focusing by clicking
+;; requires: export and window-of
 
 exports: [focused? focus-space]
 
-;@@ rename this!? e.g. focus/current instead of keyboard/focus?
 ;@@ `focus` itself should be somewhere else, as it is used by dispatch and who knows what
-keyboard: object [
-	;-- which spaces should receive focus? affects tabbing & clicking
-	;-- class should not matter, name should - then we'll be able to override/extend classes
+focus: make classy-object! declare-class 'focus-context [
+	;; template names that can receive focus (affects tabbing & clicking)
+	;; class should not matter, name should - then we'll be able to override/extend classes
 	;@@ TODO: should paths be allowed here? e.g. if some spaces are only focusable in some bigger context?
-	focusable: make hash! [scrollable button field area list-view grid-view]
+	focusable: make hash! [scrollable button field area list-view grid-view]	#type [hash!]
+	
+	;; each window has own focus history, format: [window [space ...] ...]
+	histories: make hash! 8			#type [hash!]
+	window:    none					#type [none! object!]		;-- set by on-focus global hook
 
-	focus: []	;-- a path (descending list of spaces)
-	;@@ DOC: focus is a path because we want to be able to go up the tree when tabbing
-	;@@ but now that there's a /parent facet it will be easier to just use a space!
-
-	history: []	;-- previous focus paths, including current
+	;; currently focused space in currently focused window!
+	current: does [last history]	#type [function!]	;-- returns space, host face, or none
+	history: has [w h] [								;-- previously focused spaces, including current one
+		any [
+			select/same histories window
+			last repend
+				self/histories: sift histories [w h .. w/state]		;-- forget closed windows
+				[window make [] 11]
+		]
+	] #type [function!]
 	;@@ DOC: history is used when focused face is no longer there
 
-	;-- path is valid if it's visible still
-	;-- for faces this means 'state' is not none and 'visible?' is true
-	;-- spaces can be created in a vacuum, but their map should contain rendered only items
-	;@@ TODO: externalize this, as it is general enough ?
-	valid-path?: function [path [path! block!]] [
-		foreach space path [
-			either host? space [
-				unless all [space/state space/visible?] [return no]
-			][
-				if all [map  not find/same map space] [return no]
-				map: select space 'map
+	;; path is valid if it's visible still
+	;; for faces this means 'state' is not none and 'visible?' is true
+	;; spaces validity is checked by get-full-path itself
+	last-valid-focus: function [] [
+		for-each/reverse space history [
+			all [
+				path: get-full-path space
+				host: first path
+				host/state
+				host/visible?
+				result: path
+				break
 			]
 		]
-		yes
+		result
+	]
+	
+	;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
+	find-next-focal-space: function [dir "forth or back"] [
+		focused: any [last-valid-focus reduce [system/view/screens/1]]
+		#debug focus [#print "last valid focus: (mold as path! focused)"]
+		loop: pick [									;@@ use apply
+			foreach-*ace/next
+			foreach-*ace/next/reverse
+		] dir = 'forth 
+		do compose/only [
+			(loop) path found: focused [				;-- default to already focused item (e.g. it's the only focusable)
+				#debug focus [
+					space: last path 
+					text: mold any [select space 'text  select space 'data] 
+					#print "find-next-focal-space @(mold path), text=(text)"
+				]
+				if find focus/focusable select last path 'type [found: path break]
+			]
+		]
+		last found
 	]
 
-	;@@ TODO: maybe instead of this, scanning should continue from last valid outer space
-	last-valid-focus: function [] [
-		foreach path history [if valid-path? path [return path]]
-		none
-	]
-
-	;-- automatic focus history collection
-	on-change*: func [word old [any-type!] new [any-type!]] [
-		if any [word <> 'focus  same-paths? old new][exit]
-		insert/only history copy new
-		clear skip history 10							;@@ 10 spaces should be enough?
-	]
 ]
 
 
-;-- for use within styles
+;; for use within styles
 focused?: function [
 	"Check if current style is the one in focus"
 	/above n "Rather check if space N levels above is the one in focus"
 	/parent  "Shortcut for /above 1"
 ][
-	n: any [n if parent [1] 0]
-	all [
-		space1: last keyboard/focus
-		space2: pick tail current-path -1 - n
+	n: 1 + any [n if parent [1] 0]
+	to logic! all [
+		space1: focus/current
+		space2: pick tail current-path negate n
 		space1 =? space2
-	]													;-- result: true or none
-]
-
-
-;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
-find-next-focal-space: function [dir "forth or back"] [
-	focus: any [keyboard/last-valid-focus reduce [system/view/screens/1]]
-	#debug focus [#print "last valid focus: (mold as path! focus)"]
-	; #assert [focus]										;@@ TODO: cover the case when it's none
-	foreach: pick [										;@@ use apply
-		foreach-*ace/next
-		foreach-*ace/next/reverse
-	] dir = 'forth 
-	do compose/only [
-		(foreach) path next: focus [			;-- default to already focused item (e.g. it's the only focusable)
-			#debug focus [
-				space: last path 
-				text: mold any [select space 'text  select space 'data] 
-				#print "find-next-focal-space @(mold path), text=(text)"
-			]
-			if find keyboard/focusable select last path 'type [next: path break]
-		]
 	]
-	path: copy as focus next					;-- preserve the original type
-	new-line/all path no
 ]
+
 
 ;; since I can't create events, but still gotta tell previewers/finalizers what kind of event it is, have to work around
 focus-event!:   object [type: 'focus   face: none]
 unfocus-event!: object [type: 'unfocus face: none]
 
+;@@ should this refocus windows?
 focus-space: function [
-	"Focus given space object"
-	space [object! (space? space) block!] "Space object or a full path to it (may include faces)"
-	; return: [logic!] "True if focus changed"
+	"Focus given space object in it's window (does not refocus windows)"
+	space [object!] (space? space)
 ] with events [
-	if object? path: space [
+	if any [
+		space =? old: focus/current						;-- no refocusing into the same target
+		not find focus/focusable space/type				;-- this space cannot be focused
+	] [return no]
+	#debug focus [#print "Moving focus from (mold/only reduce [old]) to (mold/only reduce [space])"]
+	
+	if all [
+		old
+		old-path: get-full-path old
+		old-face: old-path/1
+		old-face/state
+	][
+		invalidate old									;-- let space remove it's focus decoration
+		with-stop [										;-- init a separate stop flag for a separate event
+			unfocus-event!/face: old-face 
+			process-event as [] old-path unfocus-event! [] yes
+		]
+	]	
+	
+	if all [
 		path: get-full-path space
-		#assert [path "space is not on the tree"]		;@@ should be an error?
-		unless path [exit] 
+		face: path/1
+		face/state
+	][
+		set-focus face
+		unless system/view/auto-sync? [show window-of face]		;-- otherwise keys won't be detected
 	]
-	path: append clear [] path							;-- make a copy so we can modify it
-	while [space: take/last path] [						;-- reverse order to focus the innermost space possible ;@@ #5066
-		unless all [
-			space? space
-			find keyboard/focusable space/type
-		] [continue]
-		append path space								;-- restore the taken item
-		if same-paths? path keyboard/focus [break]		;-- no refocusing into the same target
-		#debug focus [#print "Moving focus from (mold as path! keyboard/focus) to (mold as path! path)"]
-
-		foreach obj path [								;-- if faces are provided, find the innermost one
-			if host? obj [face: obj break]
-		]
 		
-		unless empty? old-path: keyboard/focus [
-			if space? obj: last old-path [invalidate obj]	;-- let space remove it's focus decoration
-			with-stop [									;-- init a separate stop flag for a separate event
-				unfocus-event!/face: face
-				process-event old-path unfocus-event! [] yes
-				unfocus-event!/face: none
-			]
-		]
+	append hist: focus/history space
+	remove/part hist skip tail hist -10					;-- limit history length
+	invalidate space									;-- let space paint it's focus decoration
 
-		if face [										;-- ..and focus it
-			set-focus face
-			unless system/view/auto-sync? [
-				show window-of face						;-- otherwise keys won't be detected
-			]
-		]
-		keyboard/focus: copy path						;-- copy since the path is static
-		if space? obj: last path [invalidate obj]		;-- let space paint it's focus decoration
-
+	if face [											;-- event needs path, which is unavailable if space is orphaned or not drawn yet
 		with-stop [										;-- init a separate stop flag for a separate event
 			focus-event!/face: face
-			process-event path focus-event! [] yes
-			focus-event!/face: none
+			process-event as [] path focus-event! [] yes
 		]
-		
-		return yes
 	]
-	no
+	yes
+]
+
+;@@ set-focus inside the same window won't affect focus/current
+;@@ I could track host switch here too, but what space to focus in this case?
+insert-event-func function [face event] [
+	if event/type == 'focus [focus/window: event/window]
+	none
 ]
 
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks may change focus
 	function [space [object!] path [block!] event [event! object!]] [
-		path: keep-type head path object!				;-- for focus path we want style names only
-
-		f: event/face									;-- list also all face parents in the path
-		until [
-			insert path f
-			none? f: f/parent
-		]
-
-		#debug focus [#print "Attempting to focus (mold as path! path)"]
-		focus-space path
+		#debug focus [#print "Attempting to focus (mold as path! keep-type head path object!)"]
+		focus-space space
 	]
 
 
