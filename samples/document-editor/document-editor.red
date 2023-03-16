@@ -4,9 +4,9 @@ Red [
 	license: BSD-3
 ]
 
-#include %everything.red
-#include %widgets/color-picker.red
-#include %document.red
+#include %../../everything.red
+#include %../../widgets/color-picker.red
+#include %../../document.red
 #include %editor-toolbar.red
 
 do/expand with spaces/ctx [
