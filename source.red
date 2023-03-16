@@ -72,7 +72,7 @@ rich: context [											;@@ what would be a better name?
 	]
 	
 	index->attrs: function [index [integer!]] [
-		pick catalog index + 1 * 2
+		copy/deep pick catalog index + 1 * 2			;-- copy ensures attrs are never modified in place
 	]
 	
 	attrs->index: function [attrs [block!]] [
