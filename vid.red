@@ -347,10 +347,9 @@ VID: context [
 				(def/with)
 			]
 			
-			either def/styling? [						;-- new style defined
-				repend def/style [						;-- already copied and in the sheet
-					quote payload: copy/deep/part style-bgn style-end
-				]
+			either def/styling? [						;-- new style defined, def/style already copied and in the sheet
+				unless def/style/payload [append def/style [payload: []]] 
+				def/style/payload: copy/deep/part style-bgn style-end
 				; #print "saved payload (mold def/style/payload) in (def/link) style based on (def/style/template)"
 			][
 				space: make-space def/style/template space-spec
