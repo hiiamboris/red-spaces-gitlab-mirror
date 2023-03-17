@@ -948,7 +948,7 @@ paragraph-ctx: context [
 						#on-change [space word value] [space/size/x: width]
 		;; offset and side do not affect the caret itself, but serve for it's location descriptors within the parent
 		offset: 0		#type =? :invalidates [integer!]
-		side:  'left	#type =  :invalidates [word!] (find/case [left right] side)
+		side:  'right	#type =  :invalidates [word!] (find/case [left right] side)
 	]
 	
  	declare-template 'text/space [
