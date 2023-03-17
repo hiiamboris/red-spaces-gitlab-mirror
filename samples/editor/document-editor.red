@@ -21,7 +21,8 @@ initial-text: [
 	break break
 	p ["It implements all features needed to build your own " bold "word processor" /bold
 	   ", but can also be handy in many other " bold "applications:" /bold]
-	li [!(bullet) "to write rich text in " italic "chat clients"]
+	li [!(bullet) "as a Draw-based " !(code "area") " widget (main goal of the implementation)"]
+	li [!(bullet) "to type rich text in " italic "chat clients"]
 	li [!(bullet) "to compose " italic "emails and forum messages"]
 	li [!(bullet) "for " italic "note-taking apps"]
 	li [!(bullet) "to edit " italic "wiki pages or math sheets"]
@@ -336,7 +337,8 @@ editor-tools: context [
 	insert-grid: function [doc [object!] size [word! (size = 'pick) pair!]] [
 		if size = 'pick [size: request-grid-size]
 		unless size [exit]
-		grid: remake-space 'grid [bounds: (size)]
+		col-width: to integer! (max 100 doc/parent/size/x - 100) / size/x
+		grid: remake-space 'grid [bounds: (size) widths/default: (col-width)]
 		for-each xy size [
 			grid/content/:xy: cell: first lay-out-vids [editor]
 			cell/content/timeline: doc/timeline			;-- share undo/redo timeline
@@ -402,6 +404,7 @@ code: func [text] [remake-space 'code-span [text: (text)]]
 pre:  func [text] [remake-space 'code-block [text: (text)]]
 
 view reshape [
+	title "Spaces Document Editor"
 	host 640x400 [
 		vlist [
 			editor-toolbar
