@@ -47,13 +47,11 @@ declare-template 'spiral/space [
 	]
 
 	draw: function [] [
-		unless r: field/spaces/text/layout [
-			;; render is needed to produce layout and cached parents tree
-			;; so on key press paragraph invalidates also spiral itself
-			render/on field infxinf			;-- produce layout 
-			r: field/spaces/text/layout
-			assert [r]
-		]
+		;; render is needed to produce layout and cached parents tree
+		;; so on key press paragraph invalidates also spiral itself
+		render/on field infxinf			;-- produce layout 
+		r: field/spaces/text/layout
+		assert [r]
 
 		len: length? text: field/text
 		if empty? text [return []]			;-- case of empty string
