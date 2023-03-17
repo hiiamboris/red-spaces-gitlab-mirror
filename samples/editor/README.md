@@ -4,4 +4,4 @@ While builtin [`editor`](../../reference.md#editor) widget provides basic docume
 
 Editor sample includes such higher level tooling and also allows me to test how editor widget behaves in advanced usage scenarios.
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/sample-document-editor.gif)
+<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/sample-document-editor.gif></img>
