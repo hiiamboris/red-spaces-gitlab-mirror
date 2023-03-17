@@ -283,7 +283,11 @@ events: context [
 				]
 				key key-down key-up enter [
 					focused?: yes								;-- event should not be detected by parent spaces
-					if focus/current [as [] get-full-path focus/current]
+					if face/space [
+						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
+						unless focus/current [focus-space focus/find-next-focal-space 'forth]
+						if path: get-full-path focus/current [as [] path] 
+					]
 				]
 				; focus unfocus ;-- generated internally by focus.red
 				time [
