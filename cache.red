@@ -155,6 +155,16 @@ invalidate-tree: function [
 ]
 	
 	
+; invalidated?: function [
+	; "Check if SPACE was invalidated and not yet rendered"
+	; space [object!] (space? space)
+; ][
+	; to logic! all [
+		; empty? space/cached
+		; block? space/cache								;-- for uncached spaces cannot tell! 
+	; ]
+; ]
+
 invalidate: function [
 	"Invalidate SPACE cache, to force it's next redraw"
 	space [object!] (space? space) "If present, space/on-invalidate is called instead of cache/invalidate"

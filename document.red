@@ -313,6 +313,7 @@ doc-ctx: context [
 			; ?? left ?? right
 			push-to-timeline doc left right init
 			; probe head doc/timeline/events
+			doc/modified?: yes							;-- will adjust origin on next render!
 			:result
 		]
 		record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent: none
@@ -363,6 +364,7 @@ doc-ctx: context [
 		"Displace the caret"
 		pos [word! (not by) integer!]
 		/by "Move by a relative integer number of slots"
+		/side cside [word!] "Specify caret side" (find [left right] cside)
 	] with :actions/edit [
 		do update
 		case/all [
@@ -370,15 +372,15 @@ doc-ctx: context [
 			word? pos [
 				pos: actions/at pos
 				if block? pos [							;-- block may be returned by find-line-below/above
-					side: pos/side
+					default cside: pos/side
 					pos:  clip 0 doc/length pos/offset
 				]
 			]
 			integer? pos [								;-- unknown words are silently ignored
-				default side: case [pos > offset ['left] pos < offset ['right]]	;-- only change side if moved
+				default cside: case [pos > offset ['left] pos < offset ['right]]	;-- only change side if moved
 				pos: clip 0 doc/length pos
 				actions/record [move (offset)] [move (pos)]
-				if side [actions/record [side (doc/caret/side)] [side (side)]]
+				if cside [actions/record [side (doc/caret/side)] [side (cside)]]
 			]
 		]
 	]
@@ -767,6 +769,7 @@ doc-ctx: context [
 		selected: none				#type [pair! none!] :on-selected-change
 		timeline: copy timeline!	#type [object!]
 		paint:    []				#type [block!]		;-- current set of attributes (for newly inserted chars), updated on caret movement
+		modified?: no									;-- set by edit as a flag to adjust origin on next render
 		
 		;; high-level functions
 		measure: func [plan [block!]] [~/metrics/measure self plan]	;@@ needs docstring
@@ -804,13 +807,24 @@ doc-ctx: context [
 			content: reduce [make-space 'rich-content []]		;-- ensure editor is not empty, or it can't be clicked on
 		]
 		content-flow: 'vertical
+		
 		adjust-origin: function [] [
-			doc: content
+			doc:  content
 			cbox: doc/measure [caret->box doc/caret/offset doc/caret/side]
 			if cbox [
 				height: cbox/2/y - cbox/1/y
 				move-to/margin (cbox/1 + cbox/2 / 2) 0 by height / 2 + 30
 			]
+		]
+		
+		scrollable-draw: :draw
+		draw: function [/on canvas [pair!]] [
+			if content/modified? [
+				scrollable-draw/on canvas
+				adjust-origin
+				content/modified?: no
+			]
+			scrollable-draw/on canvas
 		]
 	]
 ]
@@ -849,7 +863,7 @@ define-handlers [
 				doc/selected: none
 				caret: doc/measure [point->caret path/2]
 				if caret [
-					set with doc/caret [offset side] reduce [caret/offset caret/side]
+					doc/edit [move/side caret/offset caret/side]
 					start-drag/with path copy caret
 				]
 			]
@@ -862,8 +876,10 @@ define-handlers [
 					caret: doc/measure [point->caret path/2]
 					if caret [
 						start: drag-parameter
-						doc/selected: start/offset by caret/offset
-						set with doc/caret [offset side] reduce [caret/offset caret/side]
+						doc/edit [
+							select start/offset by caret/offset
+							move/side caret/offset caret/side
+						]
 					]
 				]
 			]
@@ -892,8 +908,6 @@ define-handlers [
 			on-key-down [doc path event] [
 				if is-key-printable? event [exit]
 				doc/edit key->plan event doc/selected
-				editor: path/-1
-				editor/adjust-origin					;-- move the viewport to make caret visible
 			]
 			;; these show/hide the caret - /draw will check if document is focused or not
 			on-focus   [doc path event] [invalidate doc]
