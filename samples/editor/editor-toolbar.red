@@ -58,6 +58,8 @@ icons: object [
 	]
 ]
 
+;; since document contains other documents, a toolbar button must know which one to affect
+;; this tracks which document was the last one in focus and affects it 
 last-focused-document: none
 define-handlers [
 	editor: extends 'editor [
@@ -69,6 +71,8 @@ define-handlers [
 
 ;@@ need a simpler way to put styles into global sheet
 extend VID/styles reshape [
+
+	;; attr is a text-based button style used in the toolbar
 	attr [
 		template: data-clickable
 		spec: [
@@ -84,12 +88,13 @@ extend VID/styles reshape [
 		]
 		facets: [string! data image! data block! command @(VID/props/font-styles)]
 	]
+	
+	;; icon is an image-based button style used in the toolbar
 	icon [
 		template: clickable
 		spec: [
 			weight: 0
 			margin: 5x10
-			font:   font-20
 			color:  none
 			actors: object [
 				on-over: function [space path event] [
@@ -98,6 +103,8 @@ extend VID/styles reshape [
 			]
 		]
 	]
+	
+	;; toolbar style that inserts whole layout (as payload) into it, as if it was declared using `style` VID/S keyword
 	editor-toolbar [
 		template: tube
 		spec:     [axes: [e s] weight: 0]

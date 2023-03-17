@@ -46,6 +46,7 @@ initial-text: [
 	p [size: 10 "Now go on and try to edit this text yourself!"]
 ]
 
+;; this wrapping is used to ease access to Spaces context
 do/expand with spaces/ctx [
 
 ;; 'bullet' template used for numbering paragraph lists
