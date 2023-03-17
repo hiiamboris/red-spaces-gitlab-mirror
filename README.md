@@ -26,7 +26,7 @@ Self-containing grid shows that there are no limitations: every space can contai
 | [MORE DEMOS IN /TESTS](tests/) |
 | :-: |
 
-| [LOOK INTO /PROGRAMS AS WELL](programs/) |
+| [LOOK INTO /PROGRAMS AS WELL](programs/) AND [SAMPLES](samples/) |
 | :-: |
 
 ## Docs
@@ -62,7 +62,7 @@ Good enough to write basic apps with. Design enhancements proposals and feature 
 | User guide | [Written](manual.md) |
 | Widget reference | [Written](reference.md) |
 | Creator's guide | [Written](creators.md) |
-| UI templates | None made so far |
+| UI samples | See [samples](samples/) |
 | Alternate stylesheets | [Glossy](stylesheets/#glossy-glossy-red) |
 
 
