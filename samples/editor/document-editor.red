@@ -4,10 +4,18 @@ Red [
 	license: BSD-3
 ]
 
+;; include Spaces core
 #include %../../everything.red
+
+;; color picker widget needed by the toolbar
 #include %../../widgets/color-picker.red
-#include %../../document.red
+
+;; document widget provides the foundation for the editor
+#include %../../widgets/document.red
+
+;; toolbar includes all the buttons and their associated actions
 #include %editor-toolbar.red
+
 
 ;; this block is used as VID/S layout for initial fill of editor's document
 ;; it's not super readable because there's no special design for it, since I think it's uncommon to pre-load editor with text
@@ -40,19 +48,22 @@ initial-text: [
 
 do/expand with spaces/ctx [
 
-;@@ pageup/down keys events
-
-;; used for numbering paragraph lists
+;; 'bullet' template used for numbering paragraph lists
 declare-template 'bullet/text [
-	text:   "^(2981)"
+	text:   "^(2981)"									;-- has bullet symbol by default, not number
 	format: does [rejoin [text " "]]
-	limits: 15 .. none
+	limits: 15 .. none									;-- set min width to align numbers better
 ]
 
+;; in-line and block code templates
 ;@@ can I make code templates generic enough to separate them?
 declare-template 'code-span/text []
 declare-template 'code-block/paragraph []
 
+;; fixed-width font for code
+code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
+
+;; helper function that draws background in styles
 underbox: function [
 	"Draw a box to highlight code parts"
 	size       [pair!]
@@ -69,9 +80,9 @@ underbox: function [
 	]
 ]
 
-code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
-
+;; extension of the stylesheet
 define-styles [
+	;; styles for newly introduced code templates
 	code-span: using [pen] [
 		font: code-font
 		margin: 4x0
@@ -84,7 +95,7 @@ define-styles [
 		below: [(underbox size 2 5)]
 	]
 	
-	;; makes grid cells outline visible
+	;; this just makes grid cells outline visible (by default grid has no background)
 	grid: [
 		spacing: margin: 1x1
 		below: [
@@ -126,6 +137,7 @@ request-url: function [
 	url
 ]
 
+;@@ currently there's no UI to resize the grid
 request-grid-size: function [] [
 	focus: spaces/ctx/focus/current						;-- remember focus (changed by new window)
 	accept: [if pair? attempt [loaded: load entry/text] [unview result: loaded]]
@@ -151,7 +163,7 @@ request-grid-size: function [] [
 ]
 
 				
-lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
+;; high level wrappers for basic `document/edit` functions, more suitable for toolbar actions
 editor-tools: context [
 	selected-range: function [doc [object!]] [
 		any [doc/selected  doc/caret/offset * 1x1]
@@ -187,7 +199,10 @@ editor-tools: context [
 		]
 	]
 
-	linkify-data: function [data [block!] command [block!]] [
+	linkify-data: function [
+		"Given text slice returns a single link containing it"
+		data [block!] command [block!]
+	][
 		rich/attributes/mark data 'all 'color hex-to-rgb #35F	;@@ I shouldn't hardcode the color like this 
 		rich/attributes/mark data 'all 'underline on 
 		link: first lay-out-vids [clickable [rich-content data= data] command= command]
@@ -195,7 +210,10 @@ editor-tools: context [
 	]
 	
 	;@@ do auto-linkification on space after url?! good for high-level editors but not the base one, so maybe in actor?
-	linkify: function [doc [object!] range [pair!] command [block!]] [
+	linkify: function [
+		"Convert given range into a link"
+		doc [object!] range [pair!] command [block!]
+	][
 		if range/1 = range/2 [exit]
 		;; each paragraph becomes a separate link as this is simplest to do
 		data: doc/edit [slice range]
@@ -213,7 +231,10 @@ editor-tools: context [
 		]
 	]
 	
-	linkify-selected: function [doc [object!] command [word! (command = 'pick) block!]] [
+	linkify-selected: function [
+		"Convert selection into a link"
+		doc [object!] command [word! (command = 'pick) block!]
+	][
 		if zero? span? range: selected-range doc [exit]
 		if command = 'pick [
 			if empty? url: request-url [exit]
@@ -226,7 +247,10 @@ editor-tools: context [
 		linkify doc range command
 	]
 					
-	codify: function [doc [object!] range [pair!]] [
+	codify: function [
+		"Convert given range into a code span or block"
+		doc [object!] range [pair!]
+	][
 		if range/1 = range/2 [exit]
 		slice: doc/edit [slice range]
 		either slice/name = 'rich-text-span [
@@ -242,13 +266,17 @@ editor-tools: context [
 		]
 	]
 	
-	codify-selected: function [doc [object!]] [
+	codify-selected: function [
+		"Convert selection into a code span or block"
+		doc [object!]
+	][
 		unless zero? span? range: selected-range doc [
 			codify doc range
 			doc/selected: none
 		]
 	]
 	
+	;; helpers that simplify work with bulleted/numbered paragraphs
 	get-bullet-text: function [para [object!]] [
 		all [
 			space? bullet: para/data/1
@@ -273,8 +301,10 @@ editor-tools: context [
 	;@@ maybe bullets should also inherit font/size/flags from the first char of the first paragraph?
 	;@@ also ideally on break/remove/cut/paste paragraph numbers should auto-update, but I'm too lazy
 	
-	;; replaces paragraph's bullet following that of the previous paragraph
-	auto-bullet: function [doc [object!] para [object!]] [
+	auto-bullet: function [
+		"Replace paragraph's bullet with the one that follows the previous paragraph"
+		doc [object!] para [object!]
+	][
 		pindex: index? find/same doc/content para
 		if prev: pick doc/content pindex - 1 [
 			text: either num: get-bullet-number prev
@@ -294,12 +324,18 @@ editor-tools: context [
 		]
 	]
 	
-	auto-bullet-caret: function [doc [object!]] [
+	auto-bullet-caret: function [
+		"Replace bullet of the current paragraph with the one following the previous paragraph"
+		doc [object!]
+	][
 		para: first doc/measure [caret->paragraph doc/caret/offset]
 		auto-bullet doc para
 	]
 	
-	debulletify: function [doc [object!] para [object!]] [
+	debulletify: function [
+		"Remove bullet or number from the paragraph"
+		doc [object!] para [object!]
+	][
 		if bulleted-paragraph? para [
 			offset: doc-ctx/get-paragraph-offset doc para
 			new-indent: if para/indent [compose [first: (i: para/indent/first) rest: (i)]]
@@ -310,7 +346,11 @@ editor-tools: context [
 		]
 	]
 	
-	bulletify: function [doc [object!] para [object!] /as number [integer!]] [
+	bulletify: function [
+		"Set bullet for the paragraph"
+		doc [object!] para [object!]
+		/as number [integer!] "Set a number instead of a bullet"
+	][
 		offset: doc-ctx/get-paragraph-offset doc para
 		bullet: make-space 'bullet []
 		if number [bullet/text: rejoin [number "."]]
@@ -322,19 +362,28 @@ editor-tools: context [
 		]
 	]
 	
-	bulletify-selected: function [doc [object!]] [
+	bulletify-selected: function [
+		"Set bullets for selected paragraphs"
+		doc [object!]
+	][
 		list: range->paragraphs doc selected-range doc
 		action: either bulleted-paragraph? list/1 [:debulletify][:bulletify]
 		foreach para list [action doc para]
 	]
 	
-	enumerate-selected: function [doc [object!]] [
+	enumerate-selected: function [
+		"Enumerate selected paragraphs"
+		doc [object!]
+	][
 		list: range->paragraphs doc selected-range doc
 		either num: get-bullet-number list/1 [debulletify doc list/1][bulletify/as doc list/1 1]
 		foreach para next list [auto-bullet doc para]
 	]
 	
-	insert-grid: function [doc [object!] size [word! (size = 'pick) pair!]] [
+	insert-grid: function [
+		"Insert grid of given size at caret location"
+		doc [object!] size [word! (size = 'pick) pair!] "Use 'pick to pop up a requester"
+	][
 		if size = 'pick [size: request-grid-size]
 		unless size [exit]
 		col-width: to integer! (max 100 doc/parent/size/x - 100) / size/x
@@ -346,7 +395,10 @@ editor-tools: context [
 		doc/edit [insert grid]
 	]
 	
-	change-selected-font: function [doc [object!] font [word! (font = 'pick) none! object!]] [ 
+	change-selected-font: function [
+		"Change font for the selection or for newly input text"
+		doc [object!] font [word! (font = 'pick) none! object!] "Use 'pick to pop up a requester"
+	][ 
 		if font = 'pick [font: request-font]
 		default font: [name: #[none] size: #[none]]
 		either zero? span? range: selected-range doc [
@@ -363,7 +415,10 @@ editor-tools: context [
 		]
 	]
 	
-	change-selected-color: function [doc [object!] color [word! (color = 'pick) none! tuple!]] [ 
+	change-selected-color: function [
+		"Change color for the selection or for newly input text"
+		doc [object!] color [word! (color = 'pick) none! tuple!] "Use 'pick to pop up a requester"
+	][ 
 		selected?: zero? span? range: selected-range doc
 		if color = 'pick [
 			old: either selected?
@@ -379,6 +434,8 @@ editor-tools: context [
 	
 ];editor-tools: context [
 
+
+;; extend Enter key of editor to auto-add bullets to new paragraph
 define-handlers [
 	editor: extends 'editor [
 		document: extends 'editor/document [
@@ -391,7 +448,8 @@ define-handlers [
 	]
 ]
 
-;; helpful layout funcs
+
+;; helpful layout funcs (used in the `initial-text` at the top of this file)
 bullet: does [make-space 'bullet []]
 home: https://codeberg.org/hiiamboris/red-spaces/src/branch/master/
 link: func [text path] [
@@ -403,6 +461,8 @@ link: func [text path] [
 code: func [text] [remake-space 'code-span [text: (text)]]
 pre:  func [text] [remake-space 'code-block [text: (text)]]
 
+
+;; build main editor window
 view reshape [
 	title "Spaces Document Editor"
 	host 640x400 [
@@ -410,7 +470,7 @@ view reshape [
 			editor-toolbar
 			editor: editor 50x50 .. 620x300 focus !(reshape initial-text)
 		]
-	] ;with [watch in parent 'offset]
+	]
 ]
 
 ; prof/show
