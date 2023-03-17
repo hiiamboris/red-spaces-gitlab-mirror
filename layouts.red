@@ -488,22 +488,28 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; i.e. it's more optimal to keep long-word in the 1st row than the 2nd
 			;; after a few iterations only indent2+width matters then
 	    	total: indent1
+	    	first?: yes
 	    	foreach [wordx width white? _] words [		;@@ use accumulate
 	    		unless white? [
-		    		total: max total min (indent1 + wordx/2) (indent2 + wordx/2 - wordx/1)
+	    			either first? [						;-- first non-white word is always on the first row 
+			    		total: max total (indent1 + wordx/2)
+			    		first?: no
+		    		][
+			    		total: max total min (indent1 + wordx/2) (indent2 + wordx/2 - wordx/1)
+		    		]
 	    		]
 	    	]
 	    	total
 	    ]
 	    #assert [
 	    	10 = get-min-total-width-2D [] 10 20
-	    	30 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
+	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
 	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 35
 	    	23 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 30
 	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 30
-	    	18 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 12
-	    	18 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
-	    	10 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 2
+	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 12
+	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
+	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 2
 	    ]
 	    
 		;; copy words into buffer, until it fits row-width (or until scaling factor worsens in 'scale mode)
@@ -532,8 +538,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				align <> 'scale
 				row-used-width > row-avail-width
 			][
-				#assert [words-period = offset? words words-end]	;-- single word in the row
-				#assert [force-wrap?]					;-- no-wrap mode must have adjusted the row-avail-width
+				; #assert [words-period = offset? words words-end]	;-- single word in the row -- doesn't check for white words before!
+				#assert [wrap?]							;-- no-wrap mode must have adjusted the row-avail-width
 				#assert [0 < span? word-sections]
 				#assert [not white?]					;-- whitespace does not increase used width
 				
@@ -545,12 +551,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				sec-added: 0
 				foreach w sec-slice [					;@@ use for-each
 					sec-width: sec-width + abs w
-					if new-width > row-avail-width [break]
-					sec-width: new-width
+					if new-used-width > row-avail-width [break]
+					sec-width: new-used-width
 					sec-added: sec-added + 1
 				]
 				either sec-added = 0 [					;-- add only a part of the section
-					#assert [new-width > row-avail-width]
+					#assert [new-used-width > row-avail-width]
 					sec-width: row-avail-width
 					;; modify the sections themselves for next iteration to work
 					sec-slice/1: (abs w) - sec-width * (sign? w)
