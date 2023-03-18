@@ -194,7 +194,7 @@ rich: context [											;@@ what would be a better name?
 	]
 	
 	attributes/mark: function [							;@@ maybe rename to set! ?
-		data  [block!] "modified"
+		data  [block!] "modified" (parse data [end | 1 3 [skip integer!] to end])
 		range [word! ('all = range) pair!]
 		attr  [word!]
 		value

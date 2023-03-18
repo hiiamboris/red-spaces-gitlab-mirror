@@ -376,8 +376,8 @@ editor-tools: context [
 		if font = 'pick [font: request-font]
 		default font: [name: #[none] size: #[none]]
 		either zero? span? range: selected-range doc [
-			rich/attributes/mark paint 1 0x1 'font font/name
-			rich/attributes/mark paint 1 0x1 'size font/size
+			rich/attributes/change doc/paint 'font font/name
+			rich/attributes/change doc/paint 'size font/size
 		][
 			doc/edit [
 				mark range 'font font/name
@@ -393,7 +393,7 @@ editor-tools: context [
 		"Change color for the selection or for newly input text"
 		doc [object!] color [word! (color = 'pick) none! tuple!] "Use 'pick to pop up a requester"
 	][ 
-		selected?: zero? span? range: selected-range doc
+		selected?: not zero? span? range: selected-range doc
 		if color = 'pick [
 			old: either selected?
 				[doc-ctx/pick-attr doc 1 + range/1 'color]
@@ -402,7 +402,7 @@ editor-tools: context [
 		]
 		either selected?
 			[doc/edit [mark range 'color color]]
-			[rich/attributes/mark doc/paint 1 0x1 'color color]
+			[rich/attributes/change doc/paint 'color color]
 		focus-space doc									;-- focus was destroyed by request-color ;@@ FIX it
 	]
 	
