@@ -12,6 +12,8 @@ They should be included after `%everything.red`.
 
 ---
 
-`color-picker.red` contains the basic widget for creating color requester dialogs:
+`requesters.red` contains `request` dialog constructor and the following default requesters:
+- `request-color` asks for color using `color-picker.red`, that contains the basic `color-picker` widget (palette, lightness)
 
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/widget-color-picker.png)
+

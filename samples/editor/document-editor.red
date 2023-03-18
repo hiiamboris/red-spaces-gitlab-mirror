@@ -7,14 +7,18 @@ Red [
 ;; include Spaces core
 #include %../../everything.red
 
-;; color picker widget needed by the toolbar
-#include %../../widgets/color-picker.red
-
-;; document widget provides the foundation for the editor
-#include %../../widgets/document.red
-
-;; toolbar includes all the buttons and their associated actions
-#include %editor-toolbar.red
+#process off
+do/expand [												;-- hack to avoid #include bugs!
+	;; requester widgets needed by the toolbar
+	#include %../../widgets/requesters.red
+	
+	;; document widget provides the foundation for the editor
+	#include %../../widgets/document.red
+	
+	;; toolbar includes all the buttons and their associated actions
+	#include %editor-toolbar.red
+]
+#process on
 
 
 ;; this block is used as VID/S layout for initial fill of editor's document
@@ -111,56 +115,25 @@ define-styles [
 
 
 ;@@ auto determine URLs during edit, after a space
-;@@ need to build a generic requester instead of adhoc ones
 request-url: function [
 	"Show a dialog to request URL input"
-	/from url [url!] "Initial (default) result"
+	/from url: https:// [url! string! none!] "Initial (default) result"
 ][
-	focus: spaces/ctx/focus/current						;-- remember focus (changed by new window)
-	view/flags [
-		title "Enter an URL"
-		host [
-			vlist [
-				row [
-					text "URL:" entry: field 300 focus on-key [
-						if event/key = #"^M" [unview set 'url as url! entry/text]
-					]
-				]
-				row [
-					button 80 "OK"     [unview set 'url as url! entry/text]
-					<->
-					button 80 "Cancel" [unview]
-				]
-			]
-		]
-	] 'modal
-	focus-space focus									;@@ TODO: need separate focus per window!
-	url
+	request "Enter an URL"
+		[row middle [text "URL:" entry: field text= url focus 300]]
+		[@"OK" [as url! copy entry/text] "Cancel"]
 ]
 
 ;@@ currently there's no UI to resize the grid
 request-grid-size: function [] [
-	focus: spaces/ctx/focus/current						;-- remember focus (changed by new window)
-	accept: [if pair? attempt [loaded: load entry/text] [unview result: loaded]]
-	view/flags [
-		title "Enter desired grid size"
-		host [
-			vlist [
-				row [
-					text "Size:" entry: field 300 text= "2x2" focus on-key [
-						if event/key = #"^M" accept
-					]
-				]
-				row [
-					button 80 "OK"     [do accept]
-					<->
-					button 80 "Cancel" [unview]
-				]
-			]
+	accept: [unless pair? attempt [loaded: load entry/text] [exit] loaded]
+	request "Enter desired grid size" [
+		row middle [
+			text "Size:"
+			entry: field 300 focus text= "2x2"
+			on-key [if event/key = #"^M" accept]
 		]
-	] 'modal
-	focus-space focus									;@@ TODO: need separate focus per window!
-	result
+	] [@"OK" [do accept] "Cancel"]
 ]
 
 				

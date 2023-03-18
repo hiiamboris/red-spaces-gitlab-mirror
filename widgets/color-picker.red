@@ -36,7 +36,7 @@ context expand-directives with spaces/ctx [
 		saturation: 0%		#type =? [number!] :on-HSL-change
 		lightness:  50%		#type =? [number!] :on-HSL-change
 		color:      gray	#type =? [tuple!]  :on-color-change
-		spaces:  object [
+		spaces: object mapparse/deep [set x issue!] [
 			lightness: make-space 'rectangle [
 				type:  'lightness
 				weight: 0
@@ -50,7 +50,7 @@ context expand-directives with spaces/ctx [
 					pos: clip 3 width - 3 width * parent/lightness
 					compose [
 						line-width 1
-						fill-pen linear 0.0.0 255.255.255 box 0x0 (size)	;-- lightness scale
+						fill-pen linear #000 #FFF box 0x0 (size)	;-- lightness scale
 						fill-pen off box (pos - 3 by 0) (pos + 3 by 20)		;-- selected value outline ;@@ or draw arrows below/above?
 					]
 				]
@@ -62,7 +62,7 @@ context expand-directives with spaces/ctx [
 					parent/saturation: 100% - clip 0 1 offset/y / size/y
 					parent/hue:         360 * clip 0 1 offset/x / size/x
 				]
-				draw: function [/on canvas] [
+				draw: function [/on canvas /local x] [
 					set [canvas: fill:] decode-canvas canvas	;@@ use the fill flag?
 					width: first canvas: finite-canvas canvas
 					height: canvas/y * max 0 fill/y
@@ -70,28 +70,22 @@ context expand-directives with spaces/ctx [
 					hue: clip 0 1 parent/hue / 360 // 1
 					sat: clip 0 1 (1 - parent/saturation)
 					lgt: clip 0 1 parent/lightness
-					shade: either 0.5 >= lgt [
-						lgt * 2 * 0.0.0.255
-					][
-						1 - lgt * 2 * 0.0.0.255 + 255.255.255
-					]
+					shade: either 0.5 >= lgt
+						[    lgt * 2 * #000000FF]
+						[1 - lgt * 2 * #000000FF + #FFF]
 					pos: as-pair width * hue height * sat
-					compose [
+					drawn: compose [
 						line-width 1
-						fill-pen linear					;-- tuples hardcoded to withstand possible override
-							255.0.0 0.0  255.255.0 (1 / 6)  0.255.0 (2 / 6)
-							0.255.255 (3 / 6)  0.0.255 (4 / 6)  255.0.255 (5 / 6)  255.0.0 1.0
+						fill-pen linear #F00 #FF0 #0F0 #0FF #00F #F0F #F00	;-- tuples hardcoded to withstand possible override
 						box 0x0 (size)					;-- palette itself
-						fill-pen linear
-							128.128.128.255 0.0
-							128.128.128.0   1.0 0x0 (0 by size/y)
+						fill-pen linear #808080FF #80808000 0x0 (0 by size/y)
 						box 0x0 (size)					;-- fade into gray
 						fill-pen (shade) box 0x0 (size)	;-- darkening/whitening by lightness
 						fill-pen off clip 0x0 (size) circle (pos) 4	;-- selected color outline
 					]
 				]
 			]
-		]
+		] [hex-to-rgb x]
 		content: reduce with spaces [lightness palette]
 	]
 	
@@ -111,24 +105,4 @@ context expand-directives with spaces/ctx [
 	]
 	
 	; view [host [picker: color-picker 200x200]]
-]
-
-request-color: function [								;@@ suffers from #5214 unfortunately
-	"Show a dialog to request color input"
-	/from color [tuple! none!] "Initial (default) result"
-][
-	view/flags [
-		title "Pick a color..."
-		host [
-			vlist [
-				cp: color-picker 200x200 color= any [color gray]
-				box 200x20 white react [color: cp/color]
-				hlist [
-					button 80 "OK" focus [unview set 'color cp/color]
-					button 80 "Cancel"   [unview]
-				]
-			]
-		] on-key [if event/key = #"^[" [unview]]
-	] 'modal
-	color
 ]
