@@ -150,6 +150,7 @@ rich: context [											;@@ what would be a better name?
 	]
 	#assert [[backdrop 10.20.30] = attributes/to-rtd-flag 'backdrop 10.20.30]
 		
+	value-types!: make typeset! [tuple! logic! string! integer!]
 	rtd-attrs: make hash! [bold italic underline strike color backdrop size font]
 	attributes/make-rtd-flags: function [
 		"Make an RTD flags block out of data attributes"
@@ -162,6 +163,9 @@ rich: context [											;@@ what would be a better name?
 		foreach [range attrs] ranges [ 
 			flags: clear []
 			foreach [attr value] attrs [						;@@ use map-each
+				unless find value-types! type? :value [
+					ERROR "rich-content attribute value cannot be (type? :value) = (mold/flat/part :value 60)"
+				]
 				append flags only attributes/to-rtd-flag to word! attr value	;-- only collects attributes supported by RTD
 			]
 			unless empty? flags [
