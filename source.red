@@ -152,6 +152,7 @@ rich: context [											;@@ what would be a better name?
 		
 	value-types!: make typeset! [tuple! logic! string! integer!]
 	rtd-attrs: make hash! [bold italic underline strike color backdrop size font]
+	
 	attributes/make-rtd-flags: function [
 		"Make an RTD flags block out of data attributes"
 		data [block!] limits [pair!] "segment to extract"		;-- segment used in to-spaces to create individual paragraphs
@@ -162,16 +163,15 @@ rich: context [											;@@ what would be a better name?
 		ranges: extract-ranges data
 		foreach [range attrs] ranges [ 
 			flags: clear []
+			pair: ~/ranges/to-rtd-pair range
 			foreach [attr value] attrs [						;@@ use map-each
 				unless find value-types! type? :value [
 					ERROR "rich-content attribute value cannot be (type? :value) = (mold/flat/part :value 60)"
 				]
-				append flags only attributes/to-rtd-flag to word! attr value	;-- only collects attributes supported by RTD
+				attr: attributes/to-rtd-flag to word! attr value
+				if attr [append append flags pair attr]			;-- only collects attributes supported by RTD
 			]
-			unless empty? flags [
-				pair: ~/ranges/to-rtd-pair range
-				append append result pair flags
-			]
+			append result flags
 		]
 		copy result
 	]
