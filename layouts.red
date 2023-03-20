@@ -842,7 +842,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				nrows: nrows + 1
 			]
 			total-2D/y: row-y2-2D
-			drawn: compose/only [translate (margin * 2) (copy layout-drawn)]
+			drawn: compose/only [translate (margin) (copy layout-drawn)]
 			total-1D': (last x-1D-1D'-points) by total-1D/y
 			
 			frame: make frame! compose/only [
