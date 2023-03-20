@@ -99,6 +99,7 @@ do/expand with spaces/ctx [
 		]
 		rich-content: [
 			default font: styling/fonts/text/1
+			margin: font/size - svf/size * 0x1
 		]
 		cell/rich-content: [
 			default font: styling/fonts/text/1
