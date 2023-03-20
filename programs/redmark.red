@@ -147,9 +147,15 @@ red-mark: function [
 		on-resize :resize on-resizing :resize
 		host: host 600x400 [
 			style code-box: box color= opaque 'text 5% align= -1x0 margin= 10
-			scrollable content-flow= 'vertical [vlist !(decode-markdown read/lines source)]
+			; scrollable content-flow= 'vertical [vlist !(decode-markdown read/lines source)]
+			list-view with [
+				jump-length: 800
+				pages: 30
+				wrap-data: func [data] [data]
+				source: lay-out-vids !(decode-markdown read/lines source)
+			]
 		]
-		; at 0x0 text 0x0 rate 0:0:3 on-time [prof/show prof/reset]
+		at 0x0 text 0x0 rate 0:0:3 on-time [prof/show prof/reset]
 	] 'resize
 ]
 
