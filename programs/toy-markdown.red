@@ -6,10 +6,15 @@ Red [
 ]
 
 #include %../../common/tabs.red
+#include %../../common/forparse.red
 
 context [
 	join: function [lines [block!]] [
 		to string! next map-each/eval line lines [[#"^/" line]] 
+	]
+	flat: function [text [string!]] [
+		parse text [any [to #"^/" change skip #" "]]
+		text
 	]
 	
 	space!: charset " ^-"
@@ -66,7 +71,7 @@ context [
 				append list make-space 'code [text: code]
 			)
 		|	change ["&" copy name some alpha! ";"] (decode-entity name)	;@@ entity can be numeric too
-		|	change <br> "^/"
+		|	<br> =flush= (append list "^/")				;@@ this will only work inside grid cell, since it uses a vlist
 		|	[
 				[
 					set image opt "!"
@@ -119,6 +124,14 @@ context [
 		list
 	]
 	
+	decode-block: function [text [string!]] [
+		list: decode-text text
+		lines: make [] 4
+		=line=: [keep copy line any [not "^/" skip]]
+		parse list [collect after lines [=line= any ["^/" =line=]]]	;@@ use split when it works on blocks
+		map-each/eval line lines [['rich-content line]]
+	]
+	
 	glue-lines: function ["Glue together lines ending with a backslash" lines [block!]] [
 		forall lines [
 			if #"\" = last lines/1 [
@@ -132,7 +145,7 @@ context [
 		aligns: clear []
 		=cell=: [
 			copy text any [non-pipe! | "\" opt skip] "|"
-			keep pick (compose/only [rich-content (decode-text text)])
+			keep pick (compose/only [vlist (decode-block text)])
 		]
 		=line=: [0 3 space! "|" some =cell= any space! end keep ('return)]
 		=align=: [
@@ -149,7 +162,7 @@ context [
 		compose/deep/only pick [
 			;; wrap grid into a scrollable in case it is too wide, to prevent the rest of the text from stretching
 			[scrollable [grid pinned= 0x1 alignment= (copy aligns) (content)]]
-			[rich-content (decode-text join lines)]		;-- fall back to text if table parsing fails
+			[rich-content (decode-text flat join lines)]		;-- fall back to text if table parsing fails
 		] ok = yes
 	]
 	
@@ -185,7 +198,7 @@ context [
 			append vid only switch scope [
 				pre [compose/deep/only [scrollable [pre (detab/size join buffer 4)]]]
 				text numbers [
-					compose/only [rich-content (decode-text join buffer)]
+					compose/only [rich-content (decode-text flat join buffer)]
 				]
 				bullets [
 					indent: 5
@@ -194,7 +207,7 @@ context [
 						row tight [
 							; <-> (indent by 0)			;@@ stupid compiler compiles <-> as something other than word
 							stretch (indent by 0)
-							rich-content (decode-text join buffer)
+							rich-content (decode-text flat join buffer)
 						]
 					]
 				]
@@ -202,17 +215,17 @@ context [
 					compose/deep/only [
 						row tight spacing= 5 [
 							box 5 (opaque 'text 50%)
-							rich-content (decode-text join buffer)
+							rich-content (decode-text flat join buffer)
 						]
 					]
 				]
 				heading [compose/only [
-					rich-content (append copy styling/flags/headings/:level decode-text join buffer)
+					rich-content (append copy styling/flags/headings/:level decode-text flat join buffer)
 					font= pick styling/fonts/text (1 + level)
 				]]
 				break [[thematic-break]]
 				grid [decode-table buffer]
-				; html [decode-block-html join buffer]
+				; html [decode-block-html flat join buffer]
 			]
 			clear buffer
 		)]
