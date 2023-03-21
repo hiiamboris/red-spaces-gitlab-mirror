@@ -11,9 +11,9 @@ Official URL of this project: [https://codeberg.org/hiiamboris/red-spaces](https
 
 | Spiral editable field | Grid-view |
 |---|---|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-view.gif) |
+| [ ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field-small.gif) ](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field.gif) | [ ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-view-small.gif) ](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-view.gif) |
 |  **Infinite list of items *of varying size*** | **Self-containing grid** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-infinite-list.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-self-containing-grid.gif) |
+| [ ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-infinite-list-small.gif) ](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-infinite-list.gif) | [ ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-self-containing-grid-small.gif) ](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-self-containing-grid.gif) |
 
 Spiral Field demo reuses the normal rectangular `field` space (that contains all the keyboard logic and everything) by transforming hittest coordinates in a spiral way. Rendering logic of course had to be rewritten because such complex transformations are far beyond Draw capabilities. That's why it's a bit laggy: it renders each character individually.
 
