@@ -37,16 +37,22 @@ view/no-wait/options/flags [
 		style cell: cell margin= 3
 		row tight [
 			column tight weight= 1 [
+				box limits= 0x0 .. 999x20 [text "LEFT"]
 				cell left   [rich-content align= 'left]
 				cell center [rich-content align= 'center]
+				box limits= 0x0 .. 999x20 [text "CENTER"]
 			]
 			column tight weight= 1 [
+				box limits= 0x0 .. 999x20 [text "RIGHT"]
 				cell right  [rich-content align= 'right]
 				cell left   [rich-content align= 'fill]
+				box limits= 0x0 .. 999x20 [text "FILL"]
 			]
 			column tight weight= 1 [
+				box limits= 0x0 .. 999x20 [text "UPSCALE"]
 				cell right  [rich-content align= 'upscale]
 				cell left   [rich-content align= 'scale]
+				box limits= 0x0 .. 999x20 [text "SCALE"]
 			]
 		]
 	] react [
