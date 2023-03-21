@@ -8,7 +8,7 @@ include_toc: true
 Explains how each Space template works.
 
 A few terms for less confusion:
-- *style*, *template style*, *styling* - refers to what happens in [`styles.red`](styles.red), i.e. change of visual appearance of a space
+- *style*, *template style*, *styling*, *stylesheet* - refers to what happens in [`styles.red`](styles.red), i.e. change of visual appearance of a space
 - *VID/S style* - refers to `style` keyword in VID/S and `spaces/VID/styles` map
 - *template* - refers to a named block used to instantiate a space, held in `spaces/templates` map (main topic of this document)
 
@@ -171,7 +171,7 @@ Some other facets are not mandatory but have a **reserved** meaning (cannot be u
 | `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[child [offset: pair! size: pair!] child ...]`.<br> Used for hittesting and tree iteration. |
 | `into` | `func [xy [pair!]]`<br>`-> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
 | `weight` | `number!` | Used for relative scaling of items in containers like `tube`. `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
-| `sections` | `block!` `none!` `func [] -> block! or none!` | Used only by rich-paragraph and it's derivatives, to split their items. Documented [there](#rich-paragraph). |
+| `sections` | `block!` `none!` `func [] -> block! or none!` | Used by text templates (anything that can be wrapped to another line). Documented [in rich-paragraph](#rich-paragraph). |
 | `on-invalidate` | <pre>func [<br>	space [object!]<br>	cause [object! none!]<br>	scope [word! none!]<br>]</pre> | Custom invalidation function, if cache is managed by the space itself. |
 
 ---
@@ -252,19 +252,9 @@ Just an elastic spacer between other UI items (see [example in VID/S](vids.md#co
 Has weight of `1`, which makes it stretch. See [VID/S manual](vids.md#weight-effect) on how weight works.
 
 
-## Break
-
-Space that represents linebreaks in [`rich-paragraph`](#rich-paragraph) and it's derivatives. Can be styled to alter it's length or even draw some graphics on it.
-
-| facet  | type  | description |
-|-|-|-|
-| `length` | integer! | vertical height of the linebreak in pixels |
-| `size` | pair! | set automatically by `draw`, from `length` and container's width |
-
-
 ## Rectangle
 
-Draws a simple box across it's `size`. To be used in other spaces (as interactive region). Currently used only to draw scrollbar's thumb.
+Draws a simple box across it's `size`. To be used in other spaces (as interactive region). Currently used only to draw scrollbar's thumb and caret.
 
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rectangle.png) | `rectangle with [margin: 5 size: 80x60]` |
@@ -321,7 +311,10 @@ Basic single-line text renderer.
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color |
-| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
+| `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
+| `selected` | pair! none! | when set, draws a selection on the text; can be styled as `text/selection` |
+| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
 
 ## Paragraph
 
@@ -330,13 +323,18 @@ Basic multi-line text renderer. Wrap margin is controlled by canvas size, which 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-paragraph.png) | <pre>paragraph with [<br>    margin: 20x10<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
 |-|-|
 
+Inherits all of `text` facets:
+
 | facet  | type  | description |
 |-|-|-|
 | `text` | string! | obvious |
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color |
-| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); `flags: [wrap]` is the default, without it would behave like `text` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); `flags: [wrap]` is the default, without it would behave like `text` |
+| `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
+| `selected` | pair! none! | when set, draws a selection on the text; can be styled as `paragraph/selection` |
+| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
 
 ## Link
 
@@ -353,13 +351,30 @@ Inherits all of `paragraph` facets:
 | `margin` | pair! integer! | horizontal and vertical space between the bounding box and text itself; should be set in styles |
 | `font` | object! | an instance of `font!` object; should be set in styles |
 | `color` | tuple! none! | if set, affects text color; defaults to light blue |
-| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `ellipsize`); defaults to `flags: [wrap underline]` |
+| `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); defaults to `flags: [wrap underline]` |
+| `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
+| `selected` | pair! none! | when set, draws a selection on the text; can be styled as `link/selection` |
+| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
 
 Introduces new facets:
 
 | facet  | type  | description |
 |-|-|-|
 | `command` | block! | code to evaluate when link gets clicked; by default opens `text` in the browser |
+
+## Caret
+
+A `rectangle`-based template that represents the caret within text tempates.
+
+Exposes the following facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `width` | integer! | caret width in pixels (height is inferred from the font) |
+| `offset` | integer! | zero-based integer caret offset within the parent |
+| `side` | word! | `left` or `right` - determines displayed caret location at line wraps: `left` means end of the previous row, `right` means start of the next row |
+
+Note that `offset` and `side` do not affect the caret itself, but serve as hint for the parent on where to draw it.
 
 
 ## Box
@@ -534,54 +549,21 @@ Inherits all of `text` facets:
 | `color` | tuple! none! | if set, affects text color |
 | `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
 
+Adds new facets:
+
 | facet  | type  | description |
 |-|-|-|
 | `origin` | integer! | current offset of the text in the field in pixels (non-positive) |
 | `selected` | pair! none! | currently selected part of text: `BEGINxEND`, where `begin` should not be bigger than `end` |
 | `selection` | rectangle space object! | can be styled as `field/selection` |
-| `caret` | rectangle space object! | can be styled as `field/caret` |
-| `caret/width` | integer! | `caret` space width in pixels |
-| `caret/offset` | integer! | current caret offset in chars |
-| `caret/visible?` | logic! | whether caret is currently visible or not (focus indicator) |
-| `history` | block! | internally used for undo/redo |
+| `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
+| `caret/look-around` | integer! | how close caret can come to field's margins; defaults to 10 pixels |
+| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
 
 Note: `caret/offset` and `selected` facets use *offsets from head* as coordinates:
 - `0` = no offset from the head, i.e. before the 1st char
-- `1` = offset = 1, i.e. after 1st char
+- `1` = offset=1, i.e. after 1st char
 - `length? text` = offset from the head = text length, i.e. after last char
-
-Field supports it's own *macro dialect*, invoked on it by it's `edit` function. Thanks to it, it's possible to control field behavior on a higher level, ensuring certain consistency level.
-
-The dialect supports following commands:
-
-| Command & Arguments | Description |
-|-|-|
-| `undo` | Undoes the last change |
-| `redo` | Redoes the last undone change |
-| `copy selected` | Copy current selection into clipboard (no effect if no selection) |
-| `copy <pair!>` | Copy slice from pair/1 to pair/2 offsets into clipboard |
-| `select none` | Deselects everything |
-| `select all` | Selects everything |
-| `select head` | Selects everything from caret to the head |
-| `select tail` | Selects everything from caret to the tail |
-| `select prev-word` | Selects everything from caret back until the start of the word |
-| `select next-word` | Selects everything from caret forth until the end of the word |
-| `select <pair!>` | Selects from pair/1 to pair/2 offsets |
-| `select by <integer!>` | Selects from caret to caret+`integer` offset (can be negative) |
-| `select to <integer!>` | Selects from caret to `integer` offset |
-| `move head` | Move caret to the head |
-| `move tail` | Move caret to the tail |
-| `move prev-word` | Move caret back until the start of the word |
-| `move next-word` | Move caret forth until the end of the word |
-| `move sel-bgn` | Move caret to the start of the selection (no effect if no selection) |
-| `move sel-end` | Move caret to the end of the selection (no effect if no selection) |
-| `move by <integer!>` | Move caret by `integer` number of chars (can be negative) |
-| `move to <integer!>` | Move caret to `integer` offset |
-| `remove prev-word` | Delete text from caret back until the start of the word |
-| `remove next-word` | Delete text from caret forth until the end of the word |
-| `remove selected` | Delete currently selected text |
-| `remove <integer!>` | Delete from caret to caret+integer (can be negative) |
-| `insert <string!>` | Insert (trimmed) string at caret, shifting it to the end of insertion |
 
 
 ## Area
@@ -671,6 +653,7 @@ Wrapper for bigger (but finite) spaces. Automatically shows/hides scrollbars and
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
 | `scroll-timer` | timer space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
+| `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
 
 <details><summary>How to understand <code>content-flow</code>...</summary>
 
@@ -753,6 +736,7 @@ Inherits all of `scrollable` facets:
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
+| `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
 
 Introduces new facets:
 
@@ -910,6 +894,7 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
+| `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
@@ -1106,6 +1091,7 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 | `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
+| `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
 | `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
 | `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `roll` | function! | can be called to manually check for a jump |
@@ -1141,7 +1127,7 @@ Pagination works as explained for [`inf-scrollable`](#inf-scrollable). The only 
 
 ## Rich-paragraph
 
-A `container` specially designed to display mixed content (text, and other spaces including images). Arranges spaces using `paragraph` layout. Used by [`rich-content`](#rich-content).
+A `container` specially designed to display mixed content (text, and other spaces, including images). Arranges spaces using `paragraph` layout. Used by [`rich-content`](#rich-content).
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-paragraph.png) | <pre>rich-paragraph [<br>	text "some text "<br>	image data= draw 40x30 [<br>		triangle 3x25 37x25 20x5<br>		triangle 13x15 27x15 20x25<br>	]<br>	text " with an image"<br>]</pre> |
 |-|-|
@@ -1153,10 +1139,9 @@ Like [`tube`](#tube), it is a flow layout, but with the following major differen
 | optimized for | UI rows and columns | rich text |
 | size fitting | will try to stretch it's content based on weight, which may require up to 3 rendering attempts | renders content once on an infinite canvas |
 | orientation | exposes 2 axes that control primary and secondary direction | always lays out left-to-right, arranges in top-down lines |
-| alignment | 9 fixed alignments along it's two axes | 4 fixed horizontal alignments (left, right, center, fill) and a continuous vertical alignment controlled by baseline location (0% to 100% of line height) |
+| alignment | 9 fixed alignments along its two axes | 6 fixed horizontal alignments (left, right, center, fill, scale, upscale) and a continuous vertical alignment controlled by baseline location (0% to 100% of line height) |
 | splitting | content items cannot be split | content items can be split at provided sections (see below) |
 | intervals | only fixed uniform `spacing` between items | sections may denote any part of item as 'empty', and these are omitted from output at line boundaries |
-| special treatment | none | [`break`](#break) spaces are used to delimit lines and their width is set to that of the layout |
 
 
 Inherits all of `container` facets:
@@ -1164,40 +1149,56 @@ Inherits all of `container` facets:
 | facet  | type  | description |
 |-|-|-|
 | `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
-| `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+| `items` | `func [/pick i [integer!] /size]` | paragraph does not support filtering, so `items` facet should be used |
 
 Adds new facets:
 
 | facet  | type | description |
 |-|-|-|
 | `margin` | pair! | horizontal and vertical space between the items and the bounding box |
-| `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
-| `align` | word! | horizontal alignment: one of `[left center right fill]`; default = left |
+| `spacing` | integer! | vertical space between adjacent rows |
+| `align` | word! | horizontal alignment: one of `[left center right fill scale upscale]`; default = left |
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
+| `indent` | none! block! | first and the other rows indentation from the left, in the form: `[first: integer! rest: integer!]`; both `first` and `rest` values have to be present, e.g. `[first: 15 rest: 30]` |
+| `force-wrap?` | logic! | on limited width canvas: when `on`, wraps spaces that are wider than the width; when `off`, canvas width can be extended to accomodate the widest space and indentation |
+| `format` | `func [] -> string!` | formats rich paragraph contents as plain text (e.g. to paste elsewhere) |
 
-Alignments look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
+
+**Alignments** look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
 
 <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-paragraph-alignments.png></img>
 
-`fill` alignment can scale lines up to 10% to align to both left and right margins (which looks cool), but left-aligns if that fails.
+`fill` alignment is the slowest one since it has to split paragraphs into multiple fragments that can then be uniformly spaced.\
+`upscale` horizontally scales every row until it fills the total width.\
+`scale` is similar to `upscale` but can both upscale and downscale the row, choosing scale ratio closest to 1 for each row.\
+Both `scale` and `upscale` alignments are not meant for documents, but for fitting text into straight blocks.
 
-Note that `rich-paragraph` can split *any* space that appears in it into any number of lines (provided it supports `sections`). It does so using Draw `clip` command. This allows spaces to keep their simple box geometry without any special treatment and complex drawing logic.
+Note that `rich-paragraph` can split *any* space that appears in it into a number of rows (provided it supports `sections`). Final look is the result of clipping and scaling. This allows spaces to keep their simple box geometry without any special treatment and complex drawing logic.
+
+### Sectioning
 
 `sections` is a special facet reserved in all spaces for use in rich-paragraph. It can equal to:
 - `none` denoting that space cannot be split
-- `block!` of integers, representing a list of horizontal interval widths for this space on the last frame, where:
-  - positive integer denotes a mandatory inteval (always made visible)
-  - negative integer denotes an empty interval (whitespace, margin, spacing) which is excluded from output when computing breakpoints and alignment
-  - sum of absolute values of inteval widths must equal total space width!
-  - e.g.: for a `box margin= 10x5 [text "abc"]` sections may return: `[-10 19 -10]` where 19 is `text` width
+- `block!` of integers, representing a list of horizontal interval widths for this space on the last frame
 - `function!` returning `none` or `block!` (most common case)
 
-`sections` are defined for text-based and some other spaces out of the box. You can define it in your own space (including containers) to let it be split.
+Each returned interval width can be:
+- a positive integer denotes a mandatory inteval (always made visible), usually a single word of text
+- a negative integer denotes an empty interval (whitespace) which can be hidden by the alignment line, or stretched to fill the row
+  
+Constraints:
+- zero is reserved for now and should never appear in the block
+- sum of absolute values of inteval widths must equal total space width
+- generally margin should be treated as mandatory (this way margins won't be stripped off the space when it comes near the edge), while spacing should be treated as empty
+
+Example: for `text margin= 10x5 "hello world"` sections may return: `[36 -4 40]` where 36 is the width of `hello` plus left margin, 4 is the width of whitespace, 40 is the width of `world` plus right margin.
+
+`sections` are defined for the text-based templates, and containers that usually wrap them. This facet can be freely added to any other spaces that should be wrappable.
 
 
 ## Rich-content
 
-A `rich-paragraph` conainer that automatically fills it's `content` from given `source` (dialect).
+A `rich-paragraph` that adds the ability to edit content and fill it from the source dialect. It is not interactive out of the box (see [`editor`](#editor) for that).
 
 | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-content.png) | `rich-content ["normal " bold "bold" italic " italic " /bold size: 15 underline "big" /underline /size " text"]` |
 |-|-|
@@ -1210,38 +1211,100 @@ Source dialect summary (not meant to be concise, meant to be easy to parse):
 | bold | starts with `bold`, ends with `/bold` |
 | italic | starts with `italic`, ends with `/italic` |
 | underline | starts with `underline`, ends with `/underline` |
+| strikethrough | starts with `strike`, ends with `/strike` |
 | font face | starts with `font: "Font name"`, ends with `/font` |
 | font size | starts with `size: integer!`, ends with `/size` |
 | font color | starts with `color: tuple!` or `color: name` (e.g. `blue`), ends with `/color` |
-| link target | starts with `command: [code to eval]`, ends with `/command`, assigns click action to part of the content (affects both text and spaces) |
+| background color | starts with `backdrop: tuple!` or `backdrop: name` (e.g. `blue`), ends with `/backdrop` |
 | arbitrary spaces | any space! object met in the `source` is passed into `content` |
 
-Note that every space object inserted constitutes a single item (caret cannot enter it), even if it's a text space, because each caret offset should correspond to a range of source offsets. While strings and chars provide caret offsets between all chars.
+Note that every space object inserted constitutes a single item (caret cannot enter it), even if it's a text space, because there is no easy way to map integer caret offset to addresses inside other objects and back.
  
-[comment]: # (perhaps I should split text spaces by chars for caret movement? undecided)
-
 Inherits all of `rich-paragraph` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of space object!s | filled automatically when `source` is assigned |
-| `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+| `content` | block! of space object!s | filled by `decode` (done automatically in VID/S) or on `data` override, should not be changed directly |
+| `items` | `func [/pick i [integer!] /size]` | paragraph does not support filtering, so `items` facet should be used |
 | `margin` | pair! | horizontal and vertical space between the items and the bounding box |
-| `spacing` | pair! | horizontal or vertical space between adjacent items(x) and lines(y) |
-| `align` | word! | horizontal alignment: one of `[left center right fill]`, default = left |
+| `spacing` | integer! | vertical space between adjacent rows |
+| `align` | word! | horizontal alignment: one of `[left center right fill scale upscale]`, default = left |
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
+| `indent` | none! block! | first and the other rows indentation from the left, in the form: `[first: integer! rest: integer!]`; both `first` and `rest` values have to be present, e.g. `[first: 15 rest: 30]` |
+| `force-wrap?` | logic! | on limited width canvas: when `on`, wraps spaces that are wider than the width; when `off`, canvas width can be extended to accomodate the widest space and indentation |
+| `format` | `func [] -> string!` | formats rich paragraph contents as plain text (e.g. to paste elsewhere) |
 
 Adds new facets:
 
 | facet  | type | description |
 |-|-|-|
-| `source` | block! | dialected data explained above, used to fill `content` |
+| `decode` | `func [source [block!]]` | fills `content` from dialected data given in the format explained above |
 | `font` | object! | an instance of `font!` object; sets default font to use; should be set in styles |
 | `color` | tuple! none! | if set, affects default text color |
-| `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); can only be set programmatically; will display boxes of`rich-content/selection` style |
-| `point-to-caret` | `func [xy [pair!]] -> integer!` | gets caret offset closest to given point |
-| `caret-to-box` | `func [caret [integer!] side [word!]] -> [xy1 xy2]` | gets caret box for chosen zero-based offset and side (left/right - matters on line split boundaries) |
-| `apply-attributes` | `func [space [object!] attrs [map!]] -> space` | may be overridden to carry attributes met in the source over into the space (e.g. RedMark uses it to apply blue color and underscoring to code spans); must return the space after modification |
+| `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); makes it display boxes of `rich-content/selection` style |
+| `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
+| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
+| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
+| `data` | block! | internal content representation (see below); updates `content` when set |
+
+`data` facet is a block of `[item attr ...]` pairs, where:
+- `item` is either a char! value or a space object!
+- `attr` is a set of text attributes (bold, italic, color, etc) for the previous item
+
+`data` can be modified by high level `edit` functions or manually (in latter case the facet must be `set` after making changes to trigger internal updates). 
+
+
+## Document
+
+A vertical list of `rich-content` spaces. Represents a non-interactive hypertext document. Provides global (cross-paragraph) caret and selection.
+
+Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
+
+Inherits all of `list` facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `content` | block! of `rich-content` object!s | paragraphs to display; document only supports `rich-content` spaces, anything else should be put inside `rich-content` |
+| `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+| `axis` | word! | set to `y` and should not be changed |
+| `margin` | integer! pair! | horizontal and vertical space between the paragraphs and the bounding box; should not be less than 1x0, or caret may become invisible at the end of the longest line |
+| `spacing` | integer! | space between adjacent paragraphs |
+
+Adds new facets:
+
+| facet  | type | description |
+|-|-|-|
+| `length` | integer! | read-only (updated by edits) length of the document in items |
+| `caret` | [`caret` space object!](#caret) | controls caret location and width; can be styled as `rich-content/caret` |
+| `selected` | pair! none! | currently selected document part: `BEGINxEND` (two zero-based offsets) |
+| `paint` | block! | current (for newly inserted chars) set of attributes updated on caret movement; format: `[attr-name attr-value ...]` |
+| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
+| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
+
+
+## Editor
+
+A scrollable wrapper around `document`. Represents an interactive editable hypertext document and defines most common event handlers for editing.
+
+Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
+
+Inherits all of `scrollable` facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `origin` | pair! | nonpositive offset of `content` within editor's viewport |
+| `content` | object! none! | set to a `document` space and should not be changed |
+| `content-flow` | word! | set to 'vertical and should not be changed |
+| `hscroll` | scrollbar space object! | horizontal scrollbar; can be styled as `editor/hscroll` |
+| `hscroll/size/y` | integer! | height of the horizontal scrollbar; could be set in styles |
+| `vscroll` | scrollbar space object! | vertical scrollbar; can be styled as `editor/vscroll` |
+| `vscroll/size/x` | integer! | width of the vertical scrollbar; could be set in styles |
+| `scroll-timer` | timer space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
+| `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
+| `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
+
+Editor affects its document (`content`) according to received events: modifies data, selection, moves caret. 
+
 
 
 
