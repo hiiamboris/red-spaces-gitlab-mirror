@@ -15,6 +15,7 @@ doc-ctx: context [
 	;@@ scalability problem: convenience of integer caret/selection offsets leads to linear increase of caret-to-offset calculation
 	;@@ don't wanna optimize this prematurely but for big texts a b-tree index should be implemented
 	;@@ another unoptimized area is paragraph to caret offset calculation
+	;@@ one more consideration: since document can be in every cell of a grid, it should be kept lightweight, optimized for 1-3 paragraphs
 	
 	foreach-paragraph: function [spec [block!] "[paragraph offset length]" doc [object!] code [block!]] [
 		if empty? doc/content [return none]				;-- case for loop never entered
@@ -727,6 +728,7 @@ doc-ctx: context [
 		if new-holder [									;-- update offsets
 			new-holder/caret/side:   doc/caret/side
 			new-holder/caret/offset: offset - pofs
+			new-holder/caret/width:  doc/caret/width
 		]
 		
 		drawn: doc/list-draw/on canvas
@@ -757,12 +759,12 @@ doc-ctx: context [
 	declare-template 'document/list [
 		content:   []		#type :on-content-change
 		axis:     'y		#type (axis = 'y)			;-- protected
-		spacing:   5									;-- interval between paragraphs
+		spacing:   5		#type [integer!]			;-- interval between paragraphs
 		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
-		page-size: function [] [
+		page-size: function [] [						;-- needs access to the parent viewport for paging
 			vp: any [all [parent parent/viewport] 0x0]	;@@ REP 113
 			max 0 to integer! vp/y * 90%
-		] #type [integer! function!] (page-size >= 0)	;-- needs access to the parent viewport
+		] #type [integer! function!] (page-size >= 0)
 		
 		length:   0			#type [integer!]			;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates
