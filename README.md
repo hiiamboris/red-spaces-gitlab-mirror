@@ -79,6 +79,6 @@ Good enough to write basic apps with. Design enhancements proposals and feature 
 
 ## Help & feedback
 
-If you find it too complex to achieve some task, you can [ask my advice on ~~Gittard~~Matrix](https://matrix.to/#/@hiiamboris:tchncs.de).\
+If you find it too complex to achieve some task, you can [ask my advice on Matrix](https://matrix.to/#/@hiiamboris:tchncs.de).\
 When you spot bugs or other issues you can report them also on Gittard or by creating an [issue report or wish request](https://codeberg.org/hiiamboris/red-spaces/issues/new). Improvement ideas are also welcome :)
 
