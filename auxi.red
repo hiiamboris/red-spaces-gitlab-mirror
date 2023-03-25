@@ -1072,13 +1072,10 @@ find-same-path: function [block [block!] path [path!]] [
 
 make-kit: function [kit-spec [block!] /local name] [
 	kit: object append keep-type kit-spec set-word! [batch: none]
-	do mapparse [set name set-word!] kit-spec [bind name kit]
 	kit/batch: function
 		["Evaluate plan for given space" space [object!] plan [block!]]
 		compose [do with (kit) plan]
-	foreach fun values-of kit [
-		with [:kit :kit/batch :fun] body-of :fun
-	]
+	do with [:kit :kit/batch] kit-spec
 	kit
 ]
 	
@@ -1095,7 +1092,6 @@ generate-sections: function [
 	map     [block!]   "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
 	width   [integer!] "Total width (may be affected by limits/min)" (width >= 0)
 	buffer  [block!]
-	/local sections										;-- when no sections in space, uses local value
 ][
 	case [
 		not tail? buffer [return buffer]				;-- already computed
@@ -1105,12 +1101,13 @@ generate-sections: function [
 		]
 	]
 	offset: 0
+	frame: []											;-- when no sections in space, uses local value
 	foreach [space geom] map [
 		if negative? skipped: offset - geom/offset/x [
 			append buffer skipped
 		]
 		case [
-			sec: batch space [sections] [				;-- calls if a function, may return none
+			sec: batch space [frame/sections] [			;-- calls if a function, may return none
 				append buffer sec
 			]
 			geom/size/x > 0  [append buffer geom/size/x]		;-- don't add empty (0) spaces

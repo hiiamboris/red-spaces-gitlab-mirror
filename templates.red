@@ -843,115 +843,121 @@ paragraph-ctx: context [
 		;@@ what isn't drawn doesn't exist and using space/text may lead to offsets > current /size
 		;@@ but space/layout/text is not where the edits take place and I want to be in sync with them
 		;@@ it also depends if 'length' can be a valid call before space is rendered or not
-		length: function ["Get text length on the last frame"] [
-			length? get-layout space
+		length: function ["Get text length"] [
+			length? space/text
 		]
 		
-		line-count: function ["Get line count on the last frame"] [
-			rich-text/line-count? get-layout space
+		selected: function ["Get selection range or none"] [
+			all [sel: space/selected  sel/1 <> sel/2  sel]
 		]
 		
-		point->caret: function ["Get caret offset and side near the point XY" xy [pair!]] [
-			layout: get-layout space
-			caret:  offset-to-caret layout xy			;-- these never fail if layout/text is set
-			char:   offset-to-char  layout xy			;-- but -char may return 1 for empty text
-			side:   pick [left right] caret > char
-			compose [offset: (caret - 1) side: (side)]
-		]
-		
-		caret-box: function [
-			"Get box [xy1 xy2] for the caret at given offset and side"
-			offset [integer!] side [word!] (find [left right] side)
-		][
-			layout: get-layout space
-			offset: clip offset 0 n: length
-			index:  clip 1 n offset + pick [0 1] side = 'left
-			;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
-			if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
-			box: kit/item-box index
-			;; make caret box of zero width:
-			either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
-			box 
-		]
-		
-		item-box: function [							;; named 'item' for consistency with rich text
-			"Get box [xy1 xy2] for the char at given index"
-			index [integer!]
-		][
-			layout: get-layout space
-			index:  clip index 0 length
-			xy1:    caret-to-offset       layout index 
-			xy2:    caret-to-offset/lower layout index 
-			reduce [xy1 xy2]
-		]
-		
-		item-boxes: function [
-			"Get boxes [xy1 xy2 ...] for all chars in given range (unifies subsequent boxes)"
-			start [integer!] end [integer!]
-		][
-			layout: get-layout space
-			order 'start 'end
-			if start = end [return copy []]
-			boxes: clear []
-			xy1: caret-to-offset       layout start + 1
-			xy2: caret-to-offset/lower layout start + 1
-			for i start + 2 end [
-				xy1': caret-to-offset       layout i
-				xy2': caret-to-offset/lower layout i
-				either all [								;@@ should grouping be optional?
-					xy1'/x = xy2/x
-					xy1'/y = xy1/y
-					xy2'/y = xy2/y
-				][
-					xy2/x: xy2'/x
-				][
-					repend boxes [xy1 xy2]
-					xy1: xy1' xy2: xy2'
-				]
+		frame: object [
+			line-count: function ["Get line count on the last frame"] [
+				rich-text/line-count? get-layout space
 			]
-			repend boxes [xy1 xy2]
-			copy boxes
-		]
-		
-		;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
-		;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
-		sections: function ["Get section widths as list of integers"] [
-			layout: get-layout space
-			mrg: space/margin along 'x
-			case [
-				not empty? sections: space/sec-cache ['done]	;-- already computed
-				empty? space/text [
-					if space/size/x > 0 [append sections space/size/x]
-				]
-				1 <> line-count [								;-- avoid breaking multiline text
-					#assert [not negative? space/size/x - (mrg * 2)]
-					repend sections pick [
-						[mrg space/size/x - (mrg * 2) mrg]
-						[space/size/x]
-					] mrg > 0
-				]
-				'else [
-					spaces: clear []
-					parse/case space/text [collect after spaces any [	;-- collect index interval pairs of all contiguous whitespace
-						any non-space! s: any whitespace! e:
-						keep (as-pair index? s index? e)
-					]]											;-- it often produces an empty interval at the tail (accounted for later)
-					
-					if mrg > 0 [append sections mrg]
-					right: 0
-					foreach range spaces [
-						left:  first caret-to-offset layout range/1
-						if left <> right [append sections left - right]		;-- added as positive - chars up to the whitespace
-						right: first caret-to-offset layout range/2
-						if left <> right [append sections left - right]		;-- added as negative - whitespace chars
+			
+			point->caret: function ["Get caret offset and side near the point XY" xy [pair!]] [
+				layout: get-layout space
+				caret:  offset-to-caret layout xy			;-- these never fail if layout/text is set
+				char:   offset-to-char  layout xy			;-- but -char may return 1 for empty text
+				side:   pick [left right] caret > char
+				compose [offset: (caret - 1) side: (side)]
+			]
+			
+			caret-box: function [
+				"Get box [xy1 xy2] for the caret at given offset and side"
+				offset [integer!] side [word!] (find [left right] side)
+			][
+				layout: get-layout space
+				offset: clip offset 0 n: length
+				index:  clip 1 n offset + pick [0 1] side = 'left
+				;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
+				if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
+				box: kit/item-box index
+				;; make caret box of zero width:
+				either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
+				box 
+			]
+			
+			item-box: function [							;; named 'item' for consistency with rich text
+				"Get box [xy1 xy2] for the char at given index"
+				index [integer!]
+			][
+				layout: get-layout space
+				index:  clip index 0 length
+				xy1:    caret-to-offset       layout index 
+				xy2:    caret-to-offset/lower layout index 
+				reduce [xy1 xy2]
+			]
+			
+			item-boxes: function [
+				"Get boxes [xy1 xy2 ...] for all chars in given range (unifies subsequent boxes)"
+				start [integer!] end [integer!]
+			][
+				layout: get-layout space
+				order 'start 'end
+				if start = end [return copy []]
+				boxes: clear []
+				xy1: caret-to-offset       layout start + 1
+				xy2: caret-to-offset/lower layout start + 1
+				for i start + 2 end [
+					xy1': caret-to-offset       layout i
+					xy2': caret-to-offset/lower layout i
+					either all [								;@@ should grouping be optional?
+						xy1'/x = xy2/x
+						xy1'/y = xy1/y
+						xy2'/y = xy2/y
+					][
+						xy2/x: xy2'/x
+					][
+						repend boxes [xy1 xy2]
+						xy1: xy1' xy2: xy2'
 					]
-					if mrg > 0 [append sections mrg]
-					width: mrg * 2 + first size-text2 layout
-					if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
 				]
+				repend boxes [xy1 xy2]
+				copy boxes
 			]
-			sections
-		]
+			
+			;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
+			;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
+			sections: function ["Get section widths as list of integers"] [
+				layout: get-layout space
+				mrg: space/margin along 'x
+				case [
+					not empty? sections: space/sec-cache ['done]	;-- already computed
+					empty? space/text [
+						if space/size/x > 0 [append sections space/size/x]
+					]
+					1 <> frame/line-count [						;-- avoid breaking multiline text
+						#assert [not negative? space/size/x - (mrg * 2)]
+						repend sections pick [
+							[mrg space/size/x - (mrg * 2) mrg]
+							[space/size/x]
+						] mrg > 0
+					]
+					'else [
+						spaces: clear []
+						parse/case space/text [collect after spaces any [	;-- collect index interval pairs of all contiguous whitespace
+							any non-space! s: any whitespace! e:
+							keep (as-pair index? s index? e)
+						]]										;-- it often produces an empty interval at the tail (accounted for later)
+						
+						if mrg > 0 [append sections mrg]
+						right: 0
+						foreach range spaces [
+							left:  first caret-to-offset layout range/1
+							if left <> right [append sections left - right]		;-- added as positive - chars up to the whitespace
+							right: first caret-to-offset layout range/2
+							if left <> right [append sections left - right]		;-- added as negative - whitespace chars
+						]
+						if mrg > 0 [append sections mrg]
+						width: mrg * 2 + first size-text2 layout
+						if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
+					]
+				]
+				sections
+			]
+		];frame: object [
 	];kit: make-kit [
 	
 	
