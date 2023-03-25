@@ -349,12 +349,11 @@ flush: function [
 	also copy series clear series
 ]
 
-set-after: function [
-	"Set PATH to VALUE and return the previous value of PATH"
-	path [path! word!]
-	value [any-type!]
+before: function [
+	"Set PATH to VALUE, but return the previous value of PATH"
+	'path [any-path! any-word!] value
 ][
-	also get/any path set/any path :value 
+	also get path set path :value 
 ]
 
 explode: function [										;@@ use split or map-each when fast
@@ -406,14 +405,14 @@ delimit: function [
 
 ;@@ make a REP with this? (need use cases)
 ;@@ this is no good, because it treats paths as series
-native-swap: :system/words/swap
-swap: func [a [word! series!] b [word! series!]] [
-	either series? a [
-		native-swap a b
-	][
-		set a set-after b get a
-	]
-]
+; native-swap: :system/words/swap
+; swap: function [a [word! series!] b [word! series!]] [
+	; either series? a [
+		; native-swap a b
+	; ][
+		; set a before (b) get a
+	; ]
+; ]
 
 only: function [
 	"Turn falsy values into empty block (useful for composing Draw code)"
@@ -450,6 +449,9 @@ remake: function [proto [object! datatype!] spec [block!]] [
 area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
 span?: func [xy [pair!]] [abs xy/y - xy/x]				;@@ or range? but range? tests for range! class
 order-pair: function [xy [pair!]] [either xy/1 <= xy/2 [xy][reverse xy]]
+order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a block of any number of paths?
+	if greater? get a get b [set a before (b) get a]
+]
 
 skip?: func [series [series!]] [-1 + index? series]
 
@@ -1068,6 +1070,10 @@ find-same-path: function [block [block!] path [path!]] [
 ]
 
 
+batch: function ["Evaluate plan within space's kit" space [object!] plan [block!]] [
+	either kit: select space 'kit [kit/batch space plan][do plan]	;@@ or error if no kit?
+]
+
 ;; this function assumes no scaling or anything fishy, plain map
 ;; uses geom/size/x, not space/size/x because parent's map may have been fetched from the cache,
 ;; while children sizes may not have been updated
@@ -1091,7 +1097,9 @@ generate-sections: function [
 			append buffer skipped
 		]
 		case [
-			select space 'sections [append buffer space/sections]	;-- calls if a function, may return none
+			sections: batch space [sections] [			;-- calls if a function, may return none
+				append buffer sections
+			]
 			geom/size/x > 0    [append buffer geom/size/x]		;-- don't add empty (0) spaces
 		]
 		offset: offset - skipped + geom/size/x

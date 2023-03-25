@@ -50,11 +50,11 @@ modify-class 'space [
 	origin:  0x0	#type =? :invalidates-look [pair!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
-	sections: none	#type =? :invalidates [function! block! none!] 
-	measure: none	#type [function!] 
-	edit:    none	#type [function!] 
-	clone:   none	#type [function!] 
-	format:  none	#type [function!] 
+	; sections: none	#type =? :invalidates [function! block! none!] 
+	; measure: none	#type [function!] 
+	; edit:    none	#type [function!] 
+	; clone:   none	#type [function!] 
+	; format:  none	#type [function!] 
 	on-invalidate: 	#type [function! none!]
 ]	
 
@@ -753,7 +753,7 @@ paragraph-ctx: context [
 				min-width: 1x0 * size-text2 layout
 				quietly layout/size: max 1x1 max canvas min-width
 			]
-			quietly layout/text:  as string! space/text
+			quietly layout/text:  copy as string! space/text	;-- copy so it doesn't update its look until re-rendered!
 			; system/view/platform/update-view layout
 			;; NOTE: #4783 to keep in mind
 			quietly layout/extra: size-text2 layout		;-- 'size-text' is slow, has to be cached (by using on-change)
@@ -761,46 +761,6 @@ paragraph-ctx: context [
 		quietly space/layout: layout					;-- must return layout
 	]
 
-	;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
-	;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
-	get-sections: function [space [object!]] [
-		#assert [space/layout  "text must be rendered to get sections"]
-		mrg: space/margin along 'x
-		case [
-			not empty? sections: space/sec-cache ['done]		;-- already computed
-			empty? space/text [
-				if space/size/x > 0 [append sections space/size/x]
-			]
-			1 <> rich-text/line-count? space/layout [			;-- avoid breaking multiline text
-				#assert [not negative? space/size/x - (mrg * 2)]
-				repend sections pick [
-					[mrg space/size/x - (mrg * 2) mrg]
-					[space/size/x]
-				] mrg > 0
-			]
-			'else [
-				spaces: clear []
-				parse space/text [collect after spaces any [	;-- collect index interval pairs of all contiguous whitespace
-					any non-space! s: any whitespace! e:
-					keep (as-pair index? s index? e)
-				]]												;-- it often produces an empty interval at the tail (accounted for later)
-				
-				if mrg > 0 [append sections mrg]
-				right: 0
-				foreach range spaces [
-					left:  first caret-to-offset space/layout range/1
-					if left <> right [append sections left - right]		;-- added as positive - chars up to the space
-					right: first caret-to-offset space/layout range/2
-					if left <> right [append sections left - right]		;-- added as negative - space chars
-				]
-				if mrg > 0 [append sections mrg]
-				width: mrg * 2 + first size-text2 space/layout
-				if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
-			]
-		]
-		sections
-	]
-	
 	;; can be styled but cannot be accessed (and in fact shared)
 	;; because there's a selection per every row - can be many in one rich-content
 	;@@ unify this with /clone and rich-content
@@ -854,7 +814,7 @@ paragraph-ctx: context [
 		
 		if all [caret: space/caret  not ellipsize?] [
 		; if all [caret: space/caret  not ellipsize?] [
-			box: space/measure [caret->box caret/offset caret/side]
+			box: kit/call/caret->box caret/offset caret/side
 			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
 			invalidate/only caret
 			cdrawn: render caret
@@ -862,7 +822,7 @@ paragraph-ctx: context [
 		]
 		;; add selection if enabled
 		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
-			boxes: space/measure [all-item-boxes sel/1 sel/2]
+			boxes: kit/item-boxes space sel/1 sel/2
 			sdrawn: make [] 1.5 * length? boxes
 			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
 			drawn: compose/only [push (drawn) (sdrawn)]
@@ -870,55 +830,86 @@ paragraph-ctx: context [
 		drawn
 	]
 	
-	metrics: context [
-		measure: function [space [object!] plan [block!]] [
-			do with self plan
+	get-layout: function [space [object!]] [
+		any [space/layout  ERROR "(space/type) wasn't rendered with text=(mold/part space/text 40)"]
+	]
+	
+	; arg-types!: make typeset! [word! lit-word! get-word!]
+	make-kit: function [kit-spec [block!] /local name spec body] [
+		kit: object append keep-type kit-spec set-word! [batch: none]
+		do mapparse [set name set-word!] kit-spec [bind name kit]
+		kit/batch: function
+			["Evaluate plan for given space" space [object!] plan [block!]]
+			compose [do with (kit) plan]
+		for-each [name fun [function!]] to [] kit [bind bind bind body-of :fun :kit :kit/batch :fun]
+		kit
+	]
+	
+	;; TIP: use kit/do [help self] to get help on it
+	kit: make-kit [
+		clone:  does [clone-space space [text flags color margin weight font]]
+		format: does [copy space/text]
+		
+		;@@ space/text or space/layout/text here?
+		;@@ what isn't drawn doesn't exist and using space/text may lead to offsets > current /size
+		;@@ but space/layout/text is not where the edits take place and I want to be in sync with them
+		;@@ it also depends if 'length' can be a valid call before space is rendered or not
+		length: function ["Get text length on the last frame"] [
+			length? get-layout space
 		]
-		length: does with :measure [
-			;@@ space/text or space/layout/text here?
-			;@@ what isn't drawn doesn't exist and using space/text may lead to offsets > current /size
-			;@@ but space/layout/text is not where the edits take place and I want to be in sync with them
-			;@@ it also depends if 'length' can be a valid call before space is rendered or not
-			length? space/text
+		
+		line-count: function ["Get line count on the last frame"] [
+			rich-text/line-count? get-layout space
 		]
-		point->caret: function [xy [pair!]] with :measure [
-			caret: offset-to-caret space/layout xy
-			char:  offset-to-char  space/layout xy
-			side:  pick [left right] caret > char
+		
+		point->caret: function ["Get caret offset and side near the point XY" xy [pair!]] [
+			layout: get-layout space
+			caret:  offset-to-caret layout xy			;-- these never fail if layout/text is set
+			char:   offset-to-char  layout xy			;-- but -char may return 1 for empty text
+			side:   pick [left right] caret > char
 			compose [offset: (caret - 1) side: (side)]
 		]
-		;@@ maybe returned box should be the size of the char? to support overwrite mode eventually
-		caret->box: function [offset [integer!] side [word!]] with :measure [
-			index: offset + pick [0 1] side = 'left
-			if any [
-				;; left caret at offset 0 doesn't exist, so switch to the right one:
-				index = 0
-				;; rich-text considers line feed char of zero width on the line that it terminates
-				;; so without this workaround the resulting box will be the same as for the previous char:
-				all [space/text/:index = #"^/" side = 'left]
-			][
-				side: 'right
-				index: index + 1
-			]
-			dy: 0x1 * rich-text/line-height? space/layout index
-			either side = 'left [
-				xy1: (xy2: caret-to-offset/lower space/layout index) - dy
-			][	xy2: (xy1: caret-to-offset       space/layout index) + dy
-			]
-			; ?? [offset side index xy1 xy2]
+		
+		caret-box: function [
+			"Get box [xy1 xy2] for the caret at given offset and side"
+			offset [integer!] side [word!] (find [left right] side)
+		][
+			layout: get-layout space
+			offset: clip offset 0 n: length
+			index:  clip 1 n offset + pick [0 1] side = 'left
+			;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
+			if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
+			box: kit/item-box index
+			;; make caret box of zero width:
+			either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
+			box 
+		]
+		
+		item-box: function [							;; named 'item' for consistency with rich text
+			"Get box [xy1 xy2] for the char at given index"
+			index [integer!]
+		][
+			layout: get-layout space
+			index:  clip index 0 length
+			xy1:    caret-to-offset       layout index 
+			xy2:    caret-to-offset/lower layout index 
 			reduce [xy1 xy2]
 		]
-		all-item-boxes: function [start [integer!] end [integer!]] with :measure [
-			if start > end [swap 'start 'end]
+		
+		item-boxes: function [
+			"Get boxes [xy1 xy2 ...] for all chars in given range (unifies subsequent boxes)"
+			start [integer!] end [integer!]
+		][
+			layout: get-layout space
+			order 'start 'end
 			if start = end [return copy []]
-			watch [start end]
 			boxes: clear []
-			xy1: caret-to-offset       space/layout start + 1
-			xy2: caret-to-offset/lower space/layout start + 1
+			xy1: caret-to-offset       layout start + 1
+			xy2: caret-to-offset/lower layout start + 1
 			for i start + 2 end [
-				xy1': caret-to-offset       space/layout i
-				xy2': caret-to-offset/lower space/layout i
-				either all [							;@@ should grouping be optional?
+				xy1': caret-to-offset       layout i
+				xy2': caret-to-offset/lower layout i
+				either all [								;@@ should grouping be optional?
 					xy1'/x = xy2/x
 					xy1'/y = xy1/y
 					xy2'/y = xy2/y
@@ -928,15 +919,52 @@ paragraph-ctx: context [
 					repend boxes [xy1 xy2]
 					xy1: xy1' xy2: xy2'
 				]
-				; repend boxes [
-					; caret-to-offset       space/layout i
-					; caret-to-offset/lower space/layout i
-				; ]
 			]
 			repend boxes [xy1 xy2]
 			copy boxes
 		]
-	]
+		
+		;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
+		;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
+		sections: function ["Get section widths as list of integers"] [
+			layout: get-layout space
+			mrg: space/margin along 'x
+			case [
+				not empty? sections: space/sec-cache ['done]	;-- already computed
+				empty? space/text [
+					if space/size/x > 0 [append sections space/size/x]
+				]
+				1 <> line-count [								;-- avoid breaking multiline text
+					#assert [not negative? space/size/x - (mrg * 2)]
+					repend sections pick [
+						[mrg space/size/x - (mrg * 2) mrg]
+						[space/size/x]
+					] mrg > 0
+				]
+				'else [
+					spaces: clear []
+					parse/case space/text [collect after spaces any [	;-- collect index interval pairs of all contiguous whitespace
+						any non-space! s: any whitespace! e:
+						keep (as-pair index? s index? e)
+					]]											;-- it often produces an empty interval at the tail (accounted for later)
+					
+					if mrg > 0 [append sections mrg]
+					right: 0
+					foreach range spaces [
+						left:  first caret-to-offset layout range/1
+						if left <> right [append sections left - right]		;-- added as positive - chars up to the whitespace
+						right: first caret-to-offset layout range/2
+						if left <> right [append sections left - right]		;-- added as negative - whitespace chars
+					]
+					if mrg > 0 [append sections mrg]
+					width: mrg * 2 + first size-text2 layout
+					if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
+				]
+			]
+			sections
+		]
+	];kit: make-kit [
+	
 	
 	;@@ in the current design it is rendered by text, so can only be styled as field/text/caret, not field/caret
 	;@@ should I move rendering into field? (need to consider document as well)
@@ -952,6 +980,7 @@ paragraph-ctx: context [
 	]
 	
  	declare-template 'text/space [
+		kit:    ~/kit
 		text:   ""		#type    :invalidates [any-string!]	;-- every assignment counts as space doesn't know if string itself changed
 		flags:  []		#type    :invalidates [block!]	;-- [bold italic underline strike wrap] supported ;@@ typecheck that all flags are words
 		;; NOTE: every `make font!` brings View closer to it's demise, so it has to use a shared font
@@ -963,14 +992,9 @@ paragraph-ctx: context [
 		
 		;; caret disabled by default, can be set to a caret space
 		caret:  none	#type    :invalidates [object! (space? caret) none!]	
-
-		sections:  does [~/get-sections self]
-		sec-cache: []
-		measure:   func [plan [block!]] [~/metrics/measure self plan]
 		selected:  none	#type =? :invalidates [pair! none!]
-		
-		clone:     does [clone-space self [text flags color margin weight font]]
-		format:    does [copy text]
+
+		sec-cache: []	#type [block!]
 		
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
 		quietly cache: [size layout sec-cache]
