@@ -1095,6 +1095,7 @@ generate-sections: function [
 	map     [block!]   "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
 	width   [integer!] "Total width (may be affected by limits/min)" (width >= 0)
 	buffer  [block!]
+	/local sections										;-- when no sections in space, uses local value
 ][
 	case [
 		not tail? buffer [return buffer]				;-- already computed
@@ -1109,10 +1110,10 @@ generate-sections: function [
 			append buffer skipped
 		]
 		case [
-			sections: batch space [sections] [			;-- calls if a function, may return none
-				append buffer sections
+			sec: batch space [sections] [				;-- calls if a function, may return none
+				append buffer sec
 			]
-			geom/size/x > 0    [append buffer geom/size/x]		;-- don't add empty (0) spaces
+			geom/size/x > 0  [append buffer geom/size/x]		;-- don't add empty (0) spaces
 		]
 		offset: offset - skipped + geom/size/x
 	]
