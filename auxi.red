@@ -1070,6 +1070,18 @@ find-same-path: function [block [block!] path [path!]] [
 ]
 
 
+make-kit: function [kit-spec [block!] /local name] [
+	kit: object append keep-type kit-spec set-word! [batch: none]
+	do mapparse [set name set-word!] kit-spec [bind name kit]
+	kit/batch: function
+		["Evaluate plan for given space" space [object!] plan [block!]]
+		compose [do with (kit) plan]
+	foreach fun values-of kit [
+		with [:kit :kit/batch :fun] body-of :fun
+	]
+	kit
+]
+	
 batch: function ["Evaluate plan within space's kit" space [object!] plan [block!]] [
 	either kit: select space 'kit [kit/batch space plan][do plan]	;@@ or error if no kit?
 ]

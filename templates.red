@@ -834,17 +834,6 @@ paragraph-ctx: context [
 		any [space/layout  ERROR "(space/type) wasn't rendered with text=(mold/part space/text 40)"]
 	]
 	
-	; arg-types!: make typeset! [word! lit-word! get-word!]
-	make-kit: function [kit-spec [block!] /local name spec body] [
-		kit: object append keep-type kit-spec set-word! [batch: none]
-		do mapparse [set name set-word!] kit-spec [bind name kit]
-		kit/batch: function
-			["Evaluate plan for given space" space [object!] plan [block!]]
-			compose [do with (kit) plan]
-		for-each [name fun [function!]] to [] kit [bind bind bind body-of :fun :kit :kit/batch :fun]
-		kit
-	]
-	
 	;; TIP: use kit/do [help self] to get help on it
 	kit: make-kit [
 		clone:  does [clone-space space [text flags color margin weight font]]
