@@ -1107,7 +1107,10 @@ generate-sections: function [
 			append buffer skipped
 		]
 		case [
-			sec: batch space [frame/sections] [			;-- calls if a function, may return none
+			sec: batch space [
+				sec: select frame 'sections
+				sec										;-- calls if a function, may return none
+			][
 				append buffer sec
 			]
 			geom/size/x > 0  [append buffer geom/size/x]		;-- don't add empty (0) spaces
