@@ -366,7 +366,7 @@ events: context [
 					hnd-name
 				repeat i1 i2 [									;-- walk from the longest (specific) path to the shortest (generic)
 					change hpath: next hpath 'handlers
-					unless block? try [list: get hpath] [continue]	;@@ REP #113
+					unless block? list: get-safe hpath [continue]
 					commands/stop								;-- stop after current stack unless `pass` gets called
 					foreach handler list [						;-- whole list is called regardless of stop flag change
 						#assert [function? :handler]

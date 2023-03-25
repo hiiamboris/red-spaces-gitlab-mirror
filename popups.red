@@ -210,7 +210,7 @@ show-menu: function [
 	face/space: lay-out-menu menu
 	face/size:  none									;-- to make render set face/size
 	face/draw:  render face
-	either radial?: has-flag? :menu/1 'radial [			;-- radial menu is centered ;@@ REP #113
+	either radial?: has-flag? :menu/1 'radial [			;-- radial menu is centered
 		offset: offset + face/space/content/origin
 		;; radial menu is transparent but should catch clicks that close it
 		face/color: system/view/metrics/colors/panel + 0.0.0.254

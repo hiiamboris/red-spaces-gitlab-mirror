@@ -352,7 +352,7 @@ cell-ctx: context [
 	]
 	
 	format: function [space [object!]] [
-		either all [space/content  in space/content 'format] [space/content/format][copy {}]	;@@ REP #113
+		either format: get-safe 'space/content/format [format][copy {}]
 	]
 	
 	declare-template 'box/space [
@@ -1905,6 +1905,7 @@ data-view-ctx: context [
 		;; used by button to expose text styles
 		flags: []	#on-change [space word value] [push-flags space]
 		
+		;@@ remove this wrap and use flags/wrap?
 		wrap?: off	#type =? [logic!]							;-- controls choice between text (off) and paragraph (on)
 		#on-change [space word value] [
 			if :space/data = either value ['text]['paragraph] [	;-- switches from text to paragraph and back
@@ -3010,6 +3011,7 @@ grid-ctx: context [
 	;@@ add simple proportional algorithm?
 	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
 	
+	;@@ base it on container?
 	declare-template 'grid/space [
 		;; grid's /size can be 'none' in two cases: either it's infinite, or it's size was invalidated and needs a calc-size() call
 		size: none	#type [pair! none!]
@@ -3264,7 +3266,7 @@ grid-view-ctx: context [
 				~/available? self axis dir from requested
 			]
 			
-			;; currently the only way to make grid forget it's rendered content, since we can't "watch" /data
+			;; currently the only way to make grid forget its rendered content, since we can't "watch" /data
 			invalidate-range: function [xy1 [pair!] xy2 [pair!]] [
 				xyloop xy xy2 - xy1 + 1 [				;@@ should be for-each
 					remove/key grid/content xy + xy1 - 1

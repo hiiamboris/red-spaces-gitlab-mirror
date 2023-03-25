@@ -288,7 +288,7 @@ editor-tools: context [
 		]
 		old-bullet: bulleted-paragraph? para
 		offset: doc-ctx/get-paragraph-offset doc para	;@@ need to put it into measure
-		base-indent: any [if para/indent [para/indent/first] 0]	;@@ REP 113
+		base-indent: any [get-safe 'para/indent/first 0]
 		doc/edit [
 			if old-bullet [remove 0x1 + offset]
 			if new-bullet [
@@ -329,7 +329,7 @@ editor-tools: context [
 		bullet: make-space 'bullet []
 		if number [bullet/text: rejoin [number "."]]
 		if bulleted-paragraph? para [doc/edit [remove 0x1 + offset]]
-		base-indent: any [if para/indent [para/indent/first] 0]	;@@ REP 113
+		base-indent: any [get-safe 'para/indent/first 0]
 		doc/edit [
 			move offset insert bullet
 			indent compose [first: (base-indent) rest: (base-indent + 15)]

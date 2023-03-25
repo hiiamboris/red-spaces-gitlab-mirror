@@ -495,14 +495,14 @@ VID: context [
 		
 		=flag=: [
 			set w word!
-			if (attempt [facet: def/style/facets/:w])	;-- flag defined for this style? ;@@ REP #113
+			if (facet: get-safe 'def/style/facets/:w)	;-- flag defined for this style?
 			if (not find datatype-names w)				;-- datatype names do not count
 			(repend def/facets [none facet])
 		]
 			
 		=auto-facet=: [
-			set x any-type!											;-- try to match by value type
-			if (attempt [facet: select def/style/facets type?/word :x])	;@@ REP #113
+			set x any-type!										;-- try to match by value type
+			if (facet: get-safe 'def/style/facets/(type?/word :x))
 			(repend def/facets pick [[none facet :x] [facet :x]] function? :facet) 
 		]
 		

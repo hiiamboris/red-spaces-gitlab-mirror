@@ -594,7 +594,7 @@ doc-ctx: context [
 	adjust-offsets: function [doc [object!] offset [integer!] shift [integer!]] [
 		sel: doc/selected								;-- can't set components of doc/selected (due to reordering)
 		foreach path [sel/1 sel/2 doc/length doc/caret/offset] [
-			if attempt [offset <= value: get path] [	;@@ REP #113
+			if attempt [offset <= value: get path] [
 				set path max offset value + shift
 			]
 		]
@@ -815,7 +815,7 @@ doc-ctx: context [
 			cbox: doc/measure [caret->box doc/caret/offset doc/caret/side]
 			if cbox [
 				height: cbox/2/y - cbox/1/y
-				move-to/margin (cbox/1 + cbox/2 / 2) 0 by height / 2 + 30
+				move-to/margin (cbox/1 + cbox/2 / 2) 0 by height / 2 + 30	;@@ expose this hardcoded lookaround value?
 			]
 		]
 		
