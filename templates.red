@@ -123,8 +123,10 @@ clone-space: function [
 	clone/size: original/size
 	clone/limits: if object? value: original/limits [copy value]	;-- the only object copied
 	foreach word words [
-		value: :original/:word							;-- no get/any or set-quiet by design, to maintain consistency via on-change
-		clone/:word: either find copied! type? :value [copy/deep :value][:value]
+		if word: in clone word [						;-- allow specifying more words (e.g. command in link but not text)
+			value: select original word					;-- no get/any or set-quiet by design, to maintain consistency via on-change
+			set word either find copied! type? :value [copy/deep :value][:value]
+		]
 	]
 	clone
 ]
@@ -836,7 +838,7 @@ paragraph-ctx: context [
 	
 	;; TIP: use kit/do [help self] to get help on it
 	kit: make-kit [
-		clone:  does [clone-space space [text flags color margin weight font]]
+		clone:  does [clone-space space [text flags color margin weight font command]]
 		format: does [copy space/text]
 		
 		;@@ space/text or space/layout/text here?
@@ -1007,7 +1009,6 @@ paragraph-ctx: context [
 		quietly flags: [wrap underline]
 		quietly color: 50.80.255						;@@ color should be taken from the OS theme
 		command: [browse as url! text]					;-- can't use 'quietly' or no set-word = no facet
-		clone: does [clone-space self [text flags color margin weight font command]]
 	]
 ]
 
