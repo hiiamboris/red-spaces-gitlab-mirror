@@ -817,7 +817,7 @@ paragraph-ctx: context [
 		
 		if all [caret: space/caret  not ellipsize?] [
 		; if all [caret: space/caret  not ellipsize?] [
-			box: kit/call/caret->box caret/offset caret/side
+			box: caret->box space caret/offset caret/side
 			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
 			invalidate/only caret
 			cdrawn: render caret
@@ -837,6 +837,18 @@ paragraph-ctx: context [
 		any [space/layout  ERROR "(space/type) wasn't rendered with text=(mold/part space/text 40)"]
 	]
 	
+	caret->box: function [space [object!] offset [integer!] side [word!]] [
+		layout: get-layout space
+		offset: clip offset 0 n: length
+		index:  clip 1 n offset + pick [0 1] side = 'left
+		;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
+		if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
+		box: kit/item-box index
+		;; make caret box of zero width:
+		either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
+		box 
+	]
+			
 	;; TIP: use kit/do [help self] to get help on it
 	kit: make-kit 'text [
 		clone:  does [clone-space space [text flags color margin weight font command]]
@@ -850,16 +862,27 @@ paragraph-ctx: context [
 			length? space/text
 		]
 		
+		everything: function ["Get full range of text"] [		;-- used by macro language, e.g. `select everything`
+			0 by length
+		]
+		
 		selected: function ["Get selection range or none"] [
 			all [sel: space/selected  sel/1 <> sel/2  sel]
 		]
 		
+		select-range: function ["Replace selection" range [pair! none!]] [
+			space/selected: if range [clip range 0 length]
+		]
+		
 		frame: object [
-			line-count: function ["Get line count on the last frame"] [
+			line-count: function ["Get line count on last frame"] [
 				rich-text/line-count? get-layout space
 			]
 			
-			point->caret: function ["Get caret offset and side near the point XY" xy [pair!]] [
+			point->caret: function [
+				"Get caret offset and side near the point XY on last frame"
+				xy [pair!]
+			][
 				layout: get-layout space
 				caret:  offset-to-caret layout xy			;-- these never fail if layout/text is set
 				char:   offset-to-char  layout xy			;-- but -char may return 1 for empty text
@@ -868,22 +891,14 @@ paragraph-ctx: context [
 			]
 			
 			caret-box: function [
-				"Get box [xy1 xy2] for the caret at given offset and side"
+				"Get box [xy1 xy2] for the caret at given offset and side on last frame"
 				offset [integer!] side [word!] (find [left right] side)
 			][
-				layout: get-layout space
-				offset: clip offset 0 n: length
-				index:  clip 1 n offset + pick [0 1] side = 'left
-				;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
-				if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
-				box: kit/item-box index
-				;; make caret box of zero width:
-				either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
-				box 
+				~/caret-box space offset side
 			]
 			
 			item-box: function [							;; named 'item' for consistency with rich text
-				"Get box [xy1 xy2] for the char at given index"
+				"Get box [xy1 xy2] for the char at given index on last frame"
 				index [integer!]
 			][
 				layout: get-layout space
@@ -894,7 +909,7 @@ paragraph-ctx: context [
 			]
 			
 			item-boxes: function [
-				"Get boxes [xy1 xy2 ...] for all chars in given range (unifies subsequent boxes)"
+				"Get boxes [xy1 xy2 ...] for all chars in given range on last frame (unifies subsequent boxes)"
 				start [integer!] end [integer!]
 			][
 				layout: get-layout space
@@ -923,7 +938,7 @@ paragraph-ctx: context [
 			
 			;@@ an issue with this function is that caret-to-offset returns result truncated to pair (integer)
 			;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
-			sections: function ["Get section widths as list of integers"] [
+			sections: function ["Get section widths on last frame as list of integers"] [
 				layout: get-layout space
 				mrg: space/margin along 'x
 				case [
@@ -1445,8 +1460,6 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 rich-content-ctx: context [								;-- rich content
 	~: self
 	
-	;@@ will need source editing facilities too - but in the document? or partly here?
-	
 	;; returns all xy1-xy2 boxes of carets on 1D space - only empty if no spaces / caret locations, otherwise 2+ boxes
 	;@@ or should it just put them into frame?
 	;@@ can this be part of the layout? probably not, since uses source data
@@ -1473,16 +1486,6 @@ rich-content-ctx: context [								;-- rich content
 		copy boxes
 	]
 	    
-	
-	;@@ these functions below are tightly tied to row format - not something I like
-	;@@ but abstraction seems to only increase the code so far, or I haven't found a good abstraction yet
-	;@@ plus, I need /draw to be fast, which limits me (but these funcs can be slow, as they're for events mostly)
-	
-	; xscale: func [xy [pair!] scale [number!]] [
-		; xy/x: round/to xy/x * scale 1
-		; xy
-	; ]
-	
 	caret->box-1D: function [
 		"Get [XY1 XY2] box in 1D space for caret at given offset"
 		space [object!] caret [integer!]
@@ -1527,16 +1530,10 @@ rich-content-ctx: context [								;-- rich content
 		]
 	]
 	
-	; xy->caret: function [space [object!] xy [pair!] "with margin"] [
-		; if found: locate-point space xy [
-			; compose [offset: (found/4) side: (found/5)]
-		; ]
-	; ]
 	xy->caret: function [space [object!] xy [pair!] "with margin"] [
 		if found: locate-point space xy [found/4]
 	]
 	
-	;@@ to be used to cycle across row range to draw multiline selection
 	caret->row: function [
 		"Get row number for specified caret offset (or none if no rows)" 
 		space [object!]
@@ -1557,34 +1554,6 @@ rich-content-ctx: context [								;-- rich content
 		box: rich-paragraph-ctx/map-row->box space/frame row-number
 		forall box [box/1: box/1 + space/frame/margin]	;@@ use map-each
 		box
-	]
-	
-	metrics: context [
-		measure: function [space [object!] plan [block!]] [
-			do with self plan
-		]
-		length: does with :measure [half length? space/data]
-		rows:   does with :measure [space/frame/nrows]
-		point->caret: function [xy [pair!]] with :measure [
-			set [_: _: index: offset:] ~/locate-point space xy
-			side: pick [right left] offset < index
-			compose [offset: (offset) side: (side)]
-		]
-		caret->box: function [offset [integer!] side [word!]] with :measure [
-			~/caret->box-2D space offset side
-		]
-		caret->row: function [offset [integer!] side [word!]] with :measure [
-			~/caret->row space offset side
-		]
-		row->box: function [row [integer!]] with :measure [
-			~/row->box space row
-		]
-		get-attrs: function [index [integer!]] with :measure [
-			if code: pick space/data index * 2 [rich/index->attrs code]
-		]
-		pick-attr: function [index [integer!] attr [word!]] with :measure [
-			if code: pick space/data index * 2 [rich/attributes/pick code attr]
-		]
 	]
 	
 	; ;; these are just `copy`ed, since it's 5-10x faster than full `make-space`
@@ -1638,7 +1607,7 @@ rich-content-ctx: context [								;-- rich content
 	
 	draw-caret: function [space [object!]] [
 		unless caret: space/caret [return []]
-		box: space/measure [caret->box caret/offset caret/side]
+		box: space/measure [caret-box caret/offset caret/side]
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
 		#assert [box/1/y < box/2/y]
@@ -1661,83 +1630,164 @@ rich-content-ctx: context [								;-- rich content
 		drawn
 	]
 	
-	;@@ this edit is incompatible with field/edit & document/edit - should I bother fixing it?
-	edit: context [
-		edit: function [space [object!] plan [block!]] [
-			do with self plan
+	kit: make-kit 'rich-content/rich-paragraph [
+		;@@ same Q as for text, length on the frame or length of data?
+		length: function ["Get length in items"] [
+			half length? space/data
 		]
-		;; NOTE: modifying operations must explicitly set `space/data:` to trigger content/ranges update!
-		full-range?: empty-range?: copy: serialize: clip: remove: insert: mark: none
-	]
-	
-	edit/full-range?: function [range [pair!]] with :edit/edit [
-		range = as-pair 0 half length? space/data
-	]
-
-	edit/empty-range?: function [range [pair!]] with :edit/edit [
-		zero? span? clip range 0 half length? space/data
-	]
-	
-	edit/copy: function [range [pair!] /text] with :edit/edit [	;@@ rename to slice?
-		range: clip range 0 half length? space/data		;-- avoid overflow on inf * 2
-		slice: copy/part space/data range * 2 + 1
-		if text [slice: rich/source/format slice]
-		slice
-	]
-	
-	edit/serialize: function [] with :edit/edit [
-		rich/source/serialize space/data
-	]
-	
-	edit/clip: function ["modifies" range [pair!]] with :edit/edit [
-		range: clip range 0 half length? space/data
-		unless edit/full-range? range [
-			space/data: copy/part space/data range * 2 + 1
+		
+		everything: function ["Get full range of text"] [		;-- used by macro language, e.g. `select-range everything`
+			0 by length
 		]
-		space/data
-	]
-	
-	edit/remove: function ["modifies" range [pair!]] with :edit/edit [
-		range: clip range 0 half length? space/data
-		remove/part skip space/data range/1 * 2 2 * span? range
-		space/data: space/data							;-- trigger on-data-change
-	]
-	
-	edit/insert: function [
-		"modifies"
-		offset [integer!]
-		items  [
-			object! (space? items)						;-- not inlined! for inlining use `insert! ofs values-of para/data`
-			block!  (even? length? items)
-			string!
+		
+		selected: function ["Get selection range or none"] [	;-- used by macro language, e.g. `remove-range selected`
+			all [sel: space/selected  sel/1 <> sel/2  sel]
 		]
-	] with :edit/edit [
-		case [
-			;@@ should inserted objects be copied/cloned automatically? (document does that atm)
-			object? items [items: reduce [items 0]]	
-			string? items [items: zip explode items 0]
+		
+		frame: object [
+			line-count: function ["Get line count on last frame"] [
+				space/frame/nrows
+			]
+			
+			point->caret: function [
+				"Get caret offset and side near the point XY on last frame"
+				xy [pair!]
+			][
+				set [_: _: index: offset:] ~/locate-point space xy
+				side: pick [right left] offset < index
+				compose [offset: (offset) side: (side)]
+			]
+			
+			caret->row: function [
+				"Get row number for the given caret location on last frame"
+				offset [integer!] side [word!]
+			][
+				~/caret->row space offset side
+			]
+			
+			caret-box: function [
+				"Get box [xy1 xy2] for the caret at given offset and side on last frame"
+				offset [integer!] side [word!] (find [left right] side)
+			][
+				~/caret->box-2D space offset side
+			]
+			
+			row-box: function [
+				"Get box [xy1 xy2] for the given row on last frame"
+				row [integer!]
+			][
+				~/row->box space row
+			]
+		]	
+		
+		format: does [rich/source/format space/data]	;@@ should this format be so different from rich-paragraph's one?
+		
+		clone: function [] [		
+			clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
+			clone/data: map-each/eval [item [object!] code] space/data [	;-- data may contain spaces
+				when select item 'clone [item/clone code]		;-- not cloneable spaces are skipped! together with the code
+			]													;-- triggers on-data-change
+			clone
 		]
-		offset: clip offset 0 half length? space/data
-		insert skip space/data offset * 2 items
-		space/data: space/data							;-- trigger on-data-change
-	]
+		
+		;@@ should source support image! in its content? url! ? anything else?
+		deserialize: function [
+			"Set up paragraph with high-level dialected data"
+			source [block!]
+		][
+			space/data: rich/source/deserialize source			;-- triggers on-data-change
+		]
+		serialize: function ["Convert paragraph data into high-level dialected data"] [
+			rich/source/serialize space/data
+		]
+		
+		reload: function ["Reload content from data"] [space/data: space/data]	;-- triggers on-data-change
 	
-	edit/mark: function [
-		"modifies"
-		range [word! ('all = range) pair!]
-		attr  [word!]
-		value "If falsey, attribute is cleared"
-	] with :edit/edit [
-		rich/attributes/mark space/data range attr :value
-		space/data: space/data							;-- trigger on-data-change
-	]
+		select-range: function [
+			"Replace selection"
+			range [pair! none!]
+		][
+			space/selected: if range [clip range 0 length]
+		]
 	
-	;@@ should source support image! in it's content? url! ? anything else?
-	decode: function [space [object!] source [block!]] [
-		space/data: rich/source/deserialize source		;-- trigger on-data-change
-	]
+		pick-attrs: function [
+			"Get attributes code for the item at given index"
+			index [integer!]
+		][
+			if code: pick space/data index * 2 [rich/index->attrs code]
+		]
+		
+		pick-attr: function [
+			"Get chosen attribute's value for the item at given index"
+			index [integer!] attr [word!]
+		][
+			if code: pick space/data index * 2 [rich/attributes/pick code attr]
+		]
+		
+		;@@ I hate these -range and -items suffixes but without them there's too much risk of name shadowing
+		;@@ adding a sigil to all (or only some) funcs is no better
+		copy-range: function [
+			"Extract and return given range of data"
+			range [pair!] /text "Extract as plain text"
+		][
+			range: clip range 0 length					;-- avoid overflow on inf * 2
+			slice: copy/part space/data range * 2 + 1
+			if text [slice: rich/source/format slice]
+			slice
+		]
+		
+		mark-range: function [
+			"Change attribute value over given range"
+			range [pair! none!] attr [word!] value "If falsey, attribute is cleared"
+		][
+			unless all [range  range/1 <> range/2] [exit]
+			rich/attributes/mark space/data range attr :value
+			reload
+		]
 	
+		insert-items: function [
+			"Insert items at given offset"
+			offset [integer!]
+			items  [
+				object! (space? items)					;-- rich-content not inlined! for inlining use `insert! ofs para/data`
+				block!  (even? length? items)
+				string!
+			]
+		][
+			case [
+				object? items [items: reduce [items 0]]	;-- items are not auto-cloned! so undo/redo may work on *same* items
+				string? items [items: zip explode items 0]
+			]
+			offset: clip offset 0 length
+			insert skip space/data offset * 2 items
+			reload
+		]
+	
+		remove-range: function [
+			"Remove given range of items"
+			range [pair! none!]
+		][
+			unless all [range  range/1 <> range/2] [exit]		;-- for `remove selected` transparency
+			range: clip range 0 length
+			remove/part skip space/data range/1 * 2 2 * span? range
+			reload
+		]
+	
+		clip-range: function [
+			"Leave only given range of items, removing the rest"
+			range [pair!]
+		][
+			range: clip range 0 length
+			if range <> everything [
+				space/data: copy/part space/data range * 2 + 1
+			]
+			space/data
+		]
+	
+	]
+		
 	on-data-change: function [space [object!] word [word!] data [block!]] [
+		;@@ maybe postpone all this until next render?
 		set with space [content ranges] rich/source/to-spaces data	;-- /content triggers invalidation
 		if empty? space/content [						;-- let rich-content always have at least one line (mainly for document)
 			obj: make-space 'text []					;@@ use prototype for this?
@@ -1747,19 +1797,9 @@ rich-content-ctx: context [								;-- rich content
 		]
 	]
 	
-	clone: function [space [object!]] [		
-		clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
-		clone/data: map-each/eval [item [object!] code] space/data [	;-- data may contain spaces
-			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
-		]												;-- triggers on-data-change
-		clone
-	]
-	
-	kit: make-kit 'rich-content/rich-paragraph [
-	]
-		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
 	declare-template 'rich-content/rich-paragraph [
+		kit:         ~/kit
 		color:       none												;-- color & font defaults are accounted for in style
 		font:        none
 		selected:    none	#type =? [pair! none!] :invalidates-look	;-- current selection (set programmatically - use event handlers)
@@ -1773,10 +1813,7 @@ rich-content-ctx: context [								;-- rich content
 		
 		measure: func [plan [block!]] [~/metrics/measure self plan]
 		edit:    func [plan [block!]] [~/edit/edit       self plan]
-		clone:   does [~/clone self]
-		format:  does [rich/source/format data]			;@@ should this format be so different from rich-paragraph's one?
 		
-		decode:  func ["Set up paragraph with high-level dialected data" source [block!]] [~/decode self source]	#type [function!]
 		;; internal data [item code ...], generated by decode or from edit operations
 		;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
 		;; so caret can skip the single ones but dive into the created ones

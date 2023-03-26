@@ -30,10 +30,10 @@ source: does [compose [
 	{ Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
 ]]
 
-view/no-wait/options/flags [
+view/no-wait/options/flags reshape [
 	below
-	b: host 1000x500 [
-		style rich-content: rich-content with [decode source] spacing= 5
+	b: host 1200x500 [
+		style rich-content: rich-content with [batch self [deserialize source]] spacing= 5
 		style cell: cell margin= 3
 		row tight [
 			column tight weight= 1 [
@@ -62,6 +62,6 @@ view/no-wait/options/flags [
 	]
 	on-over [status/text: mold hittest face/space event/offset]
 	status: text 400x60
-] [offset: 220x10] 'resize
+] [offset: 20x10] 'resize
 
 either system/build/config/gui-console? [halt][do-events]

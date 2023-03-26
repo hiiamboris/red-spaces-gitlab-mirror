@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs half range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque]
+exports: [by abs half range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -1082,7 +1082,7 @@ make-kit: function [name [path! (parse name [2 word!]) word!] spec [block!]] [
 	kit: object append keep-type spec set-word! [batch: none]
 	kit/batch: function
 		["Evaluate plan for given space" space [object!] plan [block!]]
-		compose [do with (kit) plan]
+		with kit compose [do with self copy plan]		;-- must copy or may get context not available errors on repeated batch
 	do with [:kit :kit/batch] spec
 	kit
 ]

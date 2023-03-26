@@ -89,12 +89,12 @@ doc-ctx: context [
 		either any [block  2 < length? mapped] [		;-- extract paragraphs
 			block: map-each [para prange] mapped [
 				also para: para/clone
-				para/edit [clip prange]
+				para/edit [clip-range prange]
 			]
 			make rich-text-block! [data: block]
 		][												;-- extract text span
 			set [para: prange:] mapped
-			span: para/edit [copy prange]
+			span: para/edit [copy-range prange]
 			make rich-text-span! [data: span]
 		]
 	]
@@ -466,7 +466,7 @@ doc-ctx: context [
 			slice:  extract doc range
 			marked: extract doc range
 			either marked/name = 'rich-text-block [
-				foreach para marked/data [para/edit [mark 'all attr :value]]
+				foreach para marked/data [para/edit [mark-range everything attr :value]]
 			][
 				rich/attributes/mark marked/data 'all attr :value
 			]
@@ -521,10 +521,10 @@ doc-ctx: context [
 		n: half length? mapped: doc/map-range/relative range
 		set [para1: range1:] mapped
 		set [paraN: rangeN:] skip tail mapped -2 
-		if n >= 1 [para1/edit [remove range1]]
+		if n >= 1 [para1/edit [remove-range range1]]
 		if n >= 2 [										;-- requires removal of whole paragraphs
-			paraN/edit [remove rangeN]
-			para1/edit [insert range1/1 paraN/data]
+			paraN/edit [remove-range rangeN]
+			para1/edit [insert-items range1/1 paraN/data]
 			s: find/same/tail doc/content para1
 			e: find/same/tail s paraN
 			remove/part s e
@@ -547,23 +547,23 @@ doc-ctx: context [
 		case [
 			data/name = 'rich-text-span [
 				#assert [not find list #"^/"]
-				dst-para/edit [insert dst-loc list]
+				dst-para/edit [insert-items dst-loc list]
 			]
 			single? data/data [
-				dst-para/edit [insert dst-loc list/1/data]
+				dst-para/edit [insert-items dst-loc list/1/data]
 			]
 			'multiline [
 				;; edit first paragraph, but remember the after-insertion part
 				dst-para/edit [							;@@ make another action in edit for this?
-					stashed: copy range: dst-loc by infxinf/x
-					remove range
-					insert dst-loc list/1/data 
+					stashed: copy-range range: dst-loc by infxinf/x
+					remove-range range
+					insert-items dst-loc list/1/data 
 				]
 				;; insert other paragraphs into doc/content
 				insert (find/same/tail doc/content dst-para) next list
 				;; append stashed part to the last inserted paragraph
 				paraN: last list
-				paraN/edit [insert infxinf/x stashed]
+				paraN/edit [insert-items infxinf/x stashed]
 			]
 		]
 		adjust-offsets doc offset len
@@ -575,7 +575,7 @@ doc-ctx: context [
 		]												;-- none on 'new-line' delimiters, or if attr is not set
 	]
 	
-	get-attrs: function [doc [object!] index [integer!]] [
+	pick-attrs: function [doc [object!] index [integer!]] [
 		offset: clip index - 1 0 doc/length
 		if set [para: pofs: plen:] caret->paragraph doc offset [
 			;; no attribute at the 'new-line' delimiter, so it tries to get them from:
@@ -586,7 +586,7 @@ doc-ctx: context [
 			while [all [offset > 0  pofs + plen = offset]] [	
 				set [para: pofs: plen:] caret->paragraph doc offset: offset - 1
 			]
-			para/measure [get-attrs offset - pofs + 1]
+			para/measure [pick-attrs offset - pofs + 1]
 		]												;-- may return none if can't find any attrs
 	]
 	
@@ -688,8 +688,8 @@ doc-ctx: context [
 		doc/paint: any [
 			;; question is, should it pick the attribute from before the caret or after?
 			;; before probably makes more sense for appending, then if that fails it also tries after
-			get-attrs doc offset
-			get-attrs doc offset + 1
+			pick-attrs doc offset
+			pick-attrs doc offset + 1
 			clear doc/paint								;-- no attributes if can't pick up
 		]
 	]
@@ -865,7 +865,7 @@ define-handlers [
 				doc/selected: none
 				caret: doc/measure [point->caret path/2]
 				if caret [
-					doc/edit [move/side caret/offset caret/side]
+					doc/edit [move-caret/side caret/offset caret/side]
 					start-drag/with path copy caret
 				]
 			]
@@ -879,8 +879,8 @@ define-handlers [
 					if caret [
 						start: drag-parameter
 						doc/edit [
-							select start/offset by caret/offset
-							move/side caret/offset caret/side
+							select-range start/offset by caret/offset
+							move-caret/side caret/offset caret/side
 						]
 					]
 				]
@@ -897,12 +897,12 @@ define-handlers [
 							;@@ tabs support is "accidental" for now - only correct within a single text span
 							;@@ if something splits the text, it's incorrect
 							;@@ need special case for it in paragraph layout, for which section size=0 is reserved
-							doc/edit [insert "^-"]
+							doc/edit [insert-items "^-"]
 						]
 					]
 					find [#"^M" #"^/"] event/key [		;-- enter is not handled by key->plan
 						unless event/ctrl? [			;-- ctrl+enter is probably some special key
-							doc/edit [select 'none  insert "^/"]
+							doc/edit [select-range none  insert-items "^/"]
 						]
 					]
 				]

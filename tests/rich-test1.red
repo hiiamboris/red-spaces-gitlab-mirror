@@ -27,7 +27,7 @@ source: [
 	" 78"
 ]
 				
-view/no-wait/options/flags [
+view/no-wait/options/flags reshape [
 	below
 	b: host 200x500 [
 		style rich-content: rich-content
@@ -42,12 +42,12 @@ view/no-wait/options/flags [
 		; ]
 		row tight [
 			column tight weight= 1 [
-				box left forest [rich-content with [decode compose source] align= 'left]
-				box right blue  [rich-content with [decode compose source] align= 'right]
+				box left forest [rich-content !(compose source) align= 'left]
+				box right blue  [rich-content !(compose source) align= 'right]
 			]
 			column tight weight= 1 [
-				box center blue [rich-content with [decode compose source] align= 'center]
-				box left forest [rich-content with [decode compose source] align= 'fill]
+				box center blue [rich-content !(compose source) align= 'center]
+				box left forest [rich-content !(compose source) align= 'fill]
 			]
 		]
 	] react [

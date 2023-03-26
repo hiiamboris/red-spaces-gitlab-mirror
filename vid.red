@@ -124,13 +124,13 @@ VID: context [
 			template: rich-content
 			facets: [
 				percent! baseline
-				block! !(func [block] [reduce ['decode block]])	;-- high level source dialect support for VID
+				block! !(func [block] [compose/only/deep [kit/batch self [deserialize (block)]]])	;-- high level source dialect support for VID
 				@(props/text-align)
 			]
 		]
 		
-		box    [template: box    facets: [@(props/align)]]
-		cell   [template: cell   facets: [@(props/align)]]
+		box   [template: box    facets: [@(props/align)]]
+		cell  [template: cell   facets: [@(props/align)]]
 		timer [
 			template: timer
 			facets:   [

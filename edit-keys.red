@@ -39,30 +39,30 @@ context [
 			not event/ctrl?
 		][
 			compose [
-				remove 'selected
-				insert (form key)
+				remove-range selected
+				insert-items (form key)
 			]
 		][
 			if key = #"^H" [key: 'backspace]
 			if all [selected  0 = span? selected] [selected: none]	;-- ignore empty selection
 			removal?: find [delete backspace] key
 			distance: select either event/ctrl? [far-moves][near-moves] key
-			action:   case [removal? ['remove] event/shift? ['select] 'else ['move]]
-			if all [removal?  selected] [distance: quote 'selected]
-			if block? distance [						;-- [move [by 1]] -> [move/by 1]
+			action:   case [removal? ['remove-range] event/shift? ['select-range] 'else ['move-caret]]
+			if all [removal?  selected] [distance: 'selected]
+			if block? distance [						;-- [move-caret [by 1]] -> [move-caret/by 1]
 				distance: distance/2
 				action: as path! reduce [action 'by]
 			]
 			switch/default key [
 				left right home end up down page-up page-down [
-					deselect?: when all [selected not event/shift?] [select 'none]
+					deselect?: when all [selected not event/shift?] [select-range none]
 					compose [(deselect?) (action) (distance)]
 				] 
 				delete backspace [compose [(action) (distance)]]
-				#"A" [[select 'all]]
-				#"C" [[copy 'selected]]
-				#"X" [[copy 'selected  remove 'selected]]
-				#"V" [[remove 'selected  paste]]
+				#"A" [[select-range everything]]
+				#"C" [[copy-range selected]]
+				#"X" [[copy-range selected  remove-range selected]]
+				#"V" [[remove-range selected  paste]]
 				#"Z" [pick [[redo] [undo]] event/shift?]
 			] [[]]										;-- not supported yet key
 		]
