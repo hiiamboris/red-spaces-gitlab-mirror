@@ -825,7 +825,7 @@ paragraph-ctx: context [
 		]
 		;; add selection if enabled
 		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
-			boxes: kit/item-boxes space sel/1 sel/2
+			boxes: batch space [frame/item-boxes sel/1 sel/2]
 			sdrawn: make [] 1.5 * length? boxes
 			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
 			drawn: compose/only [push (drawn) (sdrawn)]
@@ -839,11 +839,11 @@ paragraph-ctx: context [
 	
 	caret->box: function [space [object!] offset [integer!] side [word!]] [
 		layout: get-layout space
-		offset: clip offset 0 n: length
+		offset: clip offset 0 n: length? space/text
 		index:  clip 1 n offset + pick [0 1] side = 'left
 		;; line feed in rich text belongs to the upper line, so caret after it can only have right side:
 		if all [layout/text/:index = #"^/" offset = index] [index: min n index + 1]
-		box: kit/item-box index
+		box: batch space [frame/item-box index]
 		;; make caret box of zero width:
 		either left?: index = offset [box/1/x: box/2/x][box/2/x: box/1/x]
 		box 
@@ -3498,7 +3498,7 @@ field-ctx: context [
 		length? field/text
 	]
 	
-	;@@ TODO: limit history length!
+	;@@ TODO: limit history length, and use timelines instead!
 	mark-history: function [field [object!]] [
 		field/history: clear rechange field/history [copy field/text field/caret/offset]
 	]
@@ -3522,108 +3522,156 @@ field-ctx: context [
 		]
 	]
 	
-	actions: context [
-		edit: function [field [object!] plan [block!]] [
-			update: [
-				length:   length? text: field/text
-				selected: field/selected
-				offset:   field/caret/offset
+	kit: make-kit 'field [
+		length: function ["Get text length"] [
+			length? space/text
+		]
+		
+		everything: function ["Get full range of text"] [
+			0 by length
+		]
+		
+		selected: function ["Get selection range or none"] [
+			all [sel: space/selected  sel/1 <> sel/2  sel]
+		]
+		
+		here: function ["Get current caret offset"] [
+			space/caret/offset
+		]
+		
+		frame: object [
+			point->caret: function [
+				"Get caret location [0..length] closest to given offset on last frame"
+				xy [pair! integer!] "If integer, Y=0"
+			][
+				if integer? xy [xy: xy by 0]
+				-1 + offset-to-caret
+					space/spaces/text/layout
+					xy - space/margin - (space/origin by 0)
 			]
-			do with self plan
+			
+			adjust-origin: function [
+				"Adjust field origin so that caret is visible"
+			][
+				quietly space/origin: ~/adjust-origin space
+			]
 		]
-		undo: redo: copy: at: move: remove: insert: paste: select: none
-	]
-	
-	actions/undo: does with :actions/edit [~/undo field]
-	actions/redo: does with :actions/edit [~/redo field]
-	
-	actions/copy: function [
-		"Copy specified range into clipboard"
-		range [word! pair!] "Offset range or any of: [selected all]"
-	] with :actions/edit [
-		do update
-		switch range [    	
-			selected [range: selected]
-			all      [range: 0 by length]
+		
+		select-range: function ["Replace selection" range [pair! none!]] [
+			space/selected: if range [clip range 0 length]
 		]
-		slice: when pair? range (copy/part text range + 1)		;-- silently ignores unsupported range words
-		clipboard/write slice
-		slice
-	]
+		
+		undo: does [~/undo space]
+		redo: does [~/redo space]
 	
-	actions/at: function ["Get offset of a named location" name [word!]] with :actions/edit [
-		do update
-		switch/default name [
-			head far-head [0]
-			tail far-tail [length]
-			prev-word [~/find-prev-word field offset]
-			next-word [~/find-next-word field offset]
-			selected [field/selected]
-		] [offset]										;-- don't move on unsupported commands
-	]
+		;@@ move these into text template?
+		locate: function [
+			"Get offset of a named location"
+			name [word!]
+		][
+			switch/default name [
+				head far-head [0]
+				tail far-tail [length]
+				prev-word [~/find-prev-word space space/caret/offset]
+				next-word [~/find-next-word space space/caret/offset]
+			] [space/caret/offset]						;-- don't move on unsupported anchors
+		]
 	
-	actions/move: function [
-		"Displace the caret"
-		pos [word! (not by) integer!]
-		/by "Move by a relative integer number of chars"
-	] with :actions/edit [
-		do update
-		if word? pos [pos: actions/at pos]
-		if by        [pos: offset + pos]
-		field/caret/offset: clip 0 length pos
-	]
 	
-	actions/remove: function [
-		"Remove range or from caret up to a given limit"
-		limit [word! pair! (not by) integer!]
-		/by "Relative integer number of char"
-	] with :actions/edit [
-		do update
-		case/all [
-			word? limit    [limit: actions/at limit]
-			by             [limit: offset + limit]
-			integer? limit [limit: as-pair offset limit]
-			pair? limit [
-				if 0 < span? limit: clip 0 length order-pair limit [
-					remove/part  skip text limit/1  span? limit
-					field/caret/offset: limit/1
-					field/selected: none
-					mark-history field
+		move-caret: function [
+			"Displace the caret"
+			pos [word! (not by) integer!]
+			/by "Move by a relative integer number of chars"
+		][
+			if word? pos [pos: locate pos]
+			if by        [pos: space/caret/offset + pos]
+			space/caret/offset: clip 0 length pos
+		]
+	
+		select-range: function [
+			"Redefine selection or extend up to a given limit"
+			limit [word! pair! none! (not by) integer!]
+			/by "Move selection edge by an integer number of chars"
+		][
+			set [ofs: sel:] ~/compute-selection space limit by space/caret/offset length selected
+			space/caret/offset: ofs
+			space/selected: sel
+		]
+	
+		copy-range: function [
+			"Copy and return specified range of text"
+			range: 0x0 [pair! none!]
+			/clip "Write it into clipboard"
+		][
+			slice: copy/part space/text range + 1
+			if clip [clipboard/write slice]
+			slice
+		]
+			
+		remove-range: function [
+			"Remove range from caret up to a given limit"
+			limit [word! pair! (not by) integer! none!]
+			/by "Relative integer number of char"
+			/clip "Write it into clipboard"
+		][
+			case/all [
+				not limit      [exit]					;-- for `remove selected` transparency
+				word? limit    [limit: locate limit]
+				by             [limit: space/caret/offset + limit]
+				integer? limit [limit: as-pair space/caret/offset limit]
+				pair? limit [
+					limit: system/words/clip 0 length order-pair limit 
+					if clip [clipboard/write copy/part space/text limit + 1]
+					if limit/1 <> limit/2 [
+						remove/part  skip space/text limit/1  n: span? limit
+						adjust-offsets space limit/1 negate n
+						mark-history space				;@@ use record instead
+					]
 				]
 			]
 		]
-	]
 	
-	actions/insert: function [
-		"Insert given data into current caret offset"
-		data [string!]
-	] with :actions/edit [
-		do update
-		unless empty? data [
-			insert (skip text offset) data
-			field/caret/offset: offset + length? data
-			field/selected: none
-			mark-history field
+		insert-items: function [
+			"Insert text at given offset"
+			offset [integer!]
+			text   [string!]
+		][
+			unless empty? text [
+				offset: clip offset 0 length
+				insert (skip space/text offset) text
+				adjust-offsets space offset length? text
+				mark-history space
+			]
 		]
+	
+		paste: function [
+			"Paste text from clipboard at given offset"
+			offset [integer!]
+		][
+			if str: clipboard/read/text [insert-items offset str] 
+		]
+	
 	]
 	
-	actions/paste: function [
-		"Paste text from clipboard into current caret offset"
-	] with :actions/edit [
-		if str: clipboard/read/text [actions/insert str] 
+	adjust-offsets: function [field [object!] offset [integer!] shift [integer!]] [
+		foreach path [field/selected/1 field/selected/2 field/caret/offset] [
+			if attempt [offset <= value: get path] [
+				set path max offset value + shift
+			]
+		]
 	]
 	
 	;; selection anchor to pair converter shared by field and document
 	compute-selection: function [
-		limit     [pair! word! integer!]
+		space     [object!]
+		limit     [pair! word! integer! none!]
 		relative? [logic!]
-		actions   [object!]
 		offset    [integer!]
 		length    [integer!]
 		selected  [pair! none!]
 	][
-		;@@ special case may be needed for NxN selection (should it become `none`?) need more usage data
 		case [
+			not limit      [return reduce [offset none]]
 			relative?      [ofs: offset + limit]
 			integer? limit [ofs: limit]
 			pair?    limit [sel: limit]
@@ -3632,7 +3680,7 @@ field-ctx: context [
 					none #[none] [sel: none]
 					all [sel: 0 by length]
 				][
-					ofs: actions/at limit				;-- document's action/at can return a block
+					ofs: batch space [locate limit]		;-- document's locate can return a block
 					if block? ofs [ofs: ofs/offset]		;-- ignores returned side
 				]
 			]
@@ -3653,17 +3701,6 @@ field-ctx: context [
 		reduce [ofs  if sel [order-pair sel]]
 	]
 	
-	actions/select: function [
-		"Extend or redefine selection"
-		limit [pair! word! (not by) integer!]
-		/by "Move selection edge by an integer number of chars"
-	] with :actions/edit [
-		do update
-		set [ofs: sel:] compute-selection limit by actions offset length selected
-		field/caret/offset: ofs
-		field/selected: sel
-	]
-			
 	adjust-origin: function [
 		"Return field/origin adjusted so that caret is visible"
 		field [object!]
@@ -3671,7 +3708,7 @@ field-ctx: context [
 		cmargin: field/caret/look-around
 		;; layout may be invalidated by a series of keys, second key will call `adjust` with no layout
 		;; also changes to text in the event handler effectively make current layout obsolete for caret-to-offset estimation
-		;; field can just rebuild it since canvas is always known (infinite) ;@@ area will require different canvas..
+		;; field can just rebuild it since canvas is always known (infinite)
 		layout: paragraph-ctx/lay-out field/spaces/text infxinf no no
 		#assert [object? layout]
 		view-width: field/size/x - first (2x2 * field/margin)
@@ -3679,22 +3716,12 @@ field-ctx: context [
 		cw: field/caret/width
 		if view-width - cmargin - cw >= text-width [return 0]	;-- fully fits, no origin offset required
 		co: field/caret/offset + 1
-		cx: first system/words/caret-to-offset layout co
+		cx: first caret-to-offset layout co
 		min-org: min 0 cmargin - cx
 		max-org: clip min-org 0 view-width - cx - cw - cmargin
 		clip field/origin min-org max-org
 	]
 			
-	offset-to-caret: function [
-		"Get caret location [0..length] closest to given OFFSET within FIELD"
-		field [object!] offset [pair! integer!]
-	][
-		if integer? offset [offset: offset by 0]
-		-1 + system/words/offset-to-caret
-			field/spaces/text/layout
-			offset - field/margin - (field/origin by 0)
-	]
-
 	draw: function [field [object!] canvas: infxinf [pair! none!]] [
 		ctext: field/spaces/text						;-- text content
 		quietly ctext/caret: if focused? [field/caret]
@@ -3742,8 +3769,9 @@ field-ctx: context [
 		]
 	]
 	
-	;@@ field will need on-change handler & actor support for better user friendliness!
+	;@@ field will need on-change handler support for better user friendliness!
 	declare-template 'field/space [
+		kit:      ~/kit
 		;; own facets:
 		weight:   1		#type =? :invalidates [number!] (weight >= 0)
 		origin:   0		#type =? :invalidates-look [integer!] (origin <= 0)		;-- offset(px) of text within the field
@@ -3768,17 +3796,7 @@ field-ctx: context [
 		text:   spaces/text/text	#type    :on-change
 		font:   spaces/text/font	#type =? :on-change
 		color:  none				#type =? :on-change	;-- placeholder for user to control
-		
-		offset-to-caret: func [offset [pair!]] [~/offset-to-caret self offset]
-		#type [function!]
-		
-		edit: func [
-			"Apply a sequence of edits to the text"
-			plan [block!]
-		][
-			~/actions/edit self plan
-		]
-		
+				
 		draw: func [/on canvas [pair!]] [~/draw self canvas]
 	]
 	

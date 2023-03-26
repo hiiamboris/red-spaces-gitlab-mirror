@@ -255,8 +255,10 @@ define-handlers [
 				exit									;@@ what about enter key / on-enter event?
 			]
 			;@@ TODO: input validation / filtering
-			space/edit key->plan event space/selected
-			quietly space/origin: field-ctx/adjust-origin space	;@@ should be automatic
+			batch space compose [
+				(key->plan event space/selected)
+				frame/adjust-origin						;@@ should be automatic
+			]
 			invalidate space							;-- has to reconstruct layout in order to measure caret location
 			invalidate/only space/caret					;@@ any way to properly invalidate both at once? -- need layout under cache
 		]
@@ -264,16 +266,20 @@ define-handlers [
 		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
 			;@@ up/down keys may be used for spatial navigation
 			if is-key-printable? event [exit]
-			space/edit key->plan event space/selected
-			quietly space/origin: field-ctx/adjust-origin space
+			batch space compose [
+				(key->plan event space/selected)
+				frame/adjust-origin
+			]
 			invalidate space
 		]
 
 		on-key-up [space path event] []					;-- eats the event so it's not passed forth
 
 		on-down [space path event] [
-			new-ofs: space/offset-to-caret path/2
-			space/edit compose [select 'none move (new-ofs)]
+			batch space [
+				select-range none
+				move-caret frame/point->caret path/2
+			]
 			start-drag path
 		]
 		
@@ -281,9 +287,10 @@ define-handlers [
 			#assert [space/spaces/text/layout]
 			dpath: drag-path
 			if all [dpath dpath/1 =? path/1] [			;-- if started dragging also on this field
-				new-ofs: space/offset-to-caret path/2
-				space/edit compose [select (new-ofs)]
-				quietly space/origin: field-ctx/adjust-origin space
+				batch space [
+					select-range frame/point->caret path/2
+					frame/adjust-origin
+				]
 			]
 		]
 		

@@ -351,11 +351,11 @@ doc-ctx: context [
 		
 	actions/select: function [
 		"Extend or redefine selection"
-		limit [pair! word! (not by) integer!]
+		limit [pair! word! none! (not by) integer!]
 		/by "Move selection edge by an integer number of caret slots"
 	] with :actions/edit [
 		do update
-		set [ofs: sel:] field-ctx/compute-selection limit by actions offset doc/length doc/selected
+		set [ofs: sel:] field-ctx/compute-selection doc limit by offset doc/length doc/selected
 		actions/record
 			[move (offset) select (doc/selected)]
 			[move (ofs) select (sel)]

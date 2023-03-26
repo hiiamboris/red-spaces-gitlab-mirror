@@ -40,7 +40,7 @@ context [
 		][
 			compose [
 				remove-range selected
-				insert-items (form key)
+				insert-items here (form key)
 			]
 		][
 			if key = #"^H" [key: 'backspace]
@@ -60,9 +60,9 @@ context [
 				] 
 				delete backspace [compose [(action) (distance)]]
 				#"A" [[select-range everything]]
-				#"C" [[copy-range selected]]
-				#"X" [[copy-range selected  remove-range selected]]
-				#"V" [[remove-range selected  paste]]
+				#"C" [[copy-range/clip selected]]
+				#"X" [[remove-range/clip selected]]
+				#"V" [[remove-range selected  paste here]]
 				#"Z" [pick [[redo] [undo]] event/shift?]
 			] [[]]										;-- not supported yet key
 		]
