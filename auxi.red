@@ -1070,15 +1070,23 @@ find-same-path: function [block [block!] path [path!]] [
 ]
 
 
-make-kit: function [kit-spec [block!] /local name] [
-	kit: object append keep-type kit-spec set-word! [batch: none]
+kit-catalog: make map! 40
+
+make-kit: function [name [path! (parse name [2 word!]) word!] spec [block!]] [
+	unless word? name [
+		base: kit-catalog/(name/2)
+		spec: append copy/deep base spec
+		name: name/1
+	]
+	kit-catalog/:name: copy/deep spec
+	kit: object append keep-type spec set-word! [batch: none]
 	kit/batch: function
 		["Evaluate plan for given space" space [object!] plan [block!]]
 		compose [do with (kit) plan]
-	do with [:kit :kit/batch] kit-spec
+	do with [:kit :kit/batch] spec
 	kit
 ]
-	
+
 batch: function ["Evaluate plan within space's kit" space [object!] plan [block!]] [
 	either kit: select space 'kit [kit/batch space plan][do plan]	;@@ or error if no kit?
 ]
@@ -1151,7 +1159,7 @@ distribute: function [
 		]
 	]
 	
-	result: append/dup make block! count amount * 0 count	;@@ use obtain?
+	result: append/dup make block! count amount * 0 count
 	if sum-weights <= 0 [return result]
 	sort/skip/compare data 3 3
 	

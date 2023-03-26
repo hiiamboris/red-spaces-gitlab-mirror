@@ -50,6 +50,7 @@ modify-class 'space [
 	origin:  0x0	#type =? :invalidates-look [pair!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
+	kit:     none	#type [object!]
 	; sections: none	#type =? :invalidates [function! block! none!] 
 	; measure: none	#type [function!] 
 	; edit:    none	#type [function!] 
@@ -837,7 +838,7 @@ paragraph-ctx: context [
 	]
 	
 	;; TIP: use kit/do [help self] to get help on it
-	kit: make-kit [
+	kit: make-kit 'text [
 		clone:  does [clone-space space [text flags color margin weight font command]]
 		format: does [copy space/text]
 		
@@ -1402,6 +1403,11 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		cache
 	]
 	
+	kit: make-kit 'rich-paragraph [
+		sections: does [~/get-sections space]
+		format:   does [container-ctx/format space ""]
+	]
+		
 	draw: function [space [object!] canvas: infxinf [pair! none!]] [
 		space/sec-cache: copy []						;-- reset computed sections
 		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
@@ -1415,6 +1421,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	
 	;; a paragraph layout composed out of spaces, used as a base for higher level rich-content
 	declare-template 'rich-paragraph/container [
+		kit:         ~/kit
 		margin:      0
 		spacing:     0		#type =? [integer!] :invalidates	;-- has only vertical row spacing
 		align:       'left	#type = [word!] :invalidates		;-- horizontal alignment
@@ -1425,11 +1432,9 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		force-wrap?: no		#type =? [logic!] :invalidates		;-- allow splitting words at *any pixel* to ensure canvas is not exceeded
 		
 		frame:       []		#type  [object! block!]				;-- internal frame data used by /into
-		sections:    does [~/get-sections self]
 		sec-cache:   []
 		cache:       [size map frame sec-cache]
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
-		format: does [container-ctx/format self ""]
 		
 		;; container-draw is not used due to tricky geometry
 		draw: function [/on canvas [pair!]] [~/draw self canvas]
@@ -1748,6 +1753,9 @@ rich-content-ctx: context [								;-- rich content
 			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
 		]												;-- triggers on-data-change
 		clone
+	]
+	
+	kit: make-kit 'rich-content/rich-paragraph [
 	]
 		
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
