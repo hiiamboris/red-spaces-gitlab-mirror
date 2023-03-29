@@ -63,7 +63,7 @@ declare-template 'bullet/text [
 ;; in-line and block code templates
 ;@@ can I make code templates generic enough to separate them?
 declare-template 'code-span/text []
-declare-template 'code-block/paragraph []
+declare-template 'code-block/paragraph [limits: 0 .. 500]	;@@ there must be a better way to wrap it than hard cap on width!
 
 ;; fixed-width font for code
 code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
