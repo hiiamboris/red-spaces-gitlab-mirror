@@ -1072,6 +1072,7 @@ find-same-path: function [block [block!] path [path!]] [
 
 kit-catalog: make map! 40
 
+;@@ add on-change to kit to lock it from modification
 make-kit: function [name [path! (parse name [2 word!]) word!] spec [block!]] [
 	unless word? name [
 		base: kit-catalog/(name/2)
@@ -1079,16 +1080,16 @@ make-kit: function [name [path! (parse name [2 word!]) word!] spec [block!]] [
 		name: name/1
 	]
 	kit-catalog/:name: copy/deep spec
-	kit: object append keep-type spec set-word! [batch: none]
-	kit/batch: function
+	kit: object append keep-type spec set-word! [do-batch: none]	;-- must not be named 'batch' since global batch is used by kits
+	kit/do-batch: function
 		["Evaluate plan for given space" space [object!] plan [block!]]
 		with kit compose [do with self copy plan]		;-- must copy or may get context not available errors on repeated batch
-	do with [:kit :kit/batch] spec
+	do with [:kit :kit/do-batch] spec
 	kit
 ]
 
 batch: function ["Evaluate plan within space's kit" space [object!] plan [block!]] [
-	either kit: select space 'kit [kit/batch space plan][do plan]	;@@ or error if no kit?
+	either kit: select space 'kit [kit/do-batch space plan][do plan]	;@@ or error if no kit?
 ]
 
 ;; this function assumes no scaling or anything fishy, plain map

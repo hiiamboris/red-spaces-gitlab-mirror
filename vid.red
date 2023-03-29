@@ -124,7 +124,7 @@ VID: context [
 			template: rich-content
 			facets: [
 				percent! baseline
-				block! !(func [block] [compose/only/deep [kit/batch self [deserialize (block)]]])	;-- high level source dialect support for VID
+				block! !(func [block] [compose/only/deep [kit/do-batch self [deserialize (block)]]])	;-- high level source dialect support for VID
 				@(props/text-align)
 			]
 		]
