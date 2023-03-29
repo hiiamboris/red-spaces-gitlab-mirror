@@ -65,6 +65,7 @@ do/expand [
 	#include %../common/step.red
 	; #include %../common/typecheck.red
 	; #include %../common/selective-catch.red
+	#include %../common/forparse.red
 	#include %../common/mapparse.red
 	#include %../common/reshape.red
 	#include %../common/sift-locate.red
