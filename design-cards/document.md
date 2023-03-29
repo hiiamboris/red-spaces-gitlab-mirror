@@ -176,7 +176,7 @@ Red native clipboard implementation can only carry text, images and file lists, 
 
 From what I read about Windows clipboard, it was a mess and remained a mess. Every program seems to define its own clipboard format only it is able to read. Somehow I am able to copy formatted text from a native word processor and insert it into Google Docs (I suggest it used RTF clipboard format), but even that is a pathetic failure:
 
-<img width=400 src=demo-clipboard-formatted.gif />
+<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-clipboard-formatted.gif />
 
 It copied bold and italic flags but totally lost font face and size. Hello from 2023, ancestors 🖐🛸. Sixty years after hypertext invention we're still unable to move it between programs. Let's wait another 60 and see.
 
