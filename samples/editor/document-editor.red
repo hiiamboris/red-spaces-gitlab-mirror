@@ -76,7 +76,7 @@ underbox: function [
 	rounding   [integer!]
 ][
 	compose/deep [
-		push [										;-- solid box under code areas
+		push [
 			line-width (line-width)
 			pen (opaque 'text 10%)
 			fill-pen (opaque 'text 5%)
@@ -138,16 +138,13 @@ request-grid-size: function [] [
 
 				
 ;; high level wrappers for basic `document/edit` functions, more suitable for toolbar actions
+;@@ these could go into editor/kit eventually
 editor-tools: context [
-	selected-range: function [doc [object!]] [
-		any [doc/selected  doc/caret/offset * 1x1]
-	]
-	
 	extend-range: function [							;@@ put this into document itself?
 		"Extend given range to cover instersected paragraphs fully"
-		doc [object!] range [pair!]
+		doc [object!] range [pair! none!] "If none, current caret offset"
 	][
-		mapped: doc/map-range/extend/no-empty range
+		mapped: batch doc [map-range/extend/no-empty any [range here * 1x1]]
 		range1: mapped/2
 		range2: last mapped
 		range1/1 by range2/2
@@ -157,19 +154,21 @@ editor-tools: context [
 		"Return a list of paragraphs intersecting the given range"
 		doc [object!] range [pair!]
 	][
-		extract doc/map-range range 2
+		extract batch doc [map-range range] 2
 	]
 	
 	toggle-flag: function [
 		"Toggle the state of one of logic text attributes"
 		doc [object!] name [word!] (find [bold italic underline strike] name)
 	][
-		either zero? span? range: selected-range doc [
+		either range: batch doc [selected] [
+			batch doc [
+				old: pick-attr 1 + range/1 name
+				mark-range range name not old
+			]
+		][
 			old: rich/attributes/pick doc/paint name
 			rich/attributes/change doc/paint name not old
-		][
-			old: doc-ctx/pick-attr doc 1 + range/1 name
-			doc/edit [mark range name not old]
 		]
 	]
 
@@ -190,7 +189,7 @@ editor-tools: context [
 	][
 		if range/1 = range/2 [exit]
 		;; each paragraph becomes a separate link as this is simplest to do
-		data: doc/edit [slice range]
+		data: batch doc [copy-range range]
 		either data/name = 'rich-text-span [
 			data/data: linkify-data data/data command
 		][
@@ -198,10 +197,9 @@ editor-tools: context [
 				para/data: linkify-data para/data command
 			]
 		]
-		doc/edit [
-			remove range
-			insert/at data range/1
-			select 'none
+		batch doc [
+			change-range range data
+			select-range none
 		]
 	]
 	
@@ -209,7 +207,7 @@ editor-tools: context [
 		"Convert selection into a link"
 		doc [object!] command [word! (command = 'pick) block!]
 	][
-		if zero? span? range: selected-range doc [exit]
+		unless range: batch doc [selected] [exit]
 		if command = 'pick [
 			if empty? url: request-url [exit]
 			unless any [
@@ -226,25 +224,23 @@ editor-tools: context [
 		doc [object!] range [pair!]
 	][
 		if range/1 = range/2 [exit]
-		slice: doc/edit [slice range]
+		slice: batch doc [copy-range range]
 		either slice/name = 'rich-text-span [
 			code: remake-space 'code-span [text: (slice/format)]
 		][
-			slice: doc/edit [slice range: extend-range doc range]
+			range: extend-range doc range
+			slice: batch doc [copy-range range]
 			trim/tail text: slice/format
 			code: remake-space 'code-block [text: (text) sections: (none)]	;-- prevent block from being dissected
 		]
-		doc/edit [
-			remove range
-			insert/at code range/1
-		]
+		batch doc [change-range range code]
 	]
 	
 	codify-selected: function [
 		"Convert selection into a code span or block"
 		doc [object!]
 	][
-		unless zero? span? range: selected-range doc [
+		if range: batch doc [selected] [
 			codify doc range
 			doc/selected: none
 		]
@@ -287,13 +283,14 @@ editor-tools: context [
 			if text [new-bullet: remake-space 'bullet [text: (text)]]
 		]
 		old-bullet: bulleted-paragraph? para
-		offset: doc-ctx/get-paragraph-offset doc para	;@@ need to put it into measure
 		base-indent: any [get-safe 'para/indent/first 0]
-		doc/edit [
-			if old-bullet [remove 0x1 + offset]
+		batch doc [
+			offset: paragraph-head para
+			if old-bullet [remove-range 0x1 + offset]
 			if new-bullet [
-				move offset insert new-bullet
-				indent compose [first: (base-indent) rest: (base-indent + 15)]
+				move-caret offset
+				insert-items here new-bullet
+				indent-range here compose [first: (base-indent) rest: (base-indent + 15)]
 			]
 		]
 	]
@@ -302,7 +299,7 @@ editor-tools: context [
 		"Replace bullet of the current paragraph with the one following the previous paragraph"
 		doc [object!]
 	][
-		para: first doc/measure [caret->paragraph doc/caret/offset]
+		para: first batch doc [caret->paragraph here]
 		auto-bullet doc para
 	]
 	
@@ -311,11 +308,11 @@ editor-tools: context [
 		doc [object!] para [object!]
 	][
 		if bulleted-paragraph? para [
-			offset: doc-ctx/get-paragraph-offset doc para
-			new-indent: if para/indent [compose [first: (i: para/indent/first) rest: (i)]]
-			doc/edit [
-				remove 0x1 + offset
-				if new-indent [indent new-indent]
+			batch doc [
+				offset: paragraph-head para
+				remove-range 0x1 + offset
+				new-indent: if para/indent [compose [first: (i: para/indent/first) rest: (i)]]
+				if new-indent [indent-range offset new-indent]
 			]
 		]
 	]
@@ -325,14 +322,15 @@ editor-tools: context [
 		doc [object!] para [object!]
 		/as number [integer!] "Set a number instead of a bullet"
 	][
-		offset: doc-ctx/get-paragraph-offset doc para
 		bullet: make-space 'bullet []
 		if number [bullet/text: rejoin [number "."]]
-		if bulleted-paragraph? para [doc/edit [remove 0x1 + offset]]
 		base-indent: any [get-safe 'para/indent/first 0]
-		doc/edit [
-			move offset insert bullet
-			indent compose [first: (base-indent) rest: (base-indent + 15)]
+		batch doc [
+			offset: paragraph-head para
+			move-caret offset
+			if bulleted-paragraph? para [remove-range 0x1 + here]
+			insert-items here bullet
+			indent-range here compose [first: (base-indent) rest: (base-indent + 15)]
 		]
 	]
 	
@@ -340,7 +338,7 @@ editor-tools: context [
 		"Set bullets for selected paragraphs"
 		doc [object!]
 	][
-		list: range->paragraphs doc selected-range doc
+		list: range->paragraphs doc batch doc [selected]
 		action: either bulleted-paragraph? list/1 [:debulletify][:bulletify]
 		foreach para list [action doc para]
 	]
@@ -349,7 +347,7 @@ editor-tools: context [
 		"Enumerate selected paragraphs"
 		doc [object!]
 	][
-		list: range->paragraphs doc selected-range doc
+		list: range->paragraphs doc batch doc [selected]
 		either num: get-bullet-number list/1 [debulletify doc list/1][bulletify/as doc list/1 1]
 		foreach para next list [auto-bullet doc para]
 	]
@@ -366,7 +364,7 @@ editor-tools: context [
 			grid/content/:xy: cell: first lay-out-vids [editor]
 			cell/content/timeline: doc/timeline			;-- share undo/redo timeline
 		]
-		doc/edit [insert grid]
+		batch doc [insert-items here grid]
 	]
 	
 	change-selected-font: function [
@@ -375,15 +373,15 @@ editor-tools: context [
 	][ 
 		if font = 'pick [font: request-font]
 		default font: [name: #[none] size: #[none]]
-		either zero? span? range: selected-range doc [
+		either range: batch doc [selected] [
 			rich/attributes/change doc/paint 'font font/name
 			rich/attributes/change doc/paint 'size font/size
 		][
-			doc/edit [
-				mark range 'font font/name
-				mark range 'size font/size
+			batch doc [
+				mark-range range 'font font/name
+				mark-range range 'size font/size
 				foreach style compose [(only font/style)] [
-					doc/mark range style on
+					mark-range range style on
 				]
 			]
 		]
@@ -393,17 +391,16 @@ editor-tools: context [
 		"Change color for the selection or for newly input text"
 		doc [object!] color [word! (color = 'pick) none! tuple!] "Use 'pick to pop up a requester"
 	][ 
-		selected?: not zero? span? range: selected-range doc
+		range: batch doc [selected]
 		if color = 'pick [
-			old: either selected?
-				[doc-ctx/pick-attr doc 1 + range/1 'color]
+			old: either range
+				[batch doc [pick-attr 1 + range/1 'color]]
 				[rich/attributes/pick doc/paint 'color]
 			color: request-color/from old
 		]
-		either selected?
-			[doc/edit [mark range 'color color]]
+		either range
+			[batch doc [mark-range range 'color color]]
 			[rich/attributes/change doc/paint 'color color]
-		focus-space doc									;-- focus was destroyed by request-color ;@@ FIX it
 	]
 	
 ];editor-tools: context [
