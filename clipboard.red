@@ -35,6 +35,7 @@ clipboard: context [
 		/extern data
 	][
 		read: read-clipboard
+		unless string? read [read: copy {}]				;@@ support wrapping of other clipboard formats? image?
 		unless read == as-text: data/format [			;-- last copy comes from outside the running script
 			self/data: make text! [data: read]
 			if text [as-text: data/format]
