@@ -11,23 +11,23 @@ Funny but despite the ages of web browsers development, they don't usually let u
 Word processors we all know, I bet no user really understands:
 - What will happen on Tab key press?
 
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-tab-key.gif />
+  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-tab-key.gif />
   
 - How will right-aligned numbered paragraph look like with nonzero indentation?
 
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-right-aligned.gif />
+  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-right-aligned.gif />
   
 - What if line contains more whitespace that can fit the screen?
 
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-long-line.gif />
+  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-long-line.gif />
   
 - Is it possible select whole first row of a grid and only a half of second row? Or part of the 1x1 cell and part of the 2x1 cell?
 
-  <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
+  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
 
 - If part of the grid is copied, how is it inserted inside and outside the grid?
  
-  <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-insert.gif />
+  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-insert.gif />
 
 These are just a few examples of implementation edge cases, but any implementation has to consider them.
 
@@ -95,7 +95,7 @@ Rendering phase (including splitting at row and word margins) combines clipping 
 
 Here's an illustration of how paragraph model performs in practice when containers can pass along section data from their children:
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif />
+<img width=700 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif />
 
 ## Data representation
 
@@ -145,7 +145,7 @@ Key difference between flat and tree models can be illustrated using selection w
   
 - In the flat model, if selection starts outside of the grid, it can only include grid as a whole. And whole grid can be inserted anywhere, including one of grid cells. Caret offset within the cell does not belong to the outside document, but to a separate one.
 
-  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
+  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
   
 It's an interesting distinction that can be seen in how selection works in browsers vs how it works in word processors. Former work on the tree, latter use the flat model.
 
