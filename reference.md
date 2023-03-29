@@ -171,7 +171,7 @@ Some other facets are not mandatory but have a **reserved** meaning (cannot be u
 | `map` | `block!` | Only for container spaces: describes inner spaces geometry in this space's coordinate system.<br> Has format: `[child [offset: pair! size: pair!] child ...]`.<br> Used for hittesting and tree iteration. |
 | `into` | `func [xy [pair!]]`<br>`-> [child xy']` | Only for container spaces: more general variant of `map`: takes a point in this space's coordinate system and returns an inner space it maps to, and the point in inner space's coordinate system.<br> May return `none` if point does not land on any inner space.<br> Used in hittesting only, takes precedence over `map`.<br> If space supports dragging, then `into` should accept `/force child [object! none!]` refinement that should enforce coordinate translation into chosen child even if `xy` point does not land on it. |
 | `weight` | `number!` | Used for relative scaling of items in containers like `tube`. `0` = never extend, positive values determine relative size extension (`1` is the default). Preferably should be set from styles. |
-| `sections` | `block!` `none!` `func [] -> block! or none!` | Used by text templates (anything that can be wrapped to another line). Documented [in rich-paragraph](#rich-paragraph). |
+| `kit` | `object!` | Shared kit object (see [below](#kit)). |
 | `on-invalidate` | <pre>func [<br>	space [object!]<br>	cause [object! none!]<br>	scope [word! none!]<br>]</pre> | Custom invalidation function, if cache is managed by the space itself. |
 
 ---
@@ -212,7 +212,72 @@ Some facets are not reserved or prescribed but have a **recommended** meaning as
 
 Spaces do not impose any structural limitations. If a space can hold a box or a piece of text, then it can hold *any* other space, no matter how complex it is. The only requirement is that same space should not normally appear in multiple places on the tree.
 
+### Kit
 
+`kit` facet is present in templates spaces that want provide functions to read, interpret and modify their state. Having a set of functions inside every space object is quite RAM-expensive, so instead spaces of the same template contain a link to a shared kit object that contains all the functions.
+
+Since these functions are shared, they need to know which space they should operate upon. Rather than adding a `space [object!]` argument to all of them (it becomes way too verbose), I made them implicitly receive space object from the kit entry point called `batch`. 
+
+`batch` global function is used to access functions in the kit:
+```
+>> ? batch
+USAGE:
+     BATCH space plan
+
+DESCRIPTION: 
+     Evaluate plan within space's kit. 
+     BATCH is a function! value.
+
+ARGUMENTS:
+     space        [object!] 
+     plan         [block!] 
+```
+Example usage (on document `doc`):
+```
+batch doc [
+	select-range none
+	move-caret here - 1
+	remove-range 0x1 + here
+	insert-items "text"
+]
+```
+
+`batch` evaluates given `plan` while implicitly passing its `space` argument to all the functions. That's why we don't have to write `move-caret doc (here doc) - 1` but just `move-caret here - 1`. This requires an extra `bind` call on every `plan` evaluation, but is a small price to pay compared to both the verbosity of extra argument and having a per-object copy of all functions.
+
+On top of normal functions that depend on space's state only, kit may have a `frame` object with its own functions subset. This subset contains functions that are only valid after a render (i.e. they read data from the `map` or other facets generated for a single frame). Examples are 2D caret locations, row count and geometry, and so on.
+
+If a space has a `/kit` object, to see a list of functions supported by it you can use `help`:
+```
+>> text: make-space 'text []					;) space we want to inspect 
+
+>> batch text [help self]						;) list of general functions
+SELF is an object! with the following words and values:
+     clone         function!     []
+     format        function!     []
+     length        function!     Get text length.
+     everything    function!     Get full range of text.
+     selected      function!     Get selection range or none.
+     select-range  function!     Replace selection.
+     frame         object!       [line-count point->caret caret-box item-box item-boxes sections]
+     do-batch      function!     (Generated) Evaluate plan for given space.
+     
+>> batch text [help frame]						;) list of frame functions
+FRAME is an object! with the following words and values:
+     line-count    function!     Get line count on last frame.
+     point->caret  function!     Get caret offset and side near the point XY on last frame.
+     caret-box     function!     Get box [xy1 xy2] for the caret at given offset and side on last frame.
+     item-box      function!     Get box [xy1 xy2] for the char at given index on last frame.
+     item-boxes    function!     Get boxes [xy1 xy2 ...] for all chars in given range on last frame (unifies subsequent boxes).
+     sections      function!     Get section widths on last frame as list of integers.
+```
+
+A few notes:
+- `do-batch` is an internal auto-generated entry point called by `batch`. Without it, the other functions won't work.
+- `clone` function is used by clipboard to obtain stateless deep copies of live space objects. Space must have it in the kit to be copyable.
+- `format` function is used whenever a space must be converted to plain text, e.g. when sharing it via clipboard with other programs.
+- `frame/sections` function is documented in [rich-paragraph](#sectioning).
+- Generally, naming of similar functions is kept consistent across templates. E.g. editable text spaces all use [`key->plan`](key-plan.red) to interpret input, which then calls `selected`, `everything`, `undo`, `redo`, `move-caret`, `select-range`, `insert-items`, `remove-range`, `copy-range`, etc.
+ 
 
 ## Space
 
@@ -314,7 +379,7 @@ Basic single-line text renderer.
 | `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); should be set in styles; `wrap` flag would make it behave like `paragraph` |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
 | `selected` | pair! none! | when set, draws a selection on the text; can be styled as `text/selection` |
-| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
+| `kit` | object! | shared [kit object](#kit) |
 
 ## Paragraph
 
@@ -334,7 +399,7 @@ Inherits all of `text` facets:
 | `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); `flags: [wrap]` is the default, without it would behave like `text` |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
 | `selected` | pair! none! | when set, draws a selection on the text; can be styled as `paragraph/selection` |
-| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
+| `kit` | object! | shared [kit object](#kit) |
 
 ## Link
 
@@ -354,7 +419,7 @@ Inherits all of `paragraph` facets:
 | `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `strike`, `ellipsize`); defaults to `flags: [wrap underline]` |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
 | `selected` | pair! none! | when set, draws a selection on the text; can be styled as `link/selection` |
-| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
+| `kit` | object! | shared [kit object](#kit) |
 
 Introduces new facets:
 
@@ -558,17 +623,12 @@ Adds new facets:
 | `selection` | rectangle space object! | can be styled as `field/selection` |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
 | `caret/look-around` | integer! | how close caret can come to field's margins; defaults to 10 pixels |
-| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
+| `kit` | object! | shared [kit object](#kit) |
 
 Note: `caret/offset` and `selected` facets use *offsets from head* as coordinates:
 - `0` = no offset from the head, i.e. before the 1st char
 - `1` = offset=1, i.e. after 1st char
 - `length? text` = offset from the head = text length, i.e. after last char
-
-
-## Area
-
-Not implemented yet.
 
 
 ## Logic
@@ -761,6 +821,7 @@ Basic template for various layouts. Arranges multiple spaces in a predefined way
 |-|-|-|
 | `content` | block! of space object!s | contains spaces to arrange and render |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector |
+| `kit` | object! | shared [kit object](#kit) |
 
 `items` is a picker interface that abstracts the data source:
 - called as `items/size` it should return the number of items
@@ -836,12 +897,14 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 
 | setting | types | default | constraints | description |
 |-|-|-|-|
-| align | word! none! | left | any of `[left center right fill]` | horizontal alignment |
-| baseline | percent! float! none! | 80% | any of `[left center right fill]` | horizontal alignment |
+| align | word! none! | left | any of `[left center right fill scale upscale]` | horizontal alignment |
+| baseline | percent! float! none! | 80% | normally 0%(top) to 100%(bottom) | vertical alignment |
 | margin |  integer! pair! | | >= 0x0 | space between paragraph's content and it's border |
 | spacing | integer! pair! | | >= 0x0 | space between adjacent items (x) and rows (y) |
 | canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
 | limits | range! none! | none | /min <= /max | constraints on the size |
+| indent | `[first: integer! rest: integer!]` block! or none! | none | >= 0 each | first and other rows indentation in pixels |
+| force-wrap? | logic! | false | | prioritize canvas width even if it means wrapping spaces at any pixel (may be slow on 1px canvas!) |
 
 See [rich-paragraph](#rich-paragraph) to better understand how it works.
 
@@ -859,6 +922,7 @@ Inherits all of `container` facets:
 |-|-|-|
 | `content` | block! of space object!s | contains spaces to arrange and render (see [container](#container)) |
 | `items` | `func [/pick i [integer!] /size]` | more generic item selector (see [container](#container)) |
+| `kit` | object! | shared [kit object](#kit) |
 
 Adds new facets:
 
@@ -1161,7 +1225,7 @@ Adds new facets:
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
 | `indent` | none! block! | first and the other rows indentation from the left, in the form: `[first: integer! rest: integer!]`; both `first` and `rest` values have to be present, e.g. `[first: 15 rest: 30]` |
 | `force-wrap?` | logic! | on limited width canvas: when `on`, wraps spaces that are wider than the width; when `off`, canvas width can be extended to accomodate the widest space and indentation |
-| `format` | `func [] -> string!` | formats rich paragraph contents as plain text (e.g. to paste elsewhere) |
+| `kit` | object! | shared [kit object](#kit) |
 
 
 **Alignments** look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
@@ -1177,10 +1241,9 @@ Note that `rich-paragraph` can split *any* space that appears in it into a numbe
 
 ### Sectioning
 
-`sections` is a special facet reserved in all spaces for use in rich-paragraph. It can equal to:
+All spaces that have `frame/sections` in their [kit](#kit) can be wrapped by `rich-paragraph`. `frame/sections` must be a nullary function returning:
 - `none` denoting that space cannot be split
 - `block!` of integers, representing a list of horizontal interval widths for this space on the last frame
-- `function!` returning `none` or `block!` (most common case)
 
 Each returned interval width can be:
 - a positive integer denotes a mandatory inteval (always made visible), usually a single word of text
@@ -1191,9 +1254,9 @@ Constraints:
 - sum of absolute values of inteval widths must equal total space width
 - generally margin should be treated as mandatory (this way margins won't be stripped off the space when it comes near the edge), while spacing should be treated as empty
 
-Example: for `text margin= 10x5 "hello world"` sections may return: `[36 -4 40]` where 36 is the width of `hello` plus left margin, 4 is the width of whitespace, 40 is the width of `world` plus right margin.
+Example: for `text margin= 10x5 "hello world"` sections may return: `[10 26 -4 30 10]` where 26 is the width of `hello`, 4 is the width of whitespace, 30 is the width of `world`.
 
-`sections` are defined for the text-based templates, and containers that usually wrap them. This facet can be freely added to any other spaces that should be wrappable.
+`frame/sections` is defined for the text-based templates, and containers that usually wrap them. This function can be freely added to the kit of any other spaces that should be wrappable.
 
 
 ## Rich-content
@@ -1232,7 +1295,7 @@ Inherits all of `rich-paragraph` facets:
 | `baseline` | percent! float! | vertical alignment as percentage of line's height: 0% = top, 50% = middle, 100% = bottom; default = 80% (makes text of varying font size look more or less aligned) |
 | `indent` | none! block! | first and the other rows indentation from the left, in the form: `[first: integer! rest: integer!]`; both `first` and `rest` values have to be present, e.g. `[first: 15 rest: 30]` |
 | `force-wrap?` | logic! | on limited width canvas: when `on`, wraps spaces that are wider than the width; when `off`, canvas width can be extended to accomodate the widest space and indentation |
-| `format` | `func [] -> string!` | formats rich paragraph contents as plain text (e.g. to paste elsewhere) |
+| `kit` | object! | shared [kit object](#kit) |
 
 Adds new facets:
 
@@ -1243,15 +1306,13 @@ Adds new facets:
 | `color` | tuple! none! | if set, affects default text color |
 | `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); makes it display boxes of `rich-content/selection` style |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
-| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
-| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
 | `data` | block! | internal content representation (see below); updates `content` when set |
 
 `data` facet is a block of `[item attr ...]` pairs, where:
 - `item` is either a char! value or a space object!
 - `attr` is a set of text attributes (bold, italic, color, etc) for the previous item
 
-`data` can be modified by high level `edit` functions or manually (in latter case the facet must be `set` after making changes to trigger internal updates). 
+`data` can be modified by high level kit functions or manually (in latter case the facet must be `set` after making changes to trigger internal updates). 
 
 
 ## Document
@@ -1269,6 +1330,7 @@ Inherits all of `list` facets:
 | `axis` | word! | set to `y` and should not be changed |
 | `margin` | integer! pair! | horizontal and vertical space between the paragraphs and the bounding box; should not be less than 1x0, or caret may become invisible at the end of the longest line |
 | `spacing` | integer! | space between adjacent paragraphs |
+| `kit` | object! | shared [kit object](#kit) |
 
 Adds new facets:
 
@@ -1278,11 +1340,9 @@ Adds new facets:
 | `caret` | [`caret` space object!](#caret) | controls caret location and width; can be styled as `rich-content/caret` |
 | `selected` | pair! none! | currently selected document part: `BEGINxEND` (two zero-based offsets) |
 | `paint` | block! | current (for newly inserted chars) set of attributes updated on caret movement; format: `[attr-name attr-value ...]` |
-| `measure` | `func [plan [block!]]` | exposes a set of text metrics, but they are not yet cast in stone, so not documented |
-| `edit` | `func [plan [block!]]` | exposes a set of high level edit commands, but they are still subject to change, so not documented |
 
 
-## Editor
+## <a name="area"></a>Editor
 
 A scrollable wrapper around `document`. Represents an interactive editable hypertext document and defines most common event handlers for editing.
 
@@ -1292,7 +1352,7 @@ Inherits all of `scrollable` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `origin` | pair! | nonpositive offset of `content` within editor's viewport |
+| `origin` | pair! | nonpositive offset of `content` within editor's viewport; on key presses adjusted to keep caret visible |
 | `content` | object! none! | set to a `document` space and should not be changed |
 | `content-flow` | word! | set to 'vertical and should not be changed |
 | `hscroll` | scrollbar space object! | horizontal scrollbar; can be styled as `editor/hscroll` |
