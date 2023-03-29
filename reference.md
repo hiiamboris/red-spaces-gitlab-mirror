@@ -301,6 +301,41 @@ Main functions in the timeline are:
 
 [comment]: # (need to document the rest of timeline once it matures)
 
+### Clipboard
+
+Due to limitations of native `read-clipboard` and `write-clipboard` functions, Spaces use their own `clipboard` implementation.
+
+```
+>> ? clipboard/read
+USAGE:
+     CLIPBOARD/READ 
+
+DESCRIPTION: 
+     Get clipboard contents. 
+     CLIPBOARD/READ is a function! value.
+
+REFINEMENTS:
+     /text        => Return text even if data is non-textual.
+     
+>> ? clipboard/write
+USAGE:
+     CLIPBOARD/WRITE content
+
+DESCRIPTION: 
+     Write data to clipboard. 
+     CLIPBOARD/WRITE is a function! value.
+
+ARGUMENTS:
+     content      [object! string!] 
+```
+
+It currently supports the following formats:
+- `text!` (plain text string)
+- `rich-text-span!` (items of hypertext - chars and space objects)
+- `rich-text-block!` (whole paragraphs, of `rich-content` template)
+
+[comment]: # (more can be documented, e.g. how to create a new format, how to treat it)
+
 
 ## Space
 
