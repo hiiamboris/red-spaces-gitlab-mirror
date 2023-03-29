@@ -51,11 +51,6 @@ modify-class 'space [
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
 	kit:     none	#type [object!]
-	; sections: none	#type =? :invalidates [function! block! none!] 
-	; measure: none	#type [function!] 
-	; edit:    none	#type [function!] 
-	; clone:   none	#type [function!] 
-	; format:  none	#type [function!] 
 	on-invalidate: 	#type [function! none!]
 ]	
 
@@ -218,13 +213,6 @@ context [
 		space/size: canvas/x by space/length
 		[]
 	]
-		
-	; declare-template 'break/space [						;-- template space for line breaks in rich paragraph
-		; length: 0	#type [integer!]					;-- determines linebreak thickness (exposed for styling)
-		; cache:  none
-		; draw:   function [/on canvas [pair!]] [~/draw self canvas]
-		; format: does [copy "^/"]
-	; ]		
 ]		
 
 rectangle-ctx: context [
@@ -354,11 +342,20 @@ cell-ctx: context [
 		drawn
 	]
 	
-	format: function [space [object!]] [
-		either format: get-safe 'space/content/format [format][copy {}]
+	kit: make-kit 'box [
+		format: function [] [
+			format: copy {}								;-- used when child has no format
+			all [
+				child: space/content
+				format: batch child [format]
+			]
+			format
+		]
+		sections: does [generate-sections space/map space/size/x space/sec-cache]
 	]
 	
 	declare-template 'box/space [
+		kit:     ~/kit
 		;; margin is useful for drawing inner frame, which otherwise would be hidden by content
 		margin:  0
 		weight:  1										;@@ what default weight to use? what default alignment?
@@ -369,9 +366,7 @@ cell-ctx: context [
 		
 		map:     []
 		cache:   [size map sec-cache]
-		sections: does [generate-sections map size/x sec-cache]
 		sec-cache: []									;-- holds last valid sections block if computed
-		format:   does [~/format self]
 		
 		;; draw/only can't be supported, because we'll need to translate xy1-xy2 into content space
 		;; but to do that we'll have to render content fully first to get it's size and align it
@@ -633,6 +628,7 @@ scrollable-space: context [
 			any [all [map/2 map/2/size] 0x0]			;@@ REP #113
 		] #type [function!]
 
+		;@@ move these into kit
 		move-by: func [
 			"Offset viewport by a fixed amount"
 			amount [word! integer!] "'line or 'page or offset in pixels"
@@ -1086,8 +1082,13 @@ container-ctx: context [
 		unless empty? separator [list: delimit list separator]
 		to {} list
 	]
+	
+	kit: make-kit 'container [
+		format: does [~/format space "^-"]
+	]
 
 	declare-template 'container/space [
+		kit:     ~/kit
 		origin:  0x0									;-- used by ring layout to center itself around the pointer
 		content: []		#type :invalidates				;-- no type check as user may redefine it and /items freely
 		
@@ -1100,8 +1101,6 @@ container-ctx: context [
 		into: func [xy [pair!] /force child [object! none!]] [
 			into-map map xy + origin child
 		]
-		
-		format: does [~/format self "^-"]
 
 		draw: function [
 			; /on canvas [pair! none!]					;-- not used: layout gets it in settings instead
@@ -1130,16 +1129,22 @@ list-ctx: context [
 		cache
 	]
 
-	clone: function [space [object!]] [		
-		clone: clone-space space [axis margin spacing]	;-- no /origin since that is state
-		foreach item space/content [
-			;@@ is it ok to skip non cloneable items silently?
-			if select item 'clone [append clone/content item/clone]
+	kit: make-kit 'list [
+		clone: function [] [		
+			cloned: clone-space space [axis margin spacing]	;-- no /origin since that is state
+			clone: []									;-- used when item is not cloneable
+			foreach item space/content [
+				;@@ is it ok to skip non cloneable items silently?
+				append cloned/content batch item [clone]
+			]
+			cloned
 		]
-		clone
+		format:   does [container-ctx/format space select [x "^-" y "^/"] axis]
+		sections: does [~/get-sections space]
 	]
 		
 	declare-template 'list/container [
+		kit:     ~/kit
 		size:    0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
 		axis:    'x		#type =  :invalidates [word!] (find [x y] axis)
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
@@ -1147,9 +1152,6 @@ list-ctx: context [
 		spacing: 0
 		;@@ TODO: alignment?
 
-		clone:     does [~/clone self]
-		format:    does [container-ctx/format self select [x "^-" y "^/"] axis]
-		sections:  does [~/get-sections self]
 		sec-cache: []
 		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
 		
@@ -1206,14 +1208,17 @@ icon-ctx: context [
 tube-ctx: context [
 	~: self
 
-	format: function [space [object!]] [
-		list: container-ctx/format-items space
-		if find [n w ↑ ←] space/axes/1 [list: reverse list]
-		list: delimit list either find [e w → ←] space/axes/1 ["^-"]["^/"]
-		to {} list
+	kit: make-kit 'tube [
+		format: function [] [
+			list: container-ctx/format-items space
+			if find [n w ↑ ←] space/axes/1 [list: reverse list]
+			list: delimit list either find [e w → ←] space/axes/1 ["^-"]["^/"]
+			to {} list
+		]
 	]
 
 	declare-template 'tube/container [
+		kit:     ~/kit
 		margin:  0
 		spacing: 0
 		align:   -1x-1	#type =? :invalidates-look
@@ -1222,8 +1227,6 @@ tube-ctx: context [
 							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
 							[→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←]
 						] axes)
-		
-		format:   does [~/format self]
 		
 		container-draw: :draw	#type [function!]
 		draw: function [/on canvas [pair!]] [
@@ -1607,7 +1610,7 @@ rich-content-ctx: context [								;-- rich content
 	
 	draw-caret: function [space [object!]] [
 		unless caret: space/caret [return []]
-		box: space/measure [caret-box caret/offset caret/side]
+		box: batch space [frame/caret-box here caret/side]
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
 		#assert [box/1/y < box/2/y]
@@ -1642,6 +1645,10 @@ rich-content-ctx: context [								;-- rich content
 		
 		selected: function ["Get selection range or none"] [	;-- used by macro language, e.g. `remove-range selected`
 			all [sel: space/selected  sel/1 <> sel/2  sel]
+		]
+		
+		here: function ["Get current caret offset"] [
+			space/caret/offset
 		]
 		
 		frame: object [
@@ -1683,11 +1690,12 @@ rich-content-ctx: context [								;-- rich content
 		format: does [rich/source/format space/data]	;@@ should this format be so different from rich-paragraph's one?
 		
 		clone: function [] [		
-			clone: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
-			clone/data: map-each/eval [item [object!] code] space/data [	;-- data may contain spaces
-				when select item 'clone [item/clone code]		;-- not cloneable spaces are skipped! together with the code
+			cloned: clone-space space [margin spacing align baseline weight color font indent force-wrap?]
+			clone: none									;-- used when item is not cloneable
+			cloned/data: map-each/eval [item [object!] code] space/data [	;-- data may contain spaces
+				when item: batch item [clone] [item code]		;-- not cloneable spaces are skipped! together with the code
 			]													;-- triggers on-data-change
-			clone
+			cloned
 		]
 		
 		;@@ should source support image! in its content? url! ? anything else?
@@ -1773,6 +1781,19 @@ rich-content-ctx: context [								;-- rich content
 			reload
 		]
 	
+		change-range: function [
+			"Remove given range and insert items there"
+			range [pair!]
+			items [
+				object! (space? items)					;-- rich-content not inlined! for inlining use `insert! ofs para/data`
+				block!  (even? length? items)
+				string!
+			]
+		][
+			remove-range range
+			insert-items range/1 items
+		]
+		
 		clip-range: function [
 			"Leave only given range of items, removing the rest"
 			range [pair!]
@@ -1811,9 +1832,6 @@ rich-content-ctx: context [								;-- rich content
 		;@@ need to think more on this one - disabled for now
 		; apply-attributes: func [space [object!] attrs [map!]] [space]	#type [function!]
 		
-		measure: func [plan [block!]] [~/metrics/measure self plan]
-		edit:    func [plan [block!]] [~/edit/edit       self plan]
-		
 		;; internal data [item code ...], generated by decode or from edit operations
 		;; ranges preserve info about what spaces were 'single' in the source, and what spaces were created from text
 		;; so caret can skip the single ones but dive into the created ones
@@ -1832,14 +1850,17 @@ rich-text-span!: make clipboard/text! [
 	data:   []
 	length: does [half length? data]
 	format: does [
+		format: {}										;-- used when item has no /format
 		to {} map-each [item [object!]] extract data 2 [
-			when in item 'format (item/format)
+			batch item [format]
 		]
 	]
 	copy:  does [remake rich-text-span! [data: (system/words/copy data)]]
 	clone: function [] [
+		clone: none										;-- used when item has no /clone
 		data: map-each/eval [item [object!] code] self/data [
-			when select item 'clone [item/clone code]	;-- not cloneable spaces are skipped! together with the code
+			item: batch item [clone]
+			when item [item code]						;-- not cloneable spaces are skipped! together with the code
 		]
 		remake rich-text-span! [data: (data)]
 	]
@@ -3073,11 +3094,17 @@ grid-ctx: context [
 		to {} delimit rows "^/"
 	]
 	
+	;@@ move grid internal funcs here!
+	kit: make-kit 'grid [
+		format: does [~/format space]
+	]
+	
 	;@@ add simple proportional algorithm?
 	fit-types: [width-total width-difference area-total area-difference]	;-- for type checking
 	
 	;@@ base it on container?
 	declare-template 'grid/space [
+		kit:  ~/kit
 		;; grid's /size can be 'none' in two cases: either it's infinite, or it's size was invalidated and needs a calc-size() call
 		size: none	#type [pair! none!]
 		
@@ -3137,8 +3164,6 @@ grid-ctx: context [
 		; cache: [size map hcache fitcache size-cache]
 		cache: []
 		
-		format: does [~/format self]
-
 		wrap-space: function [xy [pair!] space [object! none!]] [	;-- wraps any cells/space into a lightweight "cell", that can be styled
 			unless cell: frame/cells/:xy [
 				cell: make-space 'cell [pinned?: does [grid-ctx/pinned? self]]
@@ -3356,14 +3381,17 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
-	clone-clickable: function [space [object!]] [
-		clone: clone-space space [align margin weight command]
-		all [
-			child: space/content
-			in child 'clone
-			clone/content: child/clone
+	kit: make-kit 'clickable [
+		clone: function [] [
+			cloned: clone-space space [align margin weight command]
+			all [
+				space? child: select space 'content
+				object? ckit: select child 'kit
+				function? select ckit 'clone
+				cloned/content: batch child [clone]
+			]
+			cloned
 		]
-		clone
 	]
 		
 	declare-template 'clickable/box [					;-- low-level primitive, unlike data-view
@@ -3377,8 +3405,6 @@ button-ctx: context [
 			unless value [do space/command]				;-- trigger when released
 		]
 		;@@ should command be also a function (actor)? if so, where to take event info from?
-		
-		clone:     does [~/clone-clickable self]
 	]
 
 	;; main point of this being separate from button is to keep it not focusable (and so without a focus frame)
@@ -3670,6 +3696,7 @@ field-ctx: context [
 		length    [integer!]
 		selected  [pair! none!]
 	][
+		; ?? [limit relative? offset length selected]
 		case [
 			not limit      [return reduce [offset none]]
 			relative?      [ofs: offset + limit]
