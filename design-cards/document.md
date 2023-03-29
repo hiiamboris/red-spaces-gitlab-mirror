@@ -26,7 +26,7 @@ Word processors we all know, I bet no user really understands:
   <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
 
 - If part of the grid is copied, how is it inserted inside and outside the grid?
-- 
+ 
   <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-insert.gif />
 
 These are just a few examples of implementation edge cases, but any implementation has to consider them.
@@ -52,13 +52,13 @@ This task presents a few challenges:
    
    Sometimes leading whitespace affects the result:
    
-   <img width=150 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-leading-space.gif />
+   <img width=200 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-leading-space.gif />
    
 3. Stretching.
 
    The *fill* alignment complicates everything.
    
-   Suppose I have "a few words of text" that fit in a row, so I have 4 whitespace regions (between 5 words) that I need to expand uniformly. Simple Draw-level scaling works up to 110% max, then the text becomes too distorted, so that trick doesn't work. Now what if I want this text to become a link? I create a `rich-content`, put it into a `clickable` space, and insert as a single item. How should `clickable` container now tell me where the whitespace is within it?
+   Suppose I have "a few words of text" that fit in a row, so I have 4 whitespace regions (between 5 words) that I need to expand uniformly. Simple Draw-level scaling works up to 110% max, then the text becomes too distorted, so I can't scale whole row at once. Now what if I want this text to become a link? I create a `rich-content`, put it into a `clickable` space, and insert as a single item. How should `clickable` container now tell me where the whitespace is within it?
    
    If a code span (or a focused link) has an outline, and contains whitespace from the fill alignment, how to not interrupt the outline with the inserted whitespace?
 
@@ -70,7 +70,7 @@ This task presents a few challenges:
 
    Text glyphs are drawn above a certain baseline. If we don't take it into account, we may end up with something like this:
    
-   <img width=100 src=https://camo.githubusercontent.com/7f13cec707d1a633a6c4a10eef3bf7fee794c0d0e0db11f8c7f9661a73c5cae4/68747470733a2f2f692e6779617a6f2e636f6d2f39326362626633356661643734313134646536383338363730363432313437342e706e67 /> 
+   <img width=150 src=https://camo.githubusercontent.com/7f13cec707d1a633a6c4a10eef3bf7fee794c0d0e0db11f8c7f9661a73c5cae4/68747470733a2f2f692e6779617a6f2e636f6d2f39326362626633356661643734313134646536383338363730363432313437342e706e67 /> 
 
 6. Coordinate mapping.
 
@@ -95,7 +95,7 @@ Rendering phase (including splitting at row and word margins) combines clipping 
 
 Here's an illustration of how paragraph model performs in practice when containers can pass along section data from their children:
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif />
+<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif />
 
 ## Data representation
 
@@ -145,42 +145,46 @@ Key difference between flat and tree models can be illustrated using selection w
   
 - In the flat model, if selection starts outside of the grid, it can only include grid as a whole. And whole grid can be inserted anywhere, including one of grid cells. Caret offset within the cell does not belong to the outside document, but to a separate one.
 
-  <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
+  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
   
 It's an interesting distinction that can be seen in how selection works in browsers vs how it works in word processors. Former work on the tree, latter use the flat model.
 
 Flat model is trivial to edit, as long as we are able to represent the data in a simple way. Characters do not constitute any problem, but how do we work with space *objects* and text *attributes*?
 
-For *space objects*, if sameness is preserved it can get us across undo/redo cycles, but when we copy something and paste into multiple places, we have to:
+For **space objects**, if sameness is preserved it can get us across undo/redo cycles, but when we copy something and paste into multiple places, we have to:
 - convert spaces (active object) into data (passive object) in the clipboard, so any further modification of the object won't affect the clipboard contents
 - convert clipped data back into spaces on insertion, and ensure modification of the inserted spaces does not modify the data on the clipboard
 - ensure every newly inserted space objects are never the same, as tree can only support unique objects, and we want to interact with each individually anyway, rather than edit one and see changes appear on all others
 
-I had to reserve `clone` facet in all spaces for the purpose of converting them into 'passive' objects. It produces a space of the same type with all data (e.g. text, margins) deeply copied and state (e.g. caret, selection) discarded. And also to be able to insert the data into other programs, I reserved `format` facet that converts space into formatted plain text. Only spaces that define both facets can be copied and pasted.
+I reserved the meaning of `clone` kit function in all spaces for the purpose of converting them into 'passive' objects. It produces a space of the same type with all data (e.g. text, margins) deeply copied and state (e.g. caret, selection) discarded. And also to be able to share the data with other programs, I reserved `format` kit function that converts space into formatted plain text. Only spaces that define both facets can be properly copied and pasted.
 
-*Attributes* representation is also not trivial. We need to attach (possibly quite big) attribute set to each character. Sameness doesn't work, because we want to be able to modify attributes of arbitrary ranges. We could copy them on modification, but multiple modifications then would lead to more and more copies. In the worst case scenario - some macro or script operating on a document - this could eat all available RAM pretty soon.
+**Attributes** representation is also not trivial. We need to attach (possibly quite big) attribute set to each character. Sameness doesn't work, because we want to be able to *modify* attributes of arbitrary items in place. We could copy them on modification, but multiple modifications then would lead to more and more copies being held at once. In the worst case scenario - some macro or script operating on a document - this could eat all available RAM pretty soon.
 
 I've tried to keep attributes separate from text in maps with vectors, binaries, strings, but scratched all these models, as they were unwieldy and led to bugs, esp. when multiple undo operations needed to be grouped.
 
 What I ended with is a global catalog of all attribute combinations that ever appeared in the documents. Normally their number should not exceed a few dozens, but in the worst case it could be equal the number of characters in the text (e.g. some rainbow colored text), which is an unlikely occurrence but still manageable even for a text of 1M chars.
 
-Data then can be represented as simple `[char attr ...]` paired list, where `char` is a character or space object and `attr` is an integer index of the attribute combination for this `char`. Getting the block from integer index is trivial, and to convert a block back to an integer, block is molded and hashed with SHA1. SHA1 data is then also hashed by the `hash!` datatype, allowing O(1) lookups, with the slowest operation being `mold`. This assumes that `mold/all` produces unique output for every sorted attribute set, which holds true if attributes can only carry data (strings, numbers, none value), not code (bound words, objects).
+Data then can be represented as simple `[char attr ...]` paired list, where `char` is a character or space object and `attr` is an integer index of the attribute combination for this `char`. E.g. `[#"a" 0 #"b" 0 #"c" 1 #"d" 1 #"e" 0]` Getting the block from integer index is trivial. To convert back a block to an integer, block is molded and hashed with SHA1. SHA1 data is then also hashed by the `hash!` datatype, allowing O(1) lookups, with the slowest operation being `mold`. This assumes that `mold/all` produces unique output for every sorted attribute set, which holds true if attributes can only carry data (strings, numbers, none value), not code (bound words, objects).
 
-This format is used by `rich-content` template, while `document` just carries a list of `rich-content` paragraphs. I decided against putting all of `rich-content` data into a single array in a `document`, because that would put limit on the speed of every character insertion/removal, esp. at the head of a big document. We'll at least need some tree-based series datatype to make this and a few other aspects of the document scalable to bigger texts, and likely `slice!` datatype to put parts of the document into it's paragraphs as data.
+This format is used by `rich-content` template, while `document` just carries a list of `rich-content` paragraphs. I decided against putting all of `rich-content` data into a single array in a `document`, because that would put limit on the speed of every character insertion/removal, esp. at the head of a big document. We'll at least need some tree-based series datatype to make this and a few other aspects of the document scalable to bigger texts, and likely `slice!` datatype to put parts of the document into it's paragraphs as data without duplicating it.
 
-### Clipboard
+## Clipboard
 
 How this data can be stashed and handed over to other programs?
 
 Red native clipboard implementation can only carry text, images and file lists, and only text is implemented on every platform.
 
-From what I read about Windows clipboard, it was a mess and remained a mess. Every program seems to define its own clipboard format only it is able to read. Somehow I am able to copy formatted text from a native word processor and insert it into Google Docs (I suggest it used RTF clipboard format), but even that is a pathetic failure:
+From what I read about Windows clipboard, it was a mess and remains a mess. Every program seems to define its own clipboard format only it is able to read. Somehow I am able to copy formatted text from a native word processor and insert it into Google Docs (I suggest it used RTF clipboard format), but even that is a pathetic failure:
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-clipboard-formatted.gif />
+<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-clipboard-formatted.gif />
 
 It copied bold and italic flags but totally lost font face and size. Hello from 2023, ancestors 🖐🛸. Sixty years after hypertext invention we're still unable to move it between programs. Let's wait another 60 and see.
 
-For now, until Red can at least hold rich text data in the clipboard, I've implemented it to hold in parallel: rich text inside Red process RAM, plain text inside OS clipboard. If it detects plain text was changed from what it remembers, it discards the rich text part and uses just the text.
+For now, until Red can at least hold rich text data in the clipboard, I've implemented it to hold in parallel: 
+- rich text inside Red process RAM
+- plain text inside OS clipboard
+ 
+If it detects plain text was changed from what it remembers, it discards the rich text part and uses just the text.
 Even when Red implements such format, the question will remain how to put space objects into it without losing information, and whether we can carry objects into other Red apps or other incompatible programs.
 
 One more quirk is that `[char attr ...]` format isn't enough: it doesn't carry paragraph alignment, so I had to implement two formats: `rich-text-span!` holds a (flat) slice of hypertext, and `rich-text-block!` holds whole paragraphs with hypertext within them.
