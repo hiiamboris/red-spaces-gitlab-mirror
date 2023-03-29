@@ -166,7 +166,7 @@ What I ended with is a global catalog of all attribute combinations that ever ap
 
 Data then can be represented as simple `[char attr ...]` paired list, where `char` is a character or space object and `attr` is an integer index of the attribute combination for this `char`. Getting the block from integer index is trivial, and to convert a block back to an integer, block is molded and hashed with SHA1. SHA1 data is then also hashed by the `hash!` datatype, allowing O(1) lookups, with the slowest operation being `mold`. This assumes that `mold/all` produces unique output for every sorted attribute set, which holds true if attributes can only carry data (strings, numbers, none value), not code (bound words, objects).
 
-This format is used by `rich-content` template, while `document` just carries a list of `rich-content` paragraphs. I decided against putting all of `rich-content` data into a single array in a `document`, because that would put limit on the speed of every character insertion/removal, esp. at the head of a big document. We'll at least need some tree-based datatype to make this and a few other aspects of the document scalable to bigger texts.
+This format is used by `rich-content` template, while `document` just carries a list of `rich-content` paragraphs. I decided against putting all of `rich-content` data into a single array in a `document`, because that would put limit on the speed of every character insertion/removal, esp. at the head of a big document. We'll at least need some tree-based series datatype to make this and a few other aspects of the document scalable to bigger texts, and likely `slice!` datatype to put parts of the document into it's paragraphs as data.
 
 ### Clipboard
 
