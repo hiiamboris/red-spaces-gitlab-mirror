@@ -343,6 +343,16 @@ cell-ctx: context [
 	]
 	
 	kit: make-kit 'box [
+		clone: function [] [
+			cloned: clone-space space [align margin weight command]
+			all [
+				space? child: select space 'content
+				object? ckit: select child 'kit
+				function? select ckit 'clone
+				cloned/content: batch child [clone]
+			]
+			cloned
+		]
 		format: function [] [
 			format: copy {}								;-- used when child has no format
 			all [
@@ -351,7 +361,9 @@ cell-ctx: context [
 			]
 			format
 		]
-		sections: does [generate-sections space/map space/size/x space/sec-cache]
+		frame: object [
+			sections: does [generate-sections space/map space/size/x space/sec-cache]
+		]
 	]
 	
 	declare-template 'box/space [
@@ -1140,7 +1152,9 @@ list-ctx: context [
 			cloned
 		]
 		format:   does [container-ctx/format space select [x "^-" y "^/"] axis]
-		sections: does [~/get-sections space]
+		frame: object [
+			sections: does [~/get-sections space]
+		]
 	]
 		
 	declare-template 'list/container [
@@ -1422,7 +1436,9 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 	
 	kit: make-kit 'rich-paragraph [
-		sections: does [~/get-sections space]
+		frame: object [
+			sections: does [~/get-sections space]
+		]
 		format:   does [container-ctx/format space ""]
 	]
 		
@@ -1651,7 +1667,7 @@ rich-content-ctx: context [								;-- rich content
 			space/caret/offset
 		]
 		
-		frame: object [
+		frame: make frame [
 			line-count: function ["Get line count on last frame"] [
 				space/frame/nrows
 			]
@@ -1849,9 +1865,8 @@ rich-text-span!: make clipboard/text! [
 	name:   'rich-text-span
 	data:   []
 	length: does [half length? data]
-	format: does [
-		format: {}										;-- used when item has no /format
-		to {} map-each [item [object!]] extract data 2 [
+	format: function [] [
+		to format: {} map-each [item [object!]] extract data 2 [
 			batch item [format]
 		]
 	]
@@ -3381,19 +3396,6 @@ grid-view-ctx: context [
 button-ctx: context [
 	~: self
 	
-	kit: make-kit 'clickable [
-		clone: function [] [
-			cloned: clone-space space [align margin weight command]
-			all [
-				space? child: select space 'content
-				object? ckit: select child 'kit
-				function? select ckit 'clone
-				cloned/content: batch child [clone]
-			]
-			cloned
-		]
-	]
-		
 	declare-template 'clickable/box [					;-- low-level primitive, unlike data-view
 		;@@ should pushed be in button rather?
 		align:    0x0									;-- center by default
