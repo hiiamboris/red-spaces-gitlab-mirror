@@ -263,12 +263,13 @@ rich: context [											;@@ what would be a better name?
 	source/format: function [
 		"Convert decoded source into plain text"
 		data [block!] "[item attr ...] block" (even? length? data)
+		/local format: {}								;-- used when item has no /format in the kit
 	][
 		result: make {} half length? data
 		foreach [item attr] data [						;@@ use map-each
 			case [
 				char?  :item [append result item]
-				space? :item [if in item 'format [append result item/format]]
+				space? :item [append result batch item [format]]
 			]
 		]
 		result

@@ -55,7 +55,7 @@ do/expand with spaces/ctx [
 
 ;; 'bullet' template used for numbering paragraph lists
 declare-template 'bullet/text [
-	text:   "^(2981)"									;-- has bullet symbol by default, not number
+	text:   "^(2981) "									;-- has bullet symbol by default, not number; space is for better look in the clipboard
 	format: does [rejoin [text " "]]
 	limits: 15 .. none									;-- set min width to align numbers better
 ]
