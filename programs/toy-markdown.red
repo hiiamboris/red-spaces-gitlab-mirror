@@ -114,7 +114,7 @@ context [
 						(decode-text name)
 					]
 					append list make-space 'clickable compose/deep/only [
-						content: make-space 'rich-content [decode (source)]
+						content: make-space 'rich-content [batch self [deserialize (source)]]
 						command: [browse (as url! link)]
 					]
 				]
