@@ -12,6 +12,8 @@ Red [
 	}
 ]	
 
+exports: [clipboard]
+
 clipboard: context [
 	;; prototype for custom clipboard formats
 	text!: make classy-object! format!: declare-class 'clipboard-format [
@@ -54,3 +56,4 @@ clipboard: context [
 	]
 ]
 
+export exports
