@@ -193,6 +193,7 @@ Some facets are not reserved or prescribed but have a **recommended** meaning as
 | `color`   | `tuple!` | Used by VID/S to tell styles what pen color they should use. Styles decide how and if they use it. |
 | `command` | `block!` | Used by clickable items to define on-click action. Event handlers decide how and if they use it. |
 | `font`    | `object!` | An instance of `font!` object. Preferably should be set from styles. |
+| `timeline` | `object!` | Timeline of recorded events (see [below](#timelines)). |
 
 <details>
 	<summary>Note on <code>map</code> vs <code>into</code></summary>
@@ -218,7 +219,9 @@ Spaces do not impose any structural limitations. If a space can hold a box or a 
 
 Since these functions are shared, they need to know which space they should operate upon. Rather than adding a `space [object!]` argument to all of them (it becomes way too verbose), I made them implicitly receive space object from the kit entry point called `batch`. 
 
-`batch` global function is used to access functions in the kit:
+<details>
+<summary><code>batch</code> global function is used to access functions in the kit...</summary>
+
 ```
 >> ? batch
 USAGE:
@@ -242,11 +245,16 @@ batch doc [
 ]
 ```
 
+</details>
+
 `batch` evaluates given `plan` while implicitly passing its `space` argument to all the functions. That's why we don't have to write `move-caret doc (here doc) - 1` but just `move-caret here - 1`. This requires an extra `bind` call on every `plan` evaluation, but is a small price to pay compared to both the verbosity of extra argument and having a per-object copy of all functions.
 
 On top of normal functions that depend on space's state only, kit may have a `frame` object with its own functions subset. This subset contains functions that are only valid after a render (i.e. they read data from the `map` or other facets generated for a single frame). Examples are 2D caret locations, row count and geometry, and so on.
 
-If a space has a `/kit` object, to see a list of functions supported by it you can use `help`:
+
+<details>
+<summary>If a space has a <code>/kit</code> object, to see a list of functions supported by it you can use <code>help</code>...</summary>
+
 ```
 >> text: make-space 'text []					;) space we want to inspect 
 
@@ -277,7 +285,22 @@ A few notes:
 - `format` function is used whenever a space must be converted to plain text, e.g. when sharing it via clipboard with other programs.
 - `frame/sections` function is documented in [rich-paragraph](#sectioning).
 - Generally, naming of similar functions is kept consistent across templates. E.g. editable text spaces all use [`key->plan`](key-plan.red) to interpret input, which then calls `selected`, `everything`, `undo`, `redo`, `move-caret`, `select-range`, `insert-items`, `remove-range`, `copy-range`, etc.
- 
+
+</details> 
+
+### Timelines
+
+`/timeline` facet can be set to a `timeline!` object (used by `document` mainly) that holds all events that led the space from its initial state to the current one. Used by `undo`/`redo`.
+
+Timeline object can be shared across multiple spaces (of any template), because each event holds a link to the event receiver.
+
+Main functions in the timeline are:
+- `undo` - undoes last event
+- `redo` - redoes next event
+- `put space [object!] left [block!] right [block!]` - adds an event to the timeline with a reference to the receiver (space); `left` is the code to evaluate when undoing this event, `right` - when redoing it
+
+[comment]: # (need to document the rest of timeline once it matures)
+
 
 ## Space
 
