@@ -152,7 +152,7 @@ editor-tools: context [
 	
 	range->paragraphs: function [
 		"Return a list of paragraphs intersecting the given range"
-		doc [object!] range [pair!]
+		doc [object!] range: (1x1 * doc/caret/offset) [pair! none!]
 	][
 		extract batch doc [map-range range] 2
 	]
@@ -374,9 +374,6 @@ editor-tools: context [
 		if font = 'pick [font: request-font]
 		default font: [name: #[none] size: #[none]]
 		either range: batch doc [selected] [
-			rich/attributes/change doc/paint 'font font/name
-			rich/attributes/change doc/paint 'size font/size
-		][
 			batch doc [
 				mark-range range 'font font/name
 				mark-range range 'size font/size
@@ -384,6 +381,9 @@ editor-tools: context [
 					mark-range range style on
 				]
 			]
+		][
+			rich/attributes/change doc/paint 'font font/name
+			rich/attributes/change doc/paint 'size font/size
 		]
 	]
 	
