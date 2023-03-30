@@ -1345,7 +1345,7 @@ Inherits all of `rich-paragraph` facets:
 
 | facet  | type  | description |
 |-|-|-|
-| `content` | block! of space object!s | filled by `decode` (done automatically in VID/S) or on `data` override, should not be changed directly |
+| `content` | block! of space object!s | filled by `deserialize` kit function (done automatically in VID/S) or on `data` override, should not be changed directly |
 | `items` | `func [/pick i [integer!] /size]` | paragraph does not support filtering, so `items` facet should be used |
 | `margin` | pair! | horizontal and vertical space between the items and the bounding box |
 | `spacing` | integer! | vertical space between adjacent rows |
@@ -1359,7 +1359,6 @@ Adds new facets:
 
 | facet  | type | description |
 |-|-|-|
-| `decode` | `func [source [block!]]` | fills `content` from dialected data given in the format explained above |
 | `font` | object! | an instance of `font!` object; sets default font to use; should be set in styles |
 | `color` | tuple! none! | if set, affects default text color |
 | `selected` | pair! none! | currently selected part of content: `BEGINxEND` (two zero-based offsets); makes it display boxes of `rich-content/selection` style |
@@ -1370,7 +1369,11 @@ Adds new facets:
 - `item` is either a char! value or a space object!
 - `attr` is a set of text attributes (bold, italic, color, etc) for the previous item
 
-`data` can be modified by high level kit functions or manually (in latter case the facet must be `set` after making changes to trigger internal updates). 
+`data` can be modified by high level kit functions or manually (in latter case the facet must be `set` after making changes to trigger internal updates).
+
+The easiest ways to fill data are:
+- in VID/S add a block after `rich-content` instance (as in the example above)
+- after `rich-content` space creation call `batch my-rich-content-object [deserialize [source ...]]`
 
 
 ## Document
