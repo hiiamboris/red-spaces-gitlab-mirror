@@ -1379,6 +1379,10 @@ A vertical list of `rich-content` spaces. Represents a non-interactive hypertext
 
 Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
 
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-document.png) | <pre>document 80 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
+|-|-|
+
+
 Inherits all of `list` facets:
 
 | facet  | type  | description |
@@ -1405,6 +1409,11 @@ Adds new facets:
 A scrollable wrapper around `document`. Represents an interactive editable hypertext document and defines most common event handlers for editing.
 
 Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
+
+| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-editor.gif) | <pre>editor 80x70 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
+|-|-|
+
+See [Document Editor](samples/editor) sample for advanced usage. 
 
 Inherits all of `scrollable` facets:
 
