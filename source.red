@@ -3,9 +3,10 @@ Red [
 	author:  @hiiamboris
 	license: BSD-3
 	description: {
-		This provides an internal format for holding rich-content /data:
-		- [items block] which contains char! values and space! objects
-		- #(attrs map) which contains string! masks that map attributes (bold, italic, etc) to each item
+		This provides an internal efficient format for holding rich-content /data:
+			[item1 attr1 item2 attr2 ...]
+			itemN can be a char! value or space! object
+			attrN is an integer index in global attribute catalog
 		All rich-content edits work with this /data.
 		
 		For convenience there's also a high-level 'source' format, which is used by VID/S to populate /data.
