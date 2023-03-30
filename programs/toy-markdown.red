@@ -68,7 +68,7 @@ context [
 				["`" copy code to "`" skip]
 			|	[<code> copy code to </code> </code>]
 			] =flush= (
-				append list make-space 'code [text: code]
+				append list make-space 'code [text: code color: none]
 			)
 		|	change ["&" copy name some alpha! ";"] (decode-entity name)	;@@ entity can be numeric too
 		|	<br> =flush= (append list "^/")				;@@ this will only work inside grid cell, since it uses a vlist
@@ -113,8 +113,14 @@ context [
 						underline
 						(decode-text name)
 					]
+					name: make-space 'rich-content [batch self [deserialize (source)]]
+					;@@ should this attribute carryover mechanics belong to rich/deserialize somehow?
+					foreach space sift name/data [obj .. object! /type = 'code] [
+						space/flags: [underline]
+						space/color: 50.80.255
+					] 
 					append list make-space 'clickable compose/deep/only [
-						content: make-space 'rich-content [batch self [deserialize (source)]]
+						content: (name)
 						command: [browse (as url! link)]
 					]
 				]
