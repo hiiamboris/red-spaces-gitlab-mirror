@@ -138,7 +138,7 @@ rich: context [											;@@ what would be a better name?
 
 	;; external context allows me to use /copy word without shadowing the global one
 	attributes: context [
-		to-rtd-flag: make-rtd-flags: change: mark: pick: exclude: none
+		to-rtd-flag: make-rtd-flags: change: mark: pick: exclude: compatible?: none
 	]
 	
 	attributes/to-rtd-flag: function [attr [word!] value [tuple! logic! string! integer!]] [
@@ -257,6 +257,23 @@ rich: context [											;@@ what would be a better name?
 		[a 3] = attributes/exclude [b 2 a 3] [a 1 b 2]
 	]
 	
+	;; used to split text on font size change, to ease alignment
+	attributes/compatible?: function [index1 [integer!] index2 [integer!]] [
+		to logic! any [
+			index1 =? index2
+			all [
+				attrs1: index->attrs index1
+				attrs2: index->attrs index2
+				size1: select/skip attrs1 'size 2 
+				size2: select/skip attrs2 'size 2
+				size1 =? size2 
+				font1: select/skip attrs1 'font 2 
+				font2: select/skip attrs2 'font 2 
+				font1 = font2
+			]
+		]
+	]
+	
 	
 	source: context [deserialize: serialize: format: to-spaces: none]
 
@@ -289,7 +306,11 @@ rich: context [											;@@ what would be a better name?
 		#assert [not find data #"^/"  "line breaks are not allowed inside paragraph text"]
 		buf:     clear {}
 		parse data [any [
-			[	s: some [set char char! integer! (append buf char)] e: (
+			[	s: [set char char! set attr1 integer! (append buf char)]
+				any [
+					set char char! set attr2 integer!
+					if (attributes/compatible? attr1 attr2) (append buf char)
+				] e: (
 					append content obj: make-space 'text []
 					append obj/text buf
 					clear buf
@@ -308,7 +329,7 @@ rich: context [											;@@ what would be a better name?
 	]
 		
 	source/deserialize: function [
-		"Split source into decoded block of [item code ...]"
+		"Split source into decoded block of [item attr ...]"
 		source [block!]
 		/local attr value item
 	][
