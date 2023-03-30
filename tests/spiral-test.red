@@ -20,7 +20,7 @@ declare-template 'spiral/space [
 
 	into: function [xy [pair!] /force child [object! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
-		render/on field infxinf	;-- produce layout 
+		render/on field infxinf no no	;-- produce layout 
 		r: field/spaces/text/layout
 		assert [r]
 
@@ -49,7 +49,7 @@ declare-template 'spiral/space [
 	draw: function [] [
 		;; render is needed to produce layout and cached parents tree
 		;; so on key press paragraph invalidates also spiral itself
-		render/on field infxinf			;-- produce layout 
+		render/on field infxinf no no		;-- produce layout 
 		r: field/spaces/text/layout
 		assert [r]
 

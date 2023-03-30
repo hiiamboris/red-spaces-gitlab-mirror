@@ -39,13 +39,13 @@ view/no-wait/options [
 			]
 			depth: 0
 			old-draw: :draw
-			draw: function [/on canvas /extern depth] [
+			draw: function [/on canvas fill-x fill-y /extern depth] [
 				r: []
 				;-- this gets quite slow to render :)
 				;-- depth<=7 even if 4 cells are visible means 4**7=16384 cells! and about ~1G of RAM
 				if depth < max-depth [
 					depth: depth + 1
-					r: old-draw/on canvas
+					r: old-draw/on canvas fill-x fill-y
 					depth: depth - 1
 					if depth > 0 [
 						zx: cell-size/x / size/x

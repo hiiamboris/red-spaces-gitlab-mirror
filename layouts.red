@@ -32,7 +32,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   axis             [word!]   x or y
 		;;   margin       [integer! pair!]   >= 0x0
 		;;   spacing      [integer! pair!]   >= 0x0
-		;;   canvas        [pair! none!]
+		;;   canvas        [pair! none!]   encoded canvas
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
 		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
@@ -61,25 +61,24 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default origin: 0x0
 			default canvas: infxinf
 			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
-			set [canvas: fill:] decode-canvas canvas
+			set [canvas: fill-x: fill-y:] decode-canvas canvas
 			margin: margin * 1x1						;-- integer to pair normalization
 			; canvas: constrain canvas limits
 			x: ortho y: axis
-			fill/:x: 1									;-- always fills along it's secondary axis
+			either x = 'x [fill-x: yes][fill-y: yes]	;-- always fills along its secondary axis
 			guide: axis2pair y
 			pos: pos': origin + margin
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
 			canvas1: canvas2: subtract-canvas canvas 2 * margin
-			canvas1: encode-canvas canvas1 fill
 			
 			map: make [] 2 * count
 			size: 0x0
 			repeat i count [							;-- first render cycle
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
-				drawn: render/on space canvas1
+				drawn: render/on space canvas1 fill-x fill-y
 				#assert [space/size +< (1e7 by 1e7)]
 				compose/only/deep/into [(space) [offset (pos) size (space/size) drawn (drawn)]] tail map
 				pos:   pos + (space/size + spacing * guide)
@@ -91,13 +90,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; apply limits to canvas2/:x to obtain proper list width
 			; size: constrain size limits
 			canvas2: constrain canvas2 limits
-			canvas2: encode-canvas canvas2 fill
 			#debug sizing [#print "list c1=(canvas1) c2=(canvas2)"]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
 				repeat i count [
 					space: either func? [spaces/pick i][spaces/:i]
-					drawn: render/on space canvas2
+					drawn: render/on space canvas2 fill-x fill-y
 					#assert [space/size +< (1e7 by 1e7)]
 					geom:  pick map 2 * i
 					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
@@ -122,7 +120,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;                                      default = -1x-1 - both x/y stick to the negative size of axes
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing       [integer! pair!]   >= 0x0
-		;;   canvas         [none! pair!]   if none=inf, width determined by widest item
+		;;   canvas         [none! pair!]   encoded canvas; if none=inf, width determined by widest item
 		;;   limits        [none! object!]
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
@@ -164,7 +162,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default axes:   [e s]
 			default align:  -1x-1
 			default canvas: infxinf						;-- none to pair normalization
-			set [canvas: fill:] decode-canvas canvas
+			set [canvas: fill-x: fill-y:] decode-canvas canvas
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
 			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
@@ -199,25 +197,18 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
-			ccanvas: subtract-canvas constrain canvas limits 2 * margin
-			; stripe: (subtract-canvas canvas 2 * margin) * oy
+			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
-			;; along Y canvas becomes infinite, later expanded to fill the row
-			;@@ should it always be 0xinf maybe?
-			; stripe: round/to subtract-canvas canvas 2 * margin infxinf * ox		;@@ #5151
-			; stripe: reverse? encode-canvas  0 by ccanvas/:y  0x-1	;-- fill is not used for 1st render
-			stripe: encode-canvas ccanvas reverse? 0x-1	;-- fill is not used for 1st render
-			; stripe: reverse? encode-canvas  infxinf/x by ccanvas/:y  0x-1	;-- fill is not used for 1st render
-			; stripe: subtract-canvas canvas 2 * margin
-			; stripe/:x: round/to stripe/:x infxinf/x
-			; stripe/:y: infxinf/x
+			;; along Y canvas becomes of canvas size
+			stripe/:x: 0
 			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
+#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"
 			
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
 				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
-				drawn: render/on space stripe
+				drawn: render/on space ccanvas no no	;-- fill is not used for 1st render
 				weight: any [select space 'weight 0]
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
@@ -301,7 +292,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
 								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
-								item/2: render/on space encode-canvas desired-size reverse? 1x-1
+								item/2: render/on space desired-size x = 'x x = 'y
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -321,7 +312,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			
 			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
 			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
-			if fill/:y = 1 [
+			if fill-y [
 				free: ccanvas/:y - total-length
 				if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
 					weights: extract/into next rows 3 clear []	;@@ use map-each
@@ -343,7 +334,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					;; always re-renders items, because they were painted on an infinite canvas
 					;; finite canvas will most likely bring about different outcome
 					desired-size: reverse? space/size/:x by row-size/y
-					item/2: render/on space encode-canvas desired-size 1x1
+					item/2: render/on space desired-size yes yes
 				]
 			]
 			
@@ -660,7 +651,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing         [integer!]       >= 0 - vertical distance between rows
-		;;   canvas            [pair!]        if infinite, produces a single row
+		;;   canvas            [pair!]        encoded canvas; if infinite, produces a single row
 		;;   limits        [none! object!]
 		;;   indent        [none! block!]     [first: integer! rest: integer!], first and rest are independent of each other
 		;;   force-wrap?      [logic!]        prioritize canvas width and allow splitting words at *any pixel, even inside a character*
@@ -698,7 +689,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			default align:  'left
 			default canvas: infxinf						;-- none to pair normalization
-			set [|canvas|: fill:] decode-canvas canvas
+			set [|canvas|: fill-x: fill-y:] decode-canvas canvas
 			default indent: []
 			indent1: any [indent/first 0]
 			indent2: any [indent/rest  0]
@@ -715,7 +706,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			total-2D: 1x0 * ccanvas						;-- without margins
 			if any [
 				ccanvas/x >= infxinf/x					;-- convert infinite canvas into single-row canvas
-				fill/x < 1								;-- contract width if not asked to fill it
+				not fill-x								;-- contract width if not asked to fill it
 			][
 				total-2D/x: min total-2D/x total-1D/x
 			]

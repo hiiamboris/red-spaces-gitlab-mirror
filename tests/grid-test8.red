@@ -15,9 +15,9 @@ declare-template 'zoomer/box [
 	; draw: function [/on canvas [pair! none!]] [
 	draw: function [] [
 		canvas': as-pair
-			clip (negate infxinf/x) infxinf/x canvas/x / zoom/x
-			clip (negate infxinf/y) infxinf/y canvas/y / zoom/y
-		drawn: render/on content canvas'
+			canvas/x / zoom/x
+			canvas/y / zoom/y
+		drawn: render/on content canvas' no no 
 		size:  content/size
 		maybe self/size: as-pair
 			size/x * zoom/x

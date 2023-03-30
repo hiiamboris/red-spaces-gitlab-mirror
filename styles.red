@@ -168,11 +168,11 @@ do with context [
 			below: [(make-box size 1 none select self 'color)]	;@@ add frame (pair) field and use here?
 		]
 		
-		grid/cell: function [cell /on canvas] [			;-- has no frame since frame is drawn by grid itself
+		grid/cell: function [cell /on canvas fill-x fill-y] [	;-- has no frame since frame is drawn by grid itself
 			#assert [canvas]							;-- grid should provide finite canvas
-			drawn: cell/draw/on canvas
+			drawn: cell/draw/on canvas fill-x fill-y
 			;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
-			canvas: min abs canvas cell/size
+			canvas: min canvas cell/size
 			color: any [
 				select cell 'color
 				if cell/pinned? [mix 'panel opaque 'text 15%]
@@ -238,19 +238,12 @@ do with context [
 			below: [(make-box size 0 'off !(opaque 'text 50%))]
 		]
 
-		menu/list/clickable: [
-			below: when self =? :highlight [
-				(make-box size 0 'off !(opaque 'text 15%))
-				pen !(enhance 'panel 'text 125%)
-			]
-		]
-		
 		menu/ring/clickable: [
-			below: [(make-box size 1 none none)]
+			below: [(make-box size 1 none color)]
 		]
 		
 		menu/ring/round-clickable: [
-			below: [(make-box/round size 1 none none 50)]
+			below: [(make-box/round size 1 none color 50)]
 		]
 		
 		hint: function [box] /skip [

@@ -10,10 +10,10 @@ Red [needs: view]
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
-set-style 'heading function [self /on canvas [pair! none!]] [
+set-style 'heading function [self /on canvas [pair! none!] fill-x fill-y] [
 	self/font: bigfont
-	drawn: self/draw/on canvas
-	width: either canvas [abs canvas/x][self/size/x]
+	drawn: self/draw/on canvas fill-x fill-y
+	width: either canvas [canvas/x][self/size/x]
 	compose [
 		fill-pen (svmc/text + 0.0.0.200)
 		pen off box 0x0 (width by self/size/y)
@@ -22,8 +22,8 @@ set-style 'heading function [self /on canvas [pair! none!]] [
 ]
 set-style 'field [[fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]]
 ; set-style 'field/caret [fill-pen (svmc/text)]
-set-style 'tube function [tube /on canvas [pair! none!]] [
-	drawn: tube/draw/on canvas
+set-style 'tube function [tube /on canvas [pair! none!] fill-x fill-y] [
+	drawn: tube/draw/on canvas fill-x fill-y
 	#assert [drawn]
 	#assert [tube/size]
 	compose/only/deep [

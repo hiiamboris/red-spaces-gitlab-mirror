@@ -172,6 +172,7 @@ editor-tools: context [
 		]
 	]
 
+	;@@ it will be possible to edit links if I use `link: url!` attribute for them, but it's no pressing matter
 	linkify-data: function [
 		"Given text slice returns a single link containing it"
 		data [block!] command [block!]

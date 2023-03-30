@@ -146,8 +146,7 @@ context [
 			without-GC [								;-- speeds up render by 60%
 				with-style face [
 					style: apply-current-style face		;-- host style can only be a block
-					canvas: if face/size [encode-canvas face/size 1x1]	;-- fill by default
-					drawn: render-space/on face/space canvas
+					drawn: render-space/on face/space face/size yes yes	;-- fill by default
 					#assert [block? :drawn]
 					unless face/size [					;-- initial render: define face/size
 						#assert [face/space/size]
@@ -166,24 +165,17 @@ context [
 	render-space: function [
 		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
-		/on canvas: infxinf [pair! none!]
+		/on canvas: infxinf [pair! none!] fill-x: no [logic!] fill-y: no [logic!]
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
 		name: space/type
 		#debug cache [#print "Rendering (name)"]	
-		; if canvas [canvas: max 0x0 canvas]				;-- simplifies some arithmetics; but subtract-canvas is better
 		#assert [
-			space? :space
-			not host? :space							;-- catch the bug of `render 'face` ;@@ TODO: maybe dispatch 'face to face
-			any [
-				(abs canvas) +<= (1e6 by 1e6)
-				canvas/x = infxinf/x
-				canvas/y = infxinf/y
-				also no #print "(name): canvas=(canvas)" 
-			] "Oversized canvas detected!"
-			(negate infxinf) +< canvas	"Negative infinity canvas detected!"
+			(finite-canvas canvas) +<= (1e6 by 1e6)	"Oversized canvas detected!"
+			0x0 +<= canvas							"Negative canvas detected!"
 		]
+		encoded-canvas: encode-canvas canvas fill-x fill-y
 
 		unless tail? current-path [						;-- can be at tail on out-of-tree renders
 			#debug [check-parent-override space last current-path]
@@ -199,7 +191,7 @@ context [
 			
 			either all [
 				not window?								;-- usage of region is not supported by current cache model
-				set [words: slot:] cache/fetch space canvas
+				set [words: slot:] cache/fetch space encoded-canvas
 			][
 				drawn: slot/1
 				do-atomic [								;-- prevent reactions from invalidating the cache while it's used by `set`
@@ -223,11 +215,13 @@ context [
 						spec:    spec-of :draw
 						on?:     find spec /on
 						window?: find spec /window
+						if canvas/x = infxinf/x [fill-x: no]	;-- inf canvas cannot be filled (result of canvas extension)
+						if canvas/y = infxinf/y [fill-y: no]
 						code: case [
-							all [on? window?] [[draw/window/on xy1 xy2 canvas]]
-							window?           [[draw/window    xy1 xy2       ]]
-							on?               [[draw/on                canvas]]
-							'else             [[draw                         ]]
+							all [on? window?] [[draw/window/on xy1 xy2 canvas fill-x fill-y]]
+							window?           [[draw/window    xy1 xy2                     ]]
+							on?               [[draw/on                canvas fill-x fill-y]]
+							'else             [[draw                                       ]]
 						]
 						draw: do copy/deep code			;@@ workaround for #4854 - remove me!!
 					]
@@ -239,17 +233,19 @@ context [
 					spec:    spec-of :style
 					on?:     find spec /on
 					window?: find spec /window
+					if canvas/x = infxinf/x [fill-x: no]
+					if canvas/y = infxinf/y [fill-y: no]
 					code: case [					
-						all [on? window?] [[style/window/on space xy1 xy2 canvas]]
-						window?           [[style/window    space xy1 xy2       ]]
-						on?               [[style/on        space         canvas]]
-						'else             [[style           space               ]]
+						all [on? window?] [[style/window/on space xy1 xy2 canvas fill-x fill-y]]
+						window?           [[style/window    space xy1 xy2                     ]]
+						on?               [[style/on        space         canvas fill-x fill-y]]
+						'else             [[style           space                             ]]
 					]
 					drawn: do copy/deep code			;@@ workaround for #4854 - remove me!!
 					#assert [block? :drawn]
 				]
 				
-				unless any [xy1 xy2] [cache/commit space canvas drawn]
+				unless any [xy1 xy2] [cache/commit space encoded-canvas drawn]
 				cache/update-generation space 'drawn
 				
 				if select space 'rate [timers/prime space]		;-- render enables timer for this space if /rate facet is set
@@ -271,12 +267,14 @@ context [
 		space [object!] "Space or host face as object"
 		/window "Limit rendering area to [XY1,XY2] if space supports it"
 			xy1 [pair! none!] xy2 [pair! none!]
-		/on canvas [pair! none!] "Specify canvas size as sizing hint"
+		/on canvas: infxinf [pair! none!] "Specify canvas size as sizing hint"
+			fill-x: no [logic!] "Try to fill finite canvas width"
+			fill-y: no [logic!] "Try to fill finite canvas height"
 	][
 		drawn: either host? space [
 			render-face space
 		][
-			render-space/window/on space xy1 xy2 canvas
+			render-space/window/on space xy1 xy2 canvas fill-x fill-y
 		]
 		#debug draw [									;-- test the output to figure out which style has a "Draw error"
 			if error? error: try/keep [draw 1x1 drawn] [

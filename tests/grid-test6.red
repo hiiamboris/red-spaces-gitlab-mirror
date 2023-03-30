@@ -93,10 +93,10 @@ view/no-wait/options expand-directives [
 					;; copying depth has to be adjusted manually to a reasonable amount
 					;; with 6x6=36 cells, at depth 2 it becomes 1296 (~40fps), at depth 3 - 46656 cells (~1fps)
 					depth: 0
-					draw: function [/on canvas /extern depth] [
+					draw: function [/on canvas fill-x fill-y /extern depth] [
 						r: []
 						if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
-							append clear r old-draw/on canvas
+							append clear r old-draw/on canvas fill-x fill-y
 							#debug profile [prof/manual/start 'truncation]
 							; r: copy-deep-limit r 33				;-- 3 levels - 15625 grids
 							r: copy-deep-limit r 22				;-- 2 levels - 625 grids

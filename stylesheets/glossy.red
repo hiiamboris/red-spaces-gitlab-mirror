@@ -102,7 +102,7 @@ context with spaces/ctx [
 		shade:  opaque black 75%
 		blur:   opaque color 20%
 		blur2:  opaque color 10%
-		drawn: space/draw/on canvas
+		drawn: space/draw/on canvas no no
 		if empty? text [return []]						;-- optimization
 		layout: space/layout							;-- set by draw
 		if override: select space 'color [color: override]
@@ -198,33 +198,33 @@ context with spaces/ctx [
 			]
 		]
 		label/text-box/body/text: label/text-box/body/comment:
-		text: paragraph: link: function [self /on canvas] [
+		text: paragraph: link: function [self /on canvas fill-x fill-y] [
 			default self/font: system-font
 			draw-text self canvas self/text self/font glass silver	;-- sets the size in draw-text/draw
 		]
-		grid/cell/text: grid/cell/paragraph: function [self /on canvas] [
+		grid/cell/text: grid/cell/paragraph: function [self /on canvas fill-x fill-y] [
 			default self/font: system-font
 			draw-text self canvas self/text self/font glass			;-- sets the size in draw-text/draw
 				either self/parent/pinned? [linen][silver]
 		]
-		cell: function [self /on canvas] [
-			drawn: self/draw/on canvas
+		cell: function [self /on canvas fill-x fill-y] [
+			drawn: self/draw/on canvas fill-x fill-y
 			frame: draw-frame self/size 5 any [select self 'color glass]
 			reduce [frame drawn]
 		]
-		grid/cell: function [self /on canvas] [
-			drawn: self/draw/on canvas
+		grid/cell: function [self /on canvas fill-x fill-y] [
+			drawn: self/draw/on canvas fill-x fill-y
 			bgnd: compose [
 				pen off fill-pen (either self/pinned? [w1][s0])
-				box 0x0 (min abs canvas self/size) 5
+				box 0x0 (min canvas self/size) 5
 			]
 			reduce [bgnd drawn]
 		]
-		button: function [self /on canvas] [			;-- ignores result of native /draw, draws own text
+		button: function [self /on canvas fill-x fill-y] [		;-- ignores result of native /draw, draws own text
 			default self/font: system-font
 			self/margin: 15x8
 			self/rounding: 20
-			self/draw/on canvas							;-- only to obtain the size
+			self/draw/on canvas fill-x fill-y			;-- only to obtain the size
 			color: any [select self 'color black]
 			bgnd: either self/pushed? [opaque #fc6 100%][glass]
 			draw-glossy-text-box self/size self/data self/font bgnd color self/rounding 100%
@@ -244,12 +244,11 @@ context with spaces/ctx [
 			]
 		] 
 		grid-view/window: []
-		scrollable: list-view: grid-view: function [self /on canvas] [
+		scrollable: list-view: grid-view: function [self /on canvas fill-x fill-y] [
 			;; scrollables do not directly support margin, so I'm reducing their canvas instead
-			set [canvas: fill:] decode-canvas canvas
 			pad: 10
 			inner: subtract-canvas canvas pad * 2x2
-			drawn: self/draw/on encode-canvas inner fill
+			drawn: self/draw/on inner fill-x fill-y
 			shift: pad * 1x1
 			foreach [_ geom] self/map [geom/offset: geom/offset + shift]
 			if hscroll-geom: select/same self/map self/hscroll [step/by 'hscroll-geom/offset 0x4]
@@ -265,9 +264,9 @@ context with spaces/ctx [
 			color: either self/state [yello][glass]
 			draw-glossy-box 20x20 color 10 100%
 		]
-		field: function [self /on canvas] [
+		field: function [self /on canvas fill-x fill-y] [
 			maybe self/margin: mrg: 6x5
-			drawn: self/draw/on canvas
+			drawn: self/draw/on canvas fill-x fill-y
 			compose/deep/only [
 				; push [clip 0x0 (self/size) fill-pen off pen green box 0x0 (self/size)] 
 				(draw-frame self/size 5 glass)

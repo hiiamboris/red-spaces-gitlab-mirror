@@ -35,8 +35,8 @@ declare-template 'wheel/space [
 		if any [force  0x0 +<= offset +< content/size] [reduce [content offset]]
 	]
 	
-	draw: function [/on canvas] [
-		self/size: finite-canvas first decode-canvas canvas
+	draw: function [/on canvas fill-x fill-y] [
+		self/size: finite-canvas canvas
 		unless content [return []]
 		drawn: render content
 		left: size - content/size

@@ -15,7 +15,7 @@ declare-template 'web/inf-scrollable [
 		type: 'canvas
 		available?: function [axis dir from requested] [requested]
 	
-		draw: function [/window xy1 xy2 /on canvas] [
+		draw: function [/window xy1 xy2 /on canvas fill-x fill-y] [
 			#assert [window]
 			center: 100x100
 			sectors: 12

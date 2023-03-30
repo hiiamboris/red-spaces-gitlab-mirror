@@ -12,17 +12,17 @@ Red [needs: view]
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
-set-style 'heading function [self /on canvas [pair! none!]] [
+set-style 'heading function [self /on canvas [pair! none!] fill-x fill-y] [
 	maybe/same self/font: bigfont
-	drawn: self/draw/on canvas
+	drawn: self/draw/on canvas fill-x fill-y
 	compose [
 		fill-pen (svmc/text + 0.0.0.200)
 		pen off box 0x0 (self/size)
 		(drawn) 
 	]
 ]
-set-style 'field function [field /on canvas] [
-	drawn: field/draw/on canvas
+set-style 'field function [field /on canvas fill-x fill-y] [
+	drawn: field/draw/on canvas fill-x fill-y
 	compose/deep/only [push [
 		fill-pen (c: contrast-with svmc/text)
 		pen (contrast-with c)
@@ -31,8 +31,8 @@ set-style 'field function [field /on canvas] [
 	] (drawn)]
 ]
 ; set-style 'field/caret [[fill-pen (svmc/text)]]
-set-style 'tube function [tube /on canvas [pair! none!]] [
-	drawn: tube/draw/on canvas
+set-style 'tube function [tube /on canvas [pair! none!] fill-x fill-y] [
+	drawn: tube/draw/on canvas fill-x fill-y
 	#assert [drawn]
 	#assert [tube/size]
 	compose/only/deep [
@@ -105,7 +105,7 @@ view/no-wait compose/only/deep [
 
 ; dump-tree
 out: none
-save %tube-test-output.png out: draw list/size render/on list list/size
+save %tube-test-output.png out: draw list/size render/on list list/size no no
 if exists? ref: %tube-test-reference.png [
 	ref: load ref
 	unless ref = out [print "!! LAYOUT HAS CHANGED !!"]

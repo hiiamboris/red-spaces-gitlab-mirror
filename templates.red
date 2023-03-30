@@ -177,43 +177,22 @@ declare-template 'timer/space [							;-- template space for timers
 	cache: none
 ]		
 
-;@@ move to auxi?
-constrain-canvas: function [canvas [pair!] fill [pair!] limits [object! none!]] [
-	constrain  (finite-canvas canvas) * max 0x0 fill  limits
-]
-
 ;; used internally for empty spaces size estimation
-set-empty-size: function [space [object!] canvas [pair!]] [
-	set [canvas: fill:] decode-canvas canvas
-	space/size: either positive? space/weight [
-		constrain-canvas canvas fill space/limits
-	][
-		constrain 0x0 space/limits						;-- don't stretch what isn't supposed to stretch
-	]
+set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+	canvas: either positive? space/weight
+		[fill-canvas canvas fill-x fill-y][0x0]			;-- don't stretch what isn't supposed to stretch
+	space/size: constrain canvas space/limits
 ]
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
 put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 	weight: 1
 	cache:  none
-	draw: function [/on canvas [pair!]] [
-		set-empty-size self canvas
+	draw: function [/on canvas: infxinf [pair!] fill-x: no [logic!] fill-y: no [logic!]] [
+		set-empty-size self canvas fill-x fill-y
 		[]
 	]
 ]
-
-context [
-	~: self
-	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
-		;; as an optimization, this doesn't use decode-canvas
-		;; negative canvas is just the only one that gets filled
-		;; break must have zero width when rendered on infinitely wide canvas
-		canvas: max 0x0 negate finite-canvas canvas 
-		space/size: canvas/x by space/length
-		[]
-	]
-]		
 
 rectangle-ctx: context [
 	~: self
@@ -256,20 +235,20 @@ triangle-ctx: context [
 image-ctx: context [
 	~: self
 	
-	draw: function [image [object!] canvas: infxinf [pair! none!]] [
+	draw: function [image [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		mrg2: 2 * mrg: image/margin * 1x1 
 		switch type?/word image/data [
 			none! [
 				image/size: mrg2						;@@ can't be constrained further; or call constrain again?
 				[]
 			]
+			;@@ this feature needs to be doc'd but I'm not sure about it,
+			;@@ since it fills all canvas up to /limits but draw code knows nothing about canvas size
 			block! [
-				set [canvas: fill:] decode-canvas canvas
 				image/size: constrain finite-canvas canvas image/limits
 				compose/only [translate (mrg) (image/data)]
 			]
 			image! [
-				set [canvas: fill:] decode-canvas canvas
 				limits:        image/limits
 				isize:         image/data/size
 				;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
@@ -284,8 +263,8 @@ image-ctx: context [
 					if cx = infxinf/x [cx: 1.#inf]
 					if cy = infxinf/x [cy: 1.#inf]
 					canvas-max-scale: min  cx / isize/x  cy / isize/y	;-- won't be bigger than the canvas
-					if fill/x <= 0 [cx: 1.#inf]						;-- don't stick to dimensions it's not supposed to fill
-					if fill/y <= 0 [cy: 1.#inf]  
+					if fill-x [cx: 1.#inf]							;-- don't stick to dimensions it's not supposed to fill
+					if fill-y [cy: 1.#inf]  
 					canvas-scale: min  cx / isize/x  cy / isize/y	;-- optimal scale to fill the chosen canvas dimensions
 					canvas-scale: min canvas-scale canvas-max-scale
 				]
@@ -305,7 +284,7 @@ image-ctx: context [
 		weight: 0
 		data:   none	#type =? :invalidates [none! image! block!]		;-- images are not recyclable, so `none` by default
 		
-		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -313,21 +292,20 @@ image-ctx: context [
 cell-ctx: context [
 	~: self
 
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
 		space/sec-cache: copy []						;-- alloc new (minimal) sections block for new canvas
 		unless space/content [
-			set-empty-size space canvas
+			set-empty-size space canvas fill-x fill-y
 			return quietly space/map: []
 		]
-		set [canvas: fill:] decode-canvas canvas
 		canvas: constrain canvas space/limits
 		mrg2:   2x2 * space/margin
 		cspace: space/content
-		drawn:  render/on cspace encode-canvas (subtract-canvas canvas mrg2) fill
+		drawn:  render/on cspace (subtract-canvas canvas mrg2) fill-x fill-y
 		size:   mrg2 + cspace/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
-		size:   max size (finite-canvas canvas) * fill	;-- only extends along fill-enabled axes
+		size:   max size fill-canvas canvas fill-x fill-y		;-- only extends along fill-enabled axes
 		space/size: constrain size space/limits
 		; #print "size: (size) space/size: (space/size) fill: (fill)"
 		
@@ -384,7 +362,7 @@ cell-ctx: context [
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
-		draw: function [/on canvas [pair!]] [~/draw self canvas]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 	declare-template 'cell/box [margin: 1x1]			;-- same thing just with a border and background ;@@ margin - in style?
@@ -530,30 +508,29 @@ scrollable-space: context [
 		r
 	]
 
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		;; sizing policy (for cell, scrollable, window):
 		;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
 		;; - use canvas/size if it's less than content/size or if fill flag is set
-		set [canvas: fill:] decode-canvas canvas
 		if any [
 			not space/content 
 			zero? area? canvas
 		][
-			set-empty-size space canvas
+			set-empty-size space canvas fill-x fill-y
 			return quietly space/map: []
 		]
 		box: canvas: constrain canvas space/limits		;-- 'box' is viewport - area not occupied by scrollbars
 		cspace: space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
-		cdraw: render/on cspace encode-canvas box fill
+		cdraw: render/on cspace box fill-x fill-y
 		if all [
 			axis: switch space/content-flow [vertical ['y] horizontal ['x]]
 			cspace/size/:axis > box/:axis
 		][												;-- have to add the scroller and subtract it from canvas width
 			scrollers: space/vscroll/size/x by space/hscroll/size/y
 			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
-			cdraw: render/on cspace encode-canvas box fill
+			cdraw: render/on cspace box fill-x fill-y
 		]
 		csz: cspace/size
 		origin: space/origin							;-- must be read after render (& possible roll)
@@ -574,7 +551,7 @@ scrollable-space: context [
 			space/vscroll/size/x * vmask
 			space/hscroll/size/y * hmask
 		sz1: min canvas csz + scrollers  sz2: canvas
-		space/size: (max 0x0 sz2 - sz1) * (max 0x0 fill) + sz1
+		space/size: sz1 + fill-canvas (max 0x0 sz2 - sz1) fill-x fill-y
 		; echo [sz1 sz2 canvas csz space/size]
 		box: min box (space/size - scrollers)			;-- reduce viewport
 		
@@ -666,7 +643,7 @@ scrollable-space: context [
 			~/set-origin self origin
 		] #type [function!]
 	
-		draw: function [/on canvas [pair!]] [~/draw self canvas]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -785,15 +762,15 @@ paragraph-ctx: context [
 		compose/only [translate (xy1) (render selection)]		;@@ need to avoid allocation
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- text ignores fill flags
 		space/sec-cache: copy []						;-- reset computed sections
-		if canvas [										;-- no point in wrapping/ellipsization on inf canvas
+		if canvas/x < infxinf/x [						;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
 			wrap?:      find space/flags 'wrap
 		]
 		layout:   space/layout
 		|canvas|: either any [wrap? ellipsize?][
-			constrain abs canvas space/limits			;-- could care less about fill flag for text
+			constrain canvas space/limits
 		][
 			infxinf
 		]
@@ -1019,7 +996,7 @@ paragraph-ctx: context [
 		
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
 		quietly cache: [size layout sec-cache]
-		quietly draw: func [/on canvas [pair!]] [~/draw self canvas]
+		quietly draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas]
 	]
 
 	;; unlike text, paragraph is wrapped
@@ -1156,6 +1133,13 @@ list-ctx: context [
 			sections: does [~/get-sections space]
 		]
 	]
+
+	draw: function [list [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
+		list/sec-cache: copy []							;-- reset computed sections
+		canvas:   encode-canvas canvas fill-x fill-y
+		settings: with list [axis margin spacing canvas limits]
+		list/container-draw/layout 'list settings
+	]
 		
 	declare-template 'list/container [
 		kit:     ~/kit
@@ -1170,11 +1154,7 @@ list-ctx: context [
 		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
 		
 		container-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!]] [
-			self/sec-cache: copy []								;-- reset computed sections
-			settings: [axis margin spacing canvas limits]
-			container-draw/layout 'list settings
-		]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1231,6 +1211,14 @@ tube-ctx: context [
 		]
 	]
 
+	draw: function [tube [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
+		settings: with tube [margin spacing align axes canvas limits]
+		canvas: encode-canvas canvas fill-x fill-y
+		drawn:  tube/container-draw/layout 'tube settings
+		#debug sizing [#print "tube with (tube/content/type) on (mold canvas) -> (tube/size)"]
+		drawn
+	]
+		
 	declare-template 'tube/container [
 		kit:     ~/kit
 		margin:  0
@@ -1243,12 +1231,7 @@ tube-ctx: context [
 						] axes)
 		
 		container-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!]] [
-			settings: [margin spacing align axes canvas limits]
-			drawn: container-draw/layout 'tube settings
-			#debug sizing [#print "tube with (content/type) on (mold canvas) -> (size)"]
-			drawn
-		]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1442,9 +1425,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		format:   does [container-ctx/format space ""]
 	]
 		
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		space/sec-cache: copy []						;-- reset computed sections
 		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
+		canvas: encode-canvas canvas fill-x fill-y
 		frame: make-layout 'paragraph :space/items settings
 		size: space/margin * 2x2 + frame/size-2D
 		quietly space/frame: frame
@@ -1471,7 +1455,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		
 		;; container-draw is not used due to tricky geometry
-		draw: function [/on canvas [pair!]] [~/draw self canvas]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1636,8 +1620,9 @@ rich-content-ctx: context [								;-- rich content
 		compose/only [translate (box/1) (drawn)]
 	]
 		
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- adds selection and caret
-		drawn: space/rich-paragraph-draw/on canvas
+	;; adds selection and caret
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+		drawn: space/rich-paragraph-draw/on canvas fill-x fill-y
 		if space/selected [
 			sdrawn: draw-selection space
 			drawn: reduce [sdrawn drawn]
@@ -1835,6 +1820,7 @@ rich-content-ctx: context [								;-- rich content
 	]
 	
 	;; unlike rich-paragraph, this one is text-aware, so has font and color facets exposed for styling
+	;; also since it can count items, it supports /selected and /caret (impossible in rich-paragraph)
 	declare-template 'rich-content/rich-paragraph [
 		kit:         ~/kit
 		color:       none												;-- color & font defaults are accounted for in style
@@ -1856,7 +1842,7 @@ rich-content-ctx: context [								;-- rich content
 		data:    []	#type [block!] (even? length? data) :on-data-change		
 		
 		rich-paragraph-draw: :draw	#type [function!]
-		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1889,8 +1875,8 @@ switch-ctx: context [
 		state: off		#type =? :invalidates-look [logic!]
 		; command: []
 		data: make-space 'data-view []	#type (space? data)		;-- general viewer to be able to use text/images
-		draw: func [/on canvas [pair!]] [
-			also data/draw/on canvas					;-- draw avoids extra 'data-view' style in the tree
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+			also data/draw/on canvas fill-x fill-y		;-- draw avoids extra 'data-view' style in the tree
 			size: data/size
 		]
 	]
@@ -2047,20 +2033,19 @@ window-ctx: context [
 	;; (considering content can be smaller and window has to follow it)
 	;; but only xy1-xy2 has to appear in the render result block and map!
 	;; area outside of canvas and within xy1-xy2 may stay not rendered as long as it's size is guaranteed
-	draw: function [window [object!] canvas: infxinf [pair! none!]] [
+	draw: function [window [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug grid-view [#print "window/draw is called on canvas=(canvas)"]
 		unless content: window/content [
-			set-empty-size window canvas
+			set-empty-size window canvas fill-x fill-y
 			return quietly window/map: []
 		]
 		#assert [space? content]
 		-org: negate org: window/origin
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
-		set [canvas': fill:] decode-canvas canvas
-		size: window/pages * finite-canvas canvas'
+		size: window/pages * finite-canvas canvas
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
-			cdraw: render/window/on content -org -org + size canvas
+			cdraw: render/window/on content -org -org + size canvas fill-x fill-y	;@@ off fill flags when window is less than content?
 			;; once content is rendered, it's size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
 			if content/size [size: min size content/size - org]	;-- size has to be finite
@@ -2094,7 +2079,7 @@ window-ctx: context [
 			~/available? self axis dir from requested
 		] #type [function!]
 	
-		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2141,11 +2126,11 @@ inf-scrollable-ctx: context [
 		]
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
 		timer: space/roll-timer
 		render timer									;-- timer has to appear in the tree for timers to work
-		drawn: space/scrollable-draw/on canvas
+		drawn: space/scrollable-draw/on canvas fill-x fill-y
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
 		timer/rate: either any-scrollers? [4][0]		;-- timer is turned off when unused
 		;; scrollable/draw removes roll-timer, have to restore
@@ -2174,7 +2159,7 @@ inf-scrollable-ctx: context [
 		] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!]] [~/draw self canvas]
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2217,7 +2202,8 @@ list-view-ctx: context [
 		x: list/axis
 		if level < mrgx: list/margin along 'x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
-		canvas: encode-canvas canvas make-pair [1x1 x -1]	;-- list items will be filled along secondary axis
+		fill-x: x <> 'x
+		fill-y: x <> 'y									;-- list items will be filled along secondary axis
 		
 		; either empty? list/map [
 			i: 1
@@ -2244,7 +2230,7 @@ list-view-ctx: context [
 			;; - every time window gets scrolled closer to it's borders (where we have to render out-of-window items)
 			;; so there's no easy way around requiring render here, but for canvas previous window size can be used
 			;@@ ensure at least that this is an in-tree render
-			render/on obj canvas
+			render/on obj canvas fill-x fill-y
 			item: obj/size
 		]
 		;@@ should this func use layout or it will only complicate things?
@@ -2328,7 +2314,7 @@ list-view-ctx: context [
 	]
 	
 	available?: function [
-		list [object!] canvas [pair!] (0x0 +<= canvas) "positive!" axis [word!] dir [integer!] from [integer!] requested [integer!]
+		list [object!] canvas [pair!] (0x0 +<= canvas) axis [word!] dir [integer!] from [integer!] requested [integer!]
 	][
 		if axis <> list/axis [
 			;; along secondary axis there is no absolute width: no way to know some distant unrendered item's width
@@ -2347,15 +2333,19 @@ list-view-ctx: context [
 			
 	;; container/draw only supports finite number of `items`, infinite needs special handling
 	;; it's also too general, while this `draw` can be optimized better
-	list-draw: function [lview [object!] canvas [pair!] "Always finite" xy1 [pair!] xy2 [pair!]] [
+	list-draw: function [
+		lview  [object!]
+		canvas [pair!] (canvas +< infxinf)				;-- window is never infinite
+		xy1    [pair!]
+		xy2    [pair!]
+	][
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
-		set [canvas: _:] decode-canvas canvas			;-- fill is not used: X is infinite, Y is always filled along if finite
+		;; fill is not used: X is infinite, Y is always filled along if finite
 		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
 		list: lview/list
 		worg: negate lview/window/origin				;-- offset of window within content
 		axis: list/axis
 		; #assert [canvas/:axis > 0]						;-- some bug in window sizing likely
-		#assert [canvas +< infxinf]						;-- window is never infinite
 		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
 		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
@@ -2440,8 +2430,8 @@ list-view-ctx: context [
 			][data/size]
 		]
 		
-		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!]] [
-			~/list-draw self canvas xy1 xy2
+		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
 	]
 ]
@@ -2696,7 +2686,7 @@ grid-ctx: context [
 		hmin: make block! xlim + 1						;-- can't be static because has to be reentrant!
 		append hmin any [grid/heights/min 0]
 		for x: 1 xlim [
-			canvas: encode-canvas (as-pair grid/col-width? x infxinf/y) 1x1		;-- fill the cell
+			canvas: (grid/col-width? x) by infxinf/y
 			span: grid/get-span xy: x by y
 			if span/x < 0 [continue]					;-- skip cells of negative x span (counted at span = 0 or more)
 			cell1: grid/get-first-cell xy
@@ -2704,7 +2694,7 @@ grid-ctx: context [
 			if content: grid/cells/pick cell1 [
 				set-quiet 'rendered-xy cell1			;@@ temporary kludge until apply!
 				cspace: grid/wrap-space cell1 content
-				render/on cspace canvas					;-- render to get the size
+				render/on cspace canvas yes no			;-- render to get the size; fill the cell's width
 				height1: cspace/size/y
 			]
 			case [
@@ -2794,10 +2784,10 @@ grid-ctx: context [
 			
 			mcspace: grid/wrap-space mcell content
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
-			render/on mcspace encode-canvas canvas 1x-1		;-- render content to get it's size - in case it was invalidated
+			render/on mcspace canvas yes no					;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply! (could have been reset by inner grids)
-			mcdraw: render/on mcspace encode-canvas mcsize 1x1	;-- re-render to draw the full background
+			mcdraw: render/on mcspace mcsize yes yes		;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
 			repend map [mcspace geom]					;-- map may contain the same space if it's both pinned & normal
@@ -2809,17 +2799,23 @@ grid-ctx: context [
 	]
 
 	;; uses canvas only to figure out what cells are visible (and need to be rendered)
-	draw: function [grid [object!] canvas: infxinf [pair! none!] wxy1 [none! pair!] wxy2 [none! pair!]] [
+	draw: function [
+		grid [object!]
+		canvas: infxinf [pair! none!]
+		fill-x: no [logic! none!]
+		fill-y: no [logic! none!]
+		wxy1 [none! pair!]
+		wxy2 [none! pair!]
+	][
 		#debug grid-view [#print "grid/draw is called with window xy1=(wxy1) xy2=(wxy2)"]
 		#assert [any [not grid/infinite?  all [canvas +< infxinf wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
 		
-		set [canvas: fill:] decode-canvas new-canvas: canvas	;-- new-canvas should remember the fill flag too
 		do-invalidate grid
 		frame: grid/frame
-		frame/canvas: new-canvas
+		frame/canvas: encode-canvas canvas fill-x fill-y
 
 		;; prepare column widths before any offset-to-cell mapping, and before hcache is filled
-		if all [fill/x = 1  grid/autofit  not grid/infinite?] [
+		if all [fill-x  grid/autofit  not grid/infinite?] [
 			autofit grid canvas/x grid/autofit
 		]
  	
@@ -2886,7 +2882,6 @@ grid-ctx: context [
 		row1  [integer!] "Limit estimation to a given row span"
 		row2  [integer!]
 	][
-		canvas: encode-canvas width by infxinf/y -1x-1	;-- no fill flag is set
 		size: grid/margin * 0x2
 		spc:  grid/spacing along 'y
 		if row2 > row1 [size/y: size/y - spc]
@@ -2895,9 +2890,9 @@ grid-ctx: context [
 			unless space: grid/cells/pick cell [continue]
 			cspace: grid/wrap-space cell space			;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
-				render/on cspace encode-canvas width by h -1x-1	;-- fixed rows only affect column's width, no filling
+				render/on cspace encode-canvas width by h no no	;-- fixed rows only affect column's width, no filling
 			][
-				render/on cspace canvas
+				render/on cspace width by infxinf/y no no
 				h: cspace/size/y
 			]
 			span: grid/get-span cell1: grid/get-first-cell cell
@@ -3152,7 +3147,8 @@ grid-ctx: context [
 			;@@ maybe cache size too here? just to avoid setting grid/size to none in case it's relied upon by some reactors
 			;@@ maybe cache drawn and map and only remake the changed parts? is it worth it?
 			;@@ maybe width not canvas?
-			canvas:  none								;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
+			canvas:  none								;-- encoded canvas of last draw 
+			;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
 			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
 			heights: make map!   4						;-- cached heights of rows marked for autosizing
 			;; "cell cache" - cached `cell` spaces: [XY cell ...] and [space XY geometry ...]
@@ -3281,8 +3277,8 @@ grid-ctx: context [
 		;; hidden because /size should be valid now, and this function triggered out of tree rendering
 		; calc-size: function ["Estimate total size of the grid in pixels"] [~/calc-size self]
 
-		draw: function [/on canvas [pair!] /window xy1 [none! pair!] xy2 [none! pair!]] [
-			~/draw self canvas xy1 xy2
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+			~/draw self canvas fill-x fill-y xy1 xy2
 		]
 	]
 ]
@@ -3751,16 +3747,15 @@ field-ctx: context [
 		clip field/origin min-org max-org
 	]
 			
-	draw: function [field [object!] canvas: infxinf [pair! none!]] [
+	draw: function [field [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		ctext: field/spaces/text						;-- text content
 		quietly ctext/caret: if focused? [field/caret]
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
-		drawn: render/on field/spaces/text infxinf		;-- this sets the size
-		set [canvas: fill:] decode-canvas canvas
+		drawn: render/on field/spaces/text infxinf no no	;-- this sets the size
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		cmargin: field/caret/look-around
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
-		width: first either fill/x = 1 [canvas][min ctext/size + cmargin canvas]	
+		width: first either fill-x [canvas][min ctext/size + cmargin canvas]	
 		field/size: constrain width by ctext/size/y field/limits
 		mrg: field/margin * 1x1
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
@@ -3826,68 +3821,11 @@ field-ctx: context [
 		font:   spaces/text/font	#type =? :on-change
 		color:  none				#type =? :on-change	;-- placeholder for user to control
 				
-		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 ]
 
-;@@ native area when wrapped supports caret both at the end of the line and beginning of the next
-;@@ so just integer offset is not enough! but should I bother?
-; area-ctx: context [
-	; ~: self
-	
-	; draw: function [area [object!] canvas [pair! none!]] [
-		; #assert [pair? canvas]
-		; #assert [canvas +< infxinf]						;@@ whole code needs a rewrite here
-		; quietly area/size: canvas
-		; size: finite-canvas canvas
-		; area/paragraph/width: if area/wrap? [size/x]
-		; area/paragraph/text:  area/text
-		; pdrawn: paragraph/draw								;-- no `render` to not start a new style
-		; pdrawn: render/on in area 'paragraph size
-		; area/size: constrain max size area/paragraph/size area/limits
-		; xy1: caret-to-offset       area/paragraph/layout area/caret-index + 1
-		; xy2: caret-to-offset/lower area/paragraph/layout area/caret-index + 1
-		; area/caret/size: as-pair area/caret-width xy2/y - xy1/y
-		; cdrawn: []
-		; if area/active? [
-			; cdrawn: compose/only [translate (xy1) (render in area 'caret)]
-		; ]
-		; compose [(cdrawn) clip 0x0 (area/size) (pdrawn)]		;@@ use margin? otherwise there's no space for inner frame
-	; ]
-		
-	; watched: make hash! [text selected caret-index caret-width wrap? active?]
-	; on-change: function [area [object!] word [any-word!] old [any-type!] new [any-type!]] [
-		; if find watched word [area/invalidate]
-		; area/scrollable-on-change word :old :new
-	; ]
-	
-	; ;@@ TODO: only area should be scrollable
-	; declare-template 'area/scrollable [
-		; text: ""
-		; selected: none		;@@ TODO
-		; caret-index: 0		;-- should be kept even when not focused, so tabbing in leaves us where we were
-		; caret-width: 1		;-- in px
-		; limits: 60x20 .. none
-		; paragraph: make-space 'paragraph []
-		; caret: make-space 'rectangle []		;-- caret has to be a separate space so it can be styled
-		; content: 'paragraph
-		; wrap?: no           ;@@ must be a flag
-		; active?: no			;-- whether it should react to keyboard input or pass thru (set on click, Enter)
-		; ;@@ TODO: render caret only when focused
-		; ;@@ TODO: auto scrolling when caret is outside the viewport
-		; invalidate: does [				;@@ TODO: use on-deep-change to watch `text`??
-			; paragraph/layout: none
-			; invalidate paragraph
-		; ]
-	
-		; draw: func [/on canvas [pair! none!]] [~/draw self canvas]
-		
-		; scrollable-on-change: :on-change*
-		; #on-change-redirect
-	; ]
-	
-; ]
 
 declare-template 'fps-meter/text [
 	; cache:     off

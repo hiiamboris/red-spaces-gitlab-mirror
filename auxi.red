@@ -886,38 +886,39 @@ normalize-alignment: function [
 
 decode-canvas: function [
 	"Turn pair canvas into positive value and fill flags"
-	canvas [pair!] "can be negative or infinite (no fill), positive (fill)"
+	canvas [pair!] "can be positive or infinite (no fill), negative (fill)"
 ][
 	reduce/into [
-		|canvas|: abs canvas
-		negate canvas / max 1x1 |canvas|				;-- 1 if fill=true, -1 if false, can be 0 (also false, but doesn't matter)
+		abs canvas
+		canvas/x < 0									;-- only true if strictly negative, not zero
+		canvas/y < 0
 	] clear []
 ]
 
 #assert [
-	(reduce [infxinf -1x-1]) = decode-canvas infxinf
-	[10x20 -1x-1] = decode-canvas  10x20
-	[10x20  1x1]  = decode-canvas -10x-20
-	[10x0  -1x0]  = decode-canvas  10x0
+	(reduce [infxinf no no]) = decode-canvas infxinf
+	(reduce [10x20   no no]) = decode-canvas  10x20
+	(reduce [10x20 yes yes]) = decode-canvas -10x-20
+	(reduce [10x0    no no]) = decode-canvas  10x0		;-- zero is fill=false
 ]
 
 encode-canvas: function [
-	|canvas| [pair!] "Absolute canvas size"
-	fill     [pair!] "Fill mask (1 = true, 0 and -1 = false)"
+	|canvas| [pair!] (0x0 +<= |canvas|)
+	fill-x   [logic!]
+	fill-y   [logic!]
 ][
-	;; must ensure infinity always stays +infinity:
-	add |canvas| / infxinf * infxinf					;-- part for infinite coordinates
-		|canvas| % infxinf * negate fill				;-- part for finite coordinates
+	add (pick [-1 1] fill-x) by (pick [-1 1] fill-y) * |canvas| % infxinf	;-- finite part may flip sign
+		|canvas| / infxinf * infxinf					;-- infinite part stays positive
 ]
 
 #localize [#assert [
-	reencode: func [b] [encode-canvas b/1 b/2]
+	reencode: func [b] [encode-canvas b/1 b/2 b/3]
 	infxinf = reencode decode-canvas  infxinf
 	 10x20  = reencode decode-canvas  10x20
 	-10x-20 = reencode decode-canvas -10x-20
 	 10x0   = reencode decode-canvas  10x0
-	infxinf = encode-canvas infxinf 1x1					;-- must not become negative infinity
-	infxinf = encode-canvas infxinf 1x0					;-- must not become zero
+	infxinf = encode-canvas infxinf yes yes				;-- must not become negative infinity
+	infxinf = encode-canvas infxinf yes no
 ]]
 
 
@@ -952,6 +953,9 @@ subtract-canvas: function [
 #assert [( 60 by infxinf/y) = subtract-canvas  100 by infxinf/y 40x30]
 #assert [( 0  by infxinf/y) = subtract-canvas   20 by infxinf/y 40x30]
 
+fill-canvas: function [canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+	(make integer! fill-x) by (make integer! fill-y) * finite-canvas canvas		;-- non-filled dimensions become zero
+]
 
 top: func [
 	"Return SERIES at it's position before the last item"

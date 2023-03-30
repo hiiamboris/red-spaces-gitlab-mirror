@@ -69,10 +69,10 @@ view/no-wait/options [
 				;; but at the top level it is clipped at certain depth level,
 				;; so face/draw receives a truncated draw tree which it is able to render without deadlocking
 				;; copying depth has to be adjusted manually to a reasonable amount
-				draw: function [/on canvas /extern depth] [
+				draw: function [/on canvas fill-x fill-y /extern depth] [
 					r: []
 					if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
-						append clear r old-draw/on canvas
+						append clear r old-draw/on canvas fill-x fill-y
 						elapsed: to float! difference now/precise t0
 						zx: exp elapsed // log-e (size/x / cell-size/x)
 						zy: zx * (size/y / cell-size/y) / (size/x / cell-size/x)

@@ -788,7 +788,7 @@ doc-ctx: context [
 		]
 	]
 
-	draw: function [doc [object!] canvas: infxinf [pair! none!]] [
+	draw: function [doc [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
 		unless doc/caret/parent [render doc/caret]
 		
@@ -811,7 +811,7 @@ doc-ctx: context [
 			new-holder/caret/width:  doc/caret/width
 		]
 		
-		drawn: doc/list-draw/on canvas
+		drawn: doc/list-draw/on canvas fill-x fill-y
 	]
 	
 	on-content-change: function [doc [object!] word [word!] content [block!]] [
@@ -855,7 +855,7 @@ doc-ctx: context [
 		modified?: no									;-- set by edit as a flag to adjust origin on next render
 		
 		list-draw: :draw			#type [function!]
-		draw: func [/on canvas [pair!]] [~/draw self canvas]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 	editor-kit: make-kit 'editor [
@@ -879,13 +879,13 @@ doc-ctx: context [
 		content-flow: 'vertical
 		
 		scrollable-draw: :draw
-		draw: function [/on canvas [pair!]] [
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
 			if content/modified? [
-				scrollable-draw/on canvas
+				scrollable-draw/on canvas fill-x fill-y
 				batch self [frame/adjust-origin]
 				content/modified?: no
 			]
-			scrollable-draw/on canvas
+			scrollable-draw/on canvas fill-x fill-y
 		]
 	]
 ]
