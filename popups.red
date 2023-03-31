@@ -172,6 +172,7 @@ lay-out-menu: function [spec [block!] /local code name space value tube list fla
 		append menu* item: make-space 'clickable [
 			type:    either all [radial? round?] ['round-clickable]['clickable]	;@@ better name??
 			margin:  4x4
+			color:   none								;-- used for on-hover highlighting
 			content: make-space 'tube [spacing: 10x5]
 		]
 		if radial? [item/limits: 40x40 .. none]			;-- ensures item is big enough to tap at

@@ -176,14 +176,15 @@ define-handlers [
 				; on-up [space path event] [
 					; hide-popups event/window 1			;-- click on a menu item hides all visible menus
 				; ]
-				on-over [space path event] [
-					unless :highlight =? space [		;@@ this mechanism should be generalized
-						if space? :highlight [invalidate highlight]
-						set 'highlight space
-						invalidate space
-					]
+				on-over [space path event] [			;-- on-hover highlight ;@@ should it affect /color though?
+					inside?: 0x0 +<= path/2 +< space/size
+					space/color: if inside? [mix 'panel opaque 'text 15%]
 				]
 			]
+		]
+		ring: [
+			clickable: extends 'menu/list/clickable []
+			round-clickable: extends 'menu/list/clickable []
 		]
 		on-click [space path event] [
 			item: path/5
