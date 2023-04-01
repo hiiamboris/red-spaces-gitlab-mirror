@@ -32,7 +32,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   axis             [word!]   x or y
 		;;   margin       [integer! pair!]   >= 0x0
 		;;   spacing      [integer! pair!]   >= 0x0
-		;;   canvas        [pair! none!]   encoded canvas
+		;;   canvas        [pair! none!]     >= 0x0
+		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
 		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
@@ -44,7 +45,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [axis margin spacing canvas limits origin]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas limits origin
+			/local axis margin spacing canvas fill-x fill-y limits origin
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -54,14 +55,17 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				axis     [word! (find [x y] axis)]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
-				canvas   [none! pair!]
+				canvas   [pair! (0x0 +<= canvas) none!]
+				fill-x   [logic! none!]
+				fill-y   [logic! none!]
 				limits   [object! (range? limits) none!]
 				origin   [none! pair!]
 			]]
 			default origin: 0x0
 			default canvas: infxinf
+			default fill-x: no
+			default fill-y: no
 			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
-			set [canvas: fill-x: fill-y:] decode-canvas canvas
 			margin: margin * 1x1						;-- integer to pair normalization
 			; canvas: constrain canvas limits
 			x: ortho y: axis
@@ -120,14 +124,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;                                      default = -1x-1 - both x/y stick to the negative size of axes
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing       [integer! pair!]   >= 0x0
-		;;   canvas         [none! pair!]   encoded canvas; if none=inf, width determined by widest item
+		;;   canvas         [none! pair!]   >= 0x0; if none=inf, width determined by widest item
+		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
 		;;   limits        [none! object!]
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [axes align margin spacing canvas limits]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axes align margin spacing canvas limits
+			/local axes align margin spacing canvas fill-x fill-y limits
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -156,13 +161,16 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
-				canvas   [none! pair!]
+				canvas   [pair! (0x0 +<= canvas) none!]
+				fill-x   [none! logic!]
+				fill-y   [none! logic!]
 				limits   [object! (range? limits) none!]
 			]]
 			default axes:   [e s]
 			default align:  -1x-1
 			default canvas: infxinf						;-- none to pair normalization
-			set [canvas: fill-x: fill-y:] decode-canvas canvas
+			default fill-x: no
+			default fill-y: no
 			margin:  margin  * 1x1						;-- integer to pair normalization
 			spacing: spacing * 1x1
 			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
@@ -650,7 +658,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
 		;;   margin        [integer! pair!]   >= 0x0
 		;;   spacing         [integer!]       >= 0 - vertical distance between rows
-		;;   canvas            [pair!]        encoded canvas; if infinite, produces a single row
+		;;   canvas         [none! pair!]     >= 0; if infinite, produces a single row
+		;;   fill-x fill-y [logic! none!]     fill along canvas axes flags
 		;;   limits        [none! object!]
 		;;   indent        [none! block!]     [first: integer! rest: integer!], first and rest are independent of each other
 		;;   force-wrap?      [logic!]        prioritize canvas width and allow splitting words at *any pixel, even inside a character*
@@ -661,7 +670,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [align baseline margin spacing canvas limits indent force-wrap?]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local align baseline margin spacing canvas limits indent force-wrap?
+			/local align baseline margin spacing canvas fill-x fill-y limits indent force-wrap?
 		][
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#debug [typecheck [
@@ -669,10 +678,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				baseline [number!]
 				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing)]		;-- vertical only!
-				canvas   [pair!]
+				canvas   [pair! (0x0 +<= canvas) none!]
+				fill-x   [none! logic!]
+				fill-y   [none! logic!]
 				limits   [object! (range? limits) none!]
 				indent   [block! (parse indent [2 [integer! | none!]]) none!]
 			]]
+			default canvas: infxinf
+			default fill-x: no
+			default fill-y: no
 			margin:  margin * 1x1						;-- integer to pair normalization
 			set [map: total-1D:] build-map :spaces 1.0 * baseline
 			if empty? map [								;@@ return value needs optimization
@@ -688,13 +702,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			default align:  'left
 			default canvas: infxinf						;-- none to pair normalization
-			set [|canvas|: fill-x: fill-y:] decode-canvas canvas
 			default indent: []
 			indent1: any [indent/first 0]
 			indent2: any [indent/rest  0]
 			
 			;; clipped canvas - used to find desired paragraph width
-			ccanvas: subtract-canvas constrain |canvas| limits 2 * margin
+			ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			#debug sizing [#print "paragraph canvas=(canvas) ccanvas=(ccanvas)"]
 			
 			x-1D-to-map-offset: index-map map

@@ -1136,8 +1136,7 @@ list-ctx: context [
 
 	draw: function [list [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
 		list/sec-cache: copy []							;-- reset computed sections
-		canvas:   encode-canvas canvas fill-x fill-y
-		settings: with list [axis margin spacing canvas limits]
+		settings: with list [axis margin spacing canvas fill-x fill-y limits]
 		list/container-draw/layout 'list settings
 	]
 		
@@ -1212,8 +1211,7 @@ tube-ctx: context [
 	]
 
 	draw: function [tube [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
-		settings: with tube [margin spacing align axes canvas limits]
-		canvas: encode-canvas canvas fill-x fill-y
+		settings: with tube [margin spacing align axes canvas fill-x fill-y limits]
 		drawn:  tube/container-draw/layout 'tube settings
 		#debug sizing [#print "tube with (tube/content/type) on (mold canvas) -> (tube/size)"]
 		drawn
@@ -1427,8 +1425,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		space/sec-cache: copy []						;-- reset computed sections
-		settings: with space [margin spacing align baseline canvas limits indent force-wrap?]
-		canvas: encode-canvas canvas fill-x fill-y
+		settings: with space [margin spacing align baseline canvas fill-x fill-y limits indent force-wrap?]
 		frame: make-layout 'paragraph :space/items settings
 		size: space/margin * 2x2 + frame/size-2D
 		quietly space/frame: frame
@@ -2890,7 +2887,7 @@ grid-ctx: context [
 			unless space: grid/cells/pick cell [continue]
 			cspace: grid/wrap-space cell space			;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
-				render/on cspace encode-canvas width by h no no	;-- fixed rows only affect column's width, no filling
+				render/on cspace width by h no no		;-- fixed rows only affect column's width, no filling
 			][
 				render/on cspace width by infxinf/y no no
 				h: cspace/size/y
