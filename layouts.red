@@ -202,13 +202,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; along Y canvas becomes of canvas size
 			stripe/:x: 0
 			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
-#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"
 			
 			repeat i count [
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
 				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
-				drawn: render/on space ccanvas no no	;-- fill is not used for 1st render
+				drawn: render/on space stripe no no	;-- fill is not used for 1st render
 				weight: any [select space 'weight 0]
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
