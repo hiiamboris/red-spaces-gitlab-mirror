@@ -446,7 +446,7 @@ USAGE:
      DELIST-FINALIZER handler
 
 DESCRIPTION: 
-     Unregister a previewer from the event chain. 
+     Unregister a finalizer from the event chain. 
      DELIST-FINALIZER is a function! value.
 
 ARGUMENTS:

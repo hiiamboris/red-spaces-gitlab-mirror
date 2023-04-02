@@ -108,7 +108,7 @@ events: context [
 	]
 
 	delist-finalizer: func [
-		"Unregister a previewer from the event chain"
+		"Unregister a finalizer from the event chain"
 		handler [function!] "Previously registered"
 	][
 		delist-from finalizers :handler
