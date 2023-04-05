@@ -28,8 +28,16 @@ dump-tree: function [
 	()
 ]
 
-
 dorc: does [do read-clipboard]
+
+color-names: make map! map-each/eval [name value [tuple!]] to [] system/words [[value to word! name]]
+color-name: function [color [tuple! none!]] [			;-- used for debug output to easier identify spaces
+	any [
+		select color-names color 
+		color
+		'colorless
+	]
+]
 
 
 add-indent: function [text [string!] size [integer!]] [
