@@ -205,10 +205,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
+			min-size: constrain 0x0 limits
 			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes of canvas size
-			stripe/:x: 0
+			stripe/:x: pick ccanvas / infxinf * infxinf x
+			; stripe/:y: 0
 			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
 			
 			repeat i count [
@@ -292,6 +294,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 							append extras  available
 						]
 						extensions: distribute free weights extras
+						; ?? [free extensions weights extras]
 						
 						row-size: -1x0 * spacing
 						repeat i length? extensions [	;@@ use for-each
@@ -299,6 +302,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
 								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
+								; ?? [desired-size space/content/size]
 								item/2: render/on space desired-size x = 'x x = 'y
 							]
 							row-size: as-pair			;-- update row size with the new render results
@@ -316,21 +320,24 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; add spacing to total-length (previously not accounted for)
 			nrows: (length? rows) / 3
 			total-length: total-length + (nrows - 1 * spacing/:y)
+			?? [ccanvas fill-x fill-y total-length spacing]
 			
-			;; when canvas has height bigger than all rows height - extend row heights evenly before filling rows
-			;; this makes it possible to align tube with the canvas without resorting to manual geometry management
-			if fill-y [
-				free: ccanvas/:y - total-length
-				if all [0 < free  ccanvas/:y < infxinf/y][	;-- canvas/y has to be finite and bigger than length
-					weights: extract/into next rows 3 clear []	;@@ use map-each
-					extras:  append/dup clear [] free nrows
-					shares:  distribute free weights extras
-					repeat i nrows [					;@@ use for-each
-						i3: i - 1 * 3 + 1
-						rows/:i3/y: rows/:i3/y + shares/:i
-					]
-					total-length: ccanvas/:y
+			;; extend row heights evenly before filling rows in the following cases:
+			;; - when canvas has height bigger than all rows height and filling is requested along height 
+			;;   this makes it possible to align tube with the canvas without resorting to manual geometry management
+			;; - when min height limit is bigger than all rows height (regardless of the fill flag) 
+			fill-length: all [ccanvas/:y < infxinf/y  either x = 'x [fill-y][fill-x]]	;-- only fill if finite and requested to fill
+			min-length: max-safe min-size/:y if fill-length [ccanvas/:y]				;-- but also if cannot be smaller
+			free: min-length - total-length
+			if 0 < free: min-length - total-length [
+				weights: extract/into next rows 3 clear []	;@@ use map-each
+				extras:  append/dup clear [] free nrows
+				shares:  distribute free weights extras
+				repeat i nrows [						;@@ use for-each
+					i3: i - 1 * 3 + 1
+					rows/:i3/y: rows/:i3/y + shares/:i
 				]
+				total-length: min-length
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
