@@ -8,6 +8,7 @@ Red [needs: view]
 ; #include %../../common/debug.red
 #include %../../common/composite.red
 #include %../../common/contrast-with.red
+; #do [disable-space-cache?: on]
 #include %../everything.red
 
 svmc: system/view/metrics/colors

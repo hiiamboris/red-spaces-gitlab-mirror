@@ -39,6 +39,10 @@ color-name: function [color [tuple! none!]] [			;-- used for debug output to eas
 	]
 ]
 
+space-id: function [space [object!]] [					;-- used to identify spaces in debug sessions
+	#composite "(color-name select space 'color) (space/type):(space/size)"	
+]
+
 
 add-indent: function [text [string!] size [integer!]] [
 	indent: append/dup clear "" #" " size

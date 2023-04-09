@@ -5,6 +5,7 @@ Red [
 	needs:   view
 ]
 
+; #do [disable-space-cache?: on]
 #include %../everything.red
 
 ;; let capital initial be an image
