@@ -133,6 +133,9 @@ context [
 		clear top
 	]
 	
+	;; format: [child canvas ...]
+	children-stack: make hash! 100						;-- used to track lists of children for each canvas size in the cache
+	
 	render-face: function [
 		face [object!] "Host face"
 	][
@@ -142,6 +145,7 @@ context [
 			empty? current-path
 		]
 
+		children-mark: tail children-stack
 		cache/with-generation face/generation + 1.0 [
 			without-GC [								;-- speeds up render by 60%
 				with-style face [
@@ -158,24 +162,42 @@ context [
 			]
 			face/generation: cache/current-generation	;-- only updated if no error happened during render
 		]
+		clear children-mark
 		#debug profile [verify-validity face]			;-- check for unwanted invalidations during render, which may loop it
 		any [drawn copy []]								;-- drawn=none in case of error during render
+	]
+
+	restore-from-cache: function [space [object!] words [block!] slot [block!] deep? [logic!]] [
+		set words skip slot 2 							;-- skip [children drawn]: at [size map etc..]
+		if deep? [
+			foreach [child ccanvas] slot/1 [
+				all [
+					ccanvas <> cache/last-canvas child
+					set [words': slot':] cache/fetch child ccanvas
+					restore-from-cache child words' slot' yes
+					cache/update-generation child 'cached ccanvas
+				] 
+			] 
+			#debug cache [#print "restored (half length? slot/1) immediate children states of (space-id space): (mold/flat slot/1)"]
+		]
 	]
 
 	render-space: function [
 		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
 		/on canvas: infxinf [pair! none!] fill-x: no [logic!] fill-y: no [logic!]
+		/crude
 	][
 		; if name = 'cell [?? canvas]
 		#debug profile [prof/manual/start 'render]
 		name: space/type
-		#debug cache [#print "Rendering (name)"]	
 		#assert [
 			(finite-canvas canvas) +<= (1e6 by 1e6)	"Oversized canvas detected!"
 			0x0 +<= canvas							"Negative canvas detected!"
 		]
 		encoded-canvas: encode-canvas canvas fill-x fill-y
+		#debug cache [#print "Rendering (color-name select space 'color) (name) on (encoded-canvas)"]	
+		; #print "Rendering (color-name select space 'color) (name) on (encoded-canvas)"	
 
 		unless tail? current-path [						;-- can be at tail on out-of-tree renders
 			#debug [check-parent-override space last current-path]
@@ -193,11 +215,16 @@ context [
 				not window?								;-- usage of region is not supported by current cache model
 				set [words: slot:] cache/fetch space encoded-canvas
 			][
-				drawn: slot/1
+				set [children: drawn:] slot
 				do-atomic [								;-- prevent reactions from invalidating the cache while it's used by `set`
-					set words next slot					;-- size map etc..
+					#debug profile [prof/manual/start 'deep-restore]
+					restore-from-cache space words slot not crude
+					#debug profile [prof/manual/end 'deep-restore]
 				]
-				cache/update-generation space 'cached
+				cache/update-generation space 'cached encoded-canvas
+				unless find/same/skip children-stack space 2 [
+					append append children-stack space encoded-canvas	;-- list this space in its parent's children list
+				]
 				#debug cache [							;-- add a frame to cached spaces after committing
 					if space/size [
 						drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
@@ -207,6 +234,7 @@ context [
 				; if name = 'list [print ["canvas:" canvas mold space/content]]
 				#debug profile [prof/manual/start name]
 				style: apply-current-style space
+				children-mark: tail children-stack
 				
 				either object? :style [
 					draw: select space 'draw
@@ -245,13 +273,17 @@ context [
 					#assert [block? :drawn]
 				]
 				
-				unless any [xy1 xy2] [cache/commit space encoded-canvas drawn]
-				cache/update-generation space 'drawn
+				unless any [xy1 xy2] [cache/commit space encoded-canvas to [] children-mark drawn]
+				cache/update-generation space 'drawn encoded-canvas
+				clear children-mark
+				unless find/same/skip children-stack space 2 [
+					append append children-mark space encoded-canvas	;-- list this space in its parent's children list
+				]
 				
 				if select space 'rate [timers/prime space]		;-- render enables timer for this space if /rate facet is set
 				
 				#debug profile [prof/manual/end name]
-				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed have infinite size?
+				#assert [any [space/size find [grid canvas] name] "render must set the space's size"]	;@@ should grid be allowed to have infinite size?
 			]
 		]
 		#debug profile [prof/manual/end 'render]	
@@ -270,11 +302,14 @@ context [
 		/on canvas: infxinf [pair! none!] "Specify canvas size as sizing hint"
 			fill-x: no [logic!] "Try to fill finite canvas width"
 			fill-y: no [logic!] "Try to fill finite canvas height"
+		/crude "For spaces only - speed up caching on intermediate canvases"	;-- children may be out of sync!
 	][
 		drawn: either host? space [
 			render-face space
 		][
-			render-space/window/on space xy1 xy2 canvas fill-x fill-y
+			either crude								;@@ use apply
+				[render-space/window/on/crude space xy1 xy2 canvas fill-x fill-y]
+				[render-space/window/on       space xy1 xy2 canvas fill-x fill-y]
 		]
 		#debug draw [									;-- test the output to figure out which style has a "Draw error"
 			if error? error: try/keep [draw 1x1 drawn] [

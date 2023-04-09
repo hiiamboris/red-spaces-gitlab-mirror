@@ -8,6 +8,13 @@ exports: [invalidate invalidate-tree get-full-path]
 
 
 cache: context [
+	last-canvas: function [
+		"Get canvas of the last rendered frame of SPACE"
+		space [object!] (space? space)
+	][
+		space/cached/-3
+	]
+	
 	last-generation: function [
 		"Get generation of the last rendered frame of SPACE"
 		space [object!] (space? space)
@@ -31,11 +38,12 @@ cache: context [
 	
 	update-generation: function [
 		"Update generation data of SPACE if it's an in-tree render"
-		space [object!] (space? space)
-		state [word!] "One of [cached drawn]" (find [cached drawn] state)
+		space  [object!] (space? space)
+		state  [word!] "One of [cached drawn]" (find [cached drawn] state)
+		canvas [pair!] "Encoded canvas of the current state"
 	][
-		if current-generation [
-			change change head space/cached current-generation state
+		if current-generation [							;-- only update for in-tree renders
+			change change change head space/cached canvas current-generation state
 		]
 	]
 	
@@ -63,19 +71,19 @@ cache: context [
 	]
 	
 	fetch: function [
-		"If SPACE's draw caching is enabled and valid, return it's cached slot for given canvas"
+		"If SPACE's draw caching is enabled and valid, return its cached slot for given canvas"
 		space  [object!] (space? space)
 		canvas [pair!]
 	][
 		#debug profile [prof/manual/start 'cache]
 		result: all [
 			space/cache
-			slot: find/same/skip space/cached canvas 3 + length? space/cache
-			reduce [space/cache skip slot 2]			;-- skips canvas and generation, these are internal
+			slot: find/same/skip space/cached canvas 4 + length? space/cache
+			reduce [space/cache skip slot 2]			;-- skips canvas & generation, expose children and drawn
 		]
 		#debug cache [
 			name: space/type
-			if cache: space/cache [period: 3 + length? space/cache]
+			if cache: space/cache [period: 4 + length? space/cache]
 			either slot [
 				n: (length? space/cached) / period
 				#print "Found cache for (name):(space/size) on canvas=(mold canvas) out of (n): (mold/flat/only/part slot 40)"
@@ -97,17 +105,18 @@ cache: context [
 	#debug [max-slots: 0  culprit: none]
 	commit: function [
 		"Save SPACE's Draw block and cached facets on given CANVAS in the cache"
-		space  [object!] (space? space)
-		canvas [pair!]
-		drawn  [block!]
+		space    [object!] (space? space)
+		canvas   [pair!]
+		children [block!]
+		drawn    [block!]
 	][
 		unless space/cache [exit]						;-- do nothing if caching is disabled
 		#debug profile [prof/manual/start 'cache]
 		#assert [pair? space/size]						;@@ should I enable caching of infinite spaces? see no point so far
 		cur-gen: any [current-generation space/cached/-2]
 		old-gen: cur-gen - 1.0
-		period: 3 + length? space/cache					;-- custom words + (canvas + drawn)
-		words:  compose [canvas cur-gen drawn (space/cache)]	;-- [canvas gen drawn size map ...] all bound names
+		period: 4 + length? space/cache					;-- custom words + (canvas + drawn + gen + children)
+		words:  compose [canvas cur-gen children drawn (space/cache)]
 		#assert [period = length? words]
 		unless slot: find/same/skip space/cached canvas period [
 			;; if same canvas isn't found, try to reuse an old slot
@@ -177,7 +186,7 @@ invalidate: function [
 	/local custom										;-- can be unset during construction
 ][
 	#assert [not unset? :space/cache  "cache should be initialized before other fields"] 
-	#assert [3 = index? space/cached]
+	#assert [4 = index? space/cached]
 	unless space/cached/-1 [exit]						;-- space was never rendered; early exit (for faster tree construction)
 	#debug profile [prof/manual/start 'invalidation]
 	default scope: 'size
@@ -208,7 +217,7 @@ invalidate: function [
 	
 	
 ;; this uses generation data to detect outdated (orphaned) spaces, and returns none for them
-;; timers.red relies on this to remove no longer valid timers from it's list
+;; timers.red relies on this to remove no longer valid timers from its list
 get-full-path: function [
 	"Get host-relative path for SPACE on the last rendered frame, or none if it's not there"
 	space  [object!] (space? space)
@@ -225,9 +234,8 @@ get-full-path: function [
 	path: clear []
 	append parents space								;-- space's generation has to be verified as well 
 	foreach obj next parents [
-		frame: head obj/cached
-		if frame/1 < gen [return none]					;-- space generation is older than the host: orphaned (unused) subtree
-		if frame/2 = 'cached [break]					;-- don't check generation numbers inside cached subtree
+		if obj/cached/-2 < gen [return none]			;-- space generation is older than the host: orphaned (unused) subtree
+		if obj/cached/-1 = 'cached [break]				;-- don't check generation numbers inside cached subtree
 	]
 	#assert [not find parents none]
 	to path! parents

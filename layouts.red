@@ -217,7 +217,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
 				;; 1st render needed to obtain min *real* space/size, which may be > limits/max
-				drawn: render/on space stripe no no	;-- fill is not used for 1st render
+				drawn: render/crude/on space stripe no no	;-- fill is not used for 1st render
 				weight: any [select space 'weight 0]
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
@@ -303,7 +303,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
 								; ?? [desired-size space/content/size]
-								item/2: render/on space desired-size x = 'x x = 'y
+								item/2: render/crude/on space desired-size x = 'x x = 'y
 							]
 							row-size: as-pair			;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
@@ -320,7 +320,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; add spacing to total-length (previously not accounted for)
 			nrows: (length? rows) / 3
 			total-length: total-length + (nrows - 1 * spacing/:y)
-			?? [ccanvas fill-x fill-y total-length spacing]
 			
 			;; extend row heights evenly before filling rows in the following cases:
 			;; - when canvas has height bigger than all rows height and filling is requested along height 
@@ -341,6 +340,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			
 			;; third render cycle fills full row height if possible; doesn't affect peak-row-width or row-sizes
+			;; it must always be performed for other cycles to be used as /crude
 			;@@ maybe it should affect (contract) row widths?
 			foreach [row-size row-weight row] rows [
 				repeat i (length? row) / 4 [			;@@ use for-each

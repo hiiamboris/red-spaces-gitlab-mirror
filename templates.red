@@ -31,7 +31,7 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 	draw:   []   	#type [block! function!]
 	;; `drawn` is an exception and not held in the space, so just `size`:
 	cache:  [size]	#type [block! none!]
-	cached: tail copy [0.0 #[none]]	#type [block!]		;-- used internally to check if space is connected to the tree, and holds cached facets
+	cached: tail copy [0x0 0.0 #[none]]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
 	limits: none	#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
 ]
