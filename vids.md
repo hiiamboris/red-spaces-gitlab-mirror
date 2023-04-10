@@ -80,7 +80,7 @@ SPACES/1 is an object! with the following words and values:
      type        word!         text
      size        pair!         0x0
      parent      none!         none
-     draw        function!     [/on canvas [pair!]]
+     draw        function!     [/on canvas [pair!] fill-x [logic!] fill-y [logic!]]
      cache       block!        length: 2  [size layout]
      cached      block!        length: 0 index: 3 []
      limits      none!         none

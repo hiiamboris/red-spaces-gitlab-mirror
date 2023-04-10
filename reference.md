@@ -152,7 +152,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 |-|-|-|
 | `type` | `word!` | Used for styles and event handler lookups. Usually equals space's template name, but can be renamed freely. |
 | `size` | `pair!` `none!` | Size of this space in it's own coordinate system.<br> Usually updated during every `draw` call (as such, it is the *size of the last rendered frame* in a sequential chain of redraws), but sometimes fixed.<br> Used by container spaces (e.g. list) to arrange their items. <br> Can be `none` if space is infinite, or if it was never drawn yet. |
-| `draw` | `block!`<br>`func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas` to auto-adjust it's size. |
+| `draw` | `block!`<br>`func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas fill-x fill-y` to auto-adjust its size. |
 | `parent` | `none!` `object!` | After space is rendered, contains it's owner object. |
 | `limits` | `none!` `range!` | Object with /min and /max size this space can span. See [VID/S manual](vids.md#constraining-the-size) on details. |
 | `cache` | `none!` `block!` | List of cached words (usually `[size map]`). Turns off caching if set to `none`. |
@@ -784,9 +784,9 @@ It could render it's content on 4 canvas sizes:
 3. Canvas minus vertical scrollbar
 4. Canvas minus both scrollbars
 
-For some spaces, like `list`, there will be a difference: `list` fits content across it's secondary axis, so if list is vertical, width of the canvas will control overall list's width.
+For some spaces, like `list`, there will be a difference: `list` fits content across its secondary axis, so if list is vertical, width of the canvas will control overall list's width.
 
-But `scrollable` knows nothing of it's content's size adjustment behavior. In what order should it try canvases to render it's content on? 1-2-3-4? 1-3-2-4? And how should it evaluate if content fits successfully? 
+But `scrollable` knows nothing of its content's size adjustment behavior. In what order should it try canvases to render its content on? 1-2-3-4? 1-3-2-4? And how should it evaluate if content fits successfully? 
 
 Performance is a significant consideration here, as in a scenario when a scrollable contains a scrollable that also contains a scrollable, if each one tries 2 canvases instead of 1, the innermost scrollable will be rendered 2^3=8 times instead of 1. This gets out of hand quickly.
 
@@ -1110,7 +1110,7 @@ Generated using [`tube-test.red`](tests/tube-test.red):
 </details>
 
 Tube is not some generalized equation solver. It's just a fast simple algorithm that does roughly the following:
-- render each item to obtain it's minimal size
+- render each item to obtain its minimal size
 - split this long row into multiple rows so each row's width is no bigger than the given canvas width 
 - expand items in each row to fill row's width fully (if any item has weight > 0)
 - expand rows to fill the canvas height (if any row has item with weight > 0)

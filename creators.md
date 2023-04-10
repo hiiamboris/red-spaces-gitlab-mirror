@@ -95,7 +95,7 @@ Host face is rendered as `host/draw: render host` if out of order update is requ
 
 `draw` may support the following refinements (if it does, it's style function must also support these and pass through):
 - `/window xy1 [pair! none!] xy2 [pair! none!]` if it makes sense to draw only an area (xy1..xy2) of it. E.g. spaces that are likely to occur inside a `scrollable` (list, grid) support it. Infinite spaces *must* support it, because one cannot draw an infinite space wholly.
-- `/on canvas [pair!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Explained [below](#canvas).
+- `/on canvas [pair!] fill-x [logic!] fill-y [logic!]` if space adapts it's size to given canvas (most spaces do). This is the basis of automated sizing. Explained [below](#canvas).
 
 Space's redraw is the most expensive operation, so it is only done when necessary. Host checks if it's assigned space was invalidated to decide if it should render it. Render will fetch from cache anything that was not invalidated.
 
@@ -112,38 +112,58 @@ Since `size` is set by `draw`, it is quite volatile and represents *space's size
 
 ### Canvas
 
-Is an argument to spaces' `draw` function and to their style function, which is passed if these functions support `/on canvas [pair!]` refinement. To properly handle resizing one must understand how to interpret it.
+Is an argument to spaces' `draw` function and to their style function, which is passed if these functions support `/on canvas [pair!] fill-x [logic!] fill-y [logic!]` refinement. To properly handle resizing one must understand how to interpret it.
 
 `canvas` is best understood as the *amount of free space inside the parent*. Colored `box` space can be used to visualize it, as it tries to fill all of it's canvas.
 
-It's a bit more complicated though, as required for proper handling of flow layouts (`paragraph`, `tube`). Each axis of the canvas can have the following values:
+`fill-x` and `fill-y` flags request that space fills the canvas along one or both of its axes (if possible). `render` guarantees that infinite canvas dimensions received by `draw` are always accompanied by `false` fill flag, however if `draw` is called manually, one must ensure this consistency (e.g. if container infinitely extends along some axis it should also set corresponding fill flag to false before calling child's `draw` func).
 
-| Value | Meaning | Example |
-|-|-|-|
-| < 0 | Size of available area that should be filled if possible | `-300x-200` means area size of `300x200` should be filled |
-| = 0 | Intent is to minimize space along given axis | text rendered on `0x200` canvas should put 1 char per line |
-| 0 < canvas < infxinf/x | Size of available area should be used to limit the space but should not be filled | text or tube rendered on `200x0` canvas should wrap itself at 200 pixels and start a new line, but should not extend to fill the width `200` |
-| = infxinf/x | Size is infinite: space should take as much space as it wants, but should not constrain itself or try to fill the infinite size | text rendered on `infxinf` canvas should always render as a single line |
+<details>
+<summary>Internally canvas has an encoded form, which is mostly used by the cache...</summary>
+
+While decoded canvas is three values: pair and 2 logic flags, encoded canvas is a single pair with flags affecting the sign:
+- negative sign for `fill = true`
+- positive sign for `fill = false` and infinite dimensions
+
+</details>  
 
 Notes:
 - `infxinf` is a special `pair!` value exported by Spaces and is used to represent virtual infinity. Equals `2e9 by 2e9`
-- `/on canvas` can be absent, in which case it has the same meaning as `infxinf`
+- `/draw` doesn't have to support `/on canvas fill-x fill-y`, and it doesn't have to be passed to it: in this case the default is `infxinf false false`
 
 To simplify working with canvas, following *functions* exist in `spaces/ctx` context:
-- `decode-canvas canvas [pair!]` returns a block `[abs-canvas [pair!] fill-flags [pair!]]`:
-  - `abs-canvas` contains the positive value of area size; it's useful for calculations - min, max, subtraction, etc
-  - `fill-flags` is a pair -1x-1 to 1x1, where value of `1` means that axis should be filled, `0` or `-1` mean that it should not
-- `encode-canvas abs-canvas [pair!] fill-flags [pair!]` is the reverse: it turns positive area size value into an encoded possibly-infinite canvas size
-- `subtract-canvas abs-canvas [pair!] value [pair!]` is used to subtract margins mostly. It's like normal subtraction, but:
+- `subtract-canvas canvas [pair!] value [pair!]` is used to subtract margins mostly. It's like normal subtraction, but:
   - infinite amounts stay infinite (equal to `infxinf/x`)
   - does not make canvas less than `0x0`
 - `finite-canvas canvas [pair!]` returns canvas modulo `infxinf`, that is it turns infinite sizes into zero, which is useful to obtain the size that should be filled
-  
+
+<details>
+<summary>See typical canvas handling code example...</summary>
+
+```
+context [
+	~: self												;-- way for space to refer to this context
+	
+	;; shared draw function for all spaces in the template
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [ 
+		... draws the space ...
+	]
+	
+	declare-template 'my-template [
+		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+			~/draw self canvas fill-x fill-y			;-- dispatches call into a shared function
+		]
+	]
+]
+```
+Note that space's `/draw` may have all arguments as `none` which it passes to a shared `/draw`, which assumes the defaults (`infxinf`, `no`, `no`) for this case.
+
+</details>  
 
 
 ## Umbrella namespace
 
-To minimize the risk of clashing with the user names, an umbrella namespace is used to access common features:
+To minimize the risk of clashing with the user words, an umbrella namespace is used to access common features:
 ```
 >> ? spaces
 SPACES is an object! with the following words and values:
@@ -289,15 +309,15 @@ On parameters:
   - `'look` for a hint that only color or other cosmetic change was detected, that doesn't affect the size
     `'look` can be used as an optimization, e.g. in some big list an item changes it's look and list doesn't have to re-render all other items as it knows it's overall size did not change: it only needs to re-render the item in question.
 
-<details><summary>Cache is held within the <code>/cached</code> facet.</summary>
+<details><summary>Cache is held within the <code>/cached</code> facet...</summary>
 
 <br>
 It has the following form:
 ```
 [
-	<last-generation-number> <last-state>		;) block's head is located after these 2 values
-	<canvas> <slot-generation-number> <draw-commands> <size> <map> <any other cached facets...>
-	<canvas> <slot-generation-number> <draw-commands> <size> <map> <any other cached facets...>
+	<last-canvas> <last-generation-number> <last-state>		;) block's head is located after these 3 values
+	<canvas> <slot-generation-number> <children-list> <draw-commands> <size> <map> <any other cached facets...>
+	<canvas> <slot-generation-number> <children-list> <draw-commands> <size> <map> <any other cached facets...>
 	...
 ]
 ```

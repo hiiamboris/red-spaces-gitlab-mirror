@@ -242,17 +242,17 @@ Sometimes it's more readable. Plus there's little risk of accidentally leaking w
 
 Style function:
 - receives space as it's mandatory argument and should use path syntax to access it's facets
-- should call `/draw` manually, passing `/on canvas` and `/window xy1 xy2` arguments to `/draw` if it supports those
+- should call `/draw` manually, passing `/on canvas fill-x fill-y` and `/window xy1 xy2` arguments to `/draw` if it supports those
 - should return a block of Draw commands, which will be used to draw the space without any further modifications
  
 Example for `grid/cell` that draws full cell background regardless of how small/big the cell content happens to be:
 ```
-set-style 'grid/cell function [cell /on canvas] [
+set-style 'grid/cell function [cell /on canvas fill-x fill-y] [
 	#assert [canvas]							;-- grid should provide finite canvas
-	drawn: cell/draw/on canvas					;-- passes /canvas argument
+	drawn: cell/draw/on canvas fill-x fill-y	;-- passes canvas arguments
 	
 	;; when cell content is not compressible, cell/size may be bigger than canvas, but we draw up to allowed size only
-	canvas: min abs canvas cell/size
+	canvas: min canvas cell/size
 	
 	color: any [								;-- allow cell color override and highlight pinned cells by default
 		select cell 'color
@@ -276,7 +276,7 @@ set-style 'switch function [self] [
 
 Note: style function *should not* call the `render` function on it's own space, because the main difference between `/draw` and `render` is that `render` looks up and applies styles (and will deadlock if style calls it back).  
 
-For spaces that adapt their size automatically, their styling function should accept `/on canvas [pair!]` refinement and pass it on to it's `draw` function. One or both `canvas` dimensions may equal those of `infxinf`, which should be treated as unlimited.
+For spaces that adapt their size automatically, their styling function should accept `/on canvas [pair!] fill-x [logic!] fill-y [logic!]` refinement and pass it on to it's `draw` function. One or both `canvas` dimensions may equal those of `infxinf`, which should be treated as unlimited.
 
 When it makes sense to draw only a portion of a space (e.g. it's big or infinite), styling function should accept `/window xy1 [none! pair!] xy2 [none! pair!]` refinement and pass it on to it's `draw` function. Value of `window` should not be accounted for, only values of `xy1` and `xy2` matter. `none` means "unspecified" and implies rendering of the whole space area.
 
