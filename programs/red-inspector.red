@@ -183,24 +183,23 @@ context [
 		
 		deep-types: make typeset! [object! map! function! all-word! any-block!]	;@@ what else? should it even be here??
 		
-		too-deep: function [space [object!] canvas [none! pair!]] [
-			default canvas: 0x0
+		too-deep: function [space [object!]] [
 			make-space 'text [
 				quietly text: mold/flat/part :space/data 1000
 				quietly flags: [ellipsize]
 			]
 		]
 		
-		draw: function [space [object!] canvas [none! pair!] /extern depth] [
+		draw: function [space [object!] canvas: infxinf [none! pair!] fill-x: no [logic! none!] fill-y: no [logic! none!] /extern depth] [
 			depth: depth + 1
 			if all [
 				limit < depth
 				find deep-types type? :space/data
 			][
 				saved: space/content
-				quietly space/content: too-deep space canvas
+				quietly space/content: too-deep space
 			]
-			trap/catch [drawn: space/old-draw/on canvas] [error: thrown]
+			trap/catch [drawn: space/old-draw/on canvas fill-x fill-y] [error: thrown]
 			depth: depth - 1
 			if saved [quietly space/content: saved]
 			either error [do error][drawn]
@@ -209,17 +208,15 @@ context [
 		declare-template 'data-view/data-view [
 			wrap?: on
 			old-draw: :draw
-			draw: function [/on canvas [pair! none!]] [~/draw self canvas]
+			draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 		]
 		
 		set-style 'image [
 			limits/max: if depth > 1 [10x1 * shift-right 400 depth - 1]
 		]
-		set-style 'grid-view function [gview /on canvas] [
-			default canvas: 0x0
+		set-style 'grid-view function [gview /on canvas fill-x fill-y] [
 			widths: gview/grid/widths
 			image?: gview/kind = 'image
-			set [canvas: fill:] spaces/ctx/decode-canvas canvas
 			if all [
 				canvas/x < infxinf/x
 				canvas/x <> attempt [gview/size/x]
@@ -242,7 +239,7 @@ context [
 					if canvas/y >= infxinf/y [canvas/y: shift-right 400 depth - 1]
 				]
 			]
-			drawn: gview/draw/on spaces/ctx/encode-canvas canvas fill
+			drawn: gview/draw/on canvas fill-x fill-y
 			if depth > 1 [
 				vsc: gview/vscroll/size
 				hsc: gview/hscroll/size
