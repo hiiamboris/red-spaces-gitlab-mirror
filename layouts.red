@@ -205,7 +205,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
-			min-size: constrain 0x0 limits
+			min-size: max 0x0 (constrain 0x0 limits) - (2 * margin)
 			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes of canvas size
