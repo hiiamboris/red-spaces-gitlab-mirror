@@ -182,6 +182,14 @@ context [
 		]
 	]
 
+	add-child: function [space [object!] canvas [pair!]] [		;-- list child in its parent's children list
+		either pos: find/same/skip/tail children-stack space 2 [
+			change pos canvas
+		][
+			append append children-stack space canvas
+		]
+	]
+				
 	render-space: function [
 		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
@@ -222,9 +230,7 @@ context [
 					#debug profile [prof/manual/end 'deep-restore]
 				]
 				cache/update-generation space 'cached encoded-canvas
-				unless find/same/skip children-stack space 2 [
-					append append children-stack space encoded-canvas	;-- list this space in its parent's children list
-				]
+				add-child space encoded-canvas
 				#debug cache [							;-- add a frame to cached spaces after committing
 					if space/size [
 						drawn: compose/only [(drawn) pen green fill-pen off box 0x0 (space/size)]
@@ -275,10 +281,8 @@ context [
 				
 				unless any [xy1 xy2] [cache/commit space encoded-canvas to [] children-mark drawn]
 				cache/update-generation space 'drawn encoded-canvas
-				clear children-mark
-				unless find/same/skip children-stack space 2 [
-					append append children-mark space encoded-canvas	;-- list this space in its parent's children list
-				]
+				clear children-mark								;-- forget children of this space
+				add-child space encoded-canvas
 				
 				if select space 'rate [timers/prime space]		;-- render enables timer for this space if /rate facet is set
 				
