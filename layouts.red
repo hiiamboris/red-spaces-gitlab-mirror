@@ -30,8 +30,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	list: context [
 		;; settings for list layout:
 		;;   axis             [word!]   x or y
-		;;   margin       [integer! pair!]   >= 0x0
-		;;   spacing      [integer! pair!]   >= 0x0
+		;;   margin           [pair!]   >= 0x0
+		;;   spacing          [pair!]   >= 0x0
 		;;   canvas        [pair! none!]     >= 0x0
 		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
 		;;   limits        [none! object!]
@@ -50,11 +50,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
-			if count <= 0 [return reduce [margin * 2x2 copy []]]	;-- empty list optimization
+			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
-				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
-				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
+				margin   [pair! (0x0 +<= margin)]
+				spacing  [pair! (0x0 +<= spacing)]
 				canvas   [pair! (0x0 +<= canvas) none!]
 				fill-x   [logic! none!]
 				fill-y   [logic! none!]
@@ -66,7 +66,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default fill-x: no
 			default fill-y: no
 			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
-			margin: margin * 1x1						;-- integer to pair normalization
 			; canvas: constrain canvas limits
 			x: ortho y: axis
 			either x = 'x [fill-x: yes][fill-y: yes]	;-- always fills along its secondary axis
@@ -122,8 +121,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;                                  default = [e s] - left-to-right items, top-down rows
 		;;   align       [block! pair! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
 		;;                                      default = -1x-1 - both x/y stick to the negative size of axes
-		;;   margin        [integer! pair!]   >= 0x0
-		;;   spacing       [integer! pair!]   >= 0x0
+		;;   margin            [pair!]      >= 0x0
+		;;   spacing           [pair!]      >= 0x0
 		;;   canvas         [none! pair!]   >= 0x0; if none=inf, width determined by widest item
 		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
 		;;   limits        [none! object!]
@@ -159,8 +158,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					)]
 					none!
 				]
-				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
-				spacing  [integer! (0 <= spacing) pair! (0x0 +<= spacing)]
+				margin   [pair!] (0x0 +<= margin)
+				spacing  [pair!] (0x0 +<= spacing)
 				canvas   [pair! (0x0 +<= canvas) none!]
 				fill-x   [none! logic!]
 				fill-y   [none! logic!]
@@ -171,8 +170,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default canvas: infxinf						;-- none to pair normalization
 			default fill-x: no
 			default fill-y: no
-			margin:  margin  * 1x1						;-- integer to pair normalization
-			spacing: spacing * 1x1
 			y: ortho x: anchor2axis axes/1				;-- X/Y align with default representation (row)
 			ox: anchor2pair axes/1
 			oy: anchor2pair axes/2
@@ -663,7 +660,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; settings for paragraph layout:
 		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
 		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
-		;;   margin        [integer! pair!]   >= 0x0
+		;;   margin            [pair!]   >= 0x0
 		;;   spacing         [integer!]       >= 0 - vertical distance between rows
 		;;   canvas         [none! pair!]     >= 0; if infinite, produces a single row
 		;;   fill-x fill-y [logic! none!]     fill along canvas axes flags
@@ -683,7 +680,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			#debug [typecheck [
 				align    [word! (find [left center right fill scale upscale] align) none!]
 				baseline [number!]
-				margin   [integer! (0 <= margin)  pair! (0x0 +<= margin)]
+				margin   [pair! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing)]		;-- vertical only!
 				canvas   [pair! (0x0 +<= canvas) none!]
 				fill-x   [none! logic!]
@@ -694,7 +691,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default canvas: infxinf
 			default fill-x: no
 			default fill-y: no
-			margin:  margin * 1x1						;-- integer to pair normalization
 			set [map: total-1D:] build-map :spaces 1.0 * baseline
 			if empty? map [								;@@ return value needs optimization
 				return make frame! compose/only [

@@ -24,6 +24,11 @@ invalidates-look: function [space [object!] word [word!] value [any-type!]] [
 	invalidate/info space none 'look
 ]
 
+;; normalizes /margin & /spacing to a pair, for easier handling
+on-margin-spacing-change: function [space [object!] word [word!] value [integer! pair!]] [
+	invalidates space word quietly space/:word: value * 1x1
+]
+
 templates/space: declare-class 'space [					;-- minimum basis to build upon
 	type:	'space	#type [word!] =						;-- used for styling and event handler lookup, may differ from template name!
 	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
@@ -44,8 +49,8 @@ modify-class 'space [
 	;; rate change -> invalidation -> next render puts it into rated-spaces list
 	rate:    none	#type =  :invalidates-look [integer! float! time! (rate >= 0) none!]
 	color:   none	#type =? :invalidates-look [tuple! none!]
-	margin:  0		#type =? :invalidates [integer! pair!] (0x0 +<= (margin * 1x1))
-	spacing: 0		#type =? :invalidates [integer! pair!] (0x0 +<= (spacing * 1x1))
+	margin:  0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (margin * 1x1))
+	spacing: 0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (spacing * 1x1))
 	weight:  0		#type =? :invalidates [number!] (weight >= 0)
 	origin:  0x0	#type =? :invalidates-look [pair!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
@@ -200,7 +205,7 @@ rectangle-ctx: context [
 	declare-template 'rectangle/space [
 		size:   20x10	#on-change :invalidates
 		margin: 0
-		draw:   does [compose [box (margin * 1x1) (size - margin)]]
+		draw:   does [compose [box (margin) (size - margin)]]
 	]
 ]
 
@@ -215,7 +220,7 @@ triangle-ctx: context [
 			w [2x0 0x1 2x2]								;--   s
 			s [0x0 1x2 2x0]
 		] space/dir
-		m: space/margin * 1x1
+		m: space/margin
 		r: space/size / 2 - m
 		compose/deep [
 			translate (m) [triangle (p1 * r) (p2 * r) (p3 * r)]
@@ -236,7 +241,7 @@ image-ctx: context [
 	~: self
 	
 	draw: function [image [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		mrg2: 2 * mrg: image/margin * 1x1 
+		mrg2: 2 * mrg: image/margin
 		switch type?/word image/data [
 			none! [
 				image/size: mrg2						;@@ can't be constrained further; or call constrain again?
@@ -300,7 +305,7 @@ cell-ctx: context [
 			return quietly space/map: []
 		]
 		canvas: constrain canvas space/limits
-		mrg2:   2x2 * space/margin
+		mrg2:   space/margin * 2
 		cspace: space/content
 		drawn:  render/on cspace (subtract-canvas canvas mrg2) fill-x fill-y
 		size:   mrg2 + cspace/size
@@ -474,11 +479,11 @@ scrollable-space: context [
 	]
 
 	move-to: function [
-		space  [object!]
-		xy     [pair! word!]
-		margin [integer! pair! none!]					;-- space to reserve around XY
+		space     [object!]
+		xy        [pair! word!]
+		margin: 0 [integer! pair! none!]				;-- space to reserve around XY
 	][
-		mrg: 1x1 * any [margin 0]
+		mrg: 1x1 * margin
 		csize: select space/content 'size
 		switch xy [
 			head [xy: 0x0]
@@ -706,7 +711,7 @@ paragraph-ctx: context [
 	;; wrap=elli=on -> canvas=fixed
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
 	lay-out: function [space [object!] canvas [pair!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
-		canvas: subtract-canvas canvas mrg2: 2x2 * space/margin
+		canvas: subtract-canvas canvas mrg2: space/margin * 2
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
 		layout: new-rich-text
@@ -787,7 +792,7 @@ paragraph-ctx: context [
 		;; but if canvas is huge e.g. 2e9, then it's not so useful,
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
-		mrg2: 2 * mrg: space/margin * 1x1
+		mrg2: 2 * mrg: space/margin
 		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
 		space/size: mrg2 + text-size					;@@ full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
@@ -925,7 +930,7 @@ paragraph-ctx: context [
 			;@@ and then some rows in rich-paragraph may become offset by 1px, i.e. not perfectly aligned
 			sections: function ["Get section widths on last frame as list of integers"] [
 				layout: get-layout space
-				mrg: space/margin along 'x
+				mrg: space/margin/x
 				case [
 					not empty? sections: space/sec-cache ['done]	;-- already computed
 					empty? space/text [
@@ -1111,7 +1116,7 @@ list-ctx: context [
 			not empty? cache: list/sec-cache ['done]
 			list/size/x = 0 ['done]						;-- nothing to dissect (not rendered?)
 			list/axis <> 'x	[							;-- can't dissect vertical list
-				if 0 <> mrg: list/margin along 'x [repend cache [mrg mrg]]
+				if 0 <> mrg: list/margin/x [repend cache [mrg mrg]]
 			]
 			'else [generate-sections list/map list/size/x cache]
 		]
@@ -1406,7 +1411,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		
 	get-sections: function [space [object!]] [
 		if empty? cache: space/sec-cache [
-			mrg: space/margin along 'x					;-- make margin significant
+			mrg: space/margin/x							;-- make margin significant
 			if 0 <> mrg [append cache mrg]
 			if space/frame/nrows = 1 [					;-- not empty or multiline text (/nrows can be none if not rendered)
 				append cache space/frame/sections
@@ -1427,7 +1432,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		space/sec-cache: copy []						;-- reset computed sections
 		settings: with space [margin spacing align baseline canvas fill-x fill-y limits indent force-wrap?]
 		frame: make-layout 'paragraph :space/items settings
-		size: space/margin * 2x2 + frame/size-2D
+		size: space/margin * 2 + frame/size-2D
 		quietly space/frame: frame
 		quietly space/size:  constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:   frame/map
@@ -1438,7 +1443,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	declare-template 'rich-paragraph/container [
 		kit:         ~/kit
 		margin:      0
-		spacing:     0		#type =? [integer!] :invalidates	;-- has only vertical row spacing
+		spacing:     0		#type =? [integer!] :invalidates	;-- has only vertical row spacing; do not turn it into pair!
 		align:       'left	#type = [word!] :invalidates		;-- horizontal alignment
 		baseline:    80%	#type = [float! percent!] :invalidates-look		;-- vertical alignment in % of the height
 		weight:      1									;-- non-zero default so tube can stretch it
@@ -2197,7 +2202,7 @@ list-view-ctx: context [
 	][
 		#assert [list =? last current-path  "Out of tree rendering detected!"]
 		x: list/axis
-		if level < mrgx: list/margin along 'x [return compose [margin 1 (level)]]
+		if level < mrgx: list/margin/x [return compose [margin 1 (level)]]
 		#debug list-view [level0: level]				;-- for later output
 		fill-x: x <> 'x
 		fill-y: x <> 'y									;-- list items will be filled along secondary axis
@@ -2275,8 +2280,8 @@ list-view-ctx: context [
 	][
 		set [l-item: l-idx: l-ofs:] locate-line list canvas  low-level
 		set [h-item: h-idx: h-ofs:] locate-line list canvas high-level
-		sp: list/spacing along list/axis
-		mg: list/margin  along list/axis
+		sp: list/spacing/(list/axis)
+		mg: list/margin/(list/axis)
 		;; intent of this is to return item indexes that fully cover the requested range
 		;; so, space and margin before first item is still considered belonging to that item
 		;; (as it doesn't require rendering of the previous item)
@@ -2322,7 +2327,7 @@ list-view-ctx: context [
 		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
 		r: max 0 requested - switch item [
 			space item [0]
-			margin [either idx = 1 [0 - ofs][ofs - (list/margin along axis)]]
+			margin [either idx = 1 [0 - ofs][ofs - (list/margin/:axis)]]
 		]
 		#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
 		r
@@ -2346,7 +2351,7 @@ list-view-ctx: context [
 		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
 		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			list/size: list/margin * 2x2
+			list/size: list/margin * 2
 			return quietly list/map: []
 		]
 		#assert [i1 <= i2]
@@ -2534,7 +2539,7 @@ grid-ctx: context [
 			if x1 = x2 [continue]
 			wh?: get/any wh?							;@@ workaround for #4988
 			for xi: x1 x2 - 1 [r/:x: r/:x + wh? xi]		;@@ should be sum map
-			r/:x: r/:x + (x2 - x1 * (grid/spacing along x))
+			r/:x: r/:x + (x2 - x1 * (grid/spacing/:x))
 			if x1 > x2 [r/:x: negate r/:x]
 		]
 		r
@@ -2559,12 +2564,12 @@ grid-ctx: context [
 		array [map!]     "widths or heights"
 		axis  [word!]    "x or y"
 	][
-		mg: grid/margin along axis
+		mg: grid/margin/:axis
 		if level < mg [return reduce ['margin 1 level]]		;-- within the first margin case
 		level: level - mg
 
 		bounds: grid/calc-bounds
-		sp:     grid/spacing along axis
+		sp:     grid/spacing/:axis
 		lim:    bounds/:axis
 		def:    array/default
 		#assert [def]									;-- must always be defined
@@ -2646,10 +2651,10 @@ grid-ctx: context [
 			set [item: idx: ofs:] locate-line grid xy/:x array x
 			#debug grid-view [#print "locate-line/(x)=(xy/:x) -> [(item) (idx) (ofs)]"]
 			switch item [
-				space [ofs: ofs - (grid/spacing along x)  idx: idx + 1]
+				space [ofs: ofs - (grid/spacing/:x)  idx: idx + 1]
 				margin [
 					either idx = 1 [
-						ofs: ofs - (grid/margin along x)
+						ofs: ofs - (grid/margin/:x)
 					][
 						idx: bounds/:x
 						ofs: ofs + wh? idx
@@ -2701,7 +2706,7 @@ grid-ctx: context [
 				]
 				span/y + y = cell1/y [					;-- multi-cell vertically ends after this row
 					for y2: cell1/y y - 1 [
-						height1: height1 - (grid/spacing along 'y) - grid/row-height? y2
+						height1: height1 - (grid/spacing/y) - grid/row-height? y2
 					]
 					append hmin height1
 				]
@@ -2719,7 +2724,7 @@ grid-ctx: context [
 		#assert [xy = grid/get-first-cell xy]	;-- should be a starting cell
 		xspan: first grid/get-span xy
 		r: 0 repeat x xspan [r: r + grid/col-width? x - 1 + xy/x]
-		r + (xspan - 1 * (grid/spacing along 'x))
+		r + (xspan - 1 * (grid/spacing/x))
 	]
 		
 	cell-height?: function [grid [object!] xy [pair!]] [
@@ -2729,7 +2734,7 @@ grid-ctx: context [
 		]
 		yspan: second grid/get-span xy
 		r: 0 repeat y yspan [r: r + grid/row-height? y - 1 + xy/y]
-		r + (yspan - 1 * (grid/spacing along 'y))
+		r + (yspan - 1 * (grid/spacing/y))
 	]
 		
 	cell-size?: function [grid [object!] xy [pair!]] [
@@ -2880,7 +2885,7 @@ grid-ctx: context [
 		row2  [integer!]
 	][
 		size: grid/margin * 0x2
-		spc:  grid/spacing along 'y
+		spc:  grid/spacing/y
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
 			cell: index by irow
@@ -2919,8 +2924,8 @@ grid-ctx: context [
 		nx: bounds/x  ny: bounds/y
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
 		
-		margin:    1x1 * grid/margin
-		spacing:   1x1 * grid/spacing
+		margin:    grid/margin
+		spacing:   grid/spacing
 		widths:    grid/widths							;-- modifies widths map in place
 		min-width: any [widths/min 5]					;@@ make an option to control this?
 				
@@ -3733,7 +3738,7 @@ field-ctx: context [
 		;; field can just rebuild it since canvas is always known (infinite)
 		layout: paragraph-ctx/lay-out field/spaces/text infxinf no no
 		#assert [object? layout]
-		view-width: field/size/x - first (2x2 * field/margin)
+		view-width: field/size/x - first (2 * field/margin)
 		text-width: layout/extra/x
 		cw: field/caret/width
 		if view-width - cmargin - cw >= text-width [return 0]	;-- fully fits, no origin offset required
@@ -3754,7 +3759,7 @@ field-ctx: context [
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
 		width: first either fill-x [canvas][min ctext/size + cmargin canvas]	
 		field/size: constrain width by ctext/size/y field/limits
-		mrg: field/margin * 1x1
+		mrg: field/margin
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		if sel: field/selected [
 			sxy1: caret-to-offset       ctext/layout sel/1 + 1
@@ -3783,6 +3788,7 @@ field-ctx: context [
 	]
 		
 	on-change: function [field [object!] word [word!] value [any-type!]] [
+		if find [spacing margin] word [set in field word value: value * 1x1]	;-- normalize to pair
 		set/any 'field/spaces/text/:word :value			;-- sync these to text space; invalidated by text
 		if word = 'text [
 			field/caret/offset: length? value			;-- auto position at the tail
