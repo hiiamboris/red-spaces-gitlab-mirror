@@ -18,13 +18,15 @@ Each space must have:
    - `canvas [pair!]` - cache key; each canvas holds its own set of values of cached facets\
      Canvas serves as a key in the cache, since sizing system is supposed to produce the same visual outcome for the same canvas size.
    - `generation [number!]` - age of the cached slot (explained below)
+   - `children [block!]` - block of `[child child-canvas ...]`: list of all children drawn on this canvas with canvas sizes they were rendered on
    - `drawn [block!]` - block of Draw commands, a primary result of rendering on the given canvas
    - values of words from the `/cache` facet - usually `size [pair!]` (for all spaces) and `map [block!]` (for map-based containers only)\
    It gets cleared on invalidation.
-3. `/cached` facet has its index = 3, to avoid extra `skip` on each cache lookup. Two hidden slots are:
+3. `/cached` facet has its index = 4, to avoid extra `skip` on each cache lookup. Three hidden slots are:
+   - `last-canvas [pair!]` - encoded canvas on which this space was rendered last time
    - `generation [number!]` - age of the cache itself
    - `state [word! or none!]` - how last render attempt went: `cached` (when fetched from the cache), `drawn` (when not fetched, rendered), or `none` (never rendered, initial state)\
-   These two values must always be present in order to avoid extra checks in performance-critical cache code.
+   These values must always be present in order to avoid extra checks in performance-critical cache code.
    
 A `render` call tries to fetch cached data and only does rendering on cache misses, or if `/cache` is disabled (set to `none`).
 Consequently, if no changes are made to the layout, top-level `render` call returns the cached draw block almost immediately, not visiting any of the child nodes. However, `draw` operation is by itself very expensive for complex layouts, so host does not perform it until its immediate `/space` gets invalidated. 
@@ -45,7 +47,7 @@ Reasons to use generations:
 
 1. We need to keep cache itself from creeping, thus to clean up no longer relevant slots. Generation is parameter that tells us if slot is old or not. 
 
-   Old slot is defined as one that was not updated on the previous frame. That is, if space was not drawn at given canvas on this frame, on next frame this slot may be reused for new data. So more formally, old age is `<= current-generation - 2`, where `current-generation` is the generation of the undergoing (unfinished) render, and one before it is the last finished one. 
+   Old slot is defined as one that was not updated on the previous frame. That is, if space was not drawn at given canvas on this frame, on next frame this slot may be reused for new data. So more formally, old age is `<= current-generation - 1`, where `current-generation` is the generation of the undergoing (unfinished) render, and one before it is the last finished one. 
    
    Slots with canvases `[0x0 0xINF INFx0 INFxINF]` are never aging, because they are not a result of resizing, are likely being used on every frame, and there are only four of them so no risk of cache creep from them. All other slots (e.g. `-300xINF`) are aging.
    
@@ -76,12 +78,11 @@ Reasons to use generations:
    
 **Data validity.**
 
-While a container can be fetched from the cache, replacing its map, its children will still keep their old values (size, map, etc) from the last render, resulting in parent map not matching the children maps. This may cause glitches in hittest in particular.
+When container facets (map, size) are fetched from the cache and replaced, its children still keep their old facets, relevant to the last canvas they were rendered on, which may not match the fetched state of the container. Wrong map leads to wrong hittest geometry and other issues. To avoid it, container's cache fetch operation has to also deeply fetch facets from all children.
 
-It's an unfortunate tradeoff for performance I have no acceptable solution for. The only alternative I see is to write some of Spaces code in R/S so it will be fast enough to visit the tree deeply.
-
-Usually it is mitigated by the generation system. E.g. a tube may cache itself on `[0xINF 100xINF 100x200]`, then on the next frame it will normally use all the same slots, resulting in no issues. If canvas changed, e.g. to `105x205`, only `0xINF` slot gets reused but final slots will be the results of a new render, replacing the `100xINF` and `100x200`.
-
-However it is still theoretically possible that the next render stops at `0xINF` canvas and never uses the other slots. If it is a result of a zero-sized canvas, again no issue, since such canvas is not hittestable. But generally, while I have yet to observe such a case in practice, such cache misbehaviors must be considered in each widget's design. 
-
-This also means that even if container applies no clipping or scaling of its children, child's own `/size` facet theoretically may not equal its `size` inside the parent's map (map being more up to date). This may normally happen during unfinished render, but once frame is produced and events get handled, it is unwanted as it may totally wreck hittesting. Events code should prefer size from the map when possible, to be more resilient.
+Deep fetch is not a scalable operation and would defy the purpose of caching completely, so it's optimized the following way:
+- container's render operation remembers which child was rendered on which canvas and stashes this `children` info in the cache slot
+- when fetching container from the cache, each of its children `last-canvas` value is matched against the canvas for this child stashed in the `children` block on this container's canvas cache slot
+- when they match, child is skipped - it should be valid already
+- when they don't child is also refreshed from the cache, and matching is done for its own children (if any)
+- to avoid deep fetching it's possible to call `render` with `/crude` refinement - it can be used if container is certain that this child will be rendered again before container's `render` returns (e.g. `tube` finalizes its first two crude renders with a final one).
