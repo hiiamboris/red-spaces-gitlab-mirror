@@ -323,7 +323,7 @@ It has the following form:
 ```
 Generation number gets updated from the host's `/generation` facet which is increased on every render call. Last state can be either `'cached` (fetched from cache during last render) or `'drawn` (an actual call to `/draw` happened during last render). This data is used by timers to track spaces that are still live (on the tree), so timers for orphaned subtrees can be disabled to save resources. Slot generation numbers are used by cache to keep itself from creep.
 
-</summary>
+</details>
 
 
 ## Styles
