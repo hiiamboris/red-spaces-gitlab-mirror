@@ -803,7 +803,7 @@ paragraph-ctx: context [
 		;; (and we can't stop it from updating)
 		;; direct changes to /text get reflected into /layout automatically long as it scales
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
-		drawn: compose [text (mrg) (layout)]
+		drawn: compose [text 0x0 (layout)]
 		
 		if all [caret: space/caret  not ellipsize?] [
 		; if all [caret: space/caret  not ellipsize?] [
@@ -811,7 +811,7 @@ paragraph-ctx: context [
 			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
 			invalidate/only caret
 			cdrawn: render caret
-			drawn: compose/only [push (drawn) translate (mrg + box/1) (cdrawn)]
+			drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
 		]
 		;; add selection if enabled
 		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
@@ -820,7 +820,7 @@ paragraph-ctx: context [
 			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
 			drawn: compose/only [push (drawn) (sdrawn)]
 		]
-		drawn
+		compose/only [translate (mrg) (drawn)]
 	]
 	
 	get-layout: function [space [object!]] [
