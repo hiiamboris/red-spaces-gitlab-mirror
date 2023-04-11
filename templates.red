@@ -994,7 +994,8 @@ paragraph-ctx: context [
 		weight: 0										;-- no point in stretching single-line text as it won't change
 		
 		;; caret disabled by default, can be set to a caret space
-		caret:  none	#type    :invalidates [object! (space? caret) none!]	
+		caret:     none	#type    :invalidates [object! (space? caret) none!]
+		;; there's no /selection facet, because paragraph may have multiple selection boxes
 		selected:  none	#type =? :invalidates [pair! none!]
 
 		sec-cache: []	#type [block!]
@@ -3767,7 +3768,7 @@ field-ctx: context [
 		ctext: field/spaces/text						;-- text content
 		quietly ctext/caret: if focused? [field/caret]
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
-		drawn: render/on field/spaces/text infxinf no no	;-- this sets the size
+		drawn: render/on ctext infxinf no no			;-- this sets the size
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
 		cmargin: field/caret/look-around
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
@@ -3775,28 +3776,14 @@ field-ctx: context [
 		field/size: constrain width by ctext/size/y field/limits
 		mrg: field/margin
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
-		if sel: field/selected [
-			sxy1: caret-to-offset       ctext/layout sel/1 + 1
-			sxy2: caret-to-offset/lower ctext/layout sel/2
-			field/selection/size: ssize: sxy2 - sxy1
-			sdrawn: render field/selection
-		]
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
 		ofs: field/origin by 0
 		quietly field/map: reshape-light [
-			@[field/spaces/text]      [offset: @(ofs) size: @(ctext/size)]
-		/?	@[field/spaces/selection] [offset: @(ofs + mrg + sxy1) size: @(ssize)]		/if sel
+			@[ctext] [offset: @(ofs) size: @(ctext/size)]
 		]
 		reshape-light [									;@@ can compose-map be used without re-rendering?
 			clip @(mrg) @(field/size - mrg) [
-				translate @(ofs) [
-				/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
-					translate 0x0 @[drawn]
-					;@@ workaround for #4901 which draws white background under text over the selection:
-					#if linux? [
-					/?	translate @(mrg + sxy1) @[sdrawn]	/if sel
-					]
-				]
+				translate @(ofs) @[drawn]
 			]
 		]
 	]
@@ -3804,7 +3791,7 @@ field-ctx: context [
 	on-change: function [field [object!] word [word!] value [any-type!]] [
 		if find [spacing margin] word [set in field word value: value * 1x1]	;-- normalize to pair
 		set/any 'field/spaces/text/:word :value			;-- sync these to text space; invalidated by text
-		if word = 'text [
+		if word = 'text [								;-- count it in the history
 			field/caret/offset: length? value			;-- auto position at the tail
 			set [_: _: right':] field/timeline/last-event/for field
 			left:  either right' [right' << 3][reduce [0 none {}]]
@@ -3819,7 +3806,6 @@ field-ctx: context [
 		;; own facets:
 		weight:   1		#type =? :invalidates [number!] (weight >= 0)
 		origin:   0		#type =? :invalidates-look [integer!] (origin <= 0)		;-- offset(px) of text within the field
-		selected: none	#type =? :invalidates-look [pair! none!]	;-- none or pair (offsets of selection start & end)
 		timeline: make timeline! [limit: 50]	 #type [object!]	;-- saved states
 		map:      []
 		cache:    [size map]
@@ -3827,19 +3813,17 @@ field-ctx: context [
 		spaces: object [
 			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
 			caret:     make-space 'caret     caret-template		;-- shared between text and field, put into text only when focused
-			selection: make-space 'rectangle [type: 'selection]	;-- can be styled
 		] #type [object!]
 		
-		;; shortcuts
-		caret:     spaces/caret		#type (space? caret)		;@@ maybe keep it as text/caret not spaces/caret?
-		selection: spaces/selection	#type (space? selection)
+		caret:  spaces/caret		#type (space? caret)		;@@ maybe keep it as text/caret not spaces/caret?
 		
 		;; these mirror spaces/text facets:
-		margin: 0					#type =? :on-change	;-- default = no margin
-		flags:  []					#type    :on-change	;-- [bold italic underline strike] supported ;@@ TODO: check for absence of `wrap`
-		text:   spaces/text/text	#type    :on-change
-		font:   spaces/text/font	#type =? :on-change
-		color:  none				#type =? :on-change	;-- placeholder for user to control
+		selected: none				#type =? :on-change [pair! none!]	;-- none or pair (offsets of selection start & end)
+		margin:   0					#type =? :on-change	;-- default = no margin
+		flags:    []				#type    :on-change	;-- [bold italic underline strike] supported ;@@ TODO: check for absence of `wrap`
+		text:     spaces/text/text	#type    :on-change
+		font:     spaces/text/font	#type =? :on-change
+		color:    none				#type =? :on-change	;-- placeholder for user to control
 				
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
