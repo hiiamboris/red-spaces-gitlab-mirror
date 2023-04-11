@@ -37,11 +37,19 @@ Not interactive yet, as scrollbars events are undefined outside of `scrollable` 
 
 ---
 
-[**tube-test.red**](tube-test.red)
+[**tube-test1.red**](tube-test1.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-tube-test.gif></img>
+<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-tube-test1.gif></img>
 
 Tests all axes/align combinations of `tube` layout.
+
+---
+
+[**tube-test2.red**](tube-test2.red)
+
+<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-tube-test2.png></img>
+
+Tests some resizing cases of `tube` layout.
 
 ---
 
