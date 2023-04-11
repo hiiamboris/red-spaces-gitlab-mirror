@@ -106,8 +106,8 @@ context with spaces/ctx [
 		if empty? text [return []]						;-- optimization
 		layout: space/layout							;-- set by draw
 		if override: select space 'color [color: override]
-		compose/deep [
-			translate (1x1 * space/margin) [
+		compose/deep/only [
+			translate (space/margin) [
 				pen (shade)								;-- outline to make text more legible on gray bgnd
 				text  1x0 (layout) text 0x1  (layout)
 				text -1x0 (layout) text 0x-1 (layout)
@@ -119,6 +119,7 @@ context with spaces/ctx [
 				text -2x0 (layout) text 2x0 (layout)
 				pen (color) text 0x0 (layout)
 			]
+			(drawn)
 		]
 	]
 
@@ -284,7 +285,7 @@ context with spaces/ctx [
 				]
 			])
 		]
-		field/selection: function [self] [
+		field/text/selection: function [self] [
 			compose [
 				fill-pen linear w1 w2 0x0 2x4 reflect
 				pen off box 0x0 (self/size) 5
