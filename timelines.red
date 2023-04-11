@@ -53,12 +53,22 @@ context [
 		also timeline/last-event
 		timeline/events: skip timeline/events negate period
 	]
+	
+	last-event: function [timeline [object!] filter [object! none!]] [
+		p: timeline/events
+		until [
+			if head? p [return none]
+			p: skip p negate period
+			any [not filter  filter =? p/1] 
+		]  
+		copy/part next p period - 1
+	]
 		
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
 		limit:      1000	#type [integer!] (limit >= 20)		;-- max number of events to keep
-		elapsed?:   does [~/elapsed? self]				;-- can return none if timeline is empty
-		last-event: does [copy/part events -3]			;-- only returns arguments to 'put', not the time
+		elapsed?:   does [~/elapsed? self]						;-- can return none if timeline is empty
+		last-event: func [/for obj [object!]] [~/last-event self obj]	;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]
 		redo:       does [~/redo self]
 		mark:       does [events]
