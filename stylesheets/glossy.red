@@ -275,15 +275,15 @@ context with spaces/ctx [
 			]
 		]
 		;; size of caret & selection are set by field/draw
-		field/caret: function [self] [
+		field/text/caret: function [self] [
 			maybe self/width: 1
-			when self/visible? (compose/deep [
+			compose/deep [
 				shape [
 					pen w1 fill-pen w3
 					move -3x0 'line 3x4 3x-4
 					move (self/size/y * 0x1 + -3x-1) 'line 3x-4 3x4
 				]
-			])
+			]
 		]
 		field/text/selection: function [self] [
 			compose [
