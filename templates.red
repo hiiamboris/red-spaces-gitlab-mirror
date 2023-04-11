@@ -3524,30 +3524,35 @@ field-ctx: context [
 		length? field/text
 	]
 	
-	;@@ TODO: limit history length, and use timelines instead!
-	mark-history: function [field [object!]] [
-		field/history: clear rechange field/history [copy field/text field/caret/offset]
+	playback: function [field [object!] offset [integer!] selected [pair! none!] text [string!]] [
+		#assert [not same? text field/text]
+		change/part field/text text tail field/text
+		#assert [all [0 <= offset offset <= length? text]]
+		field/caret/offset: offset
+		field/selected: selected
 	]
 	
-	;@@ TODO: group edits somehow instead of char by char saves
-	undo: function [field [object!]] [
-		if 4 < index? field/history [					;-- at least 2 states needed: initial and unrolled
-			field/history: skip field/history -2		;-- state *after* the previous change
-			set [text: offset:] skip field/history -2
-			append clear field/text text
-			field/caret/offset: offset
+	push-to-timeline: function [
+		field [object!]
+		left  [block!] (parse left  [integer! [pair! | none!] string!])
+		right [block!] (parse right [integer! [pair! | none!] string!])
+	][
+		left:  reduce ['playback field left/1  left/2  left/3]
+		right: reduce ['playback field right/1 right/2 right/3]
+		set [space': left': right':] field/timeline/last-event
+		if group?: all [
+			field =? space'
+			elapsed: field/timeline/elapsed?
+			elapsed < 0:0:1
+		][
+			left: left'
+			field/timeline/unwind
+		]
+		unless empty-change?: left/5 == right/5 [		;-- happens when grouping with reverse event
+			field/timeline/put field left right
 		]
 	]
-	
-	redo: function [field [object!]] [
-		unless tail? field/history [
-			set [text: offset:] field/history
-			field/history: next next field/history
-			append clear field/text text
-			field/caret/offset: offset
-		]
-	]
-	
+		
 	kit: make-kit 'field [
 		length: function ["Get text length"] [
 			length? space/text
@@ -3587,8 +3592,16 @@ field-ctx: context [
 			space/selected: if range [clip range 0 length]
 		]
 		
-		undo: does [~/undo space]
-		redo: does [~/redo space]
+		record: function [code [block!]] [
+			set [space': left': right':] space/timeline/last-event 
+			left:  reduce [here selected copy space/text]
+			do code
+			right: reduce [here selected copy space/text]
+			~/push-to-timeline space left right
+		]
+	
+		undo: does [space/timeline/undo]
+		redo: does [space/timeline/redo]
 	
 		;@@ move these into text template?
 		locate: function [
@@ -3602,7 +3615,6 @@ field-ctx: context [
 				next-word [~/find-next-word space space/caret/offset]
 			] [space/caret/offset]						;-- don't move on unsupported anchors
 		]
-	
 	
 		move-caret: function [
 			"Displace the caret"
@@ -3649,9 +3661,10 @@ field-ctx: context [
 					limit: system/words/clip 0 length order-pair limit 
 					if clip [clipboard/write copy/part space/text limit + 1]
 					if limit/1 <> limit/2 [
-						remove/part  skip space/text limit/1  n: span? limit
-						adjust-offsets space limit/1 negate n
-						mark-history space				;@@ use record instead
+						record [ 
+							remove/part  skip space/text limit/1  n: span? limit
+							adjust-offsets space limit/1 negate n
+						]
 					]
 				]
 			]
@@ -3664,9 +3677,10 @@ field-ctx: context [
 		][
 			unless empty? text [
 				offset: clip offset 0 length
-				insert (skip space/text offset) text
-				adjust-offsets space offset length? text
-				mark-history space
+				record [
+					insert (skip space/text offset) text
+					adjust-offsets space offset length? text
+				]
 			]
 		]
 	
@@ -3792,7 +3806,10 @@ field-ctx: context [
 		set/any 'field/spaces/text/:word :value			;-- sync these to text space; invalidated by text
 		if word = 'text [
 			field/caret/offset: length? value			;-- auto position at the tail
-			mark-history field
+			set [_: _: right':] field/timeline/last-event/for field
+			left:  either right' [right' << 3][reduce [0 none {}]]
+			right: reduce [field/caret/offset field/selected copy field/text]
+			push-to-timeline field left right
 		]
 	]
 	
@@ -3803,7 +3820,7 @@ field-ctx: context [
 		weight:   1		#type =? :invalidates [number!] (weight >= 0)
 		origin:   0		#type =? :invalidates-look [integer!] (origin <= 0)		;-- offset(px) of text within the field
 		selected: none	#type =? :invalidates-look [pair! none!]	;-- none or pair (offsets of selection start & end)
-		history:  make block! 100	#type [block!]		;-- saved states
+		timeline: make timeline! [limit: 50]	 #type [object!]	;-- saved states
 		map:      []
 		cache:    [size map]
 

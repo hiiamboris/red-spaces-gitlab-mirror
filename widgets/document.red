@@ -137,7 +137,7 @@ doc-ctx: context [
 		
 	;; used to check grouping possibility before doing any destructive changes
 	groupable?: function [edit1 [block!] edit2 [block!] elapsed [time!]] [
-		groupable?: case [
+		case [
 			elapsed <= robot-time [yes]
 			elapsed >= human-time [no]
 			;; to avoid having "do-nothing" undo blocks I have to forbid grouping insert & remove into single action
