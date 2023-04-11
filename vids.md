@@ -319,11 +319,33 @@ view [host [
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment.png)
 
 ```
+text: "no conflict between style names and their facets!"
 view [host [
-	text text= "no conflict between style names and their facets!"
+	text text= text
 ]]
 ```
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment-2.png)
+
+<details><summary>Why invent such an alien to Redbol world syntax?...</summary>
+
+Short answer: for readability.
+
+Set-words are the best candidate, but they are already being used for style and space names. One option is to replace `facet= expr...` with `facet: (expr)` since that won't clash with style/space naming. But it will require all expressions to be parenthesized, and extra parens are often unreadable (e.g. `facet: (compose [(a + b) c (d * e)])`).
+
+Using just words like VID does are a more of a problem than a solution in a system where each VID/S style defines its own set of supported 'keywords'. E.g. is `text` a facet, or a style name to instantiate, or is it a value to fetch? Example above illustrates just that.
+
+I have considered using refinement and issue datatypes for facets:
+- `/text "text"`
+- `#text "text"` 
+
+But ultimately I find it less readable than:
+- `text="text"`
+
+`text="text"` locks the meaning for the brain, while the second leaves it up to guessing, slowing down our code interpretation.
+
+So while it's a weird variant of set-word, I still find it a lesser evil than the other options listed.
+
+</details> 
 
 ### Auto-facets
 
