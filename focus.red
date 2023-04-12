@@ -8,7 +8,7 @@ Red [
 ;; provides focusing by clicking
 ;; requires: export and window-of
 
-exports: [focused? focus-space]
+exports: [focused? focus-space set-focus]
 
 ;@@ `focus` itself should be somewhere else, as it is used by dispatch and who knows what
 focus: make classy-object! declare-class 'focus-context [
@@ -137,6 +137,11 @@ focus-space: function [
 		]
 	]
 	yes
+]
+
+;; overrides (extends) the native function
+set-focus: function ["Focus face or space object" face [object!]] compose/deep [
+	either space? face [focus-space face][(body-of :system/words/set-focus)]
 ]
 
 ;@@ set-focus inside the same window won't affect focus/current
