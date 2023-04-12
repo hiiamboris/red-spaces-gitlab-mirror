@@ -140,6 +140,7 @@ use 'look to optimize list invalidation as well (maybe box too? any other space?
 need to document sizing policy of all spaces (but it's not finally set in stone yet)
 incorporate focus-space into set-focus
 markdown viewer high-level widget with cross-paragraph selection capability and copying to clipboard
+inline date selector widget that copies its data into clipboard as date
 
 
 key aspects: draggable columns, rearrange by styles
@@ -2503,7 +2504,6 @@ found a problem with textual VID styles expansion!
 	so a different model must be used:
 	`style new: old ...` will keep the 'old' name if it's a real style, and rest as text
 	but if it's sheet style, it will use the name from that style and join the text with new attrs
-	;@@ fix it!
 	it has a benefit though: if some facet is a result of an expression, it gets evaluated anew for every widget instance
 	(+ first time for the style itself to know where expression ends)
 	but main reason I did it is to support /content - it has to be laid out anew every time, as I forbid multiple parents
@@ -3911,7 +3911,7 @@ how to set focus into editor in VID/S??
 	right! if I get rid of the path	in focus, I can directly set focus to a space then
 	and when I need traversal for tabbing I can use /parent
 	but how to make focus per-window? hook on-focus View event?
-how to navigate to caret after edits?
+how to navigate to caret after edits in document?
 	e.g. I insert a newline and it should be below the viewport
 	but since it's not rendered yet, document doesn't have this data
 	in fact, caret locations all should be seen as invalid after data changes
@@ -3919,10 +3919,162 @@ how to navigate to caret after edits?
 	when to trigger? invalidation is not good enough criterion - caret movement becomes slow
 	need to trigger it on edits only
 	or flag it and let next render deal with it?
+how to unify metrics and edits? currently:
+	text/metrics [length point->caret caret->box all-item-boxes]
+	field/edit [undo: redo: copy: at: move: remove: insert: paste: select:] 
+	rich-content/metrics [length rows point->caret caret->box row->box get-attrs pick-attr]	
+	rich-content/edit [full-range?: empty-range?: copy: serialize: clip: remove: insert: mark:]
+	document/metrics [length point->caret caret->paragraph caret->box find-prev-word find-next-word find-line-above find-line-below find-page-above find-page-below]
+	document/edit [record: undo: redo: at: select: move: remove: slice: copy: paste: insert: mark: align: indent:]
+	rich/attributes [to-rtd-flag: make-rtd-flags: change: mark: pick: exclude:]
+	rich/source [deserialize: serialize: format: to-spaces:]
+	(grid could also use some metric context)
+	grid [get-span get-first-cell set-span get-offset-from locate-point
+		  row-height? col-width? cell-size? is-cell-pinned? infinite? calc-bounds]
+	goals:
+	- keep light spaces like text minimal
+	- provide high level api for keys to work the same across various templates (i.e. commands should be separate from object name)
+	- let it be possible to use it as a macro language for complex edit scripts
+	isolation of edit and metrics becomes an issue already then
+	maybe name it /macro ? /api ? /access ?
+	another issue is names like 'copy' and 'remove' and 'pick' are very common
+	and easy to forget if they are redefined (caused a few bugs for me)
+	ideally need a sigil to denote all commands, or qualify them all, or make it necessary to compose the input
+	one option is some global edit command that receives an object and works on it, so it doesn't have to be part of the template
+	in this case template though needs to expose lower level api for it to use
+	I could dispatch by space type or class, so objects will be light (class preferred, as type can be changed for styling)
+	and allow override to be present in the space itself maybe, but doesn't seem necessary
+	macro object [code] ? or `obj/do [code]`? or can `with` be used?
+	each class could expose a link to the internal API (-ctx that I hate so much) and dispatch into it
+	but -ctx is not meant to be used anywhere, just a temporary kludge, while measure/edit is for use
+	interesting to consider how far it can go.. e.g. can /draw facet be kept per-class? can /sections be put there too? all funcs?
+	will it really save any RAM? esp if objects become more optimized?
+	factors:
+	- how much flexibility to bestow on individual objects vs making them all behave like template prescribes
+	    per-object facet has a pro in inheritance, with templates I'll have to reinvent it
+	    central access point like /do has both inheritance and flexibility
+	- whether command belongs to every template or just a few
+		sections: box/cell text/paragraph/link list/document rich-paragraph/rich-content
+		format: box/cell text/paragraph/link container/list/tube/document rich-paragraph/rich-content grid
+		clone: text/paragraph/link list/document rich-content clickable/button
+		viewport: scrollable/inf-scrollable/list-view/grid-view
+		move-by: scrollable/inf-scrollable/list-view/grid-view
+		move-to: scrollable/inf-scrollable/list-view/grid-view
+		clip-origin: scrollable/inf-scrollable/list-view/grid-view
+		adjust-origin: editor
+		decode: rich-content [could be document too]
+		available?: window list-in-list-view grid (in grid-view)
+		roll: inf-scrollable/list-view/grid-view
+		wrap-space: grid
+		wrap-data: grid-view
+		invalidate-range: grid (in grid-view)
+		offset-to-caret: field
+		page-size: document
+		length(value), map-range, extract: document
+		what a mess!
+	- whats the scope of this api exposure? only edit/measure ops or more?
+	    on-frame calculations and low or high level changes
+	    in case of length - calculation is optimized into a value
+	- how it affects RAM size of the template and how widely used it can be in the app
+		in release mode text currently is: 6k created, 10.5k rendered, +10 words may shift it all by ~2k up + functions size ~6k
+		wow thats a lot, and once object size is optimized, it will dominate
+		map of 8 k/v pairs - 560b, 10 pairs - 624, thats 10x less but no bind
+		funcs are still big, sharing is the biggest win
+	- likeliness of commands occuring in a sequence, as with edits
+	- ease of access and if to eval or not, e.g. `obj/draw` vs `macro obj [draw]` vs `macro obj compose [copy (s by e)]`
+		ideally should be accessible both as path (single op) and as batch (multiple ops)
+		obj/do/batch and obj/do/some-func ? do is so common it's too dangerous
+		batch obj [...] and obj/interface/some-func obj ... ?
+		obj/info/func and obj/edit/func ? - need obj arg
+		query obj [func] and edit obj [func] ? - no reason for the distinction
+		obj/query/func obj ... and obj/edit/func obj ... - 2 contexts (shared)
+		  and do with obj [query/func .. edit/func ..] ?
+		naming could be ? for info, ! for edits, but conflicts with length? and hundreds more names
+		more verbose names possible, e.g. get-length and copy-slice, still may be a win over paths 
+		too many drawbacks in all this, and in a dsl (which will have to eval params before the code)
+		macro obj [code] is what I want and to mix it with normal code I need to use a sigil, e.g. ~copy or .copy or >copy or ^copy but I hate it
+		and still there's macro edit lang (stateful, with caret and selection) and there lower-level api which is stateless
+		edit should be a single entry in all this api
+		kit - nice word! finally! 
+		still figuring out how to call individual funcs shorter than `batch obj [some-func]`
+		obj/kit/call/some-func is not shorter, and it's rather tedious to add a space argument to functions,
+		since they are all bound to the entry point and call each other
+how can I possibly sync kit operations?
+	e.g. batch [select 2x4 remove selected probe line-count] ?
+	selection only exists on the space, while line-count requires new layout, which requires canvas, known at next render only
+	with text it is hackable, but rich-content is waaay to slow to render it out of tree (and it's a source of inconsistency)
+	maybe separate frame funcs from synced funcs? at least it will be obvious if I'm about to shoot myself in the feet
+	but then I'll need frame/ prefix all the time which is annoying
+	ok, not so many funcs need /frame and it makes it more obvious
+3-argument canvas - on 3-arg-canvas branch
+	instead of decode canvas calls everywhere
+	I tried decoding it inside render and pass as 3 args: canvas fill-x fill-y
+	but not totally happy with it, not less complex, very verbose, just 1 less level of indirection
+gurzgri found a bug in nested tubes - map of inner spaces gets out of sync with parent cache overrides
+	one of the key questions here is whether tube's 1st render should be on canvas/x by 0 or infxinf/x by 0
+	canvas/x by 0 seems better for putting multiple paragraphs in a column, so clearly preferable
+key tube questions:
+	should this fill whole canvas?
+		column [
+			row 100x40 .. none [box blue box green box red]
+			row 100x40 .. none [box blue box green box red]
+		]
+	and this?
+		row 100x40 .. none [box blue box green box red]
+	and this?
+		vlist 100x100 .. none [ 
+			row 100x40 .. none [box blue box green box red]
+		]
+	when given a fixed canvas, why not fill it? any reason?
+		in fact it must fill it, as it's the only thing on the canvas! (otherwise in a list/tube canvas won't be fixed)
+		OTOH, there's fill flag that would be nice to use too
+	when in a vlist, there's infinity so it cant be filled
+	but when in another tube? inf or zero canvas at first, becomes fixed then filled on next renders
+	row with text paragraphs: paragraph widths will depend on their largest word - is it ok? (inf or 0 wont affect this)
+		I guess this should be "fixed" by letting paragraph have 0 (or 1) width instead of word wrapping 
+how to avoid out of sync maps in the cached spaces?
+	some kind of 'premature' render flag vs 'final'?
+		on final run if composite space is fetched from cache, it must also fetch all children, but its gonna be very slow
+		fetch only those with size <> map/size ? but these doesn't have to be equal (eg if scaled)
+		maybe cache should store some clue about children and compare those on final 'validation' stage?
+		when children are known to be from another cache branch, they are also fetched from cache, and their children validated too
+		if a child is valid, no need to validate its own children so this operation can be limited in depth
+		clue can be sameness of map, but map doesn't have to exist - what if into is used?
+		same size? might glitch if fill flag is flipped
+		store last canvas in the /cache and check against it?
+		to deeply fetch cached subtree, need to know how parent's canvas relates to each child's canvas
+		but also there's no guarantee that set of children will be the same for different canvases
+		hold all canvases for all immediate children in the cache for each slot? together with the map?
+		or can map contain canvases? it in fact can, just add it after offset & size
+		will I be able to get rid of generations with it? no, because cache will creep with old stuff
+		the issue is that it may have /into but no /map, so it's better to hold canvases separately (also faster to traverse)
+		where to get children info when committing a cache slot? commit can access parent's children block, but it may be slow
+		render may accumulate children and provide it to commit
+		problem with this is that first render may overrender a lot of items (e.g in a list) just to get their size
+		and restoration of them all is a complicated matter
+		another issue with /crude render is that tube doesn't know which of 1,2,3 child renders will be final
+		and also how to avoid duplicates in the children list?
+			tube may render the same space 3 times, as if 3 children
+			make children list a hash?
+	make maps nested with children maps?
+		then what about size, frame and other cached facets?
+	make maps and sizes - functions of rendered tree data?
+		again what to do with frame? also hold in the cache snapshot?
+	dig cache in R/S?
+	implemented as deep cache fetches based on children/canvas list, plus /crude refinement for render
+rename field/history to field/timeline and base it on timelines ?
+	but timelines might be heavy for the field, e.g. if a grid consists of a lot of field cells it matters
+	current field weight: 16kB (not rendered), 25kB (rendered), timeline: 4kB
+	ok fine then, may just move timeline funcs out in case it becomes a problem
+    
+    
+;@@ on over events are too populous now, need to reduce the load
 
-	
-	
-	
+;@@ commit better 'attempt' when apply is working
+;@@ also simplify passing of arguments into layouts
+
+
+Paragraph layout design...
 |                                                    <- total-width ->                                               |
 ^-- row-x1'                                                                                                row-x2' --^ (multiples of total-width)
 ^-- row-x1                                                                                                  row-x2 --^ (in 1D space)
@@ -4036,34 +4188,6 @@ summary of paragraph layout:
     + carets don't need mapping built in advance - rather, let it be created when need arises
 		
 	
-;@@ what about general funcs that realign parts of the map vertically/horizontally (modify)? for paragraph and tubes
-
-;@@ on over events are too populous now, need to reduce the load
-	
-
-;@@ don't treat margin as empty section, only spacing - or outline/frame will be cut
- 
-	
-
-;@@ rename rich-paragraph to rich-text? or is there a place for single-line rich-text in layouts?
-;@@ split rich-content text on font/size change!
-;@@ ensure not only last row is not scaled, but those before the linebreak as well! assertion maybe too?
-;@@ try tube/stripe/fill setting it to -1x-1 on tube-test
-;@@ remove non-pair (integer) support from margin & spacing? it's too much trouble overall, with 'along' and checks and conversion
-;@@   instead, I could let on-change convert them into pairs automatically
-;@@ instead of decode canvas calls everywhere, consider decoding it inside render! passing as 2 args (or 3 args fill-x fill-y?)
-;@@ monospace flag for rich-content? - to model extensibility on it
-;@@ date selector widget in the text? - to copy it into clipboard as date?
-;@@ make start-drag automatic? although what if I want to pass a parameter... plus, how to know which space in the path start the drag?
-;@@ document /indent format
-;@@ document source format, maybe as a design card!
-;@@ move source description into reference?
-;@@ document /format facet.. also measure/edit if I keep them
-;@@ document image/data block format (draw)
-;@@ document strike style
-;@@ document cache and generations as I tend to forget how it works all the time
-;@@ undocument apply-attributes, devise & document the replacement after fixing redmark
-
 
 Timer design:
 - we want to maintain the desired frequency of updates (otherwise every animation/game will be CPU dependent)
