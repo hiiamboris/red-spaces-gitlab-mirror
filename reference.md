@@ -678,12 +678,12 @@ Adds new facets:
 |-|-|-|
 | `origin` | integer! | current offset of the text in the field in pixels (non-positive) |
 | `selected` | pair! none! | currently selected part of text: `BEGINxEND`, where `begin` should not be bigger than `end` |
-| `selection` | rectangle space object! | can be styled as `field/selection` |
 | `caret` | none! or [`caret` space object!](#caret) | when set, draws a caret on the text |
 | `caret/look-around` | integer! | how close caret can come to field's margins; defaults to 10 pixels |
 | `kit` | object! | shared [kit object](#kit) |
+| `timeline` | object! | Timeline of recorded events for undo/redo (see [timelines](#timelines)) |
 
-Note: `caret/offset` and `selected` facets use *offsets from head* as coordinates:
+Note: `caret/offset` and `selected` facets use zero-based *offsets from head* as coordinates:
 - `0` = no offset from the head, i.e. before the 1st char
 - `1` = offset=1, i.e. after 1st char
 - `length? text` = offset from the head = text length, i.e. after last char
@@ -1405,6 +1405,7 @@ Adds new facets:
 | `caret` | [`caret` space object!](#caret) | controls caret location and width; can be styled as `rich-content/caret` |
 | `selected` | pair! none! | currently selected document part: `BEGINxEND` (two zero-based offsets) |
 | `paint` | block! | current (for newly inserted chars) set of attributes updated on caret movement; format: `[attr-name attr-value ...]` |
+| `timeline` | object! | Timeline of recorded events for undo/redo (see [timelines](#timelines)) |
 
 
 ## <a name="area"></a>Editor
