@@ -169,7 +169,6 @@ compose-map: function [
 		unless empty? cmds [							;-- don't spawn empty translate/clip structures
 			compose/only/into [
 				translate (box/offset) (cmds)
-				; clip 0x0 (box/size) (cmds)			;@@ TODO: remove `clip`
 			] tail r
 		]
 	]
@@ -304,21 +303,23 @@ cell-ctx: context [
 			set-empty-size space canvas fill-x fill-y
 			return quietly space/map: []
 		]
-		canvas: constrain canvas space/limits
-		mrg2:   space/margin * 2
-		cspace: space/content
-		drawn:  render/on cspace (subtract-canvas canvas mrg2) fill-x fill-y
-		size:   mrg2 + cspace/size
+		canvas:  constrain canvas space/limits
+		mrg2:    space/margin * 2
+		content: space/content
+		drawn:   render/on content (subtract-canvas canvas mrg2) fill-x fill-y
+		size:    mrg2 + content/size
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
-		size:   max size fill-canvas canvas fill-x fill-y		;-- only extends along fill-enabled axes
+		size:    max size fill-canvas canvas fill-x fill-y		;-- only extends along fill-enabled axes
 		space/size: constrain size space/limits
 		; #print "size: (size) space/size: (space/size) fill: (fill)"
 		
-		free:   space/size - cspace/size - mrg2
+		free:   space/size - content/size - mrg2
 		offset: space/margin + max 0x0 free * (space/align + 1) / 2
 		unless tail? drawn [
-			; drawn: compose/only [translate (offset) (drawn)]
-			drawn: compose/deep/only [clip 0x0 (space/size) [translate (offset) (drawn)]]
+			drawn: compose/only [translate (offset) (drawn)]
+			unless fits?: content/size +<= space/size [			;-- only use clipping when required! (for drop-downs)
+				drawn: compose/only [clip 0x0 (space/size) (drawn)]
+			]
 		]
 		quietly space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
 		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
@@ -524,27 +525,27 @@ scrollable-space: context [
 			set-empty-size space canvas fill-x fill-y
 			return quietly space/map: []
 		]
-		box: canvas: constrain canvas space/limits		;-- 'box' is viewport - area not occupied by scrollbars
-		cspace: space/content
+		box: canvas: constrain canvas space/limits				;-- 'box' is viewport - area not occupied by scrollbars
+		content: space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
-		cdraw: render/on cspace box fill-x fill-y
+		cdrawn: render/on content box fill-x fill-y
 		if all [
 			axis: switch space/content-flow [vertical ['y] horizontal ['x]]
-			cspace/size/:axis > box/:axis
-		][												;-- have to add the scroller and subtract it from canvas width
+			content/size/:axis > box/:axis
+		][														;-- have to add the scroller and subtract it from canvas width
 			scrollers: space/vscroll/size/x by space/hscroll/size/y
 			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
-			cdraw: render/on cspace box fill-x fill-y
+			cdrawn: render/on content box fill-x fill-y
 		]
-		csz: cspace/size
-		origin: space/origin							;-- must be read after render (& possible roll)
+		csz: content/size
+		origin: space/origin									;-- must be read after render (& possible roll)
 		;; no origin clipping can be done here, otherwise it's changed during intermediate renders
 		;; and makes it impossible to scroll to the bottom because of window resizes!
 		;; clipping is done by /clip-origin, usually in event handlers where size & viewport are valid
 		
 		;; determine what scrollers to show
-		loop 2 [										;-- each scrollbar affects another's visibility
+		loop 2 [												;-- each scrollbar affects another's visibility
 			if hdraw?: box/x < csz/x [box/y: max 0 canvas/y - space/hscroll/size/y]
 			if vdraw?: box/y < csz/y [box/x: max 0 canvas/x - space/vscroll/size/x]
 		]
@@ -558,7 +559,7 @@ scrollable-space: context [
 		sz1: min canvas csz + scrollers  sz2: canvas
 		space/size: sz1 + fill-canvas (max 0x0 sz2 - sz1) fill-x fill-y
 		; echo [sz1 sz2 canvas csz space/size]
-		box: min box (space/size - scrollers)			;-- reduce viewport
+		box: min box (space/size - scrollers)					;-- reduce viewport
 		
 		;; 'full' is viewport(box) + hidden (in all directions) part of content
 		end:  max box csz + bgn: min 0x0 origin
@@ -576,22 +577,22 @@ scrollable-space: context [
 			(space/content) [offset: 0x0 size: (box)]
 			(space/hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
 			(space/vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
-			(space/scroll-timer) [offset: 0x0 size: 0x0]	;-- list it for tree correctness
+			(space/scroll-timer) [offset: 0x0 size: 0x0]		;-- list it for tree correctness
 		]
 		space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
-		render space/scroll-timer						;-- scroll-timer has to appear in the tree for timers
+		render space/scroll-timer								;-- scroll-timer has to appear in the tree for timers
 		
 		; invalidate/only [hscroll vscroll]
 		invalidate/only space/hscroll
 		invalidate/only space/vscroll
 		
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
-		compose/deep/only [
-			translate (origin) [						;-- special geometry for content
-				clip (0x0 - origin) (box - origin)
-				(cdraw)
-			]
-			(compose-map/only space/map reduce [space/hscroll space/vscroll])
+		cdrawn: compose/only [translate (origin) (cdrawn)]
+		unless fits?: all [0x0 +<= origin  origin + content/size +<= box] [
+			cdrawn: compose/only [clip (origin) (box) (cdrawn)]		;-- only use clipping when required! (for drop-down)
+		]
+		compose/only [
+			(cdrawn) (compose-map/only space/map reduce [space/hscroll space/vscroll])
 		]
 	]
 		
@@ -2867,6 +2868,8 @@ grid-ctx: context [
 		;; because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;; as such, map doesn't need clipping, but draw code does
 
+		;@@ relax clipping when content fits - for dropdowns to be supported by headers
+		;@@ current clipping mode was meant for spanned heading cells mainly, and for normal cells translation
 		reshape [
 			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
 			clip  0x0         !(xy1)            !(drawn-common-header)	/if drawn-common-header
@@ -3778,12 +3781,12 @@ field-ctx: context [
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
 		ofs: field/origin by 0
-		quietly field/map: reshape-light [
-			@[ctext] [offset: @(ofs) size: @(ctext/size)]
+		quietly field/map: compose/deep [
+			(ctext) [offset: (ofs) size: (ctext/size)]
 		]
-		reshape-light [									;@@ can compose-map be used without re-rendering?
-			clip @(mrg) @(field/size - mrg) [
-				translate @(ofs) @[drawn]
+		compose/deep/only [
+			clip (mrg) (field/size - mrg) [
+				translate (ofs) (drawn)
 			]
 		]
 	]
