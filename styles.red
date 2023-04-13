@@ -209,7 +209,7 @@ do with context [
 			maybe data/data: either state ["✓"]["✗"]	;-- maybe still required here because /data: doesn't check for equality
 		]
 		
-		label: using [big?] [
+		label: [
 			if spaces/image-box/content = 'sigil [
 				big?: spaces/body/content/2 = 'comment
 				spaces/sigil/limits/min: pick [32 20] big? 
@@ -223,15 +223,15 @@ do with context [
 		clickable: data-clickable: [
 			below: when select self 'color [(make-box size 0 'off color)]
 		]
-		button: using [fill overlay focus? inner-radius] [
-			fill:    either pushed? [opaque 'text 50%]['off]
+		button: [
+			fill:    either pushed? [opaque 'text 50%][['off]]
 			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
-			overlay: quote (make-box/round size 1 none fill rounding)	;-- delay evaluation until 'size' is ready (after render)
+			overlay: compose [make-box/round size 1 none (fill) rounding]
 			focus?:  when focused? (
 				inner-radius: max 0 rounding - 2
-				quote (make-box/round/margin size 1 checkered-pen 'off inner-radius 4x4)
+				compose [make-box/round/margin size 1 checkered-pen 'off (inner-radius) 4x4]
 			)
-			above:   reduce [overlay focus?]
+			above:   reduce [as paren! overlay  as paren! focus?]	;-- paren delays evaluation until 'size' is ready (after render)
 		]
 		
 		hscroll/thumb: vscroll/thumb: [
