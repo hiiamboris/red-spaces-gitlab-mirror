@@ -218,8 +218,7 @@ There are 3 **steps**:
    This allows one to set various space facets before drawing it. Like the above `/font` facet is set before space is drawn.\
    Draw is quite limited: e.g. you can't "ask" what current pen color is, to modify it, and you can't set font for rich-text using "font" command, and so on. Evaluation is aimed to empower styles while still keeping them short.\
    Evaluation result is unused except for `below:` and `above:` fields.\
-   Other set-words that are not bound to space will leak out, so be careful.
-
+   
 2. Space's `/draw` function is called to get a list of commands to render it.
 
    `/draw` sets the `/size` and `/map` facets, so they will be valid when accessed from `below`/`above` blocks during their composition.
@@ -227,6 +226,12 @@ There are 3 **steps**:
 3. Values of `below:` and `above:` are composed (using `compose/deep`) and inserted around `/draw` result: `[(below) (drawn) (above)]`.
 
    If any of these values are absent or `none`, they're ignored.
+
+**Note:** set-words except `below:` and `above:` and those bound to space object are local, and will raise an error if used after style is evaluated. E.g. this style is bugged, because evaluation (1) leaves a `code` reference that during composition (3) will have no context:
+```
+code: [..produces a block..]
+below: [(do code)]
+```
 
 </details>
 
