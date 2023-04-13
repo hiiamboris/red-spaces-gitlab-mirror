@@ -219,12 +219,12 @@ do with context [
 		button: using [fill overlay focus? inner-radius] [
 			fill:    either pushed? [opaque 'text 50%]['off]
 			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
-			overlay: [make-box/round size 1 none fill rounding]	;-- delay evaluation until 'size' is ready (after render)
+			overlay: quote (make-box/round size 1 none fill rounding)	;-- delay evaluation until 'size' is ready (after render)
 			focus?:  when focused? (
 				inner-radius: max 0 rounding - 2
-				[make-box/round/margin size 1 checkered-pen 'off inner-radius 4x4]
+				quote (make-box/round/margin size 1 checkered-pen 'off inner-radius 4x4)
 			)
-			above: [(do overlay) (do focus?)]
+			above:   reduce [overlay focus?]
 		]
 		
 		hscroll/thumb: vscroll/thumb: [
