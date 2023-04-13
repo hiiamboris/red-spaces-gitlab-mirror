@@ -23,7 +23,7 @@ get-style: function [
 	#assert [not empty? head path]
 	path: tail path
 	until [												;-- look for the most specific fitting style
-		p: back path
+		p: back path									;@@ use for-each/reverse when fast
 		style: any [select/only/skip styles p 2  :style]
 		head? path: p
 	]
@@ -41,38 +41,27 @@ get-current-style: function [
 ]
 
 
-empty-context: context []
-
 apply-current-style: function [
 	"Apply relevant style to current space being drawn"
 	space [object!] "Face or space object"
 ][
-	case [
-		function? style: get-current-style [:style]		;-- function is not applied here, only in render
-		style-ctx: all [
-			pos: any [find style 'above  find style 'below]
-			context? first pos
-		] [
-			set style-ctx none							;-- clean the context from old values
-			do bind style space							;-- eval the style to preset facets
-			copy/deep style-ctx							;-- return the context for later above/below lookup & composition
-		]
-		'else [
-			do bind style space							;-- eval the style to preset facets
-			empty-context								;-- returns empty context if no /above or /below defined
-		]
+	unless function? style: get-current-style [			;-- function is not applied here, only in render
+		set style-ctx none				;-- clean the shared style context from old values
+		do bind/copy style space		;-- eval the style to preset facets; /copy to avoid children rebinding blocks used by parents
+		style: to [] style-ctx			;-- returned block is much smaller than returning the context for later above/below lookup & composition
 	]
+	:style
 ]
 
 combine-style: function [
 	"Combine style & draw code into final block"
 	drawn [block!] "Draw code produced by space/draw"
-	style [object!] "Styling context from apply-current-style"
+	style [block!] "Styling block from apply-current-style"
 ][
 	reduce [
-		compose/deep only select style 'below 
+		compose/deep only style/below 
 		drawn
-		compose/deep only select style 'above
+		compose/deep only style/above
 	]
 ]
 
@@ -242,7 +231,7 @@ context [
 				style: apply-current-style space
 				children-mark: tail children-stack
 				
-				either object? :style [
+				either block? :style [
 					draw: select space 'draw
 					;@@ this basically cries for FAST `apply` func!!
 					if function? :draw [
