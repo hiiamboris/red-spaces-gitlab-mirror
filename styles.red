@@ -17,8 +17,13 @@ exports: [set-style remove-style define-styles]
 styles: make hash! 50
 
 ;; used to keep above/below words from leaking out
-style-ctx!: context [above: below: none]
+style-ctx: context [below: above: none]
 	
+#assert [
+	1 = index? in style-ctx 'below						;-- combine-style relies on this, for less allocation
+	2 = index? in style-ctx 'above
+]
+
 set-style: function [
 	"Define a named style"
 	name [word! path!]
@@ -26,17 +31,19 @@ set-style: function [
 	/unique "Warn about duplicates"
 ][
 	name: to path! name
-	either pos: find/only/tail styles name [		;-- `put` does not support paths/blocks so have to reinvent it
+	either pos: find/only/tail styles name [					;-- `put` does not support paths/blocks so have to reinvent it
 		if unique [ERROR "Duplicate style found named `(mold name)`"]
 	][
 		pos: insert/only tail styles name
 	]
-	style: either block? :style [
-		bind copy/deep style copy style-ctx!
+	either block? :style [
+		;; let it collect set-words, to prevent leakage and bind-related errors caused by words being shared by some object:
+		;; also bind above/below words so even if function uses `return`, they are still set
+		style: function [/extern above below] bind style style-ctx	;-- function copies the body deeply
 	][
-		func spec-of :style copy/deep body-of :style	;@@ copy/deep to work around #4854
+		style: func spec-of :style copy/deep body-of :style		;@@ copy/deep to work around #4854
 	]
-	change/only pos :style
+	change pos :style
 	:style
 ]
 
@@ -233,9 +240,9 @@ do with context [
 			)
 		]
 
-		grid-view/window: [
+		grid-view: [
 			; #assert [size]
-			below: [(make-box size 0 'off !(opaque 'text 50%))]
+			below: [(make-box viewport 0 'off !(opaque 'text 50%))]
 		]
 
 		menu/ring/clickable: [

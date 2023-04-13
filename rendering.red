@@ -14,6 +14,8 @@ current-path: as path! []								;-- used as a stack during draw composition
 
 style-typeset!: make typeset! [block! function!]		;@@ hide this
 
+empty-style: does []
+
 ;@@ TODO: profile & optimize this a lot
 ;@@ devise some kind of style cache tree if it speeds it up
 get-style: function [
@@ -27,7 +29,7 @@ get-style: function [
 		style: any [select/only/skip styles p 2  :style]
 		head? path: p
 	]
-	default style: [[]]									;-- for `do` to return empty block
+	default style: :empty-style
 	#debug styles [#print "Style for (p) is (mold/flat :style)"]
 	:style
 ]
@@ -45,10 +47,13 @@ apply-current-style: function [
 	"Apply relevant style to current space being drawn"
 	space [object!] "Face or space object"
 ][
-	unless function? style: get-current-style [			;-- function is not applied here, only in render
-		set style-ctx none				;-- clean the shared style context from old values
-		do bind/copy style space		;-- eval the style to preset facets; /copy to avoid children rebinding blocks used by parents
-		style: to [] style-ctx			;-- returned block is much smaller than returning the context for later above/below lookup & composition
+	;; fast way to check if it accepts arguments (a function style) or not (a block style):
+	style-func?: any-word? first spec-of style: get-current-style
+	unless style-func? [								;-- function style is not applied here, only in render
+		set style-ctx none								;-- clean the shared style context from old values
+		bind body-of :style space
+		(style)											;-- eval the style to preset facets
+		style: values-of style-ctx						;-- block is much smaller than copying the context
 	]
 	:style
 ]
@@ -59,9 +64,9 @@ combine-style: function [
 	style [block!] "Styling block from apply-current-style"
 ][
 	reduce [
-		compose/deep only style/below 
+		compose/deep only style/1 
 		drawn
-		compose/deep only style/above
+		compose/deep only style/2
 	]
 ]
 
