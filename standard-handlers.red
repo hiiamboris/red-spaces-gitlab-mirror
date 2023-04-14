@@ -177,8 +177,7 @@ define-handlers [
 					; hide-popups event/window 1			;-- click on a menu item hides all visible menus
 				; ]
 				on-over [space path event] [			;-- on-hover highlight ;@@ should it affect /color though?
-					inside?: 0x0 +<= path/2 +< space/size
-					space/color: if inside? [mix 'panel opaque 'text 15%]
+					space/color: if path/2 inside? space [mix 'panel opaque 'text 15%]
 				]
 			]
 		]
