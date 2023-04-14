@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs half range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
+exports: [by abs half toggle range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -132,7 +132,10 @@ inside?: make op! function [
 	"Test if POINT is inside the SPACE"
 	point [pair!] space [object!]
 ][
-	within? point 0x0 space/size
+	to logic! any [
+		none = space/size								;-- infinite spaces contain any point ;@@ but should none mean infinite?
+		within? point 0x0 space/size
+	]
 ]
 
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
@@ -339,6 +342,13 @@ set-flag: function [
 	series [series!] flag [any-type!] present? [logic! none!]
 ][
 	either present? [include-into series :flag][exclude-from series :flag]
+]
+
+toggle: function [
+	"Flip the value of a boolean flag"
+	flag [path!]
+][
+	set flag not get flag
 ]
 
 

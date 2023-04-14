@@ -48,43 +48,29 @@ hittest: function [
 	/into "Append into a given buffer"
 		path: (make [] 16) [block! path!]
 ][
-	either object? space [
-		while [
-			all [
-				space
-				any [
-					none? space/size			;-- infinite spaces include any point ;@@ but should none mean infinite?
-					within? xy 0x0 space/size
-				]
-			]
-		][
-			repend path [space xy]
-			#assert [xy]
-			case [
-				into: select space 'into [
-					set [space xy] into xy
-				]
-				map: select space 'map [
-					set [space xy] into-map map xy none
-				]
-				'else [break]
-			]
-		]
-	][
-		template: space
-		forall template [
+	unless object? template: space [					;-- follow given path until it ends
+		forall template [								;@@ use for-each
 			set [space: _: child:] template
 			repend path [space xy]
-			#assert [xy]
-			case [
-				into: select space 'into [
-					set [_ xy] do copy/deep [into/force xy child]	;@@ workaround for #4854 - remove me
+			#assert [xy]								;-- forced into and map should always return the pair, if child is not none
+			set [child xy] case [
+				into: select space 'into [				;@@ workaround for #4854 - remove me
+					do copy/deep [into/force xy child]
 				]
-				map: select space 'map [
-					set [_ xy] into-map map xy child
-				]
+				map: select space 'map [into-map map xy child]
 			]
 			template: next template
+		]
+		space: child									;-- continue forth from the child (if lands on any)
+	]
+	if object? space [
+		while [all [space  xy inside? space]] [
+			repend path [space xy]
+			#assert [xy]
+			set [space xy] case [
+				into: select space 'into [into xy]
+				map:  select space 'map  [into-map map xy none]
+			]
 		]
 	]
 	new-line/all path no

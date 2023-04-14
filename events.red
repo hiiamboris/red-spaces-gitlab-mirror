@@ -276,10 +276,8 @@ events: context [
 				over wheel up mid-up alt-up aux-up
 				down mid-down alt-down aux-down click dbl-click [	;-- `click` is simulated by single-click.red
 					;@@ should spaces all be `all-over`? or dupe View 'all-over flag into each space?
-					hittest/into
-						either dragging? [head drag-path][face/space]
-						event/offset
-						make block! 12
+					target: either dragging? [head drag-path][face/space]
+					hittest target event/offset
 				]
 				key key-down key-up enter [
 					focused?: yes								;-- event should not be detected by parent spaces
@@ -429,8 +427,7 @@ events: context [
 		#debug events [#print "Starting drag on [(mold copy/part path -99) | (mold path)] with (:param)"]
 		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]
-		append clear drag-in/head head path				;-- make a copy in place, saving original offsets
-		drag-in/path: at drag-in/head index? path		;-- drag-path will return it at the same index
+		drag-in/path: clone path drag-in/head			;-- drag-path will return it at the same index
 		set/any in drag-in 'payload :param
 	]
 
