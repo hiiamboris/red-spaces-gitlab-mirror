@@ -525,7 +525,7 @@ scrollable-space: context [
 			set-empty-size space canvas fill-x fill-y
 			return quietly space/map: []
 		]
-		box: canvas: constrain canvas space/limits				;-- 'box' is viewport - area not occupied by scrollbars
+		box: canvas: constrain finite-canvas canvas space/limits				;-- 'box' is viewport - area not occupied by scrollbars
 		content: space/content
 		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
 		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
@@ -557,7 +557,9 @@ scrollable-space: context [
 			space/vscroll/size/x * vmask
 			space/hscroll/size/y * hmask
 		sz1: min canvas csz + scrollers  sz2: canvas
-		space/size: sz1 + fill-canvas (max 0x0 sz2 - sz1) fill-x fill-y
+		space/size: constrain
+			sz1 + fill-canvas (max 0x0 sz2 - sz1) fill-x fill-y
+			space/limits
 		; echo [sz1 sz2 canvas csz space/size]
 		box: min box (space/size - scrollers)					;-- reduce viewport
 		
