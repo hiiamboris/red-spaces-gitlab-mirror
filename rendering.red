@@ -152,6 +152,7 @@ context [
 					unless face/size [					;-- initial render: define face/size
 						#assert [face/space/size]
 						face/size: face/space/size
+						drawn: render-space/on face/space face/size yes yes	;-- re-render since it couldn't fill the infinite canvas
 						style: apply-current-style face	;-- reapply the host style using new size
 					]
 					drawn: combine-style drawn style
