@@ -68,7 +68,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
 			; canvas: constrain canvas limits
 			x: ortho y: axis
-			either x = 'x [fill-x: yes][fill-y: yes]	;-- always fills along its secondary axis
+			; either x = 'x [fill-x: yes][fill-y: yes]	;-- always fills along its secondary axis
 			guide: axis2pair y
 			pos: pos': origin + margin
 			;; list can be rendered in two modes:
