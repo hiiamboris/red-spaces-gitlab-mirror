@@ -591,7 +591,7 @@ scrollable-space: context [
 		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
 		cdrawn: compose/only [translate (origin) (cdrawn)]
 		unless fits?: all [0x0 +<= origin  origin + content/size +<= box] [
-			cdrawn: compose/only [clip (origin) (box) (cdrawn)]		;-- only use clipping when required! (for drop-down)
+			cdrawn: compose/only [clip 0x0 (box) (cdrawn)]		;-- only use clipping when required! (for drop-down)
 		]
 		compose/only [
 			(cdrawn) (compose-map/only space/map reduce [space/hscroll space/vscroll])
