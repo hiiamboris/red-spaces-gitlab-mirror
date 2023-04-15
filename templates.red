@@ -2404,11 +2404,15 @@ list-view-ctx: context [
 		classify-object self 'list-in-list-view			;-- on-change is not primed until /list-view is set
 	]
 
+	on-source-change: function [lview [object!] word [word!] value [any-type!]] [
+		if object? :lview/list [invalidate lview/list]
+	]
+
 	declare-template 'list-view/inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
-		source: []	#on-change :invalidates				;-- no type check for it can be freely overridden
+		source: []	#on-change :on-source-change		;-- no type check for it can be freely overridden
 		data: function [/pick i [integer!] /size] [		;-- can be overridden
 			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
 		] #type [function!]
@@ -3314,6 +3318,10 @@ grid-view-ctx: context [
 		r
 	]
 	
+	on-source-change: function [gview [object!] word [word!] value [any-type!]] [
+		if object? :gview/grid [invalidate gview/grid]
+	]
+
 	declare-template 'grid-view/inf-scrollable [
 		;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
@@ -3325,7 +3333,7 @@ grid-view-ctx: context [
 		origin: 0x0	#type =? #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
 		
 		content-flow: 'planar
-		source: make map! [size: 0x0]	#on-change :invalidates	;-- map is more suitable for spreadsheets than block of blocks
+		source: make map! [size: 0x0]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
 				block! [
