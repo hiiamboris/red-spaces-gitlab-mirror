@@ -2095,6 +2095,7 @@ inf-scrollable-ctx: context [
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
 	roll: function [space [object!] path [path!] "inf-scrollable should be the last item"] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
+		path: keep-type path object!					;-- filter out pairs!
 		window: space/window
 		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
