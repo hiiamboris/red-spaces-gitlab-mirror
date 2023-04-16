@@ -88,11 +88,11 @@ underbox: function [
 ;; extension of the stylesheet
 define-styles [
 	;; styles for newly introduced code templates
-	code-span: using [pen] [
+	code-span: [
 		font: code-font
 		margin: 4x0
 		pen: when color (compose [pen (color)])
-		below: [(underbox size 1 3) (pen)]
+		below: reduce [quote (underbox size 1 3) pen]
 	]
 	code-block: [
 		margin: 10
@@ -438,9 +438,9 @@ pre:  func [text] [remake-space 'code-block [text: (text)]]
 view reshape [
 	title "Spaces Document Editor"
 	host 640x400 [
-		vlist [
+		column [
 			editor-toolbar
-			editor: editor 50x50 .. 620x300 focus !(reshape initial-text)
+			editor: editor focus !(reshape initial-text)
 		]
 	]
 ]

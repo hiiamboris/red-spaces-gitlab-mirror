@@ -490,7 +490,7 @@ scrollable-space: context [
 		xy        [pair! word!]
 		margin: 0 [integer! pair! none!]				;-- space to reserve around XY
 	][
-		mrg: 1x1 * margin
+		mrg:   1x1 * margin
 		csize: select space/content 'size
 		switch xy [
 			head [xy: 0x0]
@@ -507,6 +507,7 @@ scrollable-space: context [
 				xy/:x > xy2/:x [dxy/:x: xy/:x - xy2/:x]
 			]
 		]
+		; ?? [box mrg xy1 xy2 xy dxy space/origin]
 		set-origin space space/origin - dxy
 	]
 
@@ -628,7 +629,7 @@ scrollable-space: context [
 		]
 		
 		viewport: does [								;-- much better than subtracting scrollers; avoids exposing internal details
-			any [all [map/2 map/2/size] 0x0]			;@@ REP #113
+			any [all [map/2 map/2/size] size]			;@@ REP #113
 		] #type [function!]
 
 		;@@ move these into kit

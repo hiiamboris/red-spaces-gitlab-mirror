@@ -355,6 +355,7 @@ doc-ctx: context [
 					set [para: prange:] caret->paragraph offset
 					geom: select/same space/map para
 					box: batch para [frame/caret-box offset - prange/1 side]
+					; ?? [para prange geom box]
 					map-each xy box [geom/offset + xy]
 				]
 			]
@@ -840,7 +841,7 @@ doc-ctx: context [
 		kit:       ~/kit
 		content:   []		#type :on-content-change
 		axis:      'y		#type (axis = 'y)			;-- protected
-		spacing:   5		#type [integer!]			;-- interval between paragraphs
+		spacing:   5		#type [integer!] :invalidates	;-- interval between paragraphs
 		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
 		page-size: function [] [						;-- needs access to the parent viewport for paging
 			vp: any [get-safe 'parent/viewport 0x0]
@@ -861,6 +862,7 @@ doc-ctx: context [
 	editor-kit: make-kit 'editor [
 		frame: object [
 			adjust-origin: function ["Adjust document origin so that caret is visible"] [
+				#assert [0x0 +< space/viewport]
 				doc:  space/content
 				cbox: batch doc [frame/caret-box here doc/caret/side]
 				if cbox [
@@ -880,7 +882,11 @@ doc-ctx: context [
 		
 		scrollable-draw: :draw
 		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
-			if content/modified? [
+			if all [
+				content/modified?
+				0x0 +< canvas							;-- don't adjust until size is final
+				fill-x									;@@ need a more reliable test than this!
+			][
 				scrollable-draw/on canvas fill-x fill-y
 				batch self [frame/adjust-origin]
 				content/modified?: no
