@@ -923,16 +923,16 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 
 #### Settings for list layout
 
-| setting | types | constraints | description |
+| setting | types | default | constraints | description |
 |-|-|-|-|
-| axis | word! | `x` or `y` | primary axis of list's extension |
-| margin |  pair! | >= 0x0 | space between list's content and its border |
-| spacing | pair! | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
-| canvas | pair! none! | > 0x0 | area size on which list will be rendered (infinite by default) |
+| axis | word! | | `x` or `y` | primary axis of list's extension |
+| margin |  pair! | | >= 0x0 | space between list's content and its border |
+| spacing | pair! | | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
+| canvas | pair! none! | INFxINF | >= 0x0 | area size on which list will be rendered (infinite by default) |
 | fill-x | logic! none! | false | | specifies an intent to fill the canvas horizontally if possible |
 | fill-y | logic! none! | false | | specifies an intent to fill the canvas vertically if possible |
-| limits | range! none! | /min <= /max | constraints on the size (unlimited by default) |
-| origin | pair! | unrestricted | point at which list's coordinate system origin is located |
+| limits | range! none! | none | /min <= /max | constraints on the size (unlimited by default) |
+| origin | pair! | 0x0 | unrestricted | point at which list's coordinate system origin is located |
 
 #### Settings for tube layout
 
@@ -942,7 +942,7 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 | align | block! of 0-2 words, pair! none! | -1x-1 | -1x-1 to 1x1 = 9 pair variants, or axes-like block | alignment vector: with pair `x` is 'list within row' and `y` is 'item within list'; with block axes are fixed and missing axis centers along it |
 | margin |  pair! | | >= 0x0 | space between tube's content and its border |
 | spacing | pair! | | >= 0x0 | space between adjacent tube's items (primary axis) and rows (secondary axis) |
-| canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
+| canvas | pair! none! | INFxINF | >= 0x0 | area size on which tube will be rendered |
 | fill-x | logic! none! | false | | specifies an intent to fill the canvas horizontally if possible |
 | fill-y | logic! none! | false | | specifies an intent to fill the canvas vertically if possible |
 | limits | range! none! | none | /min <= /max | constraints on the size |
