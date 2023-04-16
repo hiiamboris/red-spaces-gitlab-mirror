@@ -284,6 +284,8 @@ events: context [
 					if face/space [
 						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
 						unless focus/current [focus-space focus/find-next-focal-space 'forth]
+						;; but it still may fail if nothing is focusable
+						unless focus/current [exit]
 						if path: get-full-path focus/current [as [] path] 
 					]
 				]
