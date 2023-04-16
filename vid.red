@@ -242,7 +242,11 @@ VID: context [
 			image!  [make-space 'image [data:  value]]
 			url!    [make-space 'link  [data:  value]]
 			block!  [either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
-		] [make-space 'text [text: mold :value]]
+		][
+			either space? :value
+				[:value]								;-- space objects are just passed thru (e.g. to be put into a button frame)
+				[make-space 'text [text: mold :value]]
+		]
 	]
 	
 	
