@@ -190,6 +190,8 @@ set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y 
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
 context [
+	~: self
+	
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		set-empty-size space canvas fill-x fill-y
 		[]
