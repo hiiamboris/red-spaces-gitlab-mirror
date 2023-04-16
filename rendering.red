@@ -53,7 +53,7 @@ apply-current-style: function [
 		set style-ctx none								;-- clean the shared style context from old values
 		bind body-of :style space
 		(style)											;-- eval the style to preset facets
-		style: values-of style-ctx						;-- block is much smaller than copying the context
+		style: copy/deep values-of style-ctx			;-- block is much smaller than copying the context; deep copy avoids rebind on nesting!
 	]
 	:style
 ]
@@ -108,13 +108,11 @@ context [
 	;; draw code has to be evaluated after current-path changes, for inner calls to render to succeed
 	set 'with-style function [							;-- exported for an ability to spoof the tree (for roll, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
-		;@@ why the fuck function omits the check?
-		; space [path! (parse space [any object!]) object!]	
-		space [path! object!]		;-- path support is useful for out of tree renders (like roll)
+		space [path! (parse space [any object!]) object!]	;-- path support is useful for out of tree renders (like roll)	
 		code  [block!]
 	][
 		top: tail current-path
-		#assert [any [object? space not find space pair!]  "style path can't contain pairs!"]
+		; #assert [any [object? space not find space pair!]  "style path can't contain pairs!"]
 		append current-path space
 		
 		thrown: try/all [do code  ok?: yes]				;-- result is ignored for simplicity
