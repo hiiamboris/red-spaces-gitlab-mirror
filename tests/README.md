@@ -212,3 +212,21 @@ A simplest rich content test which I'm using to debug whitespace handling, hitte
 
 A more realistic rich content test which shows if alignment works as desired. Initial capital `L` is an image.
 
+
+## Cache checks
+
+[**sync-test1.red**](sync-test1.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test1.png)
+
+Simplest scenario that tests deep cache fetching after a render on another canvas. Also may show bind-related glitches in styles written in block form.
+
+---
+
+[**sync-test2.red**](sync-test2.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test2.png)
+
+More complex scenario with multiple nested tubes, for the same purpose. "T" letter should be seen *by hittest* in the center.
+
+

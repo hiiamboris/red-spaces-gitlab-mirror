@@ -3,6 +3,7 @@ Red []
 ; #do [disable-space-cache?: on]
 #include %../everything.red
 view/flags [
+	below
 	host white 600x300 [column yello [
 		row orange weight= 1 [
 			column red weight= 1 [
@@ -14,5 +15,6 @@ view/flags [
 		]
 	]]
 	 ; react [face/size: face/parent/size]
-	on-over [probe hittest face/space event/offset]
+	on-over [status/text: mold hittest face/space event/offset]
+	status: text 600x30
 ][resize]
