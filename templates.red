@@ -189,12 +189,18 @@ set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y 
 ]
 
 ;; empty stretching space used for alignment ('<->' alias still has a class name 'stretch')
-put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
-	weight: 1
-	cache:  none
-	draw: function [/on canvas: infxinf [pair!] fill-x: no [logic!] fill-y: no [logic!]] [
-		set-empty-size self canvas fill-x fill-y
+context [
+	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+		set-empty-size space canvas fill-x fill-y
 		[]
+	]
+	
+	put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
+		weight: 1
+		cache:  none
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+			~/draw self canvas fill-x fill-y
+		]
 	]
 ]
 
@@ -368,7 +374,7 @@ cell-ctx: context [
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 	declare-template 'cell/box [margin: 1x1]			;-- same thing just with a border and background ;@@ margin - in style?
@@ -636,7 +642,7 @@ scrollable-space: context [
 			~/move-by self amount dir axis factor
 		] #type [function!]
 
-		move-to: function [
+		move-to: func [
 			"Ensure point XY of content is visible, scroll only if required"
 			xy          [pair! word!]    "'head or 'tail or an offset pair"
 			/margin mrg [integer! pair!] "How much space to reserve around XY (default: 0)"
@@ -644,14 +650,14 @@ scrollable-space: context [
 			~/move-to self xy mrg
 		] #type [function!]
 		
-		clip-origin: function [
+		clip-origin: func [
 			"Change the /origin facet, ensuring no empty area is shown"
 			origin [pair!] "Clipped between (viewport - scrollable/size) and 0x0"
 		][
 			~/set-origin self origin
 		] #type [function!]
 	
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1090,7 +1096,7 @@ container-ctx: context [
 		origin:  0x0									;-- used by ring layout to center itself around the pointer
 		content: []		#type :invalidates				;-- no type check as user may redefine it and /items freely
 		
-		items: function [/pick i [integer!] /size] [
+		items: func [/pick i [integer!] /size] [
 			either pick [content/:i][length? content]
 		] #type :invalidates [function!]
 		
@@ -1100,7 +1106,7 @@ container-ctx: context [
 			into-map map xy + origin child
 		]
 
-		draw: function [
+		draw: func [
 			; /on canvas [pair! none!]					;-- not used: layout gets it in settings instead
 			/layout type [word!] settings [block!]
 		][
@@ -1162,7 +1168,7 @@ list-ctx: context [
 		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
 		
 		container-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1238,7 +1244,7 @@ tube-ctx: context [
 						] axes)
 		
 		container-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1461,7 +1467,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
 		
 		;; container-draw is not used due to tricky geometry
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2161,12 +2167,12 @@ inf-scrollable-ctx: context [
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
-		roll: function [/in path: (as path! []) [path!] "Inject subpath into current styling path"] [
-			~/roll self path
+		roll: func [/in path [path!] "Inject subpath into current styling path"] [
+			~/roll self any [path as path! []]
 		] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2397,7 +2403,7 @@ list-view-ctx: context [
 		;@@ when to forget these? and why not keep only focused item?
 		icache: make map! 16	#type [map!]
 		
-		available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+		available?: func [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 			;; must pass positive canvas (uses last rendered list-view size)
 			~/available? self size axis dir from requested
 		] #type [function!]
@@ -2414,11 +2420,11 @@ list-view-ctx: context [
 		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
 		source: []	#on-change :on-source-change		;-- no type check for it can be freely overridden
-		data: function [/pick i [integer!] /size] [		;-- can be overridden
+		data: func [/pick i [integer!] /size] [			;-- can be overridden
 			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
 		] #type [function!]
 		
-		wrap-data: function [item-data [any-type!]][	;-- can be overridden (but with care)
+		wrap-data: func [item-data [any-type!] /local spc] [	;-- can be overridden (but with care)
 			spc: make-space 'data-view [
 				quietly type:  'item
 				quietly wrap?:  on
@@ -2432,7 +2438,7 @@ list-view-ctx: context [
 			select [x horizontal y vertical] list/axis
 		] #type [function!]
 		
-		list/items: function [/pick i [integer!] /size] with list [
+		list/items: func [/pick i [integer!] /size] with list [
 			either pick [
 				any [
 					icache/:i
@@ -2441,7 +2447,7 @@ list-view-ctx: context [
 			][data/size]
 		]
 		
-		list/draw: function [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		list/draw: func [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
 			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
 	]
