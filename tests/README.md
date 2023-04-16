@@ -121,6 +121,14 @@ Simplest `list` of 3 `button` spaces.
 
 `list-view` test: a scrollable window moving over *infinite* content. No matter how far scrolled down, it should be responsive.
 
+---
+
+[**list-test4.red**](list-test4.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test4.gif)
+
+`list-view` test: each list-view item is a `label` which is a horizontal list. It shouldn't be "jumping" which is the case if each label filled the whole viewport of list-view vertically, and then `roll` function would always detect a jump condition.
+
 
 
 ## Grid tests
