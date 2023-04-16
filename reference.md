@@ -926,9 +926,11 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 | setting | types | constraints | description |
 |-|-|-|-|
 | axis | word! | `x` or `y` | primary axis of list's extension |
-| margin |  integer! pair! | >= 0x0 | space between list's content and it's border |
-| spacing | integer! pair! | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
+| margin |  pair! | >= 0x0 | space between list's content and its border |
+| spacing | pair! | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
 | canvas | pair! none! | > 0x0 | area size on which list will be rendered (infinite by default) |
+| fill-x | logic! none! | false | | specifies an intent to fill the canvas horizontally if possible |
+| fill-y | logic! none! | false | | specifies an intent to fill the canvas vertically if possible |
 | limits | range! none! | /min <= /max | constraints on the size (unlimited by default) |
 | origin | pair! | unrestricted | point at which list's coordinate system origin is located |
 
@@ -936,11 +938,13 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 
 | setting | types | default | constraints | description |
 |-|-|-|-|-|
-| axes | block! of 2 words, none! | `[e s]` | any of `[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]` (unicode arrows `←→↓↑` are also supported) | primary (first) and secondary (second) axes of tube extension (run [`tube-test`](tests/tube-test.red) to figure it out) |
+| axes | block! of 2 words, none! | `[e s]` | any of `[n e] [n w] [s e] [s w] [e n] [e s] [w n] [w s]` (unicode arrows `←→↓↑` are also supported) | primary (first) and secondary (second) axes of tube extension (run [`tube-test1`](tests/tube-test1.red) to figure it out) |
 | align | block! of 0-2 words, pair! none! | -1x-1 | -1x-1 to 1x1 = 9 pair variants, or axes-like block | alignment vector: with pair `x` is 'list within row' and `y` is 'item within list'; with block axes are fixed and missing axis centers along it |
-| margin |  integer! pair! | | >= 0x0 | space between tube's content and it's border |
-| spacing | integer! pair! | | >= 0x0 | space between adjacent tube's items (primary axis) and rows (secondary axis) |
+| margin |  pair! | | >= 0x0 | space between tube's content and its border |
+| spacing | pair! | | >= 0x0 | space between adjacent tube's items (primary axis) and rows (secondary axis) |
 | canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
+| fill-x | logic! none! | false | | specifies an intent to fill the canvas horizontally if possible |
+| fill-y | logic! none! | false | | specifies an intent to fill the canvas vertically if possible |
 | limits | range! none! | none | /min <= /max | constraints on the size |
 
 #### Settings for ring layout
@@ -954,12 +958,14 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 #### Settings for paragraph layout
 
 | setting | types | default | constraints | description |
-|-|-|-|-|
+|-|-|-|-|-|
 | align | word! none! | left | any of `[left center right fill scale upscale]` | horizontal alignment |
 | baseline | percent! float! none! | 80% | normally 0%(top) to 100%(bottom) | vertical alignment |
-| margin |  integer! pair! | | >= 0x0 | space between paragraph's content and it's border |
-| spacing | integer! pair! | | >= 0x0 | space between adjacent items (x) and rows (y) |
+| margin |  pair! | | >= 0x0 | space between paragraph's content and its border |
+| spacing | pair! | | >= 0x0 | space between adjacent items (x) and rows (y) |
 | canvas | pair! none! | INFxINF | > 0x0 | area size on which tube will be rendered |
+| fill-x | logic! none! | false | | specifies an intent to fill the canvas horizontally if possible |
+| fill-y | logic! none! | false | | specifies an intent to fill the canvas vertically if possible |
 | limits | range! none! | none | /min <= /max | constraints on the size |
 | indent | `[first: integer! rest: integer!]` block! or none! | none | >= 0 each | first and other rows indentation in pixels |
 | force-wrap? | logic! | false | | prioritize canvas width even if it means wrapping spaces at any pixel (may be slow on 1px canvas!) |
