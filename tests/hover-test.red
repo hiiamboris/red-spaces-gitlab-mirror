@@ -58,7 +58,7 @@ define-handlers [
 	box: [
 		on-over [space path event] [
 			; status/text: mold probe hittest host/space event/offset
-			quietly status/text: mold hittest host/space event/offset
+			status/text: mold hittest host/space event/offset
 			space/color: either inside?: 0x0 +<= path/2 +< space/size [magenta][brick]
 		]
 	]
