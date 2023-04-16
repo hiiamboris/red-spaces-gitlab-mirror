@@ -68,7 +68,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
 			; canvas: constrain canvas limits
 			x: ortho y: axis
-			; either x = 'x [fill-x: yes][fill-y: yes]	;-- always fills along its secondary axis
 			guide: axis2pair y
 			pos: pos': origin + margin
 			;; list can be rendered in two modes:
@@ -81,6 +80,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			repeat i count [							;-- first render cycle
 				space: either func? [spaces/pick i][spaces/:i]
 				#assert [space? :space]
+				;; no fill is enforced here, as that would break list-test4
 				drawn: render/on space canvas1 fill-x fill-y
 				#assert [space/size +< (1e7 by 1e7)]
 				compose/only/deep/into [(space) [offset (pos) size (space/size) drawn (drawn)]] tail map
