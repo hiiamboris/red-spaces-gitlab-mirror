@@ -106,7 +106,7 @@ view/no-wait compose/only/deep [
 
 ; dump-tree
 out: none
-save %tube-test-output.png out: draw list/size render/on list list/size no no
+save %tube-test-output.png out: draw list/size render/on list list/size yes no
 if exists? ref: %tube-test-reference.png [
 	ref: load ref
 	unless ref = out [print "!! LAYOUT HAS CHANGED !!"]
