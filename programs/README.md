@@ -52,7 +52,7 @@ If you'd rather run Inspector from sources, you'll need the [`cli` library](http
 
 A livecoding tool to experiment with various VID/S layouts.
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/vids-polygon.gif)
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-vids-polygon.gif)
 
 
 ## [Red Mark](redmark.red)
