@@ -924,7 +924,7 @@ By default, three layouts are available out of the box: `list` (used in vlist/hl
 #### Settings for list layout
 
 | setting | types | default | constraints | description |
-|-|-|-|-|
+|-|-|-|-|-|
 | axis | word! | | `x` or `y` | primary axis of list's extension |
 | margin |  pair! | | >= 0x0 | space between list's content and its border |
 | spacing | pair! | | >= 0x0 | space between adjacent list's items (only primary axis of the pair is used) |
