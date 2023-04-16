@@ -223,7 +223,7 @@ do with context [
 		clickable: data-clickable: [
 			below: when select self 'color [(make-box size 0 'off color)]
 		]
-		button: [
+		button: drop-box: [
 			fill:    either pushed? [opaque 'text 50%][['off]]
 			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
 			overlay: compose [make-box/round size 1 none (fill) rounding]
@@ -240,9 +240,9 @@ do with context [
 			)
 		]
 
-		grid-view: [
+		grid-view/window: [
 			; #assert [size]
-			below: [(make-box viewport 0 'off !(opaque 'text 50%))]
+			below: [(make-box size 0 'off !(opaque 'text 50%))]
 		]
 
 		menu/ring/clickable: [
