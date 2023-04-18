@@ -47,7 +47,7 @@ modify-class 'space [
 	map:     []		#type [block!]
 	into:    none	#type [function!]
 	;; rate change -> invalidation -> next render puts it into rated-spaces list
-	rate:    none	#type =  :invalidates-look [integer! float! time! (rate >= 0) none!]
+	rate:    none	#type =  [integer! float! time! (rate >= 0) none!]
 	color:   none	#type =? :invalidates-look [tuple! none!]
 	margin:  0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (margin * 1x1))
 	spacing: 0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (spacing * 1x1))
@@ -437,7 +437,8 @@ scrollbar: context [
 	
 	declare-template 'scrollbar/space [
 		;@@ maybe leverage canvas size?
-		size:       100x16	#type =? :invalidates		;-- opposite axis defines thickness
+		;@@ size should not cause invalidation here, or each deep cache fetch sets it, repainting whole tree
+		size:       100x16	;#type =? :invalidates		;-- opposite axis defines thickness
 		axis:       'x		#type =  :invalidates [word!] (find [x y] axis)
 		offset:     0%		#type =? :invalidates-look [number!] (all [0 <= offset offset <= 1])
 		amount:     100%	#type =? :invalidates-look [number!] (all [0 <= amount amount <= 1])
@@ -582,8 +583,9 @@ scrollable-space: context [
 			;; 'reverse' because sshow/x means _horizontal_ scroller which eats up _vertical_ space
 			viewport: subtract-canvas canvas scrollers * reverse sshow	;-- viewport may be infinite if canvas is
 		]
-		hscroll/size/x: viewport/x * sshow/x					;-- masking avoids infinite size
-		vscroll/size/y: viewport/y * sshow/y
+		;; quiet to avoid deep invalidation
+		quietly hscroll/size: (viewport/x * sshow/x) by hscroll/size/y	;-- masking avoids infinite size
+		quietly vscroll/size: vscroll/size/x by (viewport/y * sshow/y)
 		
 		;; final size is viewport + free space filled by fill flags + scrollbars
 		free:   subtract-canvas viewport csize
@@ -601,8 +603,8 @@ scrollable-space: context [
 		quietly vscroll/offset: 100% * clip 0 1 (negate origin/y) / csize'/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
-		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
 		unless fits? [render space/scroll-timer]				;-- scroll-timer has to appear in the tree for timers
+		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
 		viewport: min viewport csize							;-- trunctate infinity for scrollers placement
 		quietly space/map: reshape-light [
 			@(content) [offset: 0x0 size: @(viewport)]
