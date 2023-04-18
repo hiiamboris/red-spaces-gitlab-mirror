@@ -167,7 +167,7 @@ context [
 		content: parse lines [collect [into =line= into =aligns= any [into =line=]] end (ok: yes)]
 		compose/deep/only pick [
 			;; wrap grid into a scrollable in case it is too wide, to prevent the rest of the text from stretching
-			[scrollable [grid pinned= 0x1 alignment= (copy aligns) (content)]]
+			[scrollable content-flow= 'vertical [grid pinned= 0x1 alignment= (copy aligns) (content)]]
 			[rich-content (decode-text flat join lines)]		;-- fall back to text if table parsing fails
 		] ok = yes
 	]

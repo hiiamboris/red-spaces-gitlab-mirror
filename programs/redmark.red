@@ -70,7 +70,7 @@ do/expand with spaces/ctx [
 		wrap-space: function [xy [pair!] space [object! none!]] [
 			cell: old-wrap-space xy space
 			quietly cell/align: any [pick alignment xy/x  -1x0]
-			quietly cell/margin: 10
+			quietly cell/margin: 10x10
 			cell
 		]
 	]
@@ -110,13 +110,13 @@ do/expand with spaces/ctx [
 			font: styling/fonts/code/base
 			below: [(underbox size 2 5)]
 		]
-		code: using [pen] [
+		code: [
 			if parent/font [							;-- different fonts for all headings and text
 				font: styling/fonts/code/(parent/font/size)
 			]
 			margin: 4x0
 			pen: when color (compose [pen (color)])
-			below: [(underbox size 1 3) (pen)]
+			below: reduce [quote (underbox size 1 3) pen]
 		]
 		thematic-break: [
 			below: [
@@ -146,6 +146,7 @@ red-mark: function [
 	view/flags reshape [
 		title !(rejoin ["RedMark - " to-local-file clean-path source])
 		on-resize :resize on-resizing :resize
+		below
 		host: host 600x400 [
 			style code-box: box color= opaque 'text 5% align= -1x0 margin= 10
 			; scrollable content-flow= 'vertical [vlist !(decode-markdown read/lines source)]
@@ -155,7 +156,8 @@ red-mark: function [
 				wrap-data: func [data] [data]
 				source: lay-out-vids !(decode-markdown read/lines source)
 			]
-		]
+		] on-over [status/text: mold hittest host/space event/offset]
+		status: text 600x30
 		at 0x0 text 0x0 rate 0:0:3 on-time [prof/show prof/reset]
 	] 'resize
 ]

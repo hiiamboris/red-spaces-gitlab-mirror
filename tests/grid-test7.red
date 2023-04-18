@@ -86,9 +86,9 @@ view/no-wait/options [
 								]
 							]
 							; 100
-							48
-							; 33
-							; 23
+							52
+							; 40
+							; 28
 					]
 					depth: depth - 1
 					r

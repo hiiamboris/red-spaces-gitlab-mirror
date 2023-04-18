@@ -65,7 +65,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default canvas: infxinf
 			default fill-x: no
 			default fill-y: no
-			canvas: extend-canvas canvas axis			;-- list is infinite along it's axis
+			canvas: extend-canvas canvas axis			;-- list is infinite along its axis
 			; canvas: constrain canvas limits
 			x: ortho y: axis
 			guide: axis2pair y
