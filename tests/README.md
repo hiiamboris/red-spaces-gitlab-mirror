@@ -90,7 +90,7 @@ Tests `field` operation. It's logic is quite tricky to get right.
 
 [**spiral-test.red**](spiral-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-test.gif></img>
+<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field-small.gif></img>
 
 Stress test. Huge editable field curled spirally. Very slow, because renders each glyph separately :)
 
