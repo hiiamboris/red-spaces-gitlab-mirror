@@ -1294,7 +1294,7 @@ Adds new facets:
 
 **Alignments** look like this (left, fill, then center, right - snapshot from [rich-test2](tests/README.md)):
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-paragraph-alignments.png></img>
+<img width=800 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-paragraph-alignments.png></img>
 
 `fill` alignment is the slowest one since it has to split paragraphs into multiple fragments that can then be uniformly spaced.\
 `upscale` horizontally scales every row until it fills the total width.\
