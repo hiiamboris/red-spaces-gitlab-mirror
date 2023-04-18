@@ -532,13 +532,13 @@ scrollable-space: context [
 		canvas: constrain canvas space/limits
 		
 		;; canvas and fill flags used by scrollable are not the same as those given to its content
-		;; content-flow extends canvas for the child and disables filling for inf dimensions to avoid glitches
+		;; content-flow disables filling for inf dimensions to avoid glitches
+		;; but leaves canvas finite, mainly for window to properly size itself (it can't on infinity)
 		cfill-x: cfill-y: no
-		; ccanvas: infxinf								;@@ or should planar flow always assume ccanvas=canvas?
-		ccanvas: canvas								;@@ or should planar flow always assume ccanvas=canvas?
+		ccanvas: canvas									;-- canvas for the child space - may differ by scroller size
 		switch space/content-flow [
-			vertical   [cfill-x: fill-x];  ccanvas/x: canvas/x]
-			horizontal [cfill-y: fill-y];  ccanvas/y: canvas/y]
+			vertical   [cfill-x: fill-x]
+			horizontal [cfill-y: fill-y]
 		]
 		
 		;; empty canvas or no content just leads to canvas filled according to content-flow rules (optimization)
