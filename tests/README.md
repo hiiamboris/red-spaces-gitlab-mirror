@@ -129,6 +129,17 @@ Simplest `list` of 3 `button` spaces.
 
 `list-view` test: each list-view item is a `label` which is a horizontal list. It shouldn't be "jumping" which is the case if each label filled the whole viewport of list-view vertically, and then `roll` function would always detect a jump condition.
 
+---
+
+[**list-test5.red**](list-test5.red)
+
+![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test5.gif)
+
+`list-view` and `scrollable` test: each list-view item is a `label` put into a scrollable (with different `content-flow` value). A very complex layout under the hood with many possible failure points:
+- window (in list-view) may not size itself properly if not given finite canvas (result may be empty)
+- inner scrollables may not adapt their size properly, or be given a wrong canvas (they should not exceed outer scrollable's viewport and should not try to fill it vertically, and they should not be empty)
+- unwanted invalidation in scrollable's drawing code may make this test slow (it should be realtime, with no noticeable delays)
+- weird glitches can be seen if inner scrollables trigger `roll` by their filling attempts
 
 
 ## Grid tests
