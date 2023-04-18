@@ -523,88 +523,100 @@ scrollable-space: context [
 		r
 	]
 
+	;; sizing policy (for cell, scrollable, window):
+	;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
+	;; - use canvas/size if it's less than content/size or if fill flag is set
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		;; sizing policy (for cell, scrollable, window):
-		;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
-		;; - use canvas/size if it's less than content/size or if fill flag is set
+		;; apply limits in the earnest - canvas size will become the upper limit
+		;@@ maybe render should do this?
+		canvas: constrain canvas space/limits
+		
+		;; canvas and fill flags used by scrollable are not the same as those given to its content
+		;; content-flow extends canvas for the child and disables filling for inf dimensions to avoid glitches
+		cfill-x: cfill-y: no
+		; ccanvas: infxinf								;@@ or should planar flow always assume ccanvas=canvas?
+		ccanvas: canvas								;@@ or should planar flow always assume ccanvas=canvas?
+		switch space/content-flow [
+			vertical   [cfill-x: fill-x];  ccanvas/x: canvas/x]
+			horizontal [cfill-y: fill-y];  ccanvas/y: canvas/y]
+		]
+		
+		;; empty canvas or no content just leads to canvas filled according to content-flow rules (optimization)
+		content: space/content
 		if any [
-			not space/content 
+			not content 
 			zero? area? canvas
 		][
-			set-empty-size space canvas fill-x fill-y
+			set-empty-size space canvas cfill-x cfill-y
 			return quietly space/map: []
 		]
-		box: canvas: constrain finite-canvas canvas space/limits				;-- 'box' is viewport - area not occupied by scrollbars
-		content: space/content
-		;; render it before 'size' can be obtained, also render itself may change origin (in `roll`)!
-		;; fill flag passed through as is: may be useful for 1D scrollables like list-view ?
-		cdrawn: render/on content box fill-x fill-y
+		
+		;; two rendering flows possible: with scrollbar subtracted and without it
+		;; it is more correct to start without it, though this also leads to double render of big content
+		;; an unfortunate slowdown, but mostly alleviated by caching
+		hscroll:   space/hscroll
+		vscroll:   space/vscroll
+		scrollers: vscroll/size/x by hscroll/size/y
+		cdrawn:    render/on content ccanvas cfill-x cfill-y
+		sshow:     0x0											;-- scrollers show mask 0=hidden, 1=visible
 		if all [
 			axis: switch space/content-flow [vertical ['y] horizontal ['x]]
-			content/size/:axis > box/:axis
+			content/size/:axis > canvas/:axis
 		][														;-- have to add the scroller and subtract it from canvas width
-			scrollers: space/vscroll/size/x by space/hscroll/size/y
-			box: max 0x0 box - (scrollers * axis2pair ortho axis)	;-- valid since canvas is finite
-			cdrawn: render/on content box fill-x fill-y
+			sshow/:axis: 1										;-- for long vertical reduce xsize and enable vscroll
+			ccanvas: subtract-canvas ccanvas (scrollers * reverse sshow)
+			cdrawn: render/on content ccanvas cfill-x cfill-y
 		]
-		csz: content/size
-		origin: space/origin									;-- must be read after render (& possible roll)
+		
+		viewport: min canvas ccanvas							;-- viewport is area not occupied by scrollbars
+		csize:    content/size
+		origin:   space/origin									;-- must be read after render (& possible roll)
 		;; no origin clipping can be done here, otherwise it's changed during intermediate renders
 		;; and makes it impossible to scroll to the bottom because of window resizes!
-		;; clipping is done by /clip-origin, usually in event handlers where size & viewport are valid
+		;; clipping is done by /clip-origin, usually in event handlers where size & viewport are valid (final)
 		
 		;; determine what scrollers to show
 		loop 2 [												;-- each scrollbar affects another's visibility
-			if hdraw?: box/x < csz/x [box/y: max 0 canvas/y - space/hscroll/size/y]
-			if vdraw?: box/y < csz/y [box/x: max 0 canvas/x - space/vscroll/size/x]
+			if viewport/x < csize/x [sshow/x: 1]
+			if viewport/y < csize/y [sshow/y: 1]
+			;; 'reverse' because sshow/x means _horizontal_ scroller which eats up _vertical_ space
+			viewport: subtract-canvas canvas scrollers * reverse sshow	;-- viewport may be infinite if canvas is
 		]
-		space/hscroll/size/x: box/x * hmask: pick [1 0] hdraw?
-		space/vscroll/size/y: box/y * vmask: pick [1 0] vdraw?
+		hscroll/size/x: viewport/x * sshow/x					;-- masking avoids infinite size
+		vscroll/size/y: viewport/y * sshow/y
 		
-		;; size is canvas along fill=1 dimensions and min(canvas,csz+scrollers) along fill=0
-		scrollers: as-pair
-			space/vscroll/size/x * vmask
-			space/hscroll/size/y * hmask
-		sz1: min canvas csz + scrollers  sz2: canvas
-		space/size: constrain
-			sz1 + fill-canvas (max 0x0 sz2 - sz1) fill-x fill-y
-			space/limits
-		; echo [sz1 sz2 canvas csz space/size]
-		box: min box (space/size - scrollers)					;-- reduce viewport
-		
-		;; 'full' is viewport(box) + hidden (in all directions) part of content
-		end:  max box csz + bgn: min 0x0 origin
-		full: max 1x1 end - bgn
+		;; final size is viewport + free space filled by fill flags + scrollbars
+		free:   subtract-canvas viewport csize
+		hidden: subtract-canvas csize viewport
+		space/size: (min viewport csize) + (fill-canvas free fill-x fill-y) + (scrollers * reverse sshow)
+		; ?? [canvas ccanvas viewport csize sshow free hidden space/size]
 		
 		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
 		;; (else may stack up to 99% of all rendering time)
-		quietly space/hscroll/amount: 100% * box/x / full/x
-		quietly space/hscroll/offset: 100% * (negate bgn/x) / full/x
-		quietly space/vscroll/amount: 100% * box/y / full/y
-		quietly space/vscroll/offset: 100% * (negate bgn/y) / full/y
+		;@@ maybe move this into the scrollers?
+		csize': max 1x1 csize							;-- avoid division by zero
+		quietly hscroll/amount: 100% * min 1.0 viewport/x / csize'/x
+		quietly hscroll/offset: 100% * clip 0 1 (negate origin/x) / csize'/x
+		quietly vscroll/amount: 100% * min 1.0 viewport/y / csize'/y
+		quietly vscroll/offset: 100% * clip 0 1 (negate origin/y) / csize'/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
-		quietly space/map: compose/deep [				;@@ should be reshape (to remove scrollers) but it's too slow
-			(space/content) [offset: 0x0 size: (box)]
-			(space/hscroll) [offset: (box * 0x1) size: (space/hscroll/size)]
-			(space/vscroll) [offset: (box * 1x0) size: (space/vscroll/size)]
-			(space/scroll-timer) [offset: 0x0 size: 0x0]		;-- list it for tree correctness
+		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
+		unless fits? [render space/scroll-timer]				;-- scroll-timer has to appear in the tree for timers
+		viewport: min viewport csize							;-- trunctate infinity for scrollers placement
+		quietly space/map: reshape-light [
+			@(content) [offset: 0x0 size: @(viewport)]
+		/?	@(hscroll) [offset: @(viewport * 0x1) size: @(hscroll/size)]	/if sshow/x = 1
+		/?	@(vscroll) [offset: @(viewport * 1x0) size: @(vscroll/size)]	/if sshow/y = 1
+		/?	@(space/scroll-timer) [offset: 0x0 size: 0x0]					/if not fits?	;-- list it for tree correctness
 		]
-		space/scroll-timer/rate: either any [hdraw? vdraw?] [16][0]	;-- turns off timer when unused!
-		render space/scroll-timer								;-- scroll-timer has to appear in the tree for timers
 		
-		; invalidate/only [hscroll vscroll]
-		invalidate/only space/hscroll
-		invalidate/only space/vscroll
+		invalidate/only hscroll									;-- let scrollers know they were changed
+		invalidate/only vscroll
 		
-		#debug grid-view [#print "origin in scrollable/draw: (origin)"]
 		cdrawn: compose/only [translate (origin) (cdrawn)]
-		unless fits?: all [0x0 +<= origin  origin + content/size +<= box] [
-			cdrawn: compose/only [clip 0x0 (box) (cdrawn)]		;-- only use clipping when required! (for drop-down)
-		]
-		compose/only [
-			(cdrawn) (compose-map/only space/map reduce [space/hscroll space/vscroll])
-		]
+		unless fits? [cdrawn: compose/only [clip 0x0 (viewport) (cdrawn)]]	;-- only use clipping when required! (for drop-down)
+		compose/only [(cdrawn) (compose-map/only space/map reduce [hscroll vscroll])]
 	]
 		
 	declare-template 'scrollable/space [
@@ -2061,6 +2073,7 @@ window-ctx: context [
 		size: window/pages * finite-canvas canvas
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
 			cdraw: render/window/on content -org -org + size canvas fill-x fill-y	;@@ off fill flags when window is less than content?
+			; ?? [canvas size window/pages content/size]
 			;; once content is rendered, it's size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
 			if content/size [size: min size content/size - org]	;-- size has to be finite
