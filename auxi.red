@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs half toggle range! range? .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
+exports: [by abs half range! range? make-range .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -88,11 +88,12 @@ copy-deep-map: function [m [map!]] [
 ;; space with draw=[] = 512 B, rectangle = 1196 B, timer does not need this at all
 range!: object [min: max: none]
 range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
-..: make op! function [									;-- name `to` cannot be used as it's a native
+..: make op! make-range: function [						;-- name `to` cannot be used as it's a native
 	"Make a range from A to B"
 	a [scalar! none!]
 	b [scalar! none!]
 ][
+	#assert [any [not a  not b  b >= a]  "Reversed limits detected!"]
 	make range! [min: a max: b]
 ]
 
