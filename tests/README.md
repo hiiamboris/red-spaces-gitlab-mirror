@@ -211,7 +211,7 @@ Test for column [autofit algorithms](../design-cards/grid-autofit.md). Contains 
 
 [**rich-test1.red**](rich-test1.red)
 
-![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-rich-test1.png)
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-rich-test1.png></img>
 
 A simplest rich content test which I'm using to debug whitespace handling, hittesting and caret location.
 
@@ -236,7 +236,7 @@ Simplest scenario that tests deep cache fetching after a render on another canva
 
 [**sync-test2.red**](sync-test2.red)
 
-<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test2.png></img>
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test2.png></img>
 
 More complex scenario with multiple nested tubes, for the same purpose. "T" letter should be seen *by hittest* in the center.
 
