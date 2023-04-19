@@ -127,7 +127,7 @@ Simplest `list` of 3 `button` spaces.
 
 ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test4.gif)
 
-`list-view` test: each list-view item is a `label` which is a horizontal list. It shouldn't be "jumping" which is the case if each label filled the whole viewport of list-view vertically, and then `roll` function would always detect a jump condition.
+`list-view` test: each list-view item is a `label` which is a horizontal list. It shouldn't be "jumping" which is the case if each label filled the whole viewport of list-view vertically, and then `roll` function would always detect a jump condition. Full-sized zebra should indicate that items fill the viewport horizontally.
 
 ---
 

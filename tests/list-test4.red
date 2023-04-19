@@ -10,8 +10,10 @@ Red [
 view/no-wait/options expand-directives [
 	below
 	host focus [
-		list-view 200x200 source= map-each i 15 [i] wrap-data= func [i] [
-			first lay-out-vids [label image= #"0" + i text= `"label text (i)"`]
+		list-view 200x200 with [list/spacing: 0]		;-- zero spacing for equal zebra bands
+		source= map-each i 15 [i] wrap-data= function [i] [
+			color: opaque 'text pick [10% 0%] even? i
+			first lay-out-vids [box margin= 4x2 left color= color [label image= #"0" + i text= `"label text (i)"`]]
 		]
 	]
 	on-over [status/text: mold hittest face/space event/offset]
