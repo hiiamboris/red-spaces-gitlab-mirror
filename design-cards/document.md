@@ -11,23 +11,23 @@ Funny but despite the ages of web browsers development, they don't usually let u
 Word processors we all know, I bet no user really understands:
 - What will happen on Tab key press?
 
-  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-tab-key.gif />
+  <img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-tab-key.gif />
   
 - How will right-aligned numbered paragraph look like with nonzero indentation?
 
-  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-right-aligned.gif />
+  <img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-right-aligned.gif />
   
 - What if line contains more whitespace that can fit the screen?
 
-  <img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-long-line.gif />
+  <img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-long-line.gif />
   
 - Is it possible select whole first row of a grid and only a half of second row? Or part of the 1x1 cell and part of the 2x1 cell?
 
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
+  <img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-table-select.gif />
 
 - If part of the grid is copied, how is it inserted inside and outside the grid?
  
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-insert.gif />
+  <img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-table-insert.gif />
 
 These are just a few examples of implementation edge cases, but any implementation has to consider them.
 
@@ -52,7 +52,7 @@ This task presents a few challenges:
    
    Sometimes leading whitespace affects the result:
    
-   <img width=200 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-leading-space.gif />
+   <img width=200 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-leading-space.gif />
    
 3. Stretching.
 
@@ -95,7 +95,7 @@ Rendering phase (including splitting at row and word margins) combines clipping 
 
 Here's an illustration of how paragraph model performs in practice when containers can pass along section data from their children:
 
-<img width=700 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif />
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-rich-content-fill-alignment.gif />
 
 ## Data representation
 
@@ -141,11 +141,11 @@ But document can also be **flat**. Omitting implementation details, every 'chara
 Key difference between flat and tree models can be illustrated using selection with e.g. a grid object:
 - In the tree model, selection can start outside of the grid, and end within one of its cells. Ideally such selection should be copied and inserted as a subtree, but I never saw it implemented by anyone. Caret offsets can span whole tree.
 
-  <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-browser-table-select.gif />
+  <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-browser-table-select.gif />
   
 - In the flat model, if selection starts outside of the grid, it can only include grid as a whole. And whole grid can be inserted anywhere, including one of grid cells. Caret offset within the cell does not belong to the outside document, but to a separate one.
 
-  <img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-gdocs-table-select.gif />
+  <img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-gdocs-table-select.gif />
   
 It's an interesting distinction that can be seen in how selection works in browsers vs how it works in word processors. Former work on the tree, latter use the flat model.
 
@@ -176,7 +176,7 @@ Red native clipboard implementation can only carry text, images and file lists, 
 
 From what I read about Windows clipboard, it was a mess and remains a mess. Every program seems to define its own clipboard format only it is able to read. Somehow I am able to copy formatted text from a native word processor and insert it into Google Docs (I suggest it used RTF clipboard format), but even that is a pathetic failure:
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-clipboard-formatted.gif />
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-clipboard-formatted.gif />
 
 It copied bold and italic flags but totally lost font face and size. Hello from 2023, ancestors 🖐🛸. Sixty years after hypertext invention we're still unable to move it between programs. Let's wait another 60 and see.
 

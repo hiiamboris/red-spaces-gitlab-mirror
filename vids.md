@@ -120,7 +120,7 @@ view [host [
 	label #"☺" "some text" underline teal
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-instantiation.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-style-instantiation.png)
 
 Important quote from [Quickstart](quickstart.md):
 > **Standard [VID](https://doc.red-lang.org/en/vid.html) starts after `view [` and is used to describe faces layout. After `host [` VID ends and specialized [VID/S](#layout-dsl) begins.**
@@ -144,7 +144,7 @@ view [host [
 	vlist [big-button "abc" big-button "def"]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-style-definition.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-style-definition.png)
 
 All set-words within the style definition are bound to an anonymous context, so complex styles can be defined with their own local widget names, and their instances will not interfere with each other.
 
@@ -172,7 +172,7 @@ hlist [
 	roller roller roller 
 ]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-complex-style-definition.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-complex-style-definition.gif)
 
 #### Customizing the stylesheet
 
@@ -231,7 +231,7 @@ view [host [
 	]
 ]]
 ```  
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-pane-definition.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-pane-definition.png)
 
 
 ### `with`
@@ -247,7 +247,7 @@ view [host [
 	button with [data: "some text" font: make font! [size: 20] limits: none]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-with.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-modifier-with.png)
 
 ### `react`
 
@@ -269,7 +269,7 @@ view/flags [
 	] react [h/size: h/parent/size - 20]			;) VID react keyword
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-modifier-react.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-modifier-react.gif)
 
 ### Actor definition
 
@@ -316,7 +316,7 @@ view [host [
 		color= green - 20
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-facet-assignment.png)
 
 ```
 text: "no conflict between style names and their facets!"
@@ -324,7 +324,7 @@ view [host [
 	text text= text
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-facet-assignment-2.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-facet-assignment-2.png)
 
 <details><summary>Why invent such an alien to Redbol world syntax?...</summary>
 
@@ -380,7 +380,7 @@ view [host [
 	]
 ]]
 ```  
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-auto-facet.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-auto-facet.png)
 
 
 ### Flags setting
@@ -409,7 +409,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-flags-setting.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-flags-setting.png)
 
 ---
 ```
@@ -420,7 +420,7 @@ view [host [
 	]
 ]]
 ```
-<img src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-ellipsization.gif width=300></img>
+<img src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-ellipsization.gif width=300></img>
 
 
 ### Coloring
@@ -445,7 +445,7 @@ view [host 100x100 [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-coloring.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-coloring.png)
 
 ### Constraining the size
 
@@ -479,7 +479,7 @@ view/flags [
 	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-size-constraining.gif)
 
 ---
 ```
@@ -493,7 +493,7 @@ view/flags [
 	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-size-constraining-2.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-size-constraining-2.gif)
 
 ### Weight effect
 
@@ -511,7 +511,7 @@ view/flags [
 	] react [face/size: face/parent/size - 20]
 ] 'resize
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-weight-effect.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-weight-effect.gif)
 
 
 ### Grid-specific extensions
@@ -539,7 +539,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-grid-extensions.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-grid-extensions.png)
 
 ## Popups
 
@@ -560,7 +560,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-hints.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-hints.gif)
 
 **Warning:** tablet users won't see it! Mind your audience.
 
@@ -604,5 +604,5 @@ menu: reshape [
 	)
 ]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-menu.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-menu.png)
 

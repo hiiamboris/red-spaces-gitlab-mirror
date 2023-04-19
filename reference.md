@@ -74,7 +74,7 @@ view [host [
 	]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-new-template.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-new-template.png)
 
 Note that there's no VID/S style or template style defined for it yet, so VID/S won't be able to use [auto-facets](vids.md#auto-facets), and font and color won't work (because their application for `bold-text` template must defined by `bold-text` style akin to what `text` style does).
 
@@ -114,7 +114,7 @@ view [host [
 	]]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-new-space-object.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-new-space-object.png)
 
 Child space created manually example:
 ```
@@ -122,7 +122,7 @@ view [host [
 	cell 100x50 content= make-space 'text [text: "abc"]
 ]]
 ```
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-new-named-space.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-new-named-space.png)
 
 ### Testing
 
@@ -380,7 +380,7 @@ Has weight of `1`, which makes it stretch. See [VID/S manual](vids.md#weight-eff
 Draws a simple box across it's `size`. To be used in other spaces (as interactive region). Currently used only to draw scrollbar's thumb and caret.
 
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rectangle.png) | `rectangle with [margin: 5 size: 80x60]` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-rectangle.png) | `rectangle with [margin: 5 size: 80x60]` |
 |-|-|
 
 | facet  | type  | description |
@@ -393,11 +393,11 @@ Draws a simple box across it's `size`. To be used in other spaces (as interactiv
 
 Draws an [isosceles triangle](https://en.wikipedia.org/wiki/Isosceles_triangle). To be used in other spaces. Currently used only to draw scrollbar's arrows.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-triangle-n.png) | `triangle with [margin: 5 size: 80x60 dir: 'n]` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-triangle-n.png) | `triangle with [margin: 5 size: 80x60 dir: 'n]` |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-triangle-e.png) | **`triangle with [margin: 5 size: 80x60 dir: 'e]`** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-triangle-s.png) | **`triangle with [margin: 5 size: 80x60 dir: 's]`** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-triangle-w.png) | **`triangle with [margin: 5 size: 80x60 dir: 'w]`** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-triangle-e.png) | **`triangle with [margin: 5 size: 80x60 dir: 'e]`** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-triangle-s.png) | **`triangle with [margin: 5 size: 80x60 dir: 's]`** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-triangle-w.png) | **`triangle with [margin: 5 size: 80x60 dir: 'w]`** |
 
 | facet  | type  | description |
 |-|-|-|
@@ -410,7 +410,7 @@ Draws an [isosceles triangle](https://en.wikipedia.org/wiki/Isosceles_triangle).
 
 Basic image renderer. To be used in more complex templates or standalone. Canvas and limits are used to scale the image up/down when necessary.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-image.png) | <pre>image with [<br>    p: [translate 50x50 pen red line-width 2 spline -40x-28 0x-46]<br>    loop 20 [append p -1x1 * (reverse last p) * 0.9]<br>    data: system/words/draw 100x100 p<br>    margin: 5<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-image.png) | <pre>image with [<br>    p: [translate 50x50 pen red line-width 2 spline -40x-28 0x-46]<br>    loop 20 [append p -1x1 * (reverse last p) * 0.9]<br>    data: system/words/draw 100x100 p<br>    margin: 5<br>]</pre> |
 |-|-|
 
 | facet  | type  | description |
@@ -425,7 +425,7 @@ Basic image renderer. To be used in more complex templates or standalone. Canvas
 
 Basic single-line text renderer.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-text.png) | <pre>text with [<br>    text: "Single line text"<br>    margin: 10<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-text.png) | <pre>text with [<br>    text: "Single line text"<br>    margin: 10<br>]</pre> |
 |-|-|
 
 | facet  | type  | description |
@@ -443,7 +443,7 @@ Basic single-line text renderer.
 
 Basic multi-line text renderer. Wrap margin is controlled by canvas size, which is in turn constrained by /limits facet.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-paragraph.png) | <pre>paragraph with [<br>    margin: 20x10<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-paragraph.png) | <pre>paragraph with [<br>    margin: 20x10<br>    text: "You cannot hold back a good laugh any more than you can the tide. Both are forces of nature."<br>]</pre> |
 |-|-|
 
 Inherits all of `text` facets:
@@ -463,7 +463,7 @@ Inherits all of `text` facets:
 
 Basic URL renderer, based on `paragraph`. Useful for embedding clickable references into the layout. 
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-link.png) | <pre>link with [<br>    text: https://codeberg.org/hiiamboris/red-spaces/src/branch/master/reference.md<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-link.png) | <pre>link with [<br>    text: https://codeberg.org/hiiamboris/red-spaces/src/branch/master/reference.md<br>]</pre> |
 |-|-|
 
 Inherits all of `paragraph` facets:
@@ -504,16 +504,16 @@ Note that `offset` and `side` do not affect the caret itself, but serve as hint 
 
 Basic alignment box: aligns a single child space on the canvas.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box--1x-1.png) | <pre>box align= -1x-1 [text "aligned^/content"]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box--1x-1.png) | <pre>box align= -1x-1 [text "aligned^/content"]</pre> |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-0x-1.png) | **<pre>box align=  0x-1 [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-1x-1.png) | **<pre>box align=  1x-1 [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box--1x0.png) | **<pre>box align= -1x0  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-0x0.png)  | **<pre>box align=  0x0  [text "aligned^/content"]</pre> (default)** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-1x0.png)  | **<pre>box align=  1x0  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box--1x1.png) | **<pre>box align= -1x1  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-0x1.png)  | **<pre>box align=  0x1  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-box-1x1.png)  | **<pre>box align=  1x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-0x-1.png) | **<pre>box align=  0x-1 [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-1x-1.png) | **<pre>box align=  1x-1 [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box--1x0.png) | **<pre>box align= -1x0  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-0x0.png)  | **<pre>box align=  0x0  [text "aligned^/content"]</pre> (default)** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-1x0.png)  | **<pre>box align=  1x0  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box--1x1.png) | **<pre>box align= -1x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-0x1.png)  | **<pre>box align=  0x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-box-1x1.png)  | **<pre>box align=  1x1  [text "aligned^/content"]</pre>** |
 
 | facet  | type  | description |
 |-|-|-|
@@ -525,16 +525,16 @@ Basic alignment box: aligns a single child space on the canvas.
 
 `box` with a visible frame around (drawn by style).
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell--1x-1.png) | <pre>cell align= -1x-1 [text "aligned^/content"]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell--1x-1.png) | <pre>cell align= -1x-1 [text "aligned^/content"]</pre> |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-0x-1.png) | **<pre>cell align=  0x-1 [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-1x-1.png) | **<pre>cell align=  1x-1 [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell--1x0.png) | **<pre>cell align= -1x0  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-0x0.png)  | **<pre>cell align=  0x0  [text "aligned^/content"]</pre> (default)** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-1x0.png)  | **<pre>cell align=  1x0  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell--1x1.png) | **<pre>cell align= -1x1  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-0x1.png)  | **<pre>cell align=  0x1  [text "aligned^/content"]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-cell-1x1.png)  | **<pre>cell align=  1x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-0x-1.png) | **<pre>cell align=  0x-1 [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-1x-1.png) | **<pre>cell align=  1x-1 [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell--1x0.png) | **<pre>cell align= -1x0  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-0x0.png)  | **<pre>cell align=  0x0  [text "aligned^/content"]</pre> (default)** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-1x0.png)  | **<pre>cell align=  1x0  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell--1x1.png) | **<pre>cell align= -1x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-0x1.png)  | **<pre>cell align=  0x1  [text "aligned^/content"]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-cell-1x1.png)  | **<pre>cell align=  1x1  [text "aligned^/content"]</pre>** |
 
 Inherits all facets from `box`:
 
@@ -627,10 +627,10 @@ Introduces new facets:
 Clickable button, extends [`clickable`](#clickable).
 
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-button-1.png) | `button "OK"` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-button-1.png) | `button "OK"` |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-button-2.png) | **<pre>button with [<br>    data: system/words/draw 40x40 [<br>        pen red triangle 20x5 5x35 35x35<br>    ]<br>]</pre>** |
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-button-3.png) | **<pre>button with [<br>    data: reduce [<br>        system/words/draw 40x40 [<br>            pen red triangle 20x5 5x35 35x35<br>            text 19x15 "!"<br>        ]<br>        "ACHTUNG^/TEXT"<br>    ]<br>]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-button-2.png) | **<pre>button with [<br>    data: system/words/draw 40x40 [<br>        pen red triangle 20x5 5x35 35x35<br>    ]<br>]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-button-3.png) | **<pre>button with [<br>    data: reduce [<br>        system/words/draw 40x40 [<br>            pen red triangle 20x5 5x35 35x35<br>            text 19x15 "!"<br>        ]<br>        "ACHTUNG^/TEXT"<br>    ]<br>]</pre>** |
 
 Tip: `system/words/draw` is used instead of `draw` when inside spaces context (`with`), as `draw` refers to it's rendering function.
 
@@ -659,7 +659,7 @@ Introduces new facets:
 
 Basic editable single-line text field, based on [`text`](#text).
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-field.png) | `field with [text: "edit me"]` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-field.png) | `field with [text: "edit me"]` |
 |-|-|
 
 Inherits all of `text` facets:
@@ -693,7 +693,7 @@ Note: `caret/offset` and `selected` facets use zero-based *offsets from head* as
 
 Concise display of `logic!` values.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-logic.png) | <pre>hlist [<br>	logic state= on<br>	logic state= off<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-logic.png) | <pre>hlist [<br>	logic state= on<br>	logic state= off<br>]</pre> |
 |-|-|
 
 Supported facets:
@@ -706,7 +706,7 @@ Supported facets:
 
 Interactive binary switch. To be used as a base for labeled switches.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-switch.png) | <pre>hlist [<br>	switch state= on<br>	switch state= off<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-switch.png) | <pre>hlist [<br>	switch state= on<br>	switch state= off<br>]</pre> |
 |-|-|
 
 Supported facets:
@@ -719,7 +719,7 @@ Supported facets:
 
 High level text label, supporting up to 3 lines of text (label text and commentary) and a sigil (image or character).
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-label.png) | `label #"🚘" "Take a ride?^/waiting time ~2min"` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-label.png) | `label #"🚘" "Take a ride?^/waiting time ~2min"` |
 |-|-|
 
 
@@ -738,9 +738,9 @@ Supported facets:
 
 Obvious. To be used in other spaces, as by itself it's not interactive. Used in `scrollable` template. Uses `rectangle` and `triangle`.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-scrollbar-1.png) | `scrollbar with [size: 100x20 offset: 0.6 amount: 0.3 axis: 'x]` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-scrollbar-1.png) | `scrollbar with [size: 100x20 offset: 0.6 amount: 0.3 axis: 'x]` |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-scrollbar-2.png) | **`scrollbar with [size: 20x100 offset: 0.6 amount: 0.3 axis: 'y]`** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-scrollbar-2.png) | **`scrollbar with [size: 20x100 offset: 0.6 amount: 0.3 axis: 'y]`** |
 
 | facet  | type  | description |
 |-|-|-|
@@ -757,7 +757,7 @@ Scrollbar will try it's best to adapt it's appearance to remain useable (visible
 
 Wrapper for bigger (but finite) spaces. Automatically shows/hides scrollbars and provides event handlers to scroll it's content interactively.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-scrollable.png) | <pre>scrollable 100x100 [<br>	space size= 200x300<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-scrollable.png) | <pre>scrollable 100x100 [<br>	space size= 200x300<br>]</pre> |
 |-|-|
 
 | facet  | type  | description |
@@ -839,7 +839,7 @@ By default it is defined to:
 
 Wrapper for infinite spaces: `scrollable` with it's `content` set to `window`. Automatically moves the window across content when it comes near the borders, provides relevant event handlers.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-inf-scrollable.png) | <pre>inf-scrollable with [<br>	size: 100x100<br>	window/content: make-space 'space [<br>		available?: func [axis dir from req] [req]<br>	]<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-inf-scrollable.png) | <pre>inf-scrollable with [<br>	size: 100x100<br>	window/content: make-space 'space [<br>		available?: func [axis dir from req] [req]<br>	]<br>]</pre> |
 |-|-|
 
 Inherits all of `scrollable` facets:
@@ -977,7 +977,7 @@ See [rich-paragraph](#rich-paragraph) to better understand how it works.
 
 A `container` that arranges spaces using `list` layout. VID/S defines styles `vlist` and `hlist` for convenience, based on this template.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-list.png) | <pre>vlist [<br>	button "button 1"<br>	button "button 2"<br>	button "button 3"<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-list.png) | <pre>vlist [<br>	button "button 1"<br>	button "button 2"<br>	button "button 3"<br>]</pre> |
 |-|-|
 
 Inherits all of `container` facets:
@@ -1006,7 +1006,7 @@ Note that list:
 
 An inf-scrollable that is used to display finite or infinite amount of data using list layout.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-list-view.png) | <pre>list-view data= func [/pick i /size] [if pick [i]]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-list-view.png) | <pre>list-view data= func [/pick i /size] [if pick [i]]</pre> |
 |-|-|
 
 Note: above list is infinite because `data/size` returns `none`. `data/pick i` returns item number `i` itself, that's why it's populated with just numbers.
@@ -1062,9 +1062,9 @@ A `container` that arranges spaces using `tube` layout (aka flow layout). VID/S 
 
 Supports configuration of direction and alignment.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-row.png) | <pre>row 150 [<br>	button "button 1"<br>	button "..2.."<br>	button "3"<br>	button "button 4"<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-row.png) | <pre>row 150 [<br>	button "button 1"<br>	button "..2.."<br>	button "3"<br>	button "button 4"<br>]</pre> |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-column.png) | **<pre>column 0x0 .. (infxinf/x by 150) [<br>	button "button 1"<br>	button "..2.."<br>	button "3"<br>	button "button 4"<br>]</pre>** |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-column.png) | **<pre>column 0x0 .. (infxinf/x by 150) [<br>	button "button 1"<br>	button "..2.."<br>	button "3"<br>	button "button 4"<br>]</pre>** |
 
 
 Here's a quick glance at how `list` is different from `tube`:
@@ -1072,7 +1072,7 @@ Here's a quick glance at how `list` is different from `tube`:
 | | list | tube |
 |-|-|-|
 | example code | <pre>style box: cell 50x50 .. none sky<br>hlist [box box box box box]</pre> | <pre>style box: cell 50x50 .. none pink<br>row [box box box box box]</pre> |
-| behavior | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-list-resize.gif) | ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-row-resize.gif) |
+| behavior | ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-list-resize.gif) | ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-row-resize.gif) |
 | summary | <ul><li>always continues along the chosen axis<li>never stretches it's items along the chosen axis<li>expands itself over the canvas when it's too small<li>should be used with scrollers for clipped content to be accessible</ul> | <ul><li>attempts to fill the canvas by stretching it's items<li>tries not to extend over canvas when possible<li>when items don't fit in, starts another row or column</ul> |
 | area of use | scrollable lists, or where layout should be guaranteed | flexible lists, that should fit the canvas, smart enough to split when they can't fit |
 
@@ -1111,7 +1111,7 @@ Expand to see all supported axes/align combinations.
 
 Generated using [`tube-test.red`](tests/tube-test.red):
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/tube-axes-alignments-showcase.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/tube-axes-alignments-showcase.png)
 
 </details>
 
@@ -1130,7 +1130,7 @@ This works fine with spaces like `box`, which just expand to the given size, and
 A `container` that arranges spaces using `ring` layout. Used by ring menu popup.
 
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-ring.png) | <pre>ring [<br>	button "button 1"<br>	button "button 2"<br>	button "button 3"<br>	button "button 4"<br>	button "button 5"<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-ring.png) | <pre>ring [<br>	button "button 1"<br>	button "button 2"<br>	button "button 3"<br>	button "button 4"<br>	button "button 5"<br>]</pre> |
 |-|-|
 
 Inherits all of `container` facets:
@@ -1159,7 +1159,7 @@ Features:
 - Grid can have infinite height.
 - Grid cells can span multiple rows and/or columns.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-grid.png) | <pre>grid autofit= none [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-grid.png) | <pre>grid autofit= none [<br>    at 2x1 image data= system/words/draw 40x40 [<br>    	pen red triangle 20x5 5x35 35x35<br>    ]<br>    at 1x2 cell [text "some text"]<br>    at 3x2 field "field"<br>    at 2x3 button "button"<br>]</pre> |
 |-|-|
 
 | facet  | type | description |
@@ -1204,9 +1204,9 @@ For more info about these functions, create a grid `g: make-space 'grid []` and 
 
 An [`inf-scrollable`](#inf-scrollable) wrapper around [`grid`](#grid), used to display finite or infinite amount of **data**.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [either size [ [x #[none] y #[none]] ][ xy ]]<br>]</pre><br>Tip: `size/x = size/y = none` means infinite in both directions |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [either size [ [x #[none] y #[none]] ][ xy ]]<br>]</pre><br>Tip: `size/x = size/y = none` means infinite in both directions |
 |-|-|
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-gridview-autofitted.gif) | <pre>grid-view source= [<br>	[1 "22 22"]<br>	["3 3 3" "4444 4444 4444 4444"]<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-gridview-autofitted.gif) | <pre>grid-view source= [<br>	[1 "22 22"]<br>	["3 3 3" "4444 4444 4444 4444"]<br>]</pre> |
 
 Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 
@@ -1257,7 +1257,7 @@ Pagination works as explained for [`inf-scrollable`](#inf-scrollable). The only 
 
 A `container` specially designed to display mixed content (text, and other spaces, including images). Arranges spaces using `paragraph` layout. Used by [`rich-content`](#rich-content).
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-paragraph.png) | <pre>rich-paragraph [<br>	text "some text "<br>	image data= draw 40x30 [<br>		triangle 3x25 37x25 20x5<br>		triangle 13x15 27x15 20x25<br>	]<br>	text " with an image"<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-rich-paragraph.png) | <pre>rich-paragraph [<br>	text "some text "<br>	image data= draw 40x30 [<br>		triangle 3x25 37x25 20x5<br>		triangle 13x15 27x15 20x25<br>	]<br>	text " with an image"<br>]</pre> |
 |-|-|
 
 Like [`tube`](#tube), it is a flow layout, but with the following major differences:
@@ -1294,7 +1294,7 @@ Adds new facets:
 
 **Alignments** look like this (snapshot from [rich-test2](tests/README.md)):
 
-<img width=900 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-paragraph-alignments.png></img>
+<img width=900 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-rich-paragraph-alignments.png></img>
 
 `fill` alignment is the slowest one since it has to split paragraphs into multiple fragments that can then be uniformly spaced.\
 `upscale` horizontally scales every row until it fills the total width.\
@@ -1327,7 +1327,7 @@ Example: for `text margin= 10x5 "hello world"` sections may return: `[10 26 -4 3
 
 A `rich-paragraph` that adds the ability to edit content and fill it from the source dialect. It is not interactive out of the box (see [`editor`](#editor) for that).
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-rich-content.png) | `rich-content ["normal " bold "bold" italic " italic " /bold size: 15 underline "big" /underline /size " text"]` |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-rich-content.png) | `rich-content ["normal " bold "bold" italic " italic " /bold size: 15 underline "big" /underline /size " text"]` |
 |-|-|
 
 Source dialect summary (not meant to be concise, meant to be easy to parse):
@@ -1388,7 +1388,7 @@ A vertical list of `rich-content` spaces. Represents a non-interactive hypertext
 
 Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-document.png) | <pre>document 80 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-document.png) | <pre>document 80 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
 |-|-|
 
 
@@ -1420,7 +1420,7 @@ A scrollable wrapper around `document`. Represents an interactive editable hyper
 
 Has to be imported separately: [`#include %widgets/document.red`](widgets/document.red). `document.red` file contains both `document` and `editor` templates.
 
-| ![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-template-editor.gif) | <pre>editor 80x70 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-editor.gif) | <pre>editor 80x70 [<br>	rich-content [italic "First " /italic "paragraph text"]<br>	rich-content [italic "Second" /italic " paragraph text"]<br>	rich-content [italic "Third" /italic " paragraph text"]<br>]</pre> |
 |-|-|
 
 See [Document Editor](samples/editor) sample for advanced usage. 

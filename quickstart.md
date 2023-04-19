@@ -161,7 +161,7 @@ view [
 
 Code assumes /spaces and /common reside in this script's directory, if they're not, fix the path. Then run the script: `red hello-space.red`.
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-hello.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-hello.png)
 
 A few notes:
 

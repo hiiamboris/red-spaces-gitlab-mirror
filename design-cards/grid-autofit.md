@@ -3,7 +3,7 @@
 This is something we are all accustomed to and every table widget should support.
 
 All modern browsers implement such automatic estimation (on these gifs - Pale Moon browser):
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-browser-autofit.gif></img> <img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-browser-autofit-pics.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-browser-autofit.gif></img> <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-browser-autofit-pics.gif></img>
 
 The task is: knowing cells content (which can be arbitrary and can follow unknown scaling algorithms) and total width to fill, adjust all column widths so that the table would look pleasant to the human eye and these widths would sum to total width. And do that with as little rendering attempts as possible.
 
@@ -17,7 +17,7 @@ A total of four fitting algorithms is implemented (each with it's own strengths)
 
 A key idea is to treat each cell as an aquarium: it's amount of liquid (area) doesn't change and if we stretch aquarium's width, it's waterline (height) comes down proportionally. Thus we get a hyperbola `W×H = const`. As such, it works best for flow layouts of small items (small individual letters of `text`, small images in a `row`).
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/illustration-aquarium-cell.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/illustration-aquarium-cell.gif)
 
 ## `width-difference` algorithm
 
@@ -119,25 +119,25 @@ Bad edge cases: when some cells can become very thin and tall, while others are 
 ## Performance and edge cases
 
 All four algorithms on text-only grids:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-text-all-methods.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-text-all-methods.gif)
 
 `width-difference` vs `width-total` where some cells have bigger height than others:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-pics-width-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-pics-width-only.gif)
 
 `width-total` vs `area-total` where some cells have bigger height than others:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-pics-total-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-pics-total-only.gif)
 
 `area-total` vs `area-difference` where some cells have bigger height than others:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-pics-area-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-pics-area-only.gif)
 
 `width-difference` vs `width-total` on a mixed content:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-mixed-width-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-mixed-width-only.gif)
 
 `width-total` vs `area-total` on a mixed content:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-mixed-total-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-mixed-total-only.gif)
 
 `area-total` vs `area-difference` on a mixed content:
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-mixed-area-only.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-mixed-area-only.gif)
 
 Based on this data, `area-total` is chosen as default algorithm for it's resilience.
 

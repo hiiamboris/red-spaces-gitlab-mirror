@@ -22,7 +22,7 @@ red <test-name.red>
 
 [**web-test.red**](web-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-web-test.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-web-test.gif></img>
 
 Simplest infinite canvas test, with a spider web. I use it to check if `inf-scrollable` works at all.
 
@@ -30,7 +30,7 @@ Simplest infinite canvas test, with a spider web. I use it to check if `inf-scro
 
 [**scrollbars-test.red**](scrollbars-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-scrollbars-test.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-scrollbars-test.gif></img>
 
 Tests of how scrollbars adapt their look to various sizes.\
 Not interactive yet, as scrollbars events are undefined outside of `scrollable` space's use.
@@ -39,7 +39,7 @@ Not interactive yet, as scrollbars events are undefined outside of `scrollable` 
 
 [**tube-test1.red**](tube-test1.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-tube-test1.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-tube-test1.gif></img>
 
 Tests all axes/align combinations of `tube` layout.
 
@@ -47,7 +47,7 @@ Tests all axes/align combinations of `tube` layout.
 
 [**tube-test2.red**](tube-test2.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-tube-test2.png></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-tube-test2.png></img>
 
 Tests some resizing cases of `tube` layout.
 
@@ -55,7 +55,7 @@ Tests some resizing cases of `tube` layout.
 
 [**popups-test.red**](popups-test.red)
 
-<img width=300 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-popups-test.gif></img>
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-popups-test.gif></img>
 
 Tests `label` template and popups: hints and right-click menus.
 
@@ -63,7 +63,7 @@ Tests `label` template and popups: hints and right-click menus.
 
 [**resize-test.red**](resize-test.red)
 
-<img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-resize-test.gif />
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-resize-test.gif></img>
 
 Tests resizing of a relatively complex layout.
 
@@ -71,7 +71,7 @@ Tests resizing of a relatively complex layout.
 
 [**hover-test.red**](hover-test.red)
 
-<img width=300 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-hover-test.gif />
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-hover-test.gif></img>
 
 Tests whether space receives `over` events:
 - when mouse pointer stays in place but the space itself moves
@@ -82,7 +82,7 @@ Tests whether space receives `over` events:
 
 [**field-test.red**](field-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-field-test.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-field-test.gif></img>
 
 Tests `field` operation. It's logic is quite tricky to get right.
 
@@ -90,7 +90,7 @@ Tests `field` operation. It's logic is quite tricky to get right.
 
 [**spiral-test.red**](spiral-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-spiral-field-small.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-spiral-field-small.gif></img>
 
 Stress test. Huge editable field curled spirally. Very slow, because renders each glyph separately :)
 
@@ -101,7 +101,7 @@ Stress test. Huge editable field curled spirally. Very slow, because renders eac
 
 [**list-test1.red**](list-test1.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test1.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test1.png)
 
 Simplest `list` of 3 `button` spaces.
 
@@ -109,7 +109,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test2.red**](list-test2.red)
 
-<img width=300 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test2.gif></img>
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test2.gif></img>
 
 `list-view` test: a scrollable window moving over a big but finite content.
 
@@ -117,7 +117,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test3.red**](list-test3.red)
 
-<img width=300 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test3.gif></img>
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test3.gif></img>
 
 `list-view` test: a scrollable window moving over *infinite* content. No matter how far scrolled down, it should be responsive.
 
@@ -125,7 +125,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test4.red**](list-test4.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test4.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test4.gif)
 
 `list-view` test: each list-view item is a `label` which is a horizontal list. It shouldn't be "jumping" which is the case if each label filled the whole viewport of list-view vertically, and then `roll` function would always detect a jump condition. Full-sized zebra should indicate that items fill the viewport horizontally.
 
@@ -133,7 +133,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test5.red**](list-test5.red)
 
-<img width=500 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test5.gif />
+<img width=500 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test5.gif></img>
 
 `list-view` and `scrollable` test: each list-view item is a `label` put into a scrollable (with different `content-flow` value). A very complex layout under the hood with many possible failure points:
 - window (in list-view) may not size itself properly if not given finite canvas (result may be empty)
@@ -146,7 +146,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**grid-test1.red**](grid-test1.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test1.png></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test1.png></img>
 
 Simplest fixed `grid` with 2 buttons. Clickable and tabbing should work.
 
@@ -154,7 +154,7 @@ Simplest fixed `grid` with 2 buttons. Clickable and tabbing should work.
 
 [**grid-test2.red**](grid-test2.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test2.png></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test2.png></img>
 
 Simple enough `grid` that I use to test if cell span works. Has fixed limits and uneven row height.
 
@@ -162,7 +162,7 @@ Simple enough `grid` that I use to test if cell span works. Has fixed limits and
 
 [**grid-test3.red**](grid-test3.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test3.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test3.gif></img>
 
 Minimalistic `grid-view`. Size defined by data. Data is limited.
 
@@ -170,7 +170,7 @@ Minimalistic `grid-view`. Size defined by data. Data is limited.
 
 [**grid-test4.red**](grid-test4.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test4.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test4.gif></img>
 
 Big `grid-view` with unlimited data, pinned columns & rows, cell span. Should not be lagging too much.
 
@@ -178,7 +178,7 @@ Big `grid-view` with unlimited data, pinned columns & rows, cell span. Should no
 
 [**grid-test5.red**](grid-test5.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test5.png></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test5.png></img>
 
 Stress test. A `grid-view` that contains itself in each cell, truncated at some depth. Very slow. At depth=6 it has to render 4^6 = 4096 cells. Depth=7 contains 16384 cells, and 8192 scrollers, and takes about a minute to render.
 
@@ -186,7 +186,7 @@ Stress test. A `grid-view` that contains itself in each cell, truncated at some 
 
 [**grid-test6.red**](grid-test6.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test6.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test6.gif></img>
 
 Stress test. An infinitely zooming animation for `grid-view` that contains itself in each cell. Uses smarter rendering code that helps speed it up, but still has to be truncated at 625 cells to be responsive.
 
@@ -194,7 +194,7 @@ Stress test. An infinitely zooming animation for `grid-view` that contains itsel
 
 [**grid-test7.red**](grid-test7.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-grid-test7.gif></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-test7.gif></img>
 
 Stress test. An infinitely zooming animation for `grid-view` that contains itself only in the central cell, which allows to render it quite deeply.
 
@@ -202,7 +202,7 @@ Stress test. An infinitely zooming animation for `grid-view` that contains itsel
 
 [**grid-test8.red**](grid-test8.red)
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-autofit-text-all-methods.gif></img>
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-autofit-text-all-methods.gif></img>
 
 Test for column [autofit algorithms](../design-cards/grid-autofit.md). Contains grids with edge cases of text and (commented) images content.
 
@@ -211,7 +211,7 @@ Test for column [autofit algorithms](../design-cards/grid-autofit.md). Contains 
 
 [**rich-test1.red**](rich-test1.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-rich-test1.png)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-rich-test1.png)
 
 A simplest rich content test which I'm using to debug whitespace handling, hittesting and caret location.
 
@@ -219,7 +219,7 @@ A simplest rich content test which I'm using to debug whitespace handling, hitte
 
 [**rich-test2.red**](rich-test2.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-rich-test2.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-rich-test2.gif)
 
 A more realistic rich content test which shows if alignment works as desired. Initial capital `L` is an image.
 
@@ -228,7 +228,7 @@ A more realistic rich content test which shows if alignment works as desired. In
 
 [**sync-test1.red**](sync-test1.red)
 
-<img width=400 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test1.png />
+<img width=400 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test1.png></img>
 
 Simplest scenario that tests deep cache fetching after a render on another canvas. Also may show bind-related glitches in styles written in block form.
 
@@ -236,7 +236,7 @@ Simplest scenario that tests deep cache fetching after a render on another canva
 
 [**sync-test2.red**](sync-test2.red)
 
-<img width=700 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test2.png />
+<img width=700 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test2.png></img>
 
 More complex scenario with multiple nested tubes, for the same purpose. "T" letter should be seen *by hittest* in the center.
 

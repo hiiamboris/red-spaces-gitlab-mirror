@@ -19,10 +19,10 @@ A paragraph can *include any other space*, though only those spaces that define 
 Paragraph supports all basic text formatting attributes, colors, font face and font size, alignment, indentation,
 but its *real magic* lies in the **ability to wrap** any included space that defines the /sections facet, and its **ability to stretch** any such space when *fill alignment* is used.
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/example-rich-content-fill-alignment.gif></img>
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-rich-content-fill-alignment.gif></img>
 
 Document provides some basic automation, like handling of keys and attribute inherence for new chars. Yet the trickiest feature of it is **undo/redo** history that gracefully handles rich text with spaces! Even trickier: document may contain other documents (e.g. each cell of an inserted table is a separate editor), and they are all linked by the same edit history, so pressing Ctrl+Z in a cell may undo an edit in the main document and vice versa.
 
-<img width=600 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/sample-document-editor.gif></img>
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/sample-document-editor.gif></img>
 
 

@@ -12,11 +12,11 @@ Keep in mind that it's far from efficient (need effects support in Draw) and is 
 
 By-design look (on [`glossy-test.red`](../tests/glossy-test.red)):
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-glossy-test.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-glossy-test.gif)
 
 And here's Red Inspector with it included (though Inspector declares it's own styles which replace those from the stylesheet so it's *not fully* styled, and has a glitch with `hscroll`):
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-red-inspector-glossy-styled.gif)
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-red-inspector-glossy-styled.gif)
 
 Of course for full effect you will need to remove the OS frame and draw it yourself on a borderless window.
 
