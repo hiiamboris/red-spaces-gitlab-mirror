@@ -63,7 +63,7 @@ Tests `label` template and popups: hints and right-click menus.
 
 [**resize-test.red**](resize-test.red)
 
-<img width=400 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-resize-test.gif></img>
+<img width=500 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-resize-test.gif />
 
 Tests resizing of a relatively complex layout.
 
@@ -71,7 +71,7 @@ Tests resizing of a relatively complex layout.
 
 [**hover-test.red**](hover-test.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-hover-test.gif)
+<img width=300 src=https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-hover-test.gif />
 
 Tests whether space receives `over` events:
 - when mouse pointer stays in place but the space itself moves
