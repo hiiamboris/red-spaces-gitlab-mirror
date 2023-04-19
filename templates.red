@@ -590,7 +590,9 @@ scrollable-space: context [
 		;; final size is viewport + free space filled by fill flags + scrollbars
 		free:   subtract-canvas viewport csize
 		hidden: subtract-canvas csize viewport
-		space/size: (min viewport csize) + (fill-canvas free fill-x fill-y) + (scrollers * reverse sshow)
+		desired-size: (min viewport csize) + (fill-canvas free fill-x fill-y) + (scrollers * reverse sshow)
+		space/size: constrain desired-size space/limits			;-- constrain again: with fill=0 limits/min may be missed by canvas
+		; ?? [free fill-x fill-y space/size]
 		; ?? [canvas ccanvas viewport csize sshow free hidden space/size]
 		
 		;; set scrollers but avoid multiple recursive invalidation when changing srcollers fields
@@ -605,7 +607,7 @@ scrollable-space: context [
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		unless fits? [render space/scroll-timer]				;-- scroll-timer has to appear in the tree for timers
 		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
-		viewport: min viewport csize							;-- trunctate infinity for scrollers placement
+		viewport: space/size - (scrollers * reverse sshow)		;-- include 'free' size in the viewport
 		quietly space/map: reshape-light [
 			@(content) [offset: 0x0 size: @(viewport)]
 		/?	@(hscroll) [offset: @(viewport * 0x1) size: @(hscroll/size)]	/if sshow/x = 1
