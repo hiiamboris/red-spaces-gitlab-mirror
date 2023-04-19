@@ -133,7 +133,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test5.red**](list-test5.red)
 
-<img width=500 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test5.gif></img>
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-list-test5.gif></img>
 
 `list-view` and `scrollable` test: each list-view item is a `label` put into a scrollable (with different `content-flow` value). A very complex layout under the hood with many possible failure points:
 - window (in list-view) may not size itself properly if not given finite canvas (result may be empty)
@@ -228,7 +228,7 @@ A more realistic rich content test which shows if alignment works as desired. In
 
 [**sync-test1.red**](sync-test1.red)
 
-<img width=400 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test1.png></img>
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test1.png></img>
 
 Simplest scenario that tests deep cache fetching after a render on another canvas. Also may show bind-related glitches in styles written in block form.
 
@@ -236,7 +236,7 @@ Simplest scenario that tests deep cache fetching after a render on another canva
 
 [**sync-test2.red**](sync-test2.red)
 
-<img width=700 https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test2.png></img>
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-sync-test2.png></img>
 
 More complex scenario with multiple nested tubes, for the same purpose. "T" letter should be seen *by hittest* in the center.
 
