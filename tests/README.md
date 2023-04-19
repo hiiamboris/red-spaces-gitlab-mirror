@@ -133,7 +133,7 @@ Simplest `list` of 3 `button` spaces.
 
 [**list-test5.red**](list-test5.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test5.gif)
+<img width=500 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-list-test5.gif />
 
 `list-view` and `scrollable` test: each list-view item is a `label` put into a scrollable (with different `content-flow` value). A very complex layout under the hood with many possible failure points:
 - window (in list-view) may not size itself properly if not given finite canvas (result may be empty)
@@ -228,7 +228,7 @@ A more realistic rich content test which shows if alignment works as desired. In
 
 [**sync-test1.red**](sync-test1.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test1.png)
+<img width=400 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test1.png />
 
 Simplest scenario that tests deep cache fetching after a render on another canvas. Also may show bind-related glitches in styles written in block form.
 
@@ -236,7 +236,7 @@ Simplest scenario that tests deep cache fetching after a render on another canva
 
 [**sync-test2.red**](sync-test2.red)
 
-![](https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test2.png)
+<img width=700 https://codeberg.org/hiiamboris/media/raw/branch/master/spaces/demo-sync-test2.png />
 
 More complex scenario with multiple nested tubes, for the same purpose. "T" letter should be seen *by hittest* in the center.
 
