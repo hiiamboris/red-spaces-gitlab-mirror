@@ -9,8 +9,8 @@ Screenshots show the expected behavior.
 To try out any of the tests:
 1. clone the repositories:
 ```
-git clone https://codeberg.org/hiiamboris/red-common common
-git clone https://codeberg.org/hiiamboris/red-spaces
+git clone https://codeberg.org/hiiamboris/red-common common --depth=1
+git clone https://codeberg.org/hiiamboris/red-spaces spaces --depth=1
 ```
 2. run any test:
 ```
