@@ -2373,11 +2373,12 @@ list-view-ctx: context [
 		xy2    [pair!]
 	][
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
-		;; fill is not used: X is infinite, Y is always filled along if finite
 		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
 		list: lview/list
 		worg: negate lview/window/origin				;-- offset of window within content
 		axis: list/axis
+		fill-x: fill-y: no
+		either axis = 'x [fill-y: yes][fill-x: yes]		;-- always filled along finite axis
 		; #assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
 		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
@@ -2390,7 +2391,7 @@ list-view-ctx: context [
 		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
 		guide:    axis2pair axis
 		origin:   guide * (xy1 - o1 - list/margin)
-		settings: with [list 'local] [axis margin spacing canvas origin limits]
+		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
