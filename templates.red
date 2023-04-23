@@ -1175,13 +1175,12 @@ list-ctx: context [
 	]
 		
 	declare-template 'list/container [
-		kit:     ~/kit
-		size:    0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
-		axis:    'x		#type =  :invalidates [word!] (find [x y] axis)
+		kit:       ~/kit
+		size:      0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
+		axis:      'x	#type =  :invalidates [word!] (find [x y] axis)
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
-		margin:  0
-		spacing: 0
-		;@@ TODO: alignment?
+		margin:    0
+		spacing:   0
 
 		sec-cache: []
 		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
