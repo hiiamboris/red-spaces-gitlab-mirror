@@ -66,7 +66,7 @@ Reasons to use generations:
    
    Spaces have a `/parent` facet, but both live and orphaned space may have the same `/parent`. Identifying who is the most recent child of `/parent` is not so easy given that both `content` and `map` are not enforced facets and lookups in them will slow the system down.
 
-   `get-full-path` function (used by timers in particular) walks up the tree from a given space along the `/parent` facets, and collects its full path (list of all parent objects) relative to host space. After that it walks from top down, checking if child generation numbers match the host's: if a child's generation is older than the host's then it's in an orphaned subtree and does not belong to a live frame. Then a timer is disabled on such space and only active timers are kept in the timers list.
+   `get-host-path` function (used by timers in particular) walks up the tree from a given space along the `/parent` facets, and collects its full path (list of all parent objects) relative to host space. After that it walks from top down, checking if child generation numbers match the host's: if a child's generation is older than the host's then it's in an orphaned subtree and does not belong to a live frame. Then a timer is disabled on such space and only active timers are kept in the timers list.
    
    Subtrees however can be fully cached: if container is fetched from the cache, all of its children do not get their generation updated. That's why I added state (`cached` or `drawn`) to the `/cached` facet. Subtree below a space marked with `cached` state (a cached container) is not checked (only the container's generation is).
    

@@ -286,7 +286,7 @@ events: context [
 						unless focus/current [focus-space focus/find-next-focal-space 'forth]
 						;; but it still may fail if nothing is focusable
 						unless focus/current [exit]
-						if path: get-full-path focus/current [as [] path] 
+						if path: get-host-path focus/current [as [] path] 
 					]
 				]
 				; focus unfocus ;-- generated internally by focus.red

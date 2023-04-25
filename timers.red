@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-;; requires events.red (extends them on load), uses traversal.red & rendering.red (get-full-path)
+;; requires events.red (extends them on load), uses traversal.red & rendering.red (get-host-path)
 
 
 timers: context [
@@ -77,7 +77,7 @@ timers: context [
 		foreach space rated-spaces [
 			unless all [
 				rate: select space 'rate				;-- previously enabled timer has been disabled? don't react on it again
-				path: get-full-path space				;-- space is orphaned (no longer connected to the tree)? remove it so GC can take it
+				path: get-host-path space				;-- space is orphaned (no longer connected to the tree)? remove it so GC can take it
 			][
 				#debug timer [#print "disabling timer for (mold space)"]
 				fast-remove find/same rated-spaces space 1		;-- won't be active until it gets rendered again

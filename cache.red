@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 ]
 
-exports: [invalidate invalidate-tree get-full-path]
+exports: [invalidate invalidate-tree get-host-path]
 
 
 cache: context [
@@ -218,7 +218,7 @@ invalidate: function [
 	
 ;; this uses generation data to detect outdated (orphaned) spaces, and returns none for them
 ;; timers.red relies on this to remove no longer valid timers from its list
-get-full-path: function [
+get-host-path: function [
 	"Get host-relative path for SPACE on the last rendered frame, or none if it's not there"
 	space  [object!] (space? space)
 	; return: [path! none!]
@@ -239,6 +239,19 @@ get-full-path: function [
 	]
 	#assert [not find parents none]
 	to path! parents
+]
+
+get-screen-path: function [
+	"Get screen-relative path for space or face on the last rendered frame, or none if it's not there"
+	obj [object!] (any [space? obj  is-face? obj])
+][
+	either space? obj [
+		if path: get-host-path obj [face: path/1]
+	][
+		path: reduce [face: obj]
+	]
+	while [face: face/parent] [insert path face]
+	all [path  path/1/type = 'screen  path]
 ]
 
 
