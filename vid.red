@@ -168,7 +168,7 @@ VID: context [
 	;; basic event dispatching face
 	system/view/VID/styles/host: reshape [
 		default-actor: worst-actor-ever					;-- worry not! this is useful
-		init: [init-spaces-tree face]
+		init: [set 'init-window window-of face init-spaces-tree face]
 		template: /use (declare-class/manual 'host [
 			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
 			on-change*: function spec-of :classy-object!/on-change*
@@ -202,7 +202,7 @@ VID: context [
 		spec: body-of :spec
 		if empty? spec [exit]
 		
-		old-focus: focus/current
+		default focus/window: window-of face			;-- init focus
 		pane: lay-out-vids spec
 		if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 		face/space: pane/1
@@ -223,11 +223,7 @@ VID: context [
 		;; focus is tricky too: templates could call focus-space (e.g. editor focuses document)
 		;; but focus-space could not create an on-focus event because there was no path before it all got rendered
 		;; so I have to refocus the same space again, and also tell View to focus the host
-		unless old-focus =? target: focus/current [
-			clear focus/history							;-- this forces focus-space to take the same target
-			focus-space target
-			set-focus face								;-- wasn't linked to the host, so focus-space couldn't focus it
-		]
+		if focus/current [set-focus focus/current]
 	]
 	
 	
@@ -242,11 +238,7 @@ VID: context [
 			image!  [make-space 'image [data:  value]]
 			url!    [make-space 'link  [data:  value]]
 			block!  [either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
-		][
-			either space? :value
-				[:value]								;-- space objects are just passed thru (e.g. to be put into a button frame)
-				[make-space 'text [text: mold :value]]
-		]
+		] [make-space 'text [text: mold :value]]
 	]
 	
 	

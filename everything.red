@@ -42,7 +42,8 @@ do/expand [
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red
-	#include %../common/relativity.red
+	; #include %../common/relativity.red
+	#include %../common/tabbing.red						;-- extended by spaces/tabbing.red
 	#include %../common/scoping.red
 	#include %../common/collect-set-words.red
 	#include %../common/print-macro.red

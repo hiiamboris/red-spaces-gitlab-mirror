@@ -19,18 +19,21 @@ list: make-space 'list [				;) make-space is used to instantiate spaces
 	]
 ]
 
-host: make-face 'host					;) host face we need to draw spaces on
+window: make-face 'window				;) create window to put host into
+spaces/focus/window: window				;) let focus logic know the currently active window
+
+host:   make-face 'host					;) host face we need to draw spaces on
+window/pane: reduce [host]				;) add host to window
+
 host/space:  list						;) host must have exactly one space attached to it - here it's `list`
 host/draw:   render host				;) `render` returns a list of draw commands, but also sets the /size facet of spaces
 host/size:   list/size					;) now we know how big host face we need from previously set list/size
 host/offset: 10x10						;) apply default VID margin
 
-window: make-face 'window				;) create window to put host into
-window/pane: reduce [host]				;) add host to it
 window/size: host/size + 20x20			;) add default VID margins to host/size to infer window/size
 window/offset: system/view/screens/1/size - window/size / 2		;) center the window
 window/parent: system/view/screens/1
 
 show window								;) finally, we display the layout
-set-focus host							;) focus host for it to receive keyboard events
+set-focus list/content/2				;) focus button for it to receive keyboard events
 do-events								;) enter View event loop

@@ -252,7 +252,7 @@ get-screen-path: function [
 	][
 		path: reduce [face: obj]
 	]
-	while [face: face/parent] [insert path face]
+	while [all [face face: face/parent]] [insert path face]
 	all [path  path/1/type = 'screen  path]
 ]
 

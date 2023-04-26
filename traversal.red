@@ -6,6 +6,7 @@ Red [
 
 
 ;-- requires auxi.red (make-free-list), export
+;@@ now that this is used sparingly, it can be simplified (deoptimized)
 
 list-spaces:    none									;-- reserve names in the spaces/ctx context
 list-*aces:     none
@@ -125,7 +126,7 @@ context [
 
 		either pos: find-same-path list path [
 			#debug focus [
-				if attempt [get bind 'dir :find-next-focal-space] [
+				if attempt [get bind 'dir :find-next-focal-*ace] [
 					#print "Found (mold as path! path) at index (index? pos)"
 				]
 			]
@@ -135,7 +136,7 @@ context [
 			]
 		][
 			#debug focus [
-				if attempt [get bind 'dir :find-next-focal-space] [
+				if attempt [get bind 'dir :find-next-focal-*ace] [
 					#print "NOT found (mold as path! path) in spaces tree"
 				]
 			]

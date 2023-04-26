@@ -2435,6 +2435,7 @@ list-view-ctx: context [
 		if object? :lview/list [invalidate lview/list]
 	]
 
+	;@@ list-view & grid-view on child focus should scroll to child
 	declare-template 'list-view/inf-scrollable [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; size:   none									;-- avoids extra triggers in on-change
