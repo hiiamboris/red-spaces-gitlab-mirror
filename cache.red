@@ -220,9 +220,11 @@ invalidate: function [
 ;; timers.red relies on this to remove no longer valid timers from its list
 get-host-path: function [
 	"Get host-relative path for SPACE on the last rendered frame, or none if it's not there"
-	space  [object!] (space? space)
+	space  [object!] (any [space? space  host? space])
 	; return: [path! none!]
 ][
+	if host? space [return as path! reduce [space]]		;-- for use with focus/current when it's a host face
+	
 	; #assert [space/parent]
 	unless all [										;-- fails on self-containing grid
 		space/parent
