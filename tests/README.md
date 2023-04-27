@@ -77,6 +77,15 @@ Tests whether space receives `over` events:
 - when mouse pointer stays in place but the space itself moves
 - when pointer leaves it (the 'away' event)
 
+---
+
+[**focus-test.red**](focus-test.red)
+
+<img width=200 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-focus-test.gif></img>
+
+Tests focus and tabbing (which should be global across both faces and spaces). A few Red glitches prevent it from working correctly with `panel` and `button` at the moment.
+
+
 
 ## Text tests
 
@@ -224,7 +233,7 @@ A simplest rich content test which I'm using to debug whitespace handling, hitte
 A more realistic rich content test which shows if alignment works as desired. Initial capital `L` is an image.
 
 
-## Cache checks
+## Cache tests
 
 [**sync-test1.red**](sync-test1.red)
 
