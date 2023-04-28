@@ -157,7 +157,8 @@ focus-space: function [
 	;; note: same space may appear on multiple hosts and windows (e.g. when put on a new popup all the time)
 	if space =? old: focus/current [					;-- no refocusing into the same target, but need to ensure host is focused
 		host: first get-host-path space
-		if host/parent [native-set-focus host]			;@@ may error out without /parent check
+		;@@ may error out without /parent check - e.g. if click on host hides it, then click continue on focusable child
+		if host/parent [native-set-focus host]
 		return no
 	]
 	#debug focus [#print "moving focus from (mold/only reduce [old]) to (mold/only reduce [space])"]
@@ -219,7 +220,7 @@ context [
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks on host may change focus
 	function [space [object!] path [block!] event [event! object!]] [
-		;@@ perhaps buttons should not accept focus when clicked? only when tabbed?
+		;@@ should it avoid focusing if stop flag is set?
 		#debug focus [#print "attempting to focus (space-id space)"]
 		focus-space space
 	]
