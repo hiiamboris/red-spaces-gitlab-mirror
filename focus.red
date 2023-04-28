@@ -24,8 +24,13 @@ focus: make classy-object! declare-class 'focus-context [
 	window:    none					#type [none! object!]		;-- set by first history access and by global event hook
 
 	;; currently focused space in currently focused window!
-	;@@ this should be even more sophisticated to support per-tab, per-page focus
+	;@@ it's currently not possible to tell what is focused becase Red doesn't tell us which window is active - #3808
+	;@@ so this is not very reliable right now and requires a lot of kludges...
+	;@@ TODO: /current should be able to return window object (after unfocus - to avoid duplicate unfocus), while /history should not contain it
 	current: does [last history]	#type [function!]	;-- returns space, face, or none
+	
+	;; the point of /history is to recover focus when last focused space gets hidden/removed from frame/whole window disappears, and Tab is hit
+	;@@ TODO: to support per-tab, per-page focus history they may have their own histories, or maybe /focus should handle scope too?
 	history: has [w h hist] [							;-- previously focused spaces, including current one
 		unless window [self/window: last head system/view/screens/1/pane]
 		unless hist: select/same histories window [
