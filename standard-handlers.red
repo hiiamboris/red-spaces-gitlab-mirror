@@ -190,7 +190,7 @@ define-handlers [
 			if find [round-clickable clickable] select item 'type [
 				do item/command
 			]
-			hide-popups event/window 1					;-- click on a menu hides all visible menus
+			popups/hide 1								;-- click on a menu hides all visible menus
 		]
 	]
 

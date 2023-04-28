@@ -14,143 +14,6 @@ declare-template 'hint/box [
 	origin: 0x0		#type =? [pair! none!]				;-- `none` disables the arrow display (when it's not precise)
 ]
 
-;@@ use a single stack for all windows maybe? not sure if View will handle cross-window face transfer though
-popup-registry: make hash! 2
-
-has-flag?: function [
-	"Test if FLAGS is a block and contains FLAG"
-	flags [any-type!]
-	flag  [word!]
-][
-	none <> all [block? :flags  find flags flag]
-]
-
-is-popup?: function [									;-- must be blazing-fast, used in global event function
-	"Check within WINDOW if FACE is a popup host; return popup level or none"
-	window [object!] face [object!]
-][
-	all [
-		found: find/same select/same popup-registry window face
-		skip? found
-	]
-]
-
-get-popups-for: function [
-	window [object!] "Each window has it's own popups stack" (window/type = 'window)
-][
-	any [
-		stack: select/same popup-registry window
-		repend popup-registry [window stack: make hash! 4]
-	]
-	stack
-]
-
-save-popup: function [
-	window [object!] "Each window has it's own popups stack"
-	level  [integer!] ">= 0" (level >= 0)
-	face   [object!] "Popup face"
-][
-	stack: get-popups-for window
-	change enlarge stack level none face
-]
-
-;@@ `layout` cannot work - see #5131, so have to reuse the faces and refrain from VID
-make-popup: function [
-	"Create a popup face of LEVEL but don't show it yet (reuse if exists)"
-	window [object!]
-	level  [integer!]
-][
-	stack: get-popups-for window
-	unless face: pick stack level + 1 [
-		change (enlarge stack level none) face: make-face 'host
-	]
-	face
-]
-
-show-popup: function [
-	"Show a popup in the WINDOW at LEVEL and OFFSET"
-	window [object!]  "Each window has it's own popups stack"
-	level  [integer!] ">= 0"
-	offset [pair!]    "Offset on the window"
-	face   [object!]  "Previously created popup face"
-][
-	face/offset: offset
-	if level > 0 [										;-- no need to hide the hint - it's reused
-		hide-popups window 0							;-- hide hints if menu was shown
-		hide-popups window level + 1					;-- hide lower level menus
-	]
-	save-popup window level face
-	unless find/same window/pane face [append window/pane face]
-]
-
-hide-popups: function [
-	"Hides popup faces of a WINDOW from LEVEL and above"
-	window [object!] "Each window has it's own popups stack"
-	level [integer!] ">= 0; if zero, only hint is hidden"
-][
-	stack: get-popups-for window
-	do-async [											;@@ workaround for #5132
-		either level = 0 [
-			if stack/1 [
-				; invalidate-face stack/1
-				remove find/same window/pane stack/1	;-- only hide the hint
-			]
-		][
-			foreach face pos: skip stack level [		;-- hide all popups but the hint
-				; invalidate-face face
-				remove find/same window/pane face
-			]
-		]
-	]
-	show window
-]
-
-hint-text?: function [
-	"Get text of the shown hint for WINDOW; none if not shown"
-	window [object!] "Each window has it's own popups stack"
-][
-	stack: get-popups-for window
-	all [
-		face: stack/1
-		find/same window/pane face						;-- must be visible
-		face/extra/1
-	]
-]
-
-show-hint: function [
-	"Immediately show a TEXT hint in the WINDOW around POINTER"
-	window  [object!]
-	pointer [pair!]
-	text    [string!]
-][
-	unless text == old-text: hint-text? window [		;-- don't redisplay an already shown hint
-		center: window/size / 2
-		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
-		
-		hint: make-popup window 0						;@@ working around #5131 here, can't use `layout`
-		hint/rate: none									;-- unlike menus, hints should not add timer pressure
-		space: hint/space: make-space 'hint []
-		space/content: make-space 'text compose [text: (text)]
-		space/origin: either above? [0x1][0x0]			;-- corner where will the arrow be (cannot be absolute - no size yet)
-		hint/extra: reduce [text none]					;-- text for `hint-text?`, none for pointer travel estimation
-		hint/size: none									;-- to make render set face/size
-		hint/draw: render hint
-		;; hint is transparent so it can have an arrow
-		hint/color: system/view/metrics/colors/panel + 0.0.0.254
-		
-		offset: pointer + either above? [2 by (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
-		limit: window/size - hint/size
-		fixed: clip offset 0x0 limit					;-- adjust offset so it's not clipped
-		if fixed <> offset [
-			offset: fixed
-			space/origin: none							;-- disable arrow in this case
-			invalidate space
-			hint/draw: render hint						;-- have to redraw content to remove the arrow
-		]
-		show-popup window 0 offset hint 
-	]
-]
-
 ;@@ should it be here or in vid.red?
 lay-out-menu: function [spec [block!] /local code name space value tube list flags radial? round?] reshape [
 	;@@ preferably VID/S should be used here and in hints above
@@ -197,146 +60,239 @@ lay-out-menu: function [spec [block!] /local code name space value tube list fla
 	menu
 ]
 
-show-menu: function [
-	"Immediately show a menu LAYOUT at OFFSET and LEVEL in WINDOW"
-	window  [object!]
-	level   [integer!] (level > 0)
-	offset  [pair!]
-	menu    [block!] "Written using Menu DSL"
-	;@@ maybe also a flag to make it appear above the offset?
-][
-	;@@ it's dumb to 'make' it with 'level' and then 'show' with 'level' again - need to remove one
-	face: make-popup window level
-	face/rate:  10										;-- reduced timer pressure
-	face/space: lay-out-menu menu
-	face/size:  none									;-- to make render set face/size
-	face/draw:  render face
-	either radial?: has-flag? :menu/1 'radial [			;-- radial menu is centered
-		offset: offset + face/space/content/origin
-		;; radial menu is transparent but should catch clicks that close it
-		face/color: system/view/metrics/colors/panel + 0.0.0.254
+popups: context [
+	stack: make hash! 4									;-- currently visible popup faces - single stack for all windows
+	
+	hint-delay: 0:0:0.5									;-- for hints to appear
+	; menu-delay: 0:0:0.5									;-- for submenus to appear on hover
+
+	save: function [
+		level  [integer!] ">= 1" (level >= 1)
+		face   [object!] "Popup face"
 	][
-		limit: window/size - face/size
-		offset: clip offset 0x0 limit					;-- adjust offset so it's not clipped
-	]
-	show-popup window level offset face
-]
-
-
-hint-delay: 0:0:0.5										;-- for hints to appear
-; menu-delay: 0:0:0.5										;-- for submenus to appear on hover
-
-context [
-	;; event function that displays hints across all host faces when time hits
-	popup-event-func: function [host event] [
-		all [
-			event/type = 'time
-			host? host									;-- a host face?
-			space? host/space							;-- has a space assigned?
-			on-time host event
-			none   										;-- the event can be processed by other handlers
-		]
-	]
-	unless find/same system/view/handlers :popup-event-func [	;@@ check shouldn't be needed anymore
-		insert-event-func :popup-event-func
-	]
-	
-	;; global space timers are not called unless event is processed, so timer needs a dedicated event function
-	hint-text: none
-	show-time: now/utc/precise							;-- when to show next hint
-	anchor:    0x0										;-- pointer offset of the over event (timer doesn't have this info)
-	on-time: function [host event] [
-		all [
-			hint-text
-			show-time <= now/utc/precise
-			show-hint event/window anchor hint-text
-		]
+		change enlarge stack level - 1 none face
 	]
 
-	;; searches the path for a defined field (lowest/innermost one wins)
-	find-field: function [path [block!] name [word!] types [datatype! typeset!]] [
-		path: tail path
-		type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types
-		until [											;@@ use for-each/reverse
-			path: skip path -2
-			space: path/1
-			value: select space name
-			if do type-check [return :value]
-			head? path
-		]
-		none
-	]	
-	
-	reset-hint: func [event [event! object!]] [
-		if hint-text [
-			hint-text: none
-			anchor: face-to-window event/offset event/face
-		]
-		if any [
-			event/away?									;-- moved off the hint; away event should never be missed as it won't repeat!
-			10 <= travel event							;-- distinguish pointer move from sensor jitter
-		][
-			hide-popups event/window 0
-		]
-	]
-	
-	travel: func [event [event! object!]] [
-		distance? anchor face-to-window event/offset event/face
-	]
-	
-	last-offset: none
-	;; over event should be tied to spaces and is guaranteed to fire even if no space below
-	register-previewer [over] function [
-		space [object! none!] path [block!] event [event! object!]
-		/extern hint-text show-time anchor last-offset
+	hide: function [
+		"Hides popups from given level or popup face"
+		level [integer! (level >= 1) object! (face? level)] ">= 1 or face"
 	][
-		; #assert [event/window/type = 'window]
-		unless head? path [exit]						;-- don't react on multiple events on the same path
-		last-offset: face-to-screen event/offset event/face
+		old: either integer? level [at stack level][find/same stack level]
+		if empty? old [exit]
+		#debug popups [#print "hiding popups from (mold/only reduce [level])"]
+		shown: sift old [face .. /state /parent]
+		foreach face shown [
+			window: window-of face
+			remove find/same window/pane face
+		]
+		clear old
+	]
+
+	show: function [
+		"Show a popup at given offset, hiding the previous one(s)"
+		space  [object!] "Space or face object to show" (any [space? space is-face? space])
+		offset [pair!]   "Offset on the window"
+		/in window: focus/window [object! none!] "Specify parent window (defaults to focus/window)"
+		/owner parent [object! none!] "Space or face object; owner is not hidden"
+	][
+		#debug popups [#print "about to show popup (space/type):(space/size) at (offset)"] 
+		if space? face: space [							;-- automatically create a host face for it
+			face: make-face 'host
+			face/space: space
+		]
+		face/offset: offset
+		if host? face [
+			if face/size = 0x0 [face/size: none]		;-- hint for render to set its size
+			face/draw: render face
+		]
 		
-		either level: is-popup? window: event/window host: event/face [	;-- hovering over a popup face
-			either level = 0 [
-				reset-hint event						;-- no hint can trigger other hint
-			][
-				;@@ this is very simpistic now - need multiple levels support
-				if event/away? [hide-popups event/window level]
-				; reset-hint event
-			]
-		][												;-- hovering over a normal host
-			either all [
-				space
-				not event/away?
-				text: find-field path 'hint string!		;-- hint is enabled for this space or one of it's parents
-			][
-				hint-text: text
-				anchor: face-to-window event/offset event/face
-				unless hint-text? window [				;-- delay only if no other hint is visible
-					;; by design no extra face should be created until really necessary to show it
-					;; so creation is triggered by timer, renewed on each over event
-					show-time: now/utc/precise + hint-delay		;-- show tooltip at some point in the future
-				]
-			][											;-- hint-less space or no space below
-				reset-hint event
-			]
+		level: 1
+		if parent [
+			if space? parent [parent: host-of space]
+			#assert [find/same stack parent]
+			level: 1 + index? find/same stack parent
+			window: window-of parent
 		]
+		
+		hide level
+		primed/text: none								;-- without this some event asynchrony may trigger hint redisplay and popup hide
+		save level face
+		unless find/same window/pane face [append window/pane face]
 	]
 
-	
-	;; context menu display support
-	register-finalizer [alt-up] function [				;-- finalizer so other spaces can eat the event
-		space [object! none!] path [block!] event [event! object!]
+	get-hint: function [
+		"Get shown hint host; none if not shown"
 	][
-		;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
-		if all [
-			head? path									;-- don't react on multiple events on the same path
-			menu: find-field path 'menu block!
-		][
-			;; has to be under the pointer, so it won't miss /away? event closing the menu
-			offset: -1x-1 + face-to-window event/offset event/face
-			reset-hint event
-			show-menu event/window 1 offset menu
+		all [
+			host: last stack							;-- hint can only be the top level
+			host? host
+			host/space
+			host/space/type = 'hint						;@@ REP 113
+			host
+		]
+	]
+	
+	get-hint-text: function [
+		"Get text of the shown hint; none if not shown"
+	][
+		all [
+			host: get-hint
+			host/parent									;-- must be visible
+			host/space/content/text
 		]
 	]
 
+	show-hint: function [
+		"Show a hint around pointer in window"
+		text    [string!] "Text for the hint"
+		pointer [pair!]
+		/in window [object!] "Specify parent window (defaults to focus/window)"
+	][
+		if text == get-hint-text [exit]					;-- don't redisplay an already shown hint
+		#debug popups [#print "about to show hint (mold text) at (pointer)"] 
+		
+		center: window/size / 2
+		above?: center/y < pointer/y					;-- placed in the direction away from the closest top/bottom edge
+		
+		host: make-face 'host
+		host/rate: none									;-- unlike menus, hints should not add timer pressure
+		;; hint is transparent so it can have an arrow
+		host/color: svmc/panel + 0.0.0.254
+		render host/space: hint: first lay-out-vids [	;-- render sets hint/size
+			hint [text text= text] origin= either above? [0x1][0x0]	;-- corner where will the arrow be (cannot be absolute - no size yet)
+		]
+		
+		offset: pointer + either above? [2 by (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
+		limit: window/size - hint/size
+		fixed: clip offset 0x0 limit					;-- adjust offset so it's not clipped
+		if fixed <> offset [
+			offset: fixed
+			hint/origin: none							;-- disable arrow in this case
+			invalidate hint
+		]
+		show/in host offset window
+	]
+	
+	hide-hint: function ["Hide hint if it is displayed"] [
+		if host: get-hint [hide host]
+	]
+	
+	show-menu: function [
+		"Show a popup menu at given offset"
+		menu    [block!] "Written using Menu DSL"
+		offset  [pair!]
+		/owner parent [object!] "Space or face object; owner is not hidden"
+		/in    window [object!] "Specify parent window (defaults to focus/window)"
+		;@@ maybe also a flag to make it appear above the offset?
+	][
+		host: make-face/spec 'host [rate 25]			;-- reduced timer pressure
+		render host/space: lay-out-menu menu
+		either radial?: has-flag? :menu/1 'radial [		;-- radial menu is centered
+			offset: offset + host/space/content/origin
+			host/color: svmc/panel + 0.0.0.254			;-- radial menu is transparent but should catch clicks that close it
+		][
+			limit: window/size - host/space/size
+			offset: clip offset 0x0 limit				;-- adjust offset so it's not clipped
+		]
+		show/owner/in host offset parent window
+	]
+
+	primed: context [									;-- pending hint data
+		text:      none
+		show-time: now/utc/precise						;-- when to show next hint
+		anchor:    0x0									;-- pointer offset of the over event (timer doesn't have this info)
+	]
+
+	;; event funcs internal data
+	context [
+		;; global space timers are not called unless event is processed, so timer needs a dedicated event function
+		insert-event-func auto-show-hint: function [host event] [	;-- displays hints across all host faces when time hits
+			all [
+				event/type = 'time
+				host? host								;-- a host face?
+				space? host/space						;-- has a space assigned?
+				primed/text								;-- hint is available at current pointer offset
+				now/utc/precise >= primed/show-time		;-- time to show it has come
+				show-hint/in primed/text primed/anchor event/window
+				none   									;-- the event can be processed by other handlers
+			]
+		]
+		
+		;; searches the path for a defined facet (lowest/innermost one wins)
+		find-facet: function [path [block!] name [word!] types [datatype! typeset!]] [
+			type-check: pick [ [types =? type? value] [find types type? value] ] datatype? types
+			path: reverse append clear [] path			;-- search order from the innermost
+			foreach [_ space] path [					;@@ use for-each/reverse when fast, or locate/back
+				value: select space name
+				if do type-check [return :value]
+			]
+			none
+		]	
+		
+		travel: func [event [event! object!]] [			;-- distance from hint show point to current point
+			distance? primed/anchor face-to-window event/offset event/face
+		]
+		maybe-hide-hint: function [event [event! object!]] [
+			if any [
+				event/away?								;-- moved off the hint; away event should never be missed as it won't repeat!
+				10 <= travel event						;-- distinguish pointer move from sensor jitter
+			][
+				hide-hint
+			]
+			primed/text: none							;-- abort primed hint (if any)
+		]
+		
+		
+		;; over event should be tied to spaces and is guaranteed to fire even if no space below
+		register-previewer [over] function [
+			space [object! none!] path [block!] event [event! object!]
+		][
+			; #assert [event/window/type = 'window]
+			unless head? path [exit]					;-- don't react on multiple events on the same path
+			
+			either popup: find/same stack face: event/face [	;-- hovering over a popup face
+				;@@ or should I allow popup menus to show hints too?
+			    either hint: all [face/space face/space/type = 'hint] [	;-- over a hint
+					maybe-hide-hint event
+				][
+					hide either event/away? [popup/1][1 + index? popup]	;-- hide upper levels or the one pointer just left
+				]
+			][													;-- hovering over a normal host
+				either all [
+					space										;-- not on empty area
+					not event/away?								;-- still within the host
+					text: find-facet path 'hint string!			;-- hint is enabled for this space or one of its parents
+				][
+					;; prime new hint display after a delay
+					primed/text:   text
+					primed/anchor: face-to-window event/offset event/face
+					unless get-hint-text [						;-- delay only if no other hint is visible, else immediate
+						primed/show-time: now/utc/precise + hint-delay
+					]
+				][												;-- hint-less space or no space below or out of the host
+					maybe-hide-hint event
+				]
+			]
+		]
+	
+		;; context menu display support
+		register-finalizer [alt-up] function [					;-- finalizer so other spaces can eat the event
+			space [object! none!] path [block!] event [event! object!]
+		][
+			;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
+			if all [
+				head? path										;-- don't react on multiple events on the same path
+				menu: find-facet path 'menu block!
+			][
+				;; has to be under the pointer, so it won't miss /away? event closing the menu
+				offset: -1x-1 + face-to-window event/offset event/face
+				hide-hint
+				show-menu/in menu offset event/window
+			]
+		]
+	
+	]
 ]
+
+
 

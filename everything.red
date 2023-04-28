@@ -31,6 +31,7 @@ do/expand [
 	; #debug set sizing 								;-- turn on to see how spaces adapt to their canvas sizes
 	; #debug set focus									;-- turn on to see focus changes and errors
 	; #debug set events									;-- turn on to see what events get dispatched by hosts
+	; #debug set popups									;-- turn on to see popups show/hide events
 	; #debug set timer									;-- turn on to see timer events
 	; #debug set styles									;-- turn on to see which styles get applied
 	; #debug set paragraph								;-- turn on to see words inside paragraph layout

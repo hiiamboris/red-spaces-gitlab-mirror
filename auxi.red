@@ -139,6 +139,10 @@ inside?: make op! function [
 	]
 ]
 
+host-of: function [space [object!]] [
+	all [path: get-host-path space  path/1]
+]
+
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
@@ -343,6 +347,14 @@ set-flag: function [
 	series [series!] flag [any-type!] present? [logic! none!]
 ][
 	either present? [include-into series :flag][exclude-from series :flag]
+]
+
+has-flag?: function [									;-- used in popups
+	"Test if FLAGS is a block and contains FLAG"
+	flags [any-type!]
+	flag  [word!]
+][
+	none <> all [block? :flags  find flags flag]
 ]
 
 toggle: function [
