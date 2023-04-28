@@ -154,8 +154,10 @@ focus-space: function [
 	space [object!] (space? space)
 ][
 	unless find focus/focusable space/type [return no]	;-- this space cannot be focused
+	;; note: same space may appear on multiple hosts and windows (e.g. when put on a new popup all the time)
 	if space =? old: focus/current [					;-- no refocusing into the same target, but need to ensure host is focused
-		native-set-focus first get-host-path space
+		host: first get-host-path space
+		if host/parent [native-set-focus host]			;@@ may error out without /parent check
 		return no
 	]
 	#debug focus [#print "moving focus from (mold/only reduce [old]) to (mold/only reduce [space])"]
