@@ -2415,6 +2415,7 @@ list-view-ctx: context [
 	;; new class needed to type icache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
 	list-template: declare-class/manual 'list-in-list-view/list [
+		type: 'list										;-- styled normally
 		axis: 'y
 		
 		;; cache of last rendered item spaces (as words)
