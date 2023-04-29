@@ -1037,6 +1037,26 @@ rechange: function [
 	; pick either index < 0 [tail series] [series] index
 ; ]
 
+filtered-event-func: function [
+	"Make a filtered global View event function"
+	spec [block!] "Function spec"
+	body [block!] "Function body, should start with a list of supported event types" (block? :body/1)
+][
+	handler: function spec body
+	check: copy/deep [									;-- newlines are important for readability
+		do filter/(name/type)
+	]
+	excluded: exclude extract to [] system/view/evt-names 2 :body/1
+	insert remove body-of :handler bind check context [
+		filter: make map! map-each/eval type excluded [[type [return none]]]
+	]
+	parse spec-of :handler [2 thru [set evt-arg-name word!]]	;-- extract the name of the event argument
+	#assert [evt-arg-name]
+	body: body-of :handler
+	body/2/2/1/1: bind evt-arg-name :handler			;-- replace 'name' placeholder with the actual arg name
+	:handler
+]
+	
 ;-- faster than for-each/reverse, but only correct if series length is a multiple of skip
 ;@@ use for-each when becomes available
 foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [

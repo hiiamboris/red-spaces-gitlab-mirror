@@ -11,18 +11,18 @@ Red [
 
 context [
 	last-offsets: make hash! 2							;@@ suffers from REP #129
-	insert-event-func function [face event] [
-		if host? face [
-			switch event/type [
-				over [									;-- pointer may have left a space it was in
-					pos: any [find/same last-offsets face  tail last-offsets]
-					change change pos face event/offset
-					detect-away face event event/offset
-				]
-				time [									;-- space may have been moved on the last frame
-					if offset: select/same last-offsets face [
-						detect-away face event offset
-					]
+	insert-event-func filtered-event-func [face event] [
+		[over time]
+		unless host? face [return none]
+		switch event/type [
+			over [										;-- pointer may have left a space it was in
+				pos: any [find/same last-offsets face  tail last-offsets]
+				change change pos face event/offset
+				detect-away face event event/offset
+			]
+			time [										;-- space may have been moved on the last frame
+				if offset: select/same last-offsets face [
+					detect-away face event offset
 				]
 			]
 		]

@@ -195,15 +195,8 @@ context [
 	;@@ but it's not working when controls are in a panel - see #3808
 	;@@ native buttons also silently steal focus on clicks, without affecting window/selected, so they break this
 	
-	make-event-filter: function [events [block!]] [
-		excluded: exclude extract to [] system/view/evt-names 2 events
-		make map! map-each/eval type excluded [[type [return none]]]
-	]
-	
-	filter: make-event-filter [down alt-down mid-down aux-down dbl-click focus unfocus]
-	
-	insert-event-func focus-checker: function [face event] [
-		do filter/(event/type)
+	insert-event-func focus-checker: filtered-event-func [face event] [
+		[down alt-down mid-down aux-down dbl-click focus unfocus] 
 		new-focal-face: event/window/selected
 		old-focal-face: all [
 			focus/current
@@ -219,7 +212,6 @@ context [
 		]
 		none
 	]
-	;@@ this filtered structure of event funcs should be used for all other cases, to reduce event system load
 ]
 
 register-previewer

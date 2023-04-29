@@ -19,7 +19,7 @@ context [
 		time
 	]
 	;; sometimes this gets window as 'host', likely when no face is in focus
-	host-event-func: function [host event] [
+	insert-event-func function [host event] [
 		all [
 			host? host									;@@ maybe /content field not /space?
 			host/space									;-- /space is assigned?
@@ -27,9 +27,6 @@ context [
 			events/dispatch host event
 			none										;-- the event can be processed by other handlers
 		]
-	]
-	unless find/same system/view/handlers :host-event-func [	;@@ check shouldn't be needed anymore
-		insert-event-func :host-event-func
 	]
 ]
 
