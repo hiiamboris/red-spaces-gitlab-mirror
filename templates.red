@@ -1113,9 +1113,10 @@ container-ctx: context [
 	declare-template 'container/space [
 		kit:     ~/kit
 		origin:  0x0									;-- used by ring layout to center itself around the pointer
-		content: []		#type :invalidates				;-- no type check as user may redefine it and /items freely
+		content: []		#type :invalidates 				;-- no type check as user may redefine it and /items freely
 		
 		items: func [/pick i [integer!] /size] [
+			#assert [block? content]					;-- check type in the default items provider instead
 			either pick [content/:i][length? content]
 		] #type :invalidates [function!]
 		
