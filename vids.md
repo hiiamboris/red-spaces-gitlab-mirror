@@ -581,7 +581,7 @@ It starts with optional flags. Currently supported are:
 **Each menu item** is one or more values to display, followed by a `paren!` with code to evaluate when this item is chosen:\
 `data data ... (code)`
 
-Item data can contain: `char!`, `string!`, `logic!` and `image!` values, as well as `object!`s referring to existing spaces, or `word!`s referring to template names. It is laid out using [`row` layout](reference.md#row). When aligning separator (`stretch` aka `<->`) is missing in the row, one is automatically added after first textual space, so rows like `"Find..." "Ctrl+F"` become `"Find..." <-> "Ctrl+F"` and get aligned properly (name to the left, key to the right).
+Item data can contain: `char!`, `string!`, `logic!` and `image!` values, as well as `object!`s referring to existing spaces, or `word!`s referring to template names. It is laid out using horizontal [`tube` layout](reference.md#tube) (aka `row`). When aligning separator (`stretch` aka `<->`) is missing in the row, one is automatically added after first textual space, so rows like `"Find..." "Ctrl+F"` become `"Find..." <-> "Ctrl+F"` and get aligned properly (name to the left, key to the right).
 
 Example from [`popups-test.red`](tests/popups-test.red):
 ```
