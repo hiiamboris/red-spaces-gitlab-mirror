@@ -140,13 +140,55 @@ make-template: function [
 	make-space/block base spec
 ]
 
+;; #push directive expands into #on-change directive for classy-object's declare-class func
+;;   it pushes every facet change into all targets (used to expose inner facets into outer template)
+;;   and then back from targets into the source (because children may modify the source, e.g. convert margin into pair value)
+;; syntax:
+;;   facet: value  #push target/path							;-- accepts a path
+;;   facet: value  #push [target/path1 target/path2 ...]		;-- or block of paths
+;; spaces do not export any macros by design, so this function call is required when using #push in declare-class directly
+expand-template: function [
+	"Expand template directives"
+	spec [block!] "Only #push is supported at the moment"
+	/local path
+][
+	mapparse [#push set path [path! | block!]] copy spec [
+		paths: either path? path [reduce [path]][path]
+		body: collect [
+			foreach path paths [
+				insert path: copy path 'space
+				keep compose [
+					(to set-path! path) :value					;-- pushes the value forth
+					quietly space/:word: (to get-path! path)	;-- mirrors back its corrected value
+				]
+			]
+		]
+		compose/only [#on-change [space word value] (body)]
+	]
+]
+
+;@@ I should probably put it into declare-template, but then declare-class will need another call to expand it too
+#macro [#push [path! | block!]] func [s e /local path paths body] [
+	paths: either path? s/2 [reduce [s/2]][s/2]
+	body: collect [
+		foreach path paths [
+			insert path: copy path 'space
+			keep compose [
+				(to set-path! path) :value						;-- pushes the value forth
+				quietly space/:word: (to get-path! path)		;-- mirrors back its corrected value (e.g. integer to pair conversion)
+			]
+		]
+	]
+	compose/only [#on-change [space word value] (body)]
+]
+
 declare-template: function [
 	"Declare a named class and put into space templates"
 	name-base [path!] "template-name/prototype-name"
 	spec      [block!]
 ][
 	set [name: base:] name-base
-	templates/:name: make-template base declare-class name-base spec
+	templates/:name: make-template base declare-class name-base expand-template spec
 ]
 
 
