@@ -849,11 +849,7 @@ paragraph-ctx: context [
 		][
 			infxinf
 		]
-		reuse?: all [not wrap?  not ellipsize?  space/layout  space/layout/size =? canvas]	;@@ REP #113
-		layout: any [
-			if reuse? [space/layout]					;-- text can reuse its layout on any canvas
-			lay-out space |canvas| to logic! ellipsize? to logic! wrap?
-		]
+		layout: lay-out space |canvas| to logic! ellipsize? to logic! wrap?
 
 		;; size can be adjusted in various ways:
 		;;  - if rendered < canvas, we can report either canvas or rendered
@@ -890,7 +886,7 @@ paragraph-ctx: context [
 			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
 			drawn: compose/only [push (drawn) (sdrawn)]
 		]
-		compose/only [translate (mrg) (drawn)]
+p		compose/only [translate (mrg) (drawn)]
 	]
 	
 	get-layout: function [space [object!]] [
