@@ -2415,7 +2415,7 @@ list-view-ctx: context [
 		
 	;; new class needed to type icache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
-	list-template: declare-class/manual 'list-in-list-view/list [
+	list-template: declare-class 'list-in-list-view/list [
 		type: 'list										;-- styled normally
 		axis: 'y
 		
@@ -2429,8 +2429,6 @@ list-view-ctx: context [
 			;; must pass positive canvas (uses last rendered list-view size)
 			~/available? self size axis dir from requested
 		] #type [function!]
-
-		classify-object self 'list-in-list-view			;-- on-change is not primed until /list-view is set
 	]
 
 	on-source-change: function [lview [object!] word [word!] value [any-type!]] [
