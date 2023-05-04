@@ -19,11 +19,11 @@ Instead, I want widget names to tell what unique features it provides. After som
 - `drop-box`: a read-only box with an item from a drop-down list *(box + drop-down)*
 - `drop-field`: an editable field that can be reset to an item from a drop-down list *(field + drop-down)* 
 
-But these names (or similar) will be available out of the box in more recent versions, so to ensure existing features do not interfere with this guide, I will name them `drop-box*` and `drop-field*` instead.
+But these names (or similar) will be available out of the box in more recent versions, so to ensure existing features do not interfere with this guide, I will name them the first one `drop-box*` and the second one is out of scope of this guide.
 
 ### Features
 
-Let's forget about `drop-field*` for now and focus on `drop-box*` alone. Roughly what features should it have?
+Roughly what features should a `drop-box*` have?
 - some read-only text
 - a button on the right
 - when clicked, a popup list should appear
