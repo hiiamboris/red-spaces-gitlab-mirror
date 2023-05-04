@@ -72,7 +72,9 @@ Looks like tube aligns its items to the top left by default, and we can check th
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/drop-box-guide/tube-source.png)
 
-Indeed, this is the case. But we don't want to depend on default alignment anyway, so let's realign it, adding `align` line after `axes` in our template. `;<<<` marker from now on will identify the changed lines to help you follow:
+Indeed, this is the case. But we don't want to depend on default alignment anyway, so let's realign it, adding `align` line after `axes` in our template. 
+
+**`;<<<` marker from now on will identify the changed lines to help you follow:**
 ```
 declare-template 'drop-box*/tube [
 	axes: [e s]											;) east then south - most common flow direction
@@ -426,13 +428,13 @@ view [host 150x150 [vlist [drop-box*]]]
 ```
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/drop-box-guide/drop-box-15.gif)
 
-Now on to size of the list. It's width should just equal that of the drop-box. But height? We don't want it too big, partly because it will be cropped, partly because long drop-down lists are bad UI anyway. 
+Now on to size of the list. Its width should just equal that of the drop-box. But height? We don't want it too big, partly because it will be cropped, partly because long drop-down lists are bad UI anyway. 
 
 `limits` facet is just the thing for this. But instead of hardcoding a limit in pixels, let's measure it in heights of the drop-box and make it configurable. E.g. we shouldn't expect only text to be there - maybe someone will use a list of images, and whole widget will have a more square-like appearance.
 
 Let's add new facet to our template. Unlike other facets, which were inherited, this one is new, and we should type it to restrict assignable values:
 ```
-list-pages: 5		#type [integer!]					;) max drop-list vertical size in drop-box's heights
+list-pages: 5		#type [integer!] (list-pages >= 1)		;) max drop-list height in drop-box's heights
 ```
 And then our handlers will take it into account:
 ```
@@ -450,7 +452,7 @@ define-handlers [
 	]
 ]
 ```
-Note that limits fix the horizontal size and restrict vertical size from 1 to `list-pages` heights of the drop-box.
+Note that chosen limits fix the horizontal size and restrict vertical size from 1 to `list-pages` heights of the drop-box.
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/drop-box-guide/drop-box-16.gif)
 
@@ -476,7 +478,7 @@ declare-template 'drop-box*/tube [
 	]
 	content: reduce [spaces/box spaces/button]
 	
-	list-pages: 5		#type [integer!]				;) max drop-list vertical size in drop-box's heights
+	list-pages: 5		#type [integer!] (list-pages >= 1)		;) max drop-list height in drop-box's heights
 	selected:   {}		#push spaces/box/data																	;<<<
 ]
 ```
@@ -554,7 +556,7 @@ declare-template 'drop-box*/tube [
 	]
 	content: reduce [spaces/box spaces/button]
 	
-	list-pages: 5		#type [integer!]				;) max drop-list vertical size in drop-box's heights
+	list-pages: 5		#type [integer!] (list-pages >= 1)		;) max drop-list height in drop-box's heights
 	selected:   {}		#push spaces/box/data
 ]
 
@@ -891,7 +893,7 @@ declare-template 'drop-box*/tube [
 	content: reduce [spaces/box spaces/button]
 	
 	align:      -1x0	#push spaces/box/align		;) to the left, but centered vertically					;<<<
-	list-pages: 5		#type [integer!]			;) max drop-list vertical size in drop-box's heights
+	list-pages: 5		#type [integer!] (list-pages >= 1)		;) max drop-list height in drop-box's heights
 	selected:   {}		#push spaces/box/data
 	data:       []		#type [block! hash!] :on-data-change	;) available options
 ]
@@ -959,7 +961,7 @@ context with spaces/ctx expand-directives [												;<<<
 		content: reduce [spaces/box spaces/button]
 		
 	   	align:      -1x0	#push spaces/box/align		;) to the left, but centered vertically
-		list-pages: 5		#type [integer!]			;) max drop-list vertical size in drop-box's heights
+		list-pages: 5		#type [integer!] (list-pages >= 1)		;) max drop-list height in drop-box's heights
 		selected:   {}		#push spaces/box/data
 		data:       []		#type [block! hash!] :on-data-change	;) available options
 	]
