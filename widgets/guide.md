@@ -1,3 +1,8 @@
+---
+gitea: none
+include_toc: true
+---
+
 # How to create your own widget template
 
 Adding new templates is not quite as easy as using them.
@@ -652,7 +657,7 @@ drop-box*: [
 
 ### Adding on-over highlight
 
-Now we can add an `on-over` handler to the item that sets the `lit?` flag ("lit" from "light", not "literal"):
+Now we can add an `on-over` handler to the item that sets the `lit?` flag ('lit' from 'light', not 'literal'):
 ```
 drop-menu*: [
 	on-down [space path event] [
@@ -747,7 +752,7 @@ So now that our widget is mostly working, it's time to review the design.
 
 ### Using classes for type checks
 
-Our `lit?` flag is not typed and does not auto invalidate the space. We need to reserve a class for it to make all that work, however we do not want to add a new space template, since our `item` wouldn't be of any good in isolation.
+Our `lit?` flag is not typed and does not auto invalidate the space. We need to reserve a class for it to make all that work, however we do not want to add a new space template (which is also class-based), since our `item` wouldn't be of any good outside of `drop-menu*`.
 
 Let's convert our `item` init code:
 ```
@@ -765,9 +770,9 @@ item-template: declare-class 'item-in-drop-menu/data-view [
 	lit?:  no		#type = [logic!] :invalidates		;) we'll set this to true for coloring
 ]
 ```
-We use a lengthy name `item-in-drop-menu` because class names are all global, and we don't want to accidentally claim a good name for a new widget. Class is based on `data-view`, so it inherits all typechecks from it. Since `lit?` is the only new facet, it's the only one we have to type. 
+We use a lengthy name `item-in-drop-menu` because class names are all global, and we don't want to accidentally claim a good name that can be used for a new widget or something else. Class is based on `data-view`, so it inherits all typechecks from it. Since `lit?` is the only new facet, it's the only one we have to `#type`. 
 
-`quietly` there was just an optimization for really long lists, so we can remove it, as drop-lists are always limited. `type` will keep our item recognized as `item` for styles and events, not as `item-in-drop-menu` (class name is used when no explicit type is provided). `invalidates` will redraw the item every time `lit?` value changes: `=` equality type is provided to skip assignments that do not change the value.
+`quietly` there was just an optimization for really long lists, so we can remove it, as drop-lists are always limited. `type` will keep our item recognized as `item` for styles and events, not as `item-in-drop-menu` (class name is used only when no explicit type is provided). `invalidates` will redraw the item every time `lit?` value changes: `=` equality type is provided to skip assignments that do not change the value.
 
 `wrap-data` can now be rewritten as (also renamed `spc` to `item`):
 ```
@@ -777,11 +782,11 @@ wrap-data= func [item-data [any-type!] /local item] [
 	item
 ]
 ```
-It's still based on `data-view` template because we didn't declare a new template, but it will use typechecks from `item-in-drop-menu` class and evaluate code provided by `item-template` block, initializing three facets.
+It's still based on `data-view` template (because we didn't declare a new template), but it will use typechecks from `item-in-drop-menu` class and evaluate code provided by `item-template` block, initializing three facets.
 
 ### VID/S into Red code
 
-Next issue is that we're using VID/S in `drop-box*`'s `on-down` event to make a new space, but it's not what it was designed for. Let's rewrite it using plain Red:
+Next issue is that we're using VID/S in `drop-box*`'s `on-down` event to make a new space, but it's not what VID/S was designed for. Let's rewrite it using plain Red:
 ```
 drop-box*: [
 	on-down [space path event] [
@@ -856,7 +861,7 @@ And as we can see `drop-box*` now starts with a properly selected item upon crea
 
 ### Adding a VID/S style
 
-To ease the use of it, we should also add a VID/S style. What auto-facets makes sense for a `drop-box*`? Obviously, we could auto-assign block to `data`. We could probably use `[left center right]` for alignments as well.
+To ease the use of our template, we should also add a VID/S style. What auto-facets makes sense for a `drop-box*`? Obviously, we could auto-assign block to `data`. We could probably use `[left center right]` for alignments as well.
 
 Styles reside in `spaces/VID/styles`, but since we're working within Spaces context, just `VID/styles` is fine.
 Let's put this somewhere in our script before the `view` call, and test it out: 
@@ -873,7 +878,7 @@ VID/styles/drop-box*: [																						;<<<
 
 view [host 150x150 [vlist [drop-box* [a b c d e f] right]]]
 ```
-Note that instead of `align/x` we use `spaces/box/align/x`, because our `tube` fills the whole canvas anyway, and stretches the `box` (because it has nonzero default `weight`), so alignment should happen in the `box` to have a visible effect.
+Note that instead of `align/x` we use `spaces/box/align/x`, because our `tube`-based `drop-box*` fills the whole canvas anyway, and stretches the `box` (because it has nonzero default `weight`), so alignment should happen in the `box` to have a visible effect.
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/drop-box-guide/drop-box-25.png)
 
