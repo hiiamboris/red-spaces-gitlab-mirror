@@ -32,7 +32,7 @@ Roughly what features should a `drop-box*` have?
 
 We do not have to start building our template from scratch. As long as one of the standard templates can serve as a basis, it's wise to leverage it.
 
-Tip: when not to leverage existing template?
+**TIP: when not to leverage existing template?**
 - for performance reasons: specific case can always be optimized more than a general one
 - if all templates expose facets that are meaningless for the derived one
 
@@ -72,9 +72,16 @@ Looks like tube aligns its items to the top left by default, and we can check th
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/drop-box-guide/tube-source.png)
 
-Indeed, this is the case. But we don't want to depend on default alignment anyway, so let's realign it, adding this line after `axes`:
+Indeed, this is the case. But we don't want to depend on default alignment anyway, so let's realign it, adding `align` line after `axes` in our template. `;<<<` marker from now on will identify the changed lines to help you follow:
 ```
-	align: -1x0											;) to the left, but centered vertically
+declare-template 'drop-box*/tube [
+	axes: [e s]											;) east then south - most common flow direction
+	align: -1x0											;) to the left, but centered vertically						;<<<
+	content: reduce [									;) let's just put two hardcoded spaces into tube for now
+		make-space 'text [text: "chosen item"]
+		make-space 'button [data: "v"]
+	]
+]
 ```
 Better now:
 
@@ -91,7 +98,7 @@ Now look at it:
 
 ### Structure
 
-We'd like to be able to address spaces used in the drop-box by some meaningful names rather than numbered `drop-box/content/1` and so. Let's name them. `;<<<` marker from now on will identify the changed lines to help you follow:
+We'd like to be able to address spaces used in the drop-box by some meaningful names rather than numbered `drop-box/content/1` and so. Let's name them.
 ```
 declare-template 'drop-box*/tube [
 	axes: [e s]											;) east then south - most common flow direction
