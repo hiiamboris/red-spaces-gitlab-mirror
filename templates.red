@@ -167,21 +167,6 @@ expand-template: function [
 	]
 ]
 
-;@@ I should probably put it into declare-template, but then declare-class will need another call to expand it too
-#macro [#push [path! | block!]] func [s e /local path paths body] [
-	paths: either path? s/2 [reduce [s/2]][s/2]
-	body: collect [
-		foreach path paths [
-			insert path: copy path 'space
-			keep compose [
-				(to set-path! path) :value						;-- pushes the value forth
-				quietly space/:word: (to get-path! path)		;-- mirrors back its corrected value (e.g. integer to pair conversion)
-			]
-		]
-	]
-	compose/only [#on-change [space word value] (body)]
-]
-
 declare-template: function [
 	"Declare a named class and put into space templates"
 	name-base [path!] "template-name/prototype-name"
