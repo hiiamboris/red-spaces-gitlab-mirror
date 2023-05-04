@@ -4,6 +4,8 @@ This directory contains widgets that I don't want to include into the Spaces cor
 
 They should be included after `%everything.red`.
 
+See the [guide](guide.md) if you'd like to create your own widget. 
+
 ---
 
 `document.red` is an advanced template that arranges mixed content paragraphs into a (possibly editable) document:

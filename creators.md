@@ -565,3 +565,7 @@ Do use spaces console (that is run by `run.bat` or `red console.red`) or put a `
 ### Test your widgets in [VID/S Polygon](programs/vids-polygon.red)
 
 Put them into containers, e.g. into a `row` inside a `column`, and see how they work with automatic sizing. Try resizing the window.
+
+## Ready for battle?
+
+There's a [step by step practical guide](widgets/guide.md) to writing a new widget, with common mistakes, problems and solutions.
