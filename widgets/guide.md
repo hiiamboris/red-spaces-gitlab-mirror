@@ -6,11 +6,11 @@ include_toc: true
 # How to create your own widget template
 
 Adding new templates is not quite as easy as using them.
-This step by step guide explains template design on a `drop-box` ([combo box](https://en.wikipedia.org/wiki/Combo_box)) example and shows typical little problems and their solutions.
+This step by step guide explains template design on a `drop-box` ([drop-down list](https://en.wikipedia.org/wiki/Drop-down_list)) example and shows typical little problems and their solutions.
 
 This guide is meant as a more practical addition to the [Creators Guide](../creators.md) and assumes you've got the gist of it.
 
-Despite its simple appearance, combo box is rather hard to design correctly, and it's quite likely that this design will be enhanced in the future.
+Despite its simple appearance, drop down list is rather hard to design correctly, and it's quite likely that this design will be enhanced in the future.
 
 It is highly recommended to actually follow all the steps yourself rather than just read the guide. This way your brain will wire the instructions with your own understanding of the code at each step, and with questions that may otherwise not be raised.
 
