@@ -92,6 +92,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			canvas/:x: max-safe size/:x + (2 * margin/:x) if canvas/:x < infxinf/x [canvas/:x]	;-- `size` has margin subtracted
 			;; apply limits to canvas2/:x to obtain proper list width
 			canvas2: subtract-canvas constrain canvas limits 2 * margin
+			canvas2: extend-canvas canvas2 axis
 			#debug sizing [#print "list c1=(canvas1) c2=(canvas2)"]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
