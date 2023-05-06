@@ -73,7 +73,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; list can be rendered in two modes:
 			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
 			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: canvas2: subtract-canvas canvas 2 * margin
+			canvas1: subtract-canvas canvas 2 * margin
 			
 			map: make [] 2 * count
 			size: 0x0
@@ -89,10 +89,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			;; only extend the canvas to max item's size, but not contract if it's finite
 			;; do contract if X is infinite
-			canvas2/:x: max-safe size/:x if canvas2/:x < infxinf/x [canvas2/:x]		;-- `size` already has margin subtracted
+			canvas/:x: max-safe size/:x + (2 * margin/:x) if canvas/:x < infxinf/x [canvas/:x]	;-- `size` has margin subtracted
 			;; apply limits to canvas2/:x to obtain proper list width
-			; size: constrain size limits
-			canvas2: subtract-canvas constrain canvas2 limits margin * 2
+			canvas2: subtract-canvas constrain canvas limits 2 * margin
 			#debug sizing [#print "list c1=(canvas1) c2=(canvas2)"]
 			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
 				pos: pos'  size: 0x0
