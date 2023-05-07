@@ -54,16 +54,14 @@ focus: make classy-object! declare-class 'focus-context [
 		if path: last-valid-focus [set-focus last path] 
 	]
 	
-	deeply-visible?: function [path [block! path!]] [	;@@ where's the right place for this func?
+	deep-check: function [path [block! path!] facets [block!]] [
 		foreach face path [
 			unless is-face? face [break]
-			;@@ should check /enabled ? for focus? unfocus?
-			unless all [face/state face/visible? face/enabled?] [return no]	;-- /state required by last-valid-focus
-			; unless all [face/visible?] [return no]		;-- /state can be none while window is being created, but focusing already possible
+			unless all with face facets [return no]
 		]
 		yes
 	]
-
+	
 	;; path is valid if it's visible still
 	;; for faces this means 'state' is not none and 'visible?' is true
 	;; spaces validity is checked by get-screen-path itself
@@ -71,7 +69,7 @@ focus: make classy-object! declare-class 'focus-context [
 		for-each/reverse space history [
 			all [
 				path: get-screen-path space
-				deeply-visible? path 
+				deep-check path [state enabled? visible?]
 				result: path
 				break
 			]
@@ -84,7 +82,7 @@ focus: make classy-object! declare-class 'focus-context [
 		unless space? space [exit]						;-- for faces or none - no action needed
 		if all [
 			path: get-host-path space
-			; deeply-visible? path
+			deep-check path [state]						;-- without /state event is pointless; no visible/enabled in case they get set later
 		][
 			invalidate space							;-- let space remove its focus decoration
 			events/with-stop [							;-- init a separate stop flag for a separate event
@@ -97,7 +95,7 @@ focus: make classy-object! declare-class 'focus-context [
 	send-focus: function ["Put focus on the space" space [object!] (space? space)] [
 		if all [
 			path: get-host-path space
-			; deeply-visible? path
+			deep-check path [visible? enabled?]			;-- tests reachability, /state may be none if window is not yet shown
 		][
 			#assert [is-face? path/1]					;-- or set-focus will deadlock by calling this again
 			invalidate space							;-- let space paint its focus decoration
@@ -128,7 +126,7 @@ focus: make classy-object! declare-class 'focus-context [
 				accepted: either space? obj: last path [focusable][focusable-faces]
 				all [
 					find accepted obj/type
-					deeply-visible? path
+					deep-check path [state enabled? visible?]
 					found: path
 					break
 				]
@@ -225,7 +223,10 @@ register-previewer
 	function [space [object!] path [block!] event [event! object!]] [
 		;@@ should it avoid focusing if stop flag is set?
 		#debug focus [#print "attempting to focus (space-id space)"]
-		focus-space space
+		path: get-host-path space
+		if focus/deep-check path [state enabled?] [		;-- don't focus on a just-destroyed host (popup)
+			focus-space space
+		]
 	]
 
 
