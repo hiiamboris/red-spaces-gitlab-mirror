@@ -143,6 +143,22 @@ host-of: function [space [object!]] [
 	all [path: get-host-path space  path/1]
 ]
 
+host-box-of: function [									;@@ temporary until REP #144
+	"Get host coordinates of a space (kludge! not scaling aware!)"
+	space [object!] (space? space)
+][
+	box: reduce [0x0 space/size]	
+	while [parent: space/parent] [
+		if host? parent [return box]
+		#assert [select parent 'map]
+		geom: select/same parent/map space
+		#assert [geom]
+		forall box [box/1: box/1 + geom/offset]
+		space: parent
+	]
+	none
+]
+
 ;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
 ;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
