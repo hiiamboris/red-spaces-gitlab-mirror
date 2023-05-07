@@ -16,7 +16,7 @@ Red [
 
 
 ;; fonts and other style data
-styling: context [
+~styling: context [
 	svf: system/view/fonts
 	
 	fonts: object [
@@ -98,21 +98,21 @@ do/expand with spaces/ctx [
 			below: when select self 'color [pen (color)]
 		]
 		rich-content: [
-			default font: styling/fonts/text/1
+			default font: ~styling/fonts/text/1
 			margin: font/size - svf/size * 0x1
 		]
 		cell/rich-content: [
-			default font: styling/fonts/text/1
+			default font: ~styling/fonts/text/1
 			align: select #(-1 left 0 center 1 right) parent/align/x	;-- carry cell alignment into text
 		]
 		pre: [
 			margin: 10
-			font: styling/fonts/code/base
+			font: ~styling/fonts/code/base
 			below: [(underbox size 2 5)]
 		]
 		code: [
 			if parent/font [							;-- different fonts for all headings and text
-				font: styling/fonts/code/(parent/font/size)
+				font: ~styling/fonts/code/(parent/font/size)
 			]
 			margin: 4x0
 			pen: when color (compose [pen (color)])

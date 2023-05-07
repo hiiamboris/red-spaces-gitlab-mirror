@@ -226,8 +226,8 @@ context [
 					]
 				]
 				heading [compose/only [
-					rich-content (append copy styling/flags/headings/:level decode-text flat join buffer)
-					font= pick styling/fonts/text (1 + level)
+					rich-content (append copy ~styling/flags/headings/:level decode-text flat join buffer)
+					font= pick ~styling/fonts/text (1 + level)
 				]]
 				break [[thematic-break]]
 				grid [decode-table buffer]
