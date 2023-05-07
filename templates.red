@@ -856,13 +856,15 @@ paragraph-ctx: context [
 		;; however we wish to keep size up to date with text content, which requires a `draw` call
 		drawn: compose [text 0x0 (layout)]
 		
-		if all [caret: space/caret  not ellipsize?] [
-		; if all [caret: space/caret  not ellipsize?] [
-			box: caret->box space caret/offset caret/side
-			quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
-			invalidate/only caret
-			cdrawn: render caret
-			drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
+		if caret: space/caret [
+			unless caret/parent =? space [render caret]	;-- this lets caret invalidation (e.g. /visible? change) propagate to text
+			if all [caret/visible?  not ellipsize?] [
+				box: caret->box space caret/offset caret/side
+				quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
+				invalidate/only caret
+				cdrawn: render caret
+				drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
+			]
 		]
 		;; add selection if enabled
 		if all [sel: space/selected  not ellipsize?] [	;@@ I could support selection on ellipsized, but is there a point?
@@ -871,7 +873,7 @@ paragraph-ctx: context [
 			foreach [xy1 xy2] boxes [append sdrawn draw-box xy1 xy2]	;@@ use map-each
 			drawn: compose/only [push (drawn) (sdrawn)]
 		]
-p		compose/only [translate (mrg) (drawn)]
+		compose/only [translate (mrg) (drawn)]
 	]
 	
 	get-layout: function [space [object!]] [
@@ -1031,6 +1033,7 @@ p		compose/only [translate (mrg) (drawn)]
 		;; offset and side do not affect the caret itself, but serve for it's location descriptors within the parent
 		offset: 0		#type =? :invalidates [integer!]
 		side:  'right	#type =  :invalidates [word!] (find/case [left right] side)
+		visible?: no	#type =? :invalidates [logic!]	;-- controls caret visibility (necessary focusable spaces wrapping field)
 	]
 	
  	declare-template 'text/space [
@@ -1663,7 +1666,7 @@ rich-content-ctx: context [								;-- rich content
 	]
 	
 	draw-caret: function [space [object!]] [
-		unless caret: space/caret [return []]
+		unless all [caret: space/caret  caret/visible?] [return []]
 		box: batch space [frame/caret-box here caret/side]
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
@@ -3830,7 +3833,6 @@ field-ctx: context [
 			
 	draw: function [field [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		ctext: field/spaces/text						;-- text content
-		quietly ctext/caret: if focused? [field/caret]
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
 		drawn: render/on ctext infxinf no no			;-- this sets the size
 		; #assert [field/size/x = canvas/x]				;-- below algo may need review if this doesn't hold true
@@ -3875,11 +3877,11 @@ field-ctx: context [
 		cache:    [size map]
 
 		spaces: object [
-			text:      make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
-			caret:     make-space 'caret     caret-template		;-- shared between text and field, put into text only when focused
+			text:       make-space 'text      [color: none]		;-- by exposing it, I simplify styling of field
 		] #type [object!]
 		
-		caret:  spaces/caret		#type (space? caret)		;@@ maybe keep it as text/caret not spaces/caret?
+		caret: make-space 'caret caret-template					;-- shared between text and field
+			#type (space? caret) #push spaces/text/caret		;-- exposed here but belongs to (drawn by) the text space
 		
 		;; these mirror spaces/text facets:
 		selected: none				#type =? :on-change [pair! none!]	;-- none or pair (offsets of selection start & end)

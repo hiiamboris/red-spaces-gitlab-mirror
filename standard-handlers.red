@@ -295,6 +295,9 @@ define-handlers [
 		]
 		
 		on-up [space path event] [stop-drag]
+		
+		on-focus   [space path event] [space/caret/visible?: yes]
+		on-unfocus [space path event] [space/caret/visible?: no]
 	]
 
 	fps-meter: [
