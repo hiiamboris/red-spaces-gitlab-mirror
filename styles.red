@@ -24,6 +24,8 @@ style-ctx: context [below: above: none]
 	2 = index? in style-ctx 'above
 ]
 
+;; reminder: set-style 'a get-style 'b should work without any nasty tricks, binding errors, shared state, etc.
+;; `style-ctx` is shared by functions, but gets read before evaluation, so it's fine
 set-style: function [
 	"Define a named style"
 	name [word! path!]
@@ -74,7 +76,7 @@ define-styles: function [
 	parse styles [any [=names= =expr= =commit=]]
 ]
 
-do with context [
+do with styling: context [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
 	unless svm/colors [svm/colors: copy #()]			;@@ MacOS fix for #4740
 	unless svmc/text  [svmc/text: black]				;@@ GTK fix for #4740
@@ -223,7 +225,7 @@ do with context [
 		clickable: data-clickable: [
 			below: when select self 'color [(make-box size 0 'off color)]
 		]
-		button: drop-box: [
+		button: [
 			fill:    either pushed? [opaque 'text 50%][['off]]
 			; below: [shadow 2x4 5 0 (green)]				;@@ not working - see #4895; not portable (Windows only)
 			overlay: compose [make-box/round size 1 none (fill) rounding]
