@@ -10,7 +10,7 @@ See the [guide](guide.md) if you'd like to create your own widget.
 
 `document.red` is an advanced template that arranges mixed content paragraphs into a (possibly editable) document:
 
-![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/sample-document-editor.gif)
+<img width=800 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/sample-document-editor.gif></img>
 
 ---
 
