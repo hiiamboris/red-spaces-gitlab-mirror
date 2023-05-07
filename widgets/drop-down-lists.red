@@ -2,6 +2,11 @@ Red [
 	title:   "DROP-BOX and DROP-FIELD widgets for Spaces"
 	author:  @hiiamboris
 	license: BSD-3
+	notes: {
+		Current limitations:
+		- no scaling/rotation/skew is expected in all parents of drop-downs (track REP #144)
+		- lists themselves are clipped by the host (track REP #40)
+	}
 ]
 
 
