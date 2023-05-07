@@ -86,6 +86,7 @@ popups: context [
 			remove find/same window/pane face
 		]
 		clear old
+		focus/restore									;-- if popup was focused, need to refocus
 	]
 
 	show: function [
@@ -118,6 +119,7 @@ popups: context [
 		primed/text: none								;-- without this some event asynchrony may trigger hint redisplay and popup hide
 		save level face
 		unless find/same window/pane face [append window/pane face]
+		face											;-- return the popup face
 	]
 
 	get-hint: function [

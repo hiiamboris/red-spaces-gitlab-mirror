@@ -50,12 +50,16 @@ focus: make classy-object! declare-class 'focus-context [
 		remove/part hist hist << 10						;-- limit history length
 	]
 	
+	restore: function [] [
+		if path: last-valid-focus [set-focus last path] 
+	]
+	
 	deeply-visible?: function [path [block! path!]] [	;@@ where's the right place for this func?
 		foreach face path [
 			unless is-face? face [break]
-			; unless all [face/state face/visible?] [return no]
-			;@@ should check /enabled too? for focus only or unfocus too?
-			unless all [face/visible?] [return no]		;-- /state can be none while window is being created, but focusing already possible
+			;@@ should check /enabled ? for focus? unfocus?
+			unless all [face/state face/visible? face/enabled?] [return no]	;-- /state required by last-valid-focus
+			; unless all [face/visible?] [return no]		;-- /state can be none while window is being created, but focusing already possible
 		]
 		yes
 	]
@@ -80,7 +84,7 @@ focus: make classy-object! declare-class 'focus-context [
 		unless space? space [exit]						;-- for faces or none - no action needed
 		if all [
 			path: get-host-path space
-			deeply-visible? path
+			; deeply-visible? path
 		][
 			invalidate space							;-- let space remove its focus decoration
 			events/with-stop [							;-- init a separate stop flag for a separate event
@@ -93,7 +97,7 @@ focus: make classy-object! declare-class 'focus-context [
 	send-focus: function ["Put focus on the space" space [object!] (space? space)] [
 		if all [
 			path: get-host-path space
-			deeply-visible? path
+			; deeply-visible? path
 		][
 			#assert [is-face? path/1]					;-- or set-focus will deadlock by calling this again
 			invalidate space							;-- let space paint its focus decoration
