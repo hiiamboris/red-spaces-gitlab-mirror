@@ -195,7 +195,7 @@ VID: context [
 	
 	
 	;; used internally in host's `init` only
-	init-spaces-tree: function [face [object!]] [
+	init-spaces-tree: function [face [object!] /local focused] [
 		unless spec: select face/actors 'worst-actor-ever [exit]
 		face/actors/worst-actor-ever: none
 		#assert [function? :spec]
@@ -203,7 +203,7 @@ VID: context [
 		if empty? spec [exit]
 		
 		default focus/window: window-of face			;-- init focus
-		pane: lay-out-vids spec
+		focused: track-focus [pane: lay-out-vids spec]
 		if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 		face/space: pane/1
 		;; this is rather tricky:
@@ -220,12 +220,25 @@ VID: context [
 		#debug draw [prin "host/draw: " probe drawn] 
 		face/draw: drawn
 		
-		;; focus is tricky too: templates could call focus-space (e.g. editor focuses document)
-		;; but focus-space could not create an on-focus event because there was no path before it all got rendered
-		;; so I have to refocus the same space again, and also tell View to focus the host
-		if focus/current [set-focus focus/current]
+		;; also the tree does not exist until drawn, so focus-space will fail (and see notes on track-focus)
+		;; so I have to put focus here, and this also tells View to focus the host
+		if focused [set-focus focused]
 	]
 	
+	;; focus is tricky! lay-out-vids should never change focus, because its result may never be part of the tree
+	;; but it has to return the pane, so focused space becomes its extra return
+	;; lack of apply is no fun: instead of passing a refinement across all layout functions, it's much easier to use a wrapper
+	track-focus: function [
+		"Wrapper for layout functions that returns the last space with focus marker (or none)"
+		code [block!] "Evaluated"
+		/local focused
+	][
+		do code
+		:focused
+	]
+	update-focus: func [space [object!]] with :track-focus [
+		try [focused: space]							;-- may fail when called outside of track-focus scope
+	]
 	
 	wrap-value: function [
 		"Create a space to represent given VALUE; return it's name"
@@ -376,7 +389,7 @@ VID: context [
 						]
 					]
 				]
-				if def/focused? [focus-space space]
+				if def/focused? [update-focus space]	;-- does not trigger actors/events (until fully drawn)
 				
 				if object? actors: select space 'actors [
 					foreach actor values-of actors [

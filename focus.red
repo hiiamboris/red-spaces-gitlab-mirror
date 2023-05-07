@@ -53,7 +53,9 @@ focus: make classy-object! declare-class 'focus-context [
 	deeply-visible?: function [path [block! path!]] [	;@@ where's the right place for this func?
 		foreach face path [
 			unless is-face? face [break]
-			unless all [face/state face/visible?] [return no]
+			; unless all [face/state face/visible?] [return no]
+			;@@ should check /enabled too? for focus only or unfocus too?
+			unless all [face/visible?] [return no]		;-- /state can be none while window is being created, but focusing already possible
 		]
 		yes
 	]
