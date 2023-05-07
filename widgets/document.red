@@ -785,7 +785,7 @@ doc-ctx: context [
 		editor [
 			template: editor
 			layout: lay-out-editor
-			facets: [focus [focus-space content]]
+			facets: [focus [VID/update-focus content]]
 		]
 	]
 
@@ -807,9 +807,10 @@ doc-ctx: context [
 			]
 		]
 		if new-holder [									;-- update offsets
-			new-holder/caret/side:   doc/caret/side
-			new-holder/caret/offset: offset - pofs
-			new-holder/caret/width:  doc/caret/width
+			new-holder/caret/side:     doc/caret/side
+			new-holder/caret/offset:   offset - pofs
+			new-holder/caret/width:    doc/caret/width
+			new-holder/caret/visible?: doc/caret/visible?
 		]
 		
 		drawn: doc/list-draw/on canvas fill-x fill-y
@@ -833,7 +834,7 @@ doc-ctx: context [
 	caret-template: declare-class 'document-caret/caret [
 		type:  'caret
 		holder: none									;-- child that last owned the generated caret space
-		offset: 0	#on-change :on-caret-move			;-- on top of invalidation, also updates the paint
+		offset: 0		#on-change :on-caret-move		;-- on top of invalidation, also updates the paint
 	]
 	
 	;@@ should it support /items override? what will be the use case? spoilers? (for now length accounts for every paragraph)
@@ -977,8 +978,8 @@ define-handlers [
 				batch doc key->plan event doc/selected
 			]
 			;; these show/hide the caret - /draw will check if document is focused or not
-			on-focus   [doc path event] [invalidate doc]
-			on-unfocus [doc path event] [invalidate doc]
+			on-focus   [doc path event] [probe doc/caret/visible?: yes]
+			on-unfocus [doc path event] [probe doc/caret/visible?: no]
 		]; document: [
 	]; editor: extends 'scrollable [
 ]; doc-ctx: context [
