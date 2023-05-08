@@ -1,4 +1,4 @@
-Red [
+Red [ 
 	title:   "Default styles for Draw-based widgets"
 	author:  @hiiamboris
 	license: BSD-3
