@@ -97,6 +97,18 @@ Tests `field` operation. It's logic is quite tricky to get right.
 
 ---
 
+[**drop-down-test.red**](drop-down-test.red)
+
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-drop-down-test.gif></img>
+
+Tests if `drop-box` and `drop-field` are working correctly:
+- look, reaction to clicks, on-hover item highlight
+- keyboard accessibility: list display on down/page-down, hiding on esc/tab
+- tabbing and focus, hiding of the list when unfocused
+- ability to reactively detect /selected changes and actors operation
+
+---
+
 [**spiral-test.red**](spiral-test.red)
 
 <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-spiral-field-small.gif></img>
