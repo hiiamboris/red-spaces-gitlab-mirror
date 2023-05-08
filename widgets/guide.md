@@ -1051,4 +1051,6 @@ view [host 150x150 [vlist [drop-box* [a b c d e f] right]]]			;) just test code 
 
 This concludes our guide!
 
-All that's left is to remove the `view` line, `#include` our widget and use it in our program! This is the only way to determine if our design is any good.
+All that's left is to remove the `view` line, `#include` our widget and use it in our program! This is the only way to determine if our design is any good. 
+
+Extra work is still needed to design and build the `drop-field` (combo box) and make both widgets accessible via keyboard, but this guide is long enough already and that extra work follows the same principles laid out here, so it's left for the reader's exercise ;)
