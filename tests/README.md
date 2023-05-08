@@ -99,7 +99,7 @@ Tests `field` operation. It's logic is quite tricky to get right.
 
 [**drop-down-test.red**](drop-down-test.red)
 
-<img width=250 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-drop-down-test.gif></img>
+<img width=200 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-drop-down-test.gif></img>
 
 Tests if `drop-box` and `drop-field` are working correctly:
 - look, reaction to clicks, on-hover item highlight
