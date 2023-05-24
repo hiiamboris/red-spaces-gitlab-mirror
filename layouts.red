@@ -140,7 +140,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			size/:x: size/:x + (2 * margin/:x)
 			size: constrain size limits					;-- do not let it exceed the limits
 			#assert [size +< (1e7 by 1e7)]
-			reduce [size map]
+			frame: compose/only [
+				size:        (size)
+				map:         (map)
+				list-canvas: (canvas)
+				item-canvas: (item-canvas)
+			]
 		]
 	]
 	
@@ -404,7 +409,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			#debug sizing [#print "tube c=(canvas) cc=(ccanvas) stripe=(stripe) >> size=(size)"]
 			#assert [size +< infxinf]
-			reduce [size copy map]
+			frame: compose/only [
+				size: (size)
+				map:  (copy map)
+			]
 		]
 	]
 	
@@ -1005,9 +1013,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 			]
 			
-			total: total - origin
-			;; container will auto translate contents if origin is returned
-			reduce [total map origin]
+			frame: compose/only [
+				size:   (total - origin)
+				map:    (map)
+				origin: (origin)						;-- container will auto translate contents if origin is returned
+			]
 		]
 	]
 ]

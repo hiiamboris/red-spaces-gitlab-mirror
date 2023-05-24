@@ -1094,9 +1094,8 @@ container-ctx: context [
 		drawn: make [] len * 6
 		items: make [] len
 		repeat i len [append items cont/items/pick i]	;@@ use map-each
-		set [size: map: origin:] make-layout type items settings
-		default origin: 0x0
-		foreach [_ geom] map [
+		frame: make-layout type items settings
+		foreach [_ geom] frame/map [
 			pos: geom/offset
 			siz: geom/size
 			drw: geom/drawn
@@ -1113,10 +1112,10 @@ container-ctx: context [
 			] tail drawn
 			; ]
 		]
-		quietly cont/map: map	;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
-		cont/size: constrain size cont/limits			;@@ is this ok or layout needs to know the limits?
-		cont/origin: origin
-		compose/only [translate (negate origin) (drawn)]
+		quietly cont/map: frame/map		;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
+		cont/size: constrain frame/size cont/limits		;@@ is this ok or layout needs to know the limits?
+		cont/origin: any [frame/origin 0x0]
+		compose/only [translate (negate cont/origin) (drawn)]
 	]
 	
 	format-items: function [space [object!]] [
@@ -2432,13 +2431,13 @@ list-view-ctx: context [
 		guide:    axis2pair axis
 		origin:   guide * (xy1 - o1 - list/margin)
 		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y dont-extend?]
-		set [new-size: new-map:] make-layout 'list :list-picker settings
+		frame:    make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
-		drawn: make [] 3 * (2 + length? new-map) / 2
-		dxy: xy2 - xy1
-		i: i1
-		foreach [child geom] new-map [					;@@ use for-each
+		drawn:    make [] 3 * (2 + length? frame/map) / 2
+		dxy:      xy2 - xy1
+		i:        i1
+		foreach [child geom] frame/map [				;@@ use for-each
 			#assert [geom/drawn]						;@@ should never happen?
 			drw: second pos: find geom 'drawn
 			remove/part pos 2							;-- no reason to hold `drawn` in the map anymore
@@ -2457,8 +2456,8 @@ list-view-ctx: context [
 			]
 			i: i + 1
 		]
-		list/size: new-size
-		quietly list/map: new-map
+		list/size: frame/size
+		quietly list/map: frame/map
 		drawn
 	]
 
