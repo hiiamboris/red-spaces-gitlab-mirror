@@ -220,7 +220,7 @@ events: context [
 			#debug events [print ["-" name]]
 			path: as path! compose [(prefix) (name)]
 			list: any [get path  set path copy []]
-			append list function spec bind body commands
+			insert list function spec bind body commands		;-- latest must come first so it can block handlers of its prototype
 		]
 
 		=spec-def=: [								;-- just validation, to protect from errors
@@ -249,7 +249,7 @@ events: context [
 	;; stack-like wrappers for `commands` usage
 	;; have to be separate because `stop?` is valid until all finalizers are done (e.g. in simulated events)
 	with-stop: function [code [block!]] [
-		stop?: no										;-- force logic type
+		stop?: block?: no								;-- force logic type
 		do code
 	]
 
@@ -369,6 +369,7 @@ events: context [
 					foreach handler list [						;-- whole list is called regardless of stop flag change
 						#assert [function? :handler]
 						do-handler template :handler target event args	;@@ should handler index in the list be reported on error?
+						if commands/blocked? [break]
 					]
 				]
 			]
@@ -466,9 +467,10 @@ events/commands: context with events [
 	;-- flag is local to each handler's call, so we have to use a hack here
 	;@@ question here is what is the default behavior: pass the event further or not?
 	;@@ let's try with 'stop' by default
-	stop:    does [set bind 'stop?   :with-stop yes]	;-- used by previewers/finalizers
-	stop?:   does [get bind 'stop?   :with-stop]
-	pass:    does [set bind 'stop?   :with-stop no]		;-- stop is ignored for timer events ;@@ DOC it
+	stop:     func [/now] with :with-stop [stop?: yes block?: now]	;-- used by previewers/finalizers, also to block handler stack
+	stop?:    does with :with-stop [stop?]
+	blocked?: does with :with-stop [block?]
+	pass:     does with :with-stop [stop?: block?: no]			;-- stop is ignored for timer events
 
 	;-- the rest does not require a stack but should be available too
 	dragging?:      :events/dragging?

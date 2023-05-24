@@ -2148,6 +2148,7 @@ inf-scrollable-ctx: context [
 	roll: function [space [object!] path [path!] "inf-scrollable should be the last item"] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
 		path: keep-type path object!					;-- filter out pairs!
+		remove find/tail/same path space				;-- get rid of children
 		window: space/window
 		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
@@ -2207,14 +2208,15 @@ inf-scrollable-ctx: context [
 	declare-template 'inf-scrollable/scrollable [		;-- `infinite-scrollable` is too long for a name
 		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
 		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers roll-edge (px)
+		;@@ percents of window height could be supported for look-around? and maybe for jump-length?
 
 		content: window: make-space 'window []	#type (space? window)
 
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
-		roll: func [/in path [path!] "Inject subpath into current styling path"] [
-			~/roll self any [path as path! []]
+		roll: func [/in path [path! block!] "Inject subpath into current styling path"] [
+			~/roll self as path! any [path []]
 		] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
@@ -2390,6 +2392,17 @@ list-view-ctx: context [
 		r
 	]
 			
+	;; can be styled but cannot be accessed (and in fact shared)
+	;; because there's a selection per every row - can be many in one rich-content
+	;@@ similar to rich-content - possible to unify?
+	selection-prototype: make-space 'space [type: 'selection cache: none]	;-- disabled cache to avoid cloning /cached facet
+	cursor-prototype:    make-space 'space [type: 'cursor    cache: none]
+	draw-box: function [prototype [object!] size [pair!]] [
+		box: copy prototype
+		quietly box/size: size
+		render box
+	]
+	
 	;; container/draw only supports finite number of `items`, infinite needs special handling
 	;; it's also too general, while this `draw` can be optimized better
 	list-draw: function [
@@ -2414,20 +2427,35 @@ list-view-ctx: context [
 		]
 		#assert [i1 <= i2]
 
+		dont-extend?: yes								;-- forbid list width extension by largest item (or will depend on window/origin)
 		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
 		guide:    axis2pair axis
 		origin:   guide * (xy1 - o1 - list/margin)
-		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y]
+		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y dont-extend?]
 		set [new-size: new-map:] make-layout 'list :list-picker settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
-		drawn: make [] 3 * (length? new-map) / 2
-		foreach [_ geom] new-map [
+		drawn: make [] 3 * (2 + length? new-map) / 2
+		dxy: xy2 - xy1
+		i: i1
+		foreach [child geom] new-map [					;@@ use for-each
 			#assert [geom/drawn]						;@@ should never happen?
-			if drw: geom/drawn [						;-- invisible items don't get re-rendered
-				remove/part find geom 'drawn 2			;-- no reason to hold `drawn` in the map anymore
-				compose/only/into [translate (geom/offset) (drw)] tail drawn
+			drw: second pos: find geom 'drawn
+			remove/part pos 2							;-- no reason to hold `drawn` in the map anymore
+			ofs: geom/offset
+			siz: geom/size
+			;@@ skip invisible items to lighten the draw block (e.g. for inactive lists)? but that will disable list caching
+			; if boxes-overlap? ofs ofs + siz 0x0 dxy [	
+			compose/only/into [translate (ofs) (drw)] tail drawn
+			case/all [
+				find/same lview/selected child [
+					compose/only/into [translate (ofs) (draw-box selection-prototype siz)] tail drawn
+				]
+				lview/cursor = i [
+					compose/only/into [translate (ofs) (draw-box cursor-prototype siz)] tail drawn
+				]
 			]
+			i: i + 1
 		]
 		list/size: new-size
 		quietly list/map: new-map
@@ -2457,7 +2485,7 @@ list-view-ctx: context [
 		] #type [function!]
 	]
 
-	on-source-change: function [lview [object!] word [word!] value [any-type!]] [
+	invalidates-list: function [lview [object!] word [word!] value [any-type!]] [
 		if object? :lview/list [invalidate lview/list]
 	]
 
@@ -2466,7 +2494,7 @@ list-view-ctx: context [
 		; reversed?: no		;@@ TODO - for chat log, map auto reverse
 		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
-		source: []	#on-change :on-source-change		;-- no type check for it can be freely overridden
+		source: []	#on-change :invalidates-list		;-- no type check for it can be freely overridden
 		data: func [/pick i [integer!] /size] [			;-- can be overridden
 			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
 		] #type [function!]
@@ -2479,6 +2507,11 @@ list-view-ctx: context [
 			set/any 'spc/data :item-data
 			spc
 		] #type [function!]
+		
+		;; hash by default so it can scale out of the box for the general case
+		selected:   make hash! 4	#type    [hash! block!] :invalidates-list	;@@ auto convert block to hash? on >3-4 items?
+		cursor:     none			#type =? [integer! (cursor > 0) none!] :invalidates-list
+		selectable: none			#type    [word! (find [single multi] selectable) none!]	;-- only affects event handlers
 
 		window/content: list: make-space 'list list-template	#type (space? list)
 		content-flow: does [

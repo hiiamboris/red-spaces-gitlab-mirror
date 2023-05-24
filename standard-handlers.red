@@ -119,24 +119,61 @@ define-handlers [
 	;@@ TODO: when dragging and roll succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `roll` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-down     [space path event] [				;-- after button clicks
-			without-children: as path! copy/part head path next path	;@@ should I make a function for this?
-			space/roll/in without-children				;-- /in is used to provide proper styling context to out-of-tree render!
-		]
-		on-key-down [space path event] [				;-- during key holding
-			without-children: as path! copy/part head path next path
-			space/roll/in without-children
-		]
+		;; /in is used to provide proper styling context to out-of-tree render!
+		;@@ but it should be automatic now that there's /parent!
+		on-down     [space path event] [space/roll/in path]		;-- after button clicks
+		on-key-down [space path event] [space/roll/in path]		;-- during key holding
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
-				without-children: as path! copy/part head path path
-				path/-1/roll/in without-children
+				path/-1/roll/in path
 			]
 		]
 	]
 
 	;-- *************************************************************************************
-	list-view: extends 'inf-scrollable []
+	list-view: extends 'inf-scrollable [
+		on-key-down [space path event] [
+			unless space/selectable [exit]				;-- this handler is only responsible for selection
+			switch/default event/key [
+				down up [
+					;@@ how to default space/cursor to first *visible* item ? locate-line needs canvas
+					;@@ somehow it should remember last canvas and work on it
+					;@@ OTOH, 1 is fine too - first item in the window
+					; unless old [old: list-view-ctx/locate-line space/list]	;@@ use a kit
+					step: pick [1 -1] down?: event/key = 'down
+					count: any [space/data/size 1.#inf]			;-- list may be unlimited
+					i: clip 1 count step + any [space/cursor 0]
+					item: space/list/items/pick i
+					if geom: select/same space/list/map item [	;-- item has to be drawn, to scroll to it
+						unless event/ctrl? [
+							;@@ ideally this should support selection ranges, that is, shift should unselect as well
+							either all [event/shift? space/selectable = 'multi] [
+								unless find/same space/selected item [	;@@ should be a wrapper for this
+									append space/selected item
+								]
+							][
+								append clear space/selected item
+							]
+						] 
+						space/cursor: i
+						point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
+						;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
+						space/move-to/margin point space/look-around
+						space/roll/in path				;-- sync roll to the move, else roll is delayed until next roll-timer hit
+						;@@ there's some suspicious delay after roll but looks like WM_TIMER getting delayed
+					]
+				]
+				#" " [									;-- ctrl+space selected item toggle
+					item: if i: space/cursor [space/list/items/pick i]
+					if item [
+						either there: find/same space/selected item [remove there][append space/selected item]
+						space/selected: space/selected
+					]
+				]
+			] [exit]
+			stop/now
+		]
+	]
 
 	;-- *************************************************************************************
 	grid-view: extends 'inf-scrollable []

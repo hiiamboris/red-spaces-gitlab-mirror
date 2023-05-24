@@ -195,8 +195,17 @@ do with styling: context [
 			set-flag flags 'bold parent/pinned?
 		]
 		
-		
-		; list/item [[pen cyan]]
+		list-view/window/list/selection: [
+			below: [(make-box size 0 'off (opaque 'text 10%))]
+			; below: [(make-box size 0 'off glass)]
+		]
+		list-view/window/list/cursor: [
+			below: [(make-box size 1 checkered-pen 'off)]
+		]
+		list-view/window/list/item: [
+			lview:  parent/parent/parent				;@@ how to simplify this?
+			margin: either lview/selectable [4x2][0x0]	;-- add little margin to draw frame on
+		]
 		
 		;; "☒☐" make lines too big! needs custom draw code, not symbols
 		;; this doesn't use /draw at all (what's there to use?)

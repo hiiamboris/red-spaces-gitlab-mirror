@@ -290,7 +290,7 @@ if action? :mold [
 					emit [string]
 				]
 			][
-				string: case [
+				string: case [									;@@ use apply
 					flat and all [native-mold/all/flat :value]
 					all          [native-mold/all      :value]
 					flat         [native-mold/flat     :value]

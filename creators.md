@@ -384,9 +384,9 @@ So in Spaces, *handlers are function lists*: each handler entry given to `define
 
 List *is associated with a path*, e.g. `menu/list/clickable` or just `button`.
 
-List handlers are evaluated from the *oldest to the newest* (or default handler -> extension handler -> user handler).
+List handlers are evaluated from the *newest to the oldest* (e.g. user handler -> extension handler -> default handler). This allows descending widgets to conditionally block handlers of their ascendants, esp. useful to filter keyboard events, with `stop/now` command.
 
-Individual handlers in this list cannot be blocked by `stop` command, only the whole list at once. So if original event handler receives an event, then all of it's extensions do too.
+Unqualified `stop` command doesn't block event from reaching the older (ascendant) handlers, only from reaching handlers with shorter path, but that is automatic and requires explicit `pass` to counter it.
 
 
 
