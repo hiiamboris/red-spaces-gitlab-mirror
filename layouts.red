@@ -109,7 +109,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				pos:  origin + margin
 				repeat i count [
 					space:  do ith-space
-					#assert [space? :space]
 					;; fill across infinite dimension will be ignored in render
 					drawn:  render/on space item-canvas yes yes	;-- items always fill the width (render disables fill for infinity)
 					#assert [space/size +< (1e7 by 1e7)]		;-- sanity check that items are finite
@@ -138,6 +137,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			
 			size/:y: pos/:y - spacing/:y - origin/:y + margin/:y
+			size/:x: size/:x + (2 * margin/:x)
 			size: constrain size limits					;-- do not let it exceed the limits
 			#assert [size +< (1e7 by 1e7)]
 			reduce [size map]
