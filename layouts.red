@@ -22,7 +22,7 @@ make-layout: function [
 layouts: make map! to block! context [					;-- map can be extended at runtime
 	import-settings: function [settings [block!] ctx [word!]] [
 		foreach word settings [
-			#assert [(context? ctx) =? context? bind word ctx]
+			#assert [(context? ctx) =? context? bind word ctx]	;-- ensure all imported words are present in the function
 			set bind word ctx get word
 		]
 	]
@@ -33,9 +33,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   margin           [pair!]   >= 0x0
 		;;   spacing          [pair!]   >= 0x0
 		;;   canvas        [pair! none!]     >= 0x0
-		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
+		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags: flag along 'axis' is ignored completely,
+		;;      while the opposite flag controls whether whole list width extends to canvas or not (but items always fill the width)
 		;;   limits        [none! object!]
 		;;   origin           [pair!]   unrestricted
+		;;   dont-extend?     [logic!]  true if sticking out items cannot extend list's width (used by list-view); default=false
+		;;                              because list-view has to maintain fixed width across rolls and scrolls
 		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
 		;; settings are passed as a list of bound words, not as context
 		;; this is done to make the list explicit, to avoid unexpected settings being read from the space object
@@ -45,10 +48,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
 			settings [block!] "Any subset of [axis margin spacing canvas limits origin]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas fill-x fill-y limits origin
+			/local axis margin spacing canvas fill-x fill-y limits origin dont-extend?
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
+			#assert [count]								;-- this layout only supports finite number of items
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
@@ -61,54 +65,80 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				limits   [object! (range? limits) none!]
 				origin   [none! pair!]
 			]]
-			default origin: 0x0
-			default canvas: infxinf
-			default fill-x: no
-			default fill-y: no
-			canvas: extend-canvas canvas axis			;-- list is infinite along its axis
-			; canvas: constrain canvas limits
+			default origin:       0x0
+			default canvas:       infxinf
+			default fill-x:       no
+			default fill-y:       no
+			default dont-extend?: no
 			x: ortho y: axis
 			guide: axis2pair y
-			pos: pos': origin + margin
+			item-canvas: extend-canvas (subtract-canvas (constrain canvas limits) margin * 2) axis	;-- list is infinite along its axis
+			;@@ this should be documented in the canvas docs (to be written)
+			;; NOTE: fill/:x does not affect whether items fill the final width or not
+			;;   they always do (and fill/:x cannot be true for inf width anyway)
+			;;   fill/:x affects whether list extends its width to finite canvas width if former is smaller, or not
+			;;   otherwise I will have to enable fill flag for the infinite canvas to make items fill the final width
 			;; list can be rendered in two modes:
-			;; - on unlimited canvas: first render each item on unlimited canvas, then on final list size
-			;; - on fixed canvas: then only single render is required, unless some item sticks out
-			canvas1: subtract-canvas canvas 2 * margin
+			;; - on infinitely wide canvas: first render each item on unlimited, then on final (finite) list width
+			;;   final width is set to that of the widest visible item (it may change upon scrolling e.g. list-view)
+			;;   since width is infinite, scrolling won't affect items height, only resulting list width
+			;; - on finitely wide canvas: then fill/:x=true may be done in a single render (unless some item sticks out)
+			;;   - if list length is finite:
+			;;     wide sticking out items extend the final width, but not beyond limits/max/:x
+			;;     (esp. useful when zero canvas is given, e.g. in tube)
+			;;     if width has been extended or fill/:x=false (width determined by 1st render),
+			;;     then 2nd render fills items along the final width
+			;;   - if list has infinite number of items, no width extension is possible,
+			;;     because such extension will affect items heights, and items will become denser
+			;;     (that would break window-filling logic of list-view)
+			;;     if fill/:x=false (for list), 2nd render fills items along width of the widest visible item (changes while scrolling)
+			;;     however this layout doesn't know about infinite item count, so forbid-widening? flag is used instead
+			;;   so if fill/:x is set, final width cannot be thinner than finite canvas, otherwise it can be
+			;; constraining: limits/:x is applied to canvas before rendering items
+			;;   then limits/:x is checked when extending or contracting the list width
+			;;   along main axis items canvas is always infinite
+			;;   but final list length is clipped/extended by limits/:y (hiding items or adding empty space)
 			
-			map: make [] 2 * count
-			size: 0x0
-			repeat i count [							;-- first render cycle
-				space: either func? [spaces/pick i][spaces/:i]
-				#assert [space? :space]
-				;; no fill is enforced here, as that would break list-test4
-				drawn: render/on space canvas1 fill-x fill-y
-				#assert [space/size +< (1e7 by 1e7)]
-				compose/only/deep/into [(space) [offset (pos) size (space/size) drawn (drawn)]] tail map
-				pos:   pos + (space/size + spacing * guide)
-				size:  max size space/size
-			]
-			;; only extend the canvas to max item's size, but not contract if it's finite
-			;; do contract if X is infinite
-			canvas/:x: max-safe size/:x + (2 * margin/:x) if canvas/:x < infxinf/x [canvas/:x]	;-- `size` has margin subtracted
-			;; apply limits to canvas2/:x to obtain proper list width
-			canvas2: subtract-canvas constrain canvas limits 2 * margin
-			canvas2: extend-canvas canvas2 axis
-			#debug sizing [#print "list c1=(canvas1) c2=(canvas2)"]
-			if canvas2 <> canvas1 [	;-- second render cycle - only if canvas changed
-				pos: pos'  size: 0x0
+			map:          make [] 2 * count
+			ith-space:    pick [[spaces/pick i][spaces/:i]] func?
+			deep-pattern: [(space) [offset (pos) size (space/size) drawn (drawn)]]
+			flat-pattern: [offset (pos) size (space/size) drawn (drawn)]
+			add-item:     [compose/only/deep/into deep-pattern tail map]
+			loop 2 [									;-- two render cycles
+				size: 0x0
+				pos:  origin + margin
 				repeat i count [
-					space: either func? [spaces/pick i][spaces/:i]
-					drawn: render/on space canvas2 fill-x fill-y
-					#assert [space/size +< (1e7 by 1e7)]
-					geom:  pick map 2 * i
-					compose/only/into [offset (pos) size (space/size) drawn (drawn)] clear geom
-					pos:   pos + (space/size + spacing * guide)
-					size:  max size space/size
+					space:  do ith-space
+					#assert [space? :space]
+					;; fill across infinite dimension will be ignored in render
+					drawn:  render/on space item-canvas yes yes	;-- items always fill the width (render disables fill for infinity)
+					#assert [space/size +< (1e7 by 1e7)]		;-- sanity check that items are finite
+					do      add-item
+					pos:    pos + (space/size + spacing * guide)
+					size:   max size space/size					;-- accumulate width
 				]
+				
+				;; total width (size/:x) is used for new canvas when:
+				;; - fill/:x = off and total width < canvas width
+				;; - 1st render was on infinite width (included into previous case since fill/:x is off for infinity)
+				;; - total width > canvas width and count is finite
+				if switch sign? size/:x - item-canvas/:x [
+					-1 [not either x = 'x [fill-x][fill-y]]
+					 1 [not dont-extend?]
+				][
+					new-canvas: extend-canvas (subtract-canvas (constrain size + (margin * 2) limits) margin * 2) axis
+					#debug sizing [#print "list c1=(item-canvas) c2=(new-canvas)"]
+					if new-canvas <> item-canvas [
+						item-canvas: new-canvas
+						add-item: [compose/only/into flat-pattern clear map/(i * 2)]
+						continue
+					]
+				]
+				break									;-- no second render cycle if canvas is the same
 			]
-			size: pos - (spacing * guide)				;-- cut trailing space
-				- origin + margin						;-- 2 margins + size along axis
-				+ (size * reverse guide)				;-- size normal to axis
+			
+			size/:y: pos/:y - spacing/:y - origin/:y + margin/:y
+			size: constrain size limits					;-- do not let it exceed the limits
 			#assert [size +< (1e7 by 1e7)]
 			reduce [size map]
 		]
