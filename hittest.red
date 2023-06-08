@@ -54,10 +54,8 @@ hittest: function [
 			repend path [space xy]
 			#assert [xy]								;-- forced into and map should always return the pair, if child is not none
 			set [child xy] case [
-				into: select space 'into [				;@@ workaround for #4854 - remove me
-					do copy/deep [into/force xy child]
-				]
-				map: select space 'map [into-map map xy child]
+				into: select space 'into [into/force xy child]
+				map:  select space 'map  [into-map map xy child]
 			]
 			template: next template
 		]

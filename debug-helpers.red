@@ -290,12 +290,7 @@ if action? :mold [
 					emit [string]
 				]
 			][
-				string: case [									;@@ use apply
-					flat and all [native-mold/all/flat :value]
-					all          [native-mold/all      :value]
-					flat         [native-mold/flat     :value]
-					'else        [native-mold          :value]
-				]
+				string: native-mold/:all/:flat :value
 				emit [string]
 			]
 			if decor [clear find/same/only mold-stack :value]

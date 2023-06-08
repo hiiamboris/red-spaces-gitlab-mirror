@@ -444,8 +444,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    	if count <= 0 [return reduce [map 0x0]]
 	    	
 	    	offset: total: 0x0							;-- margin is not accounted for in the map, so it's easier to change
+	    	ith-item: either func? [[spaces/pick i]][[spaces/:i]]
 			repeat i count [
-				space: either func? [spaces/pick i][spaces/:i]
+				space: do ith-item
 				#assert [space? :space]
 				drawn: render space						;-- for subparagraphs and lists canvas is infinite
 				compose/deep/only/into [

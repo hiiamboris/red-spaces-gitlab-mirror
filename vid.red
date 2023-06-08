@@ -247,14 +247,14 @@ VID: context [
 	wrap-value: function [
 		"Create a space to represent given VALUE; return it's name"
 		value [any-type!]
-		wrap? [logic!] "How to lay text out: as a line (false) or paragraph (true)"
+		wrap  [logic!] "How to lay text out: as a line (false) or paragraph (true)"
 	][ 
 		switch/default type?/word :value [
-			string! [make-space pick [paragraph text] wrap? [text: value]]
+			string! [make-space pick [paragraph text] wrap [text: value]]
 			logic!  [make-space 'logic [state: value]]
 			image!  [make-space 'image [data:  value]]
 			url!    [make-space 'link  [data:  value]]
-			block!  [either wrap? [lay-out-data/wrap value][lay-out-data value]]	;@@ use apply
+			block!  [lay-out-data/:wrap value]
 		] [make-space 'text [text: mold :value]]
 	]
 	
@@ -349,9 +349,10 @@ VID: context [
 			]
 			unless empty? def/actors [
 				append facets compose/deep/only [
-					actors: either object? :actors		;-- allows block! facet to define an actor too
-						[construct/with (to [] def/actors) actors]
-						[construct      (to [] def/actors)]
+					actors: apply 'construct [
+						to [] def/actors
+						/with object? :actors actors	;-- allows block! facet to define an actor too
+					]
 				]
 			]
 			space-spec: compose [
@@ -412,9 +413,9 @@ VID: context [
 							system/reactivity/check/only self word
 						]
 				]
-				foreach [late? reaction] def/reactions [
+				foreach [later reaction] def/reactions [
 					reaction: bind copy/deep reaction space		;@@ should bind to commands too?
-					either late? [react/later reaction][react reaction] 
+					react/:later reaction
 				]
 				; #print "finished instantiation of (def/template) -> (space/type):(space/size)"
 				
@@ -524,7 +525,7 @@ VID: context [
 		;@@ should there be two colors (fg/bg)? (this may complicate styles a lot)
 		=color=:      [
 			[	set x tuple!
-			|	set w word! if (tuple? attempt [get/any w]) (x: get w)	;-- without attempt - may have lost context
+			|	set w word! if (tuple? x: get-safe w)	;-- safe or may have lost context
 			|	set w issue! if (x: hex-to-rgb w)
 			]
 			(repend def/facets ['color x])
@@ -545,7 +546,7 @@ VID: context [
 		|	set x [word! | get-word!] if (all [
 				not VID/styles/:x						;-- protect from bugs if style name is set globally to a number
 				not templates/:x
-				find limit! type? set/any 'x attempt [get/any x]	;-- without attempt - may have lost context
+				find limit! type? set/any 'x get-safe x	;-- safe or may have lost context
 			])
 		]
 		=size-component-2=: [

@@ -112,24 +112,19 @@ focus: make classy-object! declare-class 'focus-context [
 	find-next-focal-*ace: function [dir "forth or back"] [
 		focused: any [last-valid-focus compose [(system/view/screens/1) (only window)]]		;-- screen-relative path
 		#debug focus [#print "last valid focus path: (mold as path! focused)"]
-		loop: pick [									;@@ use apply
-			foreach-*ace/next
-			foreach-*ace/next/reverse
-		] dir = 'forth 
-		do compose/only [
-			(loop) path found: focused [				;-- default to already focused item (e.g. it's the only focusable)
-				#debug focus [
-					space: last path 
-					text: mold/flat/part any [select space 'text  select space 'data] 40 
-					#print "find-next-focal-*ace @(mold path), text=(text)"
-				]
-				accepted: either space? obj: last path [focusable][focusable-faces]
-				all [
-					find accepted obj/type
-					deep-check path [state enabled? visible?]
-					found: path
-					break
-				]
+		reverse: dir <> 'forth 
+		foreach-*ace/next/:reverse path found: focused [				;-- default to already focused item (e.g. it's the only focusable)
+			#debug focus [
+				space: last path 
+				text: mold/flat/part any [select space 'text  select space 'data] 40 
+				#print "find-next-focal-*ace @(mold path), text=(text)"
+			]
+			accepted: either space? obj: last path [focusable][focusable-faces]
+			all [
+				find accepted obj/type
+				deep-check path [state enabled? visible?]
+				found: path
+				break
 			]
 		]
 		last found
@@ -165,7 +160,7 @@ focus-space: function [
 	unless find focus/focusable space/type [return no]	;-- this space cannot be focused
 	;; note: same space may appear on multiple hosts and windows (e.g. when put on a new popup all the time)
 	if space =? old: focus/current [					;-- no refocusing into the same target, but need to ensure host is focused
-		host: first get-host-path space
+		host: host-of space
 		;@@ may error out without /parent check - e.g. if click on host hides it, then click continue on focusable child
 		if host/parent [native-set-focus host]
 		return no

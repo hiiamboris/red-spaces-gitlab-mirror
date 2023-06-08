@@ -186,6 +186,34 @@ context [
 		]
 	]
 				
+	;@@ since 'apply' doesn't support silently ignoring refinements not present in the function, have to manually dispatch :(
+	safe-draw: function [
+		draw   [function!]
+		space  [object! none!]
+		xy1    [pair! none!]
+		xy2    [pair! none!]
+		canvas [pair!]
+		fill-x [logic!]
+		fill-y [logic!]
+	][
+		window: in :draw /window
+		if on:  in :draw /on [
+			if canvas/x = infxinf/x [fill-x: no]		;-- inf canvas cannot be filled (result of canvas extension)
+			if canvas/y = infxinf/y [fill-y: no]
+		]
+		index:  (either on [1][0]) + (either window [2][0]) + (either space [4][0])
+		do pick [
+			[draw                                             ]
+			[draw/on                      canvas fill-x fill-y]
+			[draw/window          xy1 xy2                     ]
+			[draw/window/on       xy1 xy2 canvas fill-x fill-y]
+			[draw           space                             ]
+			[draw/on        space         canvas fill-x fill-y]
+			[draw/window    space xy1 xy2                     ]
+			[draw/window/on space xy1 xy2 canvas fill-x fill-y]
+		] index + 1
+	]
+					
 	render-space: function [
 		space [object!] (space? space)
 		/window xy1 [pair! none!] xy2 [pair! none!]
@@ -210,8 +238,7 @@ context [
 		with-style space [
 			window?: all [
 				any [xy1 xy2]
-				function? draw: select space 'draw
-				find spec-of :draw /window
+				in :space/draw /window
 				;@@ this should also check if style func supports /window but it's already too much hassle, maybe later
 			]
 			
@@ -239,39 +266,10 @@ context [
 				children-mark: tail children-stack
 				
 				either block? :style [
-					draw: select space 'draw
-					;@@ this basically cries for FAST `apply` func!!
-					if function? :draw [
-						spec:    spec-of :draw
-						on?:     find spec /on
-						window?: find spec /window
-						if canvas/x = infxinf/x [fill-x: no]	;-- inf canvas cannot be filled (result of canvas extension)
-						if canvas/y = infxinf/y [fill-y: no]
-						code: case [
-							all [on? window?] [[draw/window/on xy1 xy2 canvas fill-x fill-y]]
-							window?           [[draw/window    xy1 xy2                     ]]
-							on?               [[draw/on                canvas fill-x fill-y]]
-							'else             [[draw                                       ]]
-						]
-						draw: do copy/deep code			;@@ workaround for #4854 - remove me!!
-					]
-					#assert [block? :draw]
-					drawn: combine-style draw style
+					drawn: safe-draw :space/draw none xy1 xy2 canvas fill-x fill-y
+					drawn: combine-style :drawn style
 				][
-					#assert [function? :style]
-					;@@ this basically cries for FAST `apply` func!!
-					spec:    spec-of :style
-					on?:     find spec /on
-					window?: find spec /window
-					if canvas/x = infxinf/x [fill-x: no]
-					if canvas/y = infxinf/y [fill-y: no]
-					code: case [					
-						all [on? window?] [[style/window/on space xy1 xy2 canvas fill-x fill-y]]
-						window?           [[style/window    space xy1 xy2                     ]]
-						on?               [[style/on        space         canvas fill-x fill-y]]
-						'else             [[style           space                             ]]
-					]
-					drawn: do copy/deep code			;@@ workaround for #4854 - remove me!!
+					drawn: safe-draw :style space xy1 xy2 canvas fill-x fill-y
 					#assert [block? :drawn]
 				]
 				
@@ -307,15 +305,11 @@ context [
 		drawn: either host? space [
 			render-face space
 		][
-			either crude								;@@ use apply
-				[render-space/window/on/crude space xy1 xy2 canvas fill-x fill-y]
-				[render-space/window/on       space xy1 xy2 canvas fill-x fill-y]
+			render-space/window/on/:crude space xy1 xy2 canvas fill-x fill-y
 		]
 		#debug draw [									;-- test the output to figure out which style has a "Draw error"
 			if error? error: try/keep [draw 1x1 drawn] [
-				prin "*** Invalid draw block: "
-				attempt [copy/deep drawn]				;@@ workaround for #5111
-				probe drawn
+				prin "*** Invalid draw block: " probe drawn
 				do error
 			]
 		]

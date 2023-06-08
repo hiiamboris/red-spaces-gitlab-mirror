@@ -68,7 +68,7 @@ without-GC: function [
 	sort/compare [1 1] func [a b] code
 ]
 
-get-safe: function [path [path!]] [						;@@ REP 113; this in case of error is 10x slower than 'get'
+get-safe: function [path [path! word!]] [				;@@ REP 113; this in case of error is 10x slower than 'get'
 	try [return x: get path] none						;@@ workaround for #5300 here
 ]
 
@@ -268,9 +268,7 @@ make-free-list: function [
 ][
 	object compose/deep [
 		stack: []
-		get: function [] [
-			either tail? stack [(init)][p: tail stack also :p/-1 clear back p]	;@@ workaround for #5066
-		]
+		get: does [either tail? stack [(init)][take/last stack]]
 		put: func [x [(type)]] [
 			append/only stack (either find series! type [ [clear head x] ][ [:x] ])
 		]
@@ -761,22 +759,9 @@ context [
 		/inverse  "Given Ys find Xs"
 		/truncate "Convert result to integers"
 	][
-		reduce either inverse [
-			either truncate [[								;@@ badly need apply!
-				reproject/inverse/truncate    fun x1
-				reproject/inverse/truncate/up fun x2
-			]] [[
-				reproject/inverse    fun x1
-				reproject/inverse/up fun x2
-			]]
-		] [
-			either truncate [[
-				reproject/truncate    fun x1
-				reproject/truncate/up fun x2
-			]] [[
-				reproject    fun x1
-				reproject/up fun x2
-			]]
+		reduce [
+			reproject/:inverse/:truncate    fun x1
+			reproject/:inverse/:truncate/up fun x2
 		]
 	]
 ]

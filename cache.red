@@ -30,7 +30,7 @@ cache: context [
 		code [block!]
 	][
 		old: current-generation
-		set 'current-generation gen
+		set 'current-generation gen						;@@ need a general scope mechanism for this
 		trap/all/catch code [error: thrown]
 		set 'current-generation old
 		if error [do error]

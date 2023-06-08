@@ -10,7 +10,7 @@ Red [
 	}
 ]
 
-;; needs: map-each, anonymize, reshape, export, contrast-with, apply
+;; needs: map-each, anonymize, reshape, export, contrast-with
 
 exports: [set-style remove-style define-styles]
 
@@ -43,7 +43,7 @@ set-style: function [
 		;; also bind above/below words so even if function uses `return`, they are still set
 		style: function [/extern above below] bind style style-ctx	;-- function copies the body deeply
 	][
-		style: func spec-of :style copy/deep body-of :style		;@@ copy/deep to work around #4854
+		style: func spec-of :style body-of :style
 	]
 	change pos :style
 	:style
@@ -70,7 +70,7 @@ define-styles: function [
 		foreach name names [
 			if set-word? name [name: to word! name]		;-- to path! set-word keeps the colon
 			name: to path! name
-			apply set-style 'local
+			set-style/:unique name :style
 		]
 	)]
 	parse styles [any [=names= =expr= =commit=]]

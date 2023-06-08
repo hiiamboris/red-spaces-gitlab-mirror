@@ -29,9 +29,6 @@ context [
 
 	code-font: make font! [name: system/view/fonts/fixed]
 	
-	;@@ workaround for #4854 crashes:
-	copy-func: func [f [function!]] [func spec-of :f copy/deep body-of :f]
-	
 	define-styles [
 		cell/text: grid/cell/text: grid/cell/paragraph: [
 			spaces/ctx/set-flag flags 'bold if parent [parent/pinned?]

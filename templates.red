@@ -189,10 +189,7 @@ compose-map: function [
 		all [list  not find/same list space  continue]	;-- skip names not in the list if it's provided
 		; all [limits  not boxes-overlap? xy1 xy2 o: box/offset o + box/size  continue]	;-- skip invisibles ;@@ buggy - requires origin
 		if zero? area? box/size [continue]				;-- don't render empty elements (also works around #4859)
-		cmds: either window [
-			render/window space xy1 xy2
-		][	render        space
-		]
+		cmds: render/:window space xy1 xy2
 		unless empty? cmds [							;-- don't spawn empty translate/clip structures
 			compose/only/into [
 				translate (box/offset) (cmds)
@@ -332,7 +329,8 @@ cell-ctx: context [
 	~: self
 
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		#debug sizing [print ["cell/draw with" space/content "on" canvas]]
+		#debug sizing [#print "cell/draw with (if space/content [space-id space/content]) on (canvas) (fill-x) (fill-y)"]
+; #print "cell/draw with (if space/content [space-id space/content]) on (canvas) (fill-x) (fill-y)"
 		space/sec-cache: copy []						;-- alloc new (minimal) sections block for new canvas
 		unless space/content [
 			set-empty-size space canvas fill-x fill-y
@@ -356,6 +354,7 @@ cell-ctx: context [
 				drawn: compose/only [clip 0x0 (space/size) (drawn)]
 			]
 		]
+; ?? [canvas fill-x fill-y space/size]
 		quietly space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
 		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
 		drawn
@@ -1327,9 +1326,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		side  [word!] (find [left right] side) "Skip indentation to left or to right"
 	][
 		#assert [all [0 <= x-1D x-1D <= frame/size-1D/x]  "Map point must be within total size"]
-		either side = 'left								;@@ use apply 
-			[reproject    frame/x1D->x1D' x-1D]
-			[reproject/up frame/x1D->x1D' x-1D]
+		apply 'reproject [frame/x1D->x1D' x-1D /up side = 'right]
 	]
 	
 	map-x1D'->row: function [
@@ -2419,7 +2416,8 @@ list-view-ctx: context [
 		either axis = 'x [fill-y: yes][fill-x: yes]		;-- always filled along finite axis
 		; #assert [canvas/:axis > 0]						;-- some bug in window sizing likely
 		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
-		set [i1: o1: i2: o2:] locate-range list canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
+		item-canvas: extend-canvas subtract-canvas canvas 2 * list/margin axis
+		set [i1: o1: i2: o2:] locate-range list item-canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
 		unless all [i1 i2] [							;-- no visible items (see locate-range)
 			list/size: list/margin * 2
 			return quietly list/map: []
@@ -2427,7 +2425,7 @@ list-view-ctx: context [
 		#assert [i1 <= i2]
 
 		dont-extend?: yes								;-- forbid list width extension by largest item (or will depend on window/origin)
-		canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
+		; canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
 		guide:    axis2pair axis
 		origin:   guide * (xy1 - o1 - list/margin)
 		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y dont-extend?]
@@ -2490,8 +2488,6 @@ list-view-ctx: context [
 
 	;@@ list-view & grid-view on child focus should scroll to child
 	declare-template 'list-view/inf-scrollable [
-		; reversed?: no		;@@ TODO - for chat log, map auto reverse
-		; size:   none									;-- avoids extra triggers in on-change
 		pages:  10
 		source: []	#on-change :invalidates-list		;-- no type check for it can be freely overridden
 		data: func [/pick i [integer!] /size] [			;-- can be overridden
@@ -2507,10 +2503,16 @@ list-view-ctx: context [
 			spc
 		] #type [function!]
 		
-		;; hash by default so it can scale out of the box for the general case
-		selected:   make hash! 4	#type    [hash! block!] :invalidates-list	;@@ auto convert block to hash? on >3-4 items?
-		cursor:     none			#type =? [integer! (cursor > 0) none!] :invalidates-list
-		selectable: none			#type    [word! (find [single multi] selectable) none!]	;-- only affects event handlers
+		;; selected items list (space objects - filtering, sorting, list mutation doesn't affect them)
+		;; hash by default so it can scale out of the box for the general case ;@@ auto convert block to hash? on >3-4 items?
+		selected:    make hash! 4	#type    [hash! block!] :invalidates-list
+		
+		;; selection mode: only affects event handlers
+		;; its still possible to programmatically select anything, but how keys behave highly depends on /selectable
+		selectable:  none			#type    [word! (find [single multi] selectable) none!]
+		
+		;; current item (for keyboard navigation purposes), doesn't have to be selected 
+		cursor:      none			#type =? [integer! (cursor > 0) none!] :invalidates-list
 
 		window/content: list: make-space 'list list-template	#type (space? list)
 		content-flow: does [
@@ -2788,7 +2790,6 @@ grid-ctx: context [
 			cell1: grid/get-first-cell xy
 			height1: 0
 			if content: grid/cells/pick cell1 [
-				set-quiet 'rendered-xy cell1			;@@ temporary kludge until apply!
 				cspace: grid/wrap-space cell1 content
 				render/on cspace canvas yes no			;-- render to get the size; fill the cell's width
 				height1: cspace/size/y
@@ -2873,7 +2874,6 @@ grid-ctx: context [
 			] [continue]
 			done/:mcell: true							;-- mark it as drawn
 			
-			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply!
 			pinned?: grid/is-cell-pinned? cell
 			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
@@ -2882,7 +2882,6 @@ grid-ctx: context [
 			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
 			render/on mcspace canvas yes no					;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
-			set-quiet 'rendered-xy cell						;@@ temporary kludge until apply! (could have been reset by inner grids)
 			mcdraw: render/on mcspace mcsize yes yes		;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
