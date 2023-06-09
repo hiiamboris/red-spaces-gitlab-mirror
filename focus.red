@@ -219,6 +219,7 @@ register-previewer
 		;@@ should it avoid focusing if stop flag is set?
 		#debug focus [#print "attempting to focus (space-id space)"]
 		path: get-host-path space
+		#assert [path "detected click on an out-of-tree widget"]
 		if focus/deep-check path [state enabled?] [		;-- don't focus on a just-destroyed host (popup)
 			focus-space space
 		]

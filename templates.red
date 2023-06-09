@@ -3571,6 +3571,7 @@ declare-template 'rotor/space [
 	]
 
 	draw: function [] [
+		render ring						;-- connect it to the tree
 		unless content [return []]
 		map/1: spc: content				;-- expose actual name of inner face to iterators
 		drawn: render content			;-- render before reading the size
