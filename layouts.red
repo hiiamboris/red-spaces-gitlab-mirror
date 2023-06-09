@@ -21,10 +21,9 @@ make-layout: function [
 
 layouts: make map! to block! context [					;-- map can be extended at runtime
 	import-settings: function [settings [block!] ctx [word!]] [
-		foreach word settings [
-			#assert [(context? ctx) =? context? bind word ctx]	;-- ensure all imported words are present in the function
-			set bind word ctx get word
-		]
+		bound:  bind append clear [] settings ctx
+		values: head reduce/into settings clear []
+		set bound values
 	]
 
 	list: context [
@@ -46,7 +45,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		create: function [
 			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axis margin spacing canvas limits origin]"
+			settings [block!] "Any subset of [axis margin spacing canvas fill-x fill-y limits origin dont-extend?]"
 			;; settings - imported locally to speed up and simplify access to them:
 			/local axis margin spacing canvas fill-x fill-y limits origin dont-extend?
 		][
@@ -164,7 +163,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		create: function [
 			"Build a tube layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axes align margin spacing canvas limits]"
+			settings [block!] "Any subset of [axes align margin spacing canvas fill-x fill-y limits]"
 			;; settings - imported locally to speed up and simplify access to them:
 			/local axes align margin spacing canvas fill-x fill-y limits
 		][
@@ -711,7 +710,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		create: function [
 			"Build a paragraph layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [align baseline margin spacing canvas limits indent force-wrap?]"
+			settings [block!] "Any subset of [align baseline margin spacing canvas fill-x fill-y limits indent force-wrap?]"
 			;; settings - imported locally to speed up and simplify access to them:
 			/local align baseline margin spacing canvas fill-x fill-y limits indent force-wrap?
 		][
