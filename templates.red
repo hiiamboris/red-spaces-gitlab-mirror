@@ -30,14 +30,14 @@ on-margin-spacing-change: function [space [object!] word [word!] value [integer!
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
-	type:	'space	#type [word!] =						;-- used for styling and event handler lookup, may differ from template name!
-	size:   0x0		#type [pair! (0x0 +<= size)] =?		;-- none (infinite) must be allowed explicitly by templates supporting it
-	parent: none	#type [object! none!]
-	draw:   []   	#type [block! function!]
+	type:	'space		#type [word!] =					;-- used for styling and event handler lookup, may differ from template name!
+	size:   0x0			#type [pair! (0x0 +<= size)] =?	;-- none (infinite) must be allowed explicitly by templates supporting it
+	parent: none		#type [object! none!]
+	draw:   :no-draw  	#type [function!]
 	;; `drawn` is an exception and not held in the space, so just `size`:
-	cache:  [size]	#type [block! none!]
+	cache:  [size]		#type [block! none!]
 	cached: tail copy [0x0 0.0 #[none]]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
-	limits: none	#type [object! (range? limits)  none!] =? :invalidates
+	limits: none		#type [object! (range? limits)  none!] =? :invalidates
 	; rate: none
 ]
 
@@ -204,6 +204,9 @@ declare-template 'timer/space [							;-- template space for timers
 	rate:  0											;-- unlike space, must always have a /rate facet
 	cache: none
 ]		
+
+;; used by some templates that don't draw anything
+no-draw: does [[]]
 
 ;; used internally for empty spaces size estimation
 set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y [logic!]] [
@@ -474,9 +477,9 @@ scrollbar: context [
 		map:         []
 		cache:       [size map]
 		back-arrow:  make-space 'triangle  [type: 'back-arrow  margin: 2  dir: 'w] #type (space? back-arrow)	;-- go back a step
-		back-page:   make-space 'rectangle [type: 'back-page   draw: []]           #type (space? back-page)		;-- go back a page
+		back-page:   make-space 'rectangle [type: 'back-page   draw: :no-draw]     #type (space? back-page)		;-- go back a page
 		thumb:       make-space 'rectangle [type: 'thumb       margin: 2x1]        #type (space? thumb)			;-- draggable
-		forth-page:  make-space 'rectangle [type: 'forth-page  draw: []]           #type (space? forth-page)	;-- go forth a page
+		forth-page:  make-space 'rectangle [type: 'forth-page  draw: :no-draw]     #type (space? forth-page)	;-- go forth a page
 		forth-arrow: make-space 'triangle  [type: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
 		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
