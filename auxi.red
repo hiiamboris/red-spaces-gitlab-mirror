@@ -80,6 +80,12 @@ copy-deep-map: function [m [map!]] [
 	foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
 	m
 ]
+
+;; this version is reliable but allocates 60% more
+;@@ should cloning be based on it?
+copy-deep-safe: function ["Obtain a complete deep copy of the data" data [map! series!]] [
+	system/codecs/redbin/decode system/codecs/redbin/encode data none
+]
 	
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
 ;; since it's for layout usage only, I don't care about a few allocated objects, no need to optimize it
