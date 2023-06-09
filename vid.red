@@ -351,7 +351,7 @@ VID: context [
 				append facets compose/deep/only [
 					actors: apply 'construct [
 						to [] def/actors
-						/with object? :actors actors	;-- allows block! facet to define an actor too
+						/with object? :actors :actors	;-- allows block! facet to define an actor too
 					]
 				]
 			]
