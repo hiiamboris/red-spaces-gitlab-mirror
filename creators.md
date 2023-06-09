@@ -27,22 +27,22 @@ Minimal space includes only a few facets:
 ```
 spaces/templates/space: declare-class 'space [
 	;) type is used for styling and event handler lookup, may differ from template name!
-	type:	'space	#type [word!] =
+	type:	'space		#type [word!] =
 	
-	;) draw tells how to render this space
-	draw:   []   	#type [block! function!]
+	;) draw tells how to render this space (empty look by default)
+	draw:   does [[]]  	#type [function!]
 	
 	;) size tells outside observers how big the render was
-	size:   0x0		#type [pair! (0x0 +<= size)] =?
+	size:   0x0			#type [pair! (0x0 +<= size)] =?
 	
 	;) parent is used to invalidate upper spaces when important facet changes
-	parent: none	#type [object! none!]
+	parent: none		#type [object! none!]
 	
 	;) limits specify sizing constraints
-	limits: none	#type [object! (range? limits)  none!] =? :invalidates
+	limits: none		#type [object! (range? limits)  none!] =? :invalidates
 	
 	;) cache lists words that internal cache should memorize and restore along with rendered look
-	cache:  [size]	#type [block! none!]
+	cache:  [size]		#type [block! none!]
 	
 	;) cached holds internal cache data (explained in the relevant chapter)
 	cached: tail copy [0.0 #[none]]	#type [block!]
@@ -477,7 +477,7 @@ Example code with a new *focusable* space:
 
 declare-template 'my-space/space [
 	size: 50x50
-	draw: [box 1x1 49x49]
+	draw: does [[box 1x1 49x49]]
 ]
 append spaces/keyboard/focusable 'my-space
 

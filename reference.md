@@ -152,7 +152,7 @@ In contrast to REBOL & Red's `face!` object that always includes every possible 
 |-|-|-|
 | `type` | `word!` | Used for styles and event handler lookups. Usually equals space's template name, but can be renamed freely. |
 | `size` | `pair!` `none!` | Size of this space in it's own coordinate system.<br> Usually updated during every `draw` call (as such, it is the *size of the last rendered frame* in a sequential chain of redraws), but sometimes fixed.<br> Used by container spaces (e.g. list) to arrange their items. <br> Can be `none` if space is infinite, or if it was never drawn yet. |
-| `draw` | `block!`<br>`func [] -> block!` | Should return a block of commands to render this space on the current frame.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas fill-x fill-y` to auto-adjust its size. |
+| `draw` | `func [] -> block!` | Should return a block of commands to render this space on the current frame and adjust the `size` facet.<br> Should also fill `map` with included spaces if they are interactive.<br> May support `/window xy1 xy2` refinement - to draw only a selected region, and `/on canvas fill-x fill-y` to auto-adjust its size. |
 | `parent` | `none!` `object!` | After space is rendered, contains it's owner object. |
 | `limits` | `none!` `range!` | Object with /min and /max size this space can span. See [VID/S manual](vids.md#constraining-the-size) on details. |
 | `cache` | `none!` `block!` | List of cached words (usually `[size map]`). Turns off caching if set to `none`. |
@@ -344,7 +344,7 @@ Minimal space template to build upon:
 spaces/templates/space: declare-class 'space [
 	type:	'space
 	size:    0x0
-	draw:    []   	
+	draw:    does [[]]   	
 	limits:  none
 	parent:  none	
 	cache:   [size]	
@@ -898,9 +898,13 @@ Layouts are defined in `spaces/layouts` context (it can be extended with more la
 | argument  | types  | description |
 |-|-|-|
 | spaces | block! or function! | list of spaces or a picker function |
-| settings | block! | settings for layout |
+| settings | block! | settings for layout (see [below](#settings-for-list-layout)) |
 
-Result of all layouts is a block: `[size [pair!] map [block!]]`, but map geometries also may contain `drawn` block (in addition to `offset` and `size`), which should be used to avoid extra `render` call.
+Result of all layouts is a block or object with the following fields: 
+- `size [pair!]` (required) - total size of the rendered layout
+- `map [block!]` (required) - map of child items: see [map format](creators.md#hierarchy), but map geometry blocks may also contain a `drawn` block in addition to `offset` and `size`, which is used to avoid extra `render` call
+- `origin [pair!]` (optional) - if provided, container/origin is set to this value (used by ring layout)
+- any other fields are ignored
 		
 There's no other strict requirement as long as layout function accepts arguments given to it by the `draw` function of the template that is built upon `container`.
 
@@ -919,7 +923,7 @@ ARGUMENTS:
      settings     [block!] "Block of words referring to setting values."
 ```
 
-By default, three layouts are available out of the box: `list` (used in vlist/hlist), `tube` (used in row/column), `ring` (used in ring menu popups), and `paragraph` (used in rich-paragraph and derivatives).
+By default, four layouts are available out of the box: `list` (used in vlist/hlist), `tube` (used in row/column), `ring` (used in ring menu popups), and `paragraph` (used in rich-paragraph and derivatives, but it is not container-based).
 
 #### Settings for list layout
 
