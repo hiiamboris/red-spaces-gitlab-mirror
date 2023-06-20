@@ -31,7 +31,10 @@ svf:  system/view/fonts
 svm:  system/view/metrics
 svmc: system/view/metrics/colors
 
-digit!: charset [#"0" - #"9"]
+digit!: charset [#"0" - #"9"]							;@@ add typical charsets to /common repo
+
+INFxINF: 2e9 by 2e9										;-- used too often to always type it numerically
+;@@ consider: OxINF Ox-INF INFxO -INFxO (so far they don't seem useful)
 
 half: func [x] [x / 2]
 round-down: func [x] [to integer! x]
@@ -83,8 +86,11 @@ copy-deep-map: function [m [map!]] [
 
 ;; this version is reliable but allocates 60% more
 ;@@ should cloning be based on it?
-copy-deep-safe: function ["Obtain a complete deep copy of the data" data [map! series!]] [
-	system/codecs/redbin/decode system/codecs/redbin/encode data none
+copy-deep-safe: function [
+	"Obtain a complete deep copy of the data"
+	data [any-object! map! series!]
+] with system/codecs/redbin [
+	decode encode data none
 ]
 	
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
@@ -773,7 +779,6 @@ context [
 ]
 
 ;; constraining is used by `render` to impose soft limits on space sizes
-infxinf: 2e9 by 2e9										;-- used too often to always type it numerically
 constrain: function [
 	"Clip SIZE within LIMITS"
 	size    [pair!] "use infxinf for unlimited; negative size will become zero"

@@ -1100,9 +1100,8 @@ container-ctx: context [
 		foreach [_ geom] frame/map [
 			pos: geom/offset
 			siz: geom/size
-			drw: geom/drawn
+			drw: take remove find geom 'drawn			;-- no reason to hold `drawn` in the map anymore
 			#assert [drw]
-			remove/part find geom 'drawn 2				;-- no reason to hold `drawn` in the map anymore
 			; skip?: all [xy2  not boxes-overlap?  pos pos + siz  0x0 xy2 - xy1]
 			; unless skip? [
 			org: any [geom/origin 0x0]
@@ -1211,7 +1210,8 @@ list-ctx: context [
 		spacing:   0
 
 		sec-cache: []
-		cache:     [size map sec-cache]							;@@ put sec-cache into container or not?
+		frame:     []									;-- last frame parameters used by kit and list-view
+		cache:     [size map frame sec-cache]			;@@ put sec-cache into container or not?
 		
 		container-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
@@ -2105,8 +2105,9 @@ window-ctx: context [
 			; ?? [canvas size window/pages content/size]
 			;; once content is rendered, it's size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
-			if content/size [size: min size content/size - org]	;-- size has to be finite
+			if content/size [size: min size content/size]	;-- size has to be finite
 		]
+		; ?? [size org content/size]
 		window/size: size
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
@@ -2144,13 +2145,13 @@ inf-scrollable-ctx: context [
 	~: self
 	
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
-	roll: function [space [object!] path [path!] "inf-scrollable should be the last item"] [
+	roll: function [space [object!] path: [] [path! block! none!] "inf-scrollable should be the last item"] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
-		path: keep-type path object!					;-- filter out pairs!
-		remove find/tail/same path space				;-- get rid of children
+		path: keep-type as path! path object!			;-- filter out pairs!
+		clear find/tail/same path space					;-- get rid of children
 		window: space/window
 		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
-		wofs': wofs: negate window/origin				;-- (positive) offset of window within it's content
+		wofs': wofs: negate window/origin				;-- (positive) offset of window within its content
 		#assert [window/size]
 		wsize:  window/size
 		before: negate space/origin						;-- area before the current viewport offset
@@ -2182,6 +2183,7 @@ inf-scrollable-ctx: context [
 			#debug sizing [#print "rolling (space/size) with (space/content) by (wofs' - wofs)"]
 			space/origin: space/origin + (wofs' - wofs)	;-- may be watched (e.g. by grid-view)
 			window/origin: negate wofs'					;-- invalidates both scrollable and window
+			wofs' - wofs								;-- let caller know that roll has happened
 		]
 	]
 	
@@ -2215,7 +2217,7 @@ inf-scrollable-ctx: context [
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
 		roll: func [/in path [path! block!] "Inject subpath into current styling path"] [
-			~/roll self as path! any [path []]
+			~/roll self path
 		] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
@@ -2227,168 +2229,57 @@ inf-scrollable-ctx: context [
 list-view-ctx: context [
 	~: self
 
-	;-- locate-line returns any of:
-	;--   [margin 1 offset] - within the left margin (or if point is negative, then to the left of it)
-	;--   [item   1 offset] - within 1st cell
-	;--   [space  1 offset] - within space between 1st and 2nd cells
-	;--   [item   2 offset] - within 2nd cell
-	;--   [space  2 offset]
-	;--   ...
-	;--   [item   N offset]
-	;--   [margin 2 offset] - within the right margin
-	;--                       offset can be bigger(!) than right margin if point is outside the space's size
-	;-- location is done from the first item in the map, not from the beginning
-	;-- so eventually if previous items change size, list origin may drift from 0x0
-	;@@ will this cause problems?
+	;; constant passed into list layout, just easier to put it here than in draw and available funcs
+	;; forbids list width extension by largest item (otherwise width will depend on window/origin, leading to weird UX)
+	do-not-extend?: yes								
 	
-	;; helpers for locate-line
-	level-sub: function [level [integer!] name [path!] idx [integer!]] [
-		if level < size: get name [throw reduce [name/1 idx level]]		;-- will intersect zero, throw >=0
-		level - size
-	]
-	level-add: function [level [integer!] name [path!] idx [integer!]] [
-		also level: level + get name
-		if level >= 0 [throw reduce [name/1 idx level]]			;-- intersected zero, throw >=0
-	]
-	
-	;; see grid-view for more details on returned format
-	locate-line: function [
-		"Turn a coordinate along main axis into item index and area type (item/space/margin)"
-		list   [object!]  "List object with items"
-		canvas [pair!]    "Canvas on which it is rendered; positive!" (0x0 +<= canvas)	;-- other funcs must pass positive canvas here
-		level  [integer!] "Offset in pixels from the 0 of main axis"
+	map-index->list-index: function [
+		list      [object!]
+		map-index [integer!] (all [0 < map-index map-index <= half length? list/map])
 	][
-		#assert [list =? last current-path  "Out of tree rendering detected!"]
-		x: list/axis
-		if level < mrgx: list/margin/x [return compose [margin 1 (level)]]
-		#debug list-view [level0: level]				;-- for later output
-		fill-x: x <> 'x
-		fill-y: x <> 'y									;-- list items will be filled along secondary axis
-		
-		; either empty? list/map [
-			i: 1
-			level: level - mrgx
-		; ][
-			;@@ this needs reconsideration, because canvas is not guaranteed to have persisted! plus it has a bug now
-			;@@ ideally I'll have to have a map of item (object) -> list of it's offsets on variuos canvases
-			;@@ invalidation conditions then will become a big question
-			; ;; start off the previously rendered first item's offset
-			; #assert [not empty? list/icache]
-			; #assert ['item = list/map/1]
-			; item-spaces: reduce values-of list/icache
-			; i: pick keys-of list/icache j: index? find/same item-spaces get list/map/1
-			; level: level - list/map/2/offset/:x
-		; ]
-		imax: list/items/size
-		space: list/spacing								;-- return value is named "space"
-		fetch-ith-item: [								;-- sets `item` to size
-			obj: list/items/pick i
-			;; presence of call to `render` here is a tough call
-			;; existing previous size is always preferred here, esp. useful for non-cached items
-			;; but `locate-line` is used by `available?` which is in turn called:
-			;; - when determining initial window extent (from content size)
-			;; - every time window gets scrolled closer to it's borders (where we have to render out-of-window items)
-			;; so there's no easy way around requiring render here, but for canvas previous window size can be used
-			;@@ ensure at least that this is an in-tree render
-			render/on obj canvas fill-x fill-y
-			item: obj/size
-		]
-		;@@ should this func use layout or it will only complicate things?
-		;@@ right now it independently of list-layout computes all offsets
-		;@@ which saves some CPU time, because there's no need in final render here
-		r: catch [
-			either level >= 0 [
-				imax: any [imax 1.#inf]					;-- if undefined
-				forever [
-					do fetch-ith-item
-					level: level-sub level 'item/:x i
-					if i >= imax [throw compose [margin 2 (level)]]
-					level: level-sub level 'space/:x i
-					i: i + 1
-				]
-			][
-				forever [
-					i: i - 1
-					#assert [0 < i]
-					level: level-add level 'space/:x i
-					do fetch-ith-item
-					level: level-add level 'item/:x i
-				]
-			]
-		]
-		#debug list-view [#print "locate-line (level0) -> (mold r)"]
-		#assert [0 < r/2]
-		r
-	]
-
-	item-length?: function [list [object!] i [integer!] (i > 0)] [
-		#assert [list/icache/:i]
-		item: list/icache/:i							;-- must be cached by previous locate-line call
-		r: item/size/(list/axis)
-		#debug list-view [#print "item-length? (i) -> (r)"]
-		r
-	]
-			
-	locate-range: function [
-		"Turn a range along main axis into list item indexes and offsets from their 0x0"
-		list       [object!]  "List object with items"
-		canvas     [pair!]    "Canvas on which it is rendered"
-		low-level  [integer!] "Top/left line on main axis"
-		high-level [integer!] "Bottom/right line on main axis"
-	][
-		set [l-item: l-idx: l-ofs:] locate-line list canvas  low-level
-		set [h-item: h-idx: h-ofs:] locate-line list canvas high-level
-		sp: list/spacing/(list/axis)
-		mg: list/margin/(list/axis)
-		;; intent of this is to return item indexes that fully cover the requested range
-		;; so, space and margin before first item is still considered belonging to that item
-		;; (as it doesn't require rendering of the previous item)
-		;; returned index can be none if low-level lands after the last item's geometry
-		switch l-item [
-			space  [l-idx: l-idx + 1  l-ofs: l-ofs - sp]
-			margin [
-				l-ofs: l-ofs - mg
-				if l-idx = 2 [l-idx: none]
-			]
-		]
-		;; for the same reason, space/margin after last item belongs to that item
-		;; returned index can be none if high-level lands before the last item's geometry
-		switch h-item [
-			space [h-ofs: h-ofs + item-length? list h-idx]
-			margin [
-				either h-idx = 1 [
-					h-idx: none
-				][
-					h-idx: list/items/size				;-- can't be none since right margin is present
-					either h-idx <= 0 [					;-- data/size can be 0, then there's no item to draw
-						h-idx: none
-					][
-						h-ofs: h-ofs + item-length? list h-idx
-					]
-				]
-			]
-		]
-		r: reduce [l-idx l-ofs h-idx h-ofs]
-		#debug list-view [#print "locate-range (low-level),(high-level) -> (mold r)"]
-		r
+		#assert [list/frame/anchor]
+		anchor-item: list/items/pick anchor: list/frame/anchor
+		anchor-pos: find/same/skip list/map anchor-item 2
+		#assert [anchor-pos]
+		anchor-map-index: half 1 + index? anchor-pos
+		anchor - anchor-map-index + map-index
 	]
 	
 	available?: function [
-		list [object!] canvas [pair!] (0x0 +<= canvas) axis [word!] dir [integer!] from [integer!] requested [integer!]
+		list [object!] req-axis [word!] dir [integer!] from [integer!] requested [integer!]
 	][
-		if axis <> list/axis [
-			;; along secondary axis there is no absolute width: no way to know some distant unrendered item's width
-			;; so just previously rendered width is used (and will vary as list is rolled, if some items are bigger than canvas)
-			#assert [list/size]
-			return either dir < 0 [from][min requested list/size/:axis - from]
-		]
-		set [item: idx: ofs:] locate-line list canvas from + (requested * dir)
-		r: max 0 requested - switch item [
-			space item [0]
-			margin [either idx = 1 [0 - ofs][ofs - (list/margin/:axis)]]
-		]
-		#debug list-view [#print "available? dir=(dir) from=(from) req=(requested) -> (r)"]
-		r
+        if req-axis <> list/frame/axis [				;-- along orthogonal axis list doesn't extend
+        	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
+        ]
+        
+        ;; choose anchor item closest to the direction we're looking out into (avoids redrawing the whole window!)
+        set [anchor-item: anchor-geom:] either dir < 0 [
+        	map-index: 1
+        	list/map
+        ][
+        	map-index: half length? list/map
+        	list/map << 2
+        ]
+        #assert [anchor-item]
+        y: req-axis
+        anchor: map-index->list-index list map-index
+        anchory: anchor-geom/offset/:y 
+        
+        frame: construct list/frame						;-- for bind(with) to work
+		;@@ this is a temporary kludge to fix the bug when roll happens multiple times w/o render and origin gets ahead of the map
+		fix: frame/window-origin/:y - list/parent/origin/:y
+		from: from + fix
+		
+        ;; anchor-relative range tells list layout how many items to render
+        range: (either dir < 0 [from - requested by from][0 by requested + from]) - anchory
+		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor range do-not-extend?]	;-- origin unused
+		frame: make-layout 'list :list/items settings
+		?? [fix range frame/filled-range]
+		range: (clip range/1 range/2 frame/filled-range) - from + anchory
+		result: either dir < 0 [negate range/1][range/2]
+		#print "available from (from) along (req-axis)/(dir): (result) of (requested)"
+		; ?? frame
+		result
 	]
 			
 	;; can be styled but cannot be accessed (and in fact shared)
@@ -2412,78 +2303,91 @@ list-view-ctx: context [
 	][
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
 		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
-		list: lview/list
-		worg: negate lview/window/origin				;-- offset of window within content
-		axis: list/axis
-		fill-x: fill-y: no
-		either axis = 'x [fill-y: yes][fill-x: yes]		;-- always filled along finite axis
-		; #assert [canvas/:axis > 0]						;-- some bug in window sizing likely
-		;; i1 & i2 will be used by picker func (defined below), which limits number of items to those within the window
-		item-canvas: extend-canvas subtract-canvas canvas 2 * list/margin axis
-		set [i1: o1: i2: o2:] locate-range list item-canvas worg/:axis worg/:axis + xy2/:axis - xy1/:axis
-		unless all [i1 i2] [							;-- no visible items (see locate-range)
-			list/size: list/margin * 2
-			return quietly list/map: []
-		]
-		#assert [i1 <= i2]
-
-		dont-extend?: yes								;-- forbid list width extension by largest item (or will depend on window/origin)
+		window: lview/window
+		list:   lview/list
+		axis:   list/axis
+		fill-x: axis <> 'x								;-- always filled along finite axis
+		fill-y: axis <> 'y
+		anchor:   lview/anchor
 		; canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
-		guide:    axis2pair axis
-		origin:   guide * (xy1 - o1 - list/margin)
-		settings: with [list 'local] [axis margin spacing canvas origin limits fill-x fill-y dont-extend?]
-		frame:    make-layout 'list :list-picker settings
+		; guide:    axis2pair axis
+		; origin:   guide * (xy1 - o1 - list/margin)
+		origin:   0x0;window/origin
+		;@@ don't redraw it fully if possible after a roll, just the new part
+		range:    xy1/:axis by xy2/:axis; + origin/:axis 
+		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits origin anchor range do-not-extend?]
+		?? [xy1 xy2 range origin]
+		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
+		frame:    make-layout 'list :list/items settings
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn:    make [] 3 * (2 + length? frame/map) / 2
-		dxy:      xy2 - xy1
-		i:        i1
-		foreach [child geom] frame/map [				;@@ use for-each
+		i:        1
+		foreach [item geom] frame/map [				;@@ use for-each
 			#assert [geom/drawn]						;@@ should never happen?
-			drw: second pos: find geom 'drawn
-			remove/part pos 2							;-- no reason to hold `drawn` in the map anymore
-			ofs: geom/offset
-			siz: geom/size
+			item-drawn:  take remove find geom 'drawn	;-- no reason to hold `drawn` in the map anymore
+			item-offset: geom/offset
+			item-size:   geom/size
 			;@@ skip invisible items to lighten the draw block (e.g. for inactive lists)? but that will disable list caching
-			; if boxes-overlap? ofs ofs + siz 0x0 dxy [	
-			compose/only/into [translate (ofs) (drw)] tail drawn
+			compose/only/into [translate (item-offset) (item-drawn)] tail drawn
 			case/all [
-				find/same lview/selected child [
-					compose/only/into [translate (ofs) (draw-box selection-prototype siz)] tail drawn
+				find/same lview/selected item [
+					compose/only/into [translate (item-offset) (draw-box selection-prototype item-size)] tail drawn
 				]
+				;@@ add paging support to this
 				lview/cursor = i [
-					compose/only/into [translate (ofs) (draw-box cursor-prototype siz)] tail drawn
+					compose/only/into [translate (item-offset) (draw-box cursor-prototype item-size)] tail drawn
 				]
 			]
 			i: i + 1
 		]
-		list/size: frame/size
+		;@@ this is a temporary kludge to fix the bug when roll happens multiple times w/o render and origin gets ahead of the map
+		compose/into [window-origin: (window/origin)] tail frame
+		?? frame/map
+		?? frame
+		list/frame: frame
+		list/size:  frame/size
 		quietly list/map: frame/map
 		drawn
 	]
 
-	;; hack to avoid recreation of this func inside list-draw
-	list-picker: func [/size /pick i] with :list-draw [
-		either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
-	]
+	; ;; hack to avoid recreation of this func inside list-draw
+	; list-picker: func [/size /pick i] with :list-draw [
+		; either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
+	; ]
 		
+	;@@ review this
 	;; new class needed to type icache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
 	list-template: declare-class 'list-in-list-view/list [
 		type: 'list										;-- styled normally
 		axis: 'y
 		
-		;; cache of last rendered item spaces (as words)
-		;; this persistency is required by the focus model: items must retain sameness
-		;; an int->word map! - for flexibility in caching strategies (which items to free and when)
-		;@@ when to forget these? and why not keep only focused item?
-		icache: make map! 16	#type [map!]
-		
 		available?: func [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
 			;; must pass positive canvas (uses last rendered list-view size)
-			~/available? self size axis dir from requested
+			~/available? self axis dir from requested
 		] #type [function!]
 	]
+	
+	; draw: function [
+		; lview [object!]
+		; canvas: infxinf [pair! none!]
+		; fill-x: no [logic! none!]
+		; fill-y: no [logic! none!]
+		; wxy1 [none! pair!]
+		; wxy2 [none! pair!]
+	; ][
+		
+		; item-canvas: layouts/list/get-item-canvas canvas lview/limits lview/axis lview/margin
+		; lview/frame: make map! compose [
+			; axis:        (lview/axis)
+			; margin:      (lview/margin)
+			; spacing:     (lview/spacing)
+			; limits:      (if lview/limits [copy lview/limits])
+			; item-canvas: (item-canvas)
+		; ]
+		; lview/inf-scrollable-draw/on/window canvas fill-x fill-y wxy1 wxy2
+	; ]
 
 	invalidates-list: function [lview [object!] word [word!] value [any-type!]] [
 		if object? :lview/list [invalidate lview/list]
@@ -2517,16 +2421,29 @@ list-view-ctx: context [
 		;; current item (for keyboard navigation purposes), doesn't have to be selected 
 		cursor:      none			#type =? [integer! (cursor > 0) none!] :invalidates-list
 
+		;; index of the first visible item in the window
+		anchor:      1				#type =? [integer!] (anchor > 0) :invalidates-list	
+		
+		; frame:       []				#type    [map! block! object!]
+		; cache:       [size map frame]
+		cache:       [size map]
+		
 		window/content: list: make-space 'list list-template	#type (space? list)
 		content-flow: does [
 			select [x horizontal y vertical] list/axis
 		] #type [function!]
 		
+		;@@ remove cache somehow!
+		icache: make map! 10
 		list/items: func [/pick i [integer!] /size] with list [
 			either pick [
-				any [
-					icache/:i
-					icache/:i: wrap-data data/pick i
+				; wrap-data data/pick i
+				all [
+					0 < i i <= data/size				;-- since data/pick can return any value, this is the only way to limit it
+					any [
+						icache/:i
+						icache/:i: wrap-data data/pick i
+					]
 				]
 			][data/size]
 		]
@@ -2534,6 +2451,32 @@ list-view-ctx: context [
 		list/draw: func [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
 			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
+		
+		;@@ maybe rename roll to slide? it probably makes more sense
+		roll: function [/in path [path! block!] "Inject subpath into current styling path"] [
+			unless offset: inf-scrollable-ctx/roll self path [return none]
+			y: list/axis
+			;; change anchor to first or last item, depending on the roll direction
+	        set [new-anchor-item: new-anchor-geom:] either offset/:y < 0 [
+	        	map-index: 1							;-- window/origin shifted up/left, will draw more items below/right
+	        	list/map
+	        ][
+	        	map-index: half length? list/map		;-- window/origin shifted down/right, will draw more items above/left
+	        	list/map << 2
+	        ]
+	        #assert [new-anchor-item]
+	        new-anchor: ~/map-index->list-index list map-index
+	        old-anchor-geom: second find/same/skip list/map list/items/pick anchor 2
+			window/origin: window/origin + (new-anchor-geom/offset - old-anchor-geom/offset)
+			self/anchor: new-anchor
+			?? [offset new-anchor new-anchor-geom/offset self/origin window/origin]
+			offset
+		]
+		
+		; inf-scrollable-draw: :draw
+		; draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+			; ~/draw self canvas fill-x fill-y xy1 xy2
+		; ]
 	]
 ]
 
@@ -3377,7 +3320,7 @@ grid-ctx: context [
 		;; hidden because /size should be valid now, and this function triggered out of tree rendering
 		; calc-size: function ["Estimate total size of the grid in pixels"] [~/calc-size self]
 
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
 			~/draw self canvas fill-x fill-y xy1 xy2
 		]
 	]

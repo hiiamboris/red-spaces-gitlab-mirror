@@ -27,27 +27,35 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	]
 
 	list: context [
+		;; shared by list/create and list-view/draw
+		get-item-canvas: function [list-canvas [pair!] limits [object! none!] axis [word!] margin [pair!]] [
+			extend-canvas (subtract-canvas (constrain list-canvas limits) margin * 2) axis	;-- list is infinite along its axis
+		]
+		
 		;; settings for list layout:
-		;;   axis             [word!]   x or y
-		;;   margin           [pair!]   >= 0x0
-		;;   spacing          [pair!]   >= 0x0
-		;;   canvas        [pair! none!]     >= 0x0
-		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags: flag along 'axis' is ignored completely,
+		;;   axis             [word!]      x or y
+		;;   margin           [pair!]      >= 0x0, always added around edge items, even if 'range' limits displayed items
+		;;   spacing          [pair!]      >= 0x0
+		;;   canvas        [pair! none!]   >= 0x0
+		;;   fill-x fill-y [logic! none!]  fill along canvas axes flags: flag along 'axis' is ignored completely,
 		;;      while the opposite flag controls whether whole list width extends to canvas or not (but items always fill the width)
-		;;   limits        [none! object!]
-		;;   origin           [pair!]   unrestricted
-		;;   dont-extend?     [logic!]  true if sticking out items cannot extend list's width (used by list-view); default=false
-		;;                              because list-view has to maintain fixed width across rolls and scrolls
-		;; result of all layouts is a block: [size [pair!] map [block!]], but map geometries contain `drawn` block so it's not lost!
+		;;   limits        [object! none!]
+		;;   origin         [pair! none!]  unrestricted, offsets whole map, default=0x0
+		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
+		;;   range          [pair! none!]  in pixels - start and end of the region around anchor level along axis to draw (used by list-view)
+		;;                                 range/1 <= 0, range/2 >= 0, default=0xINF
+		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
+		;;                                 (list-view has to maintain fixed width across rolls and scrolls)
+		;; result of all layouts is a frame object with size, map and possibly more; map geometries contain `drawn` block so it's not lost!
 		;; settings are passed as a list of bound words, not as context
 		;; this is done to make the list explicit, to avoid unexpected settings being read from the space object
 		;; some of the words are also calculated directly in `draw`, so object is a bad fit to pass these
 		create: function [
 			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axis margin spacing canvas fill-x fill-y limits origin dont-extend?]"
+			settings [block!] "Any subset of [axis margin spacing canvas fill-x fill-y limits origin anchor range do-not-extend?]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas fill-x fill-y limits origin dont-extend?
+			/local axis margin spacing canvas fill-x fill-y limits origin anchor range do-not-extend?
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -62,17 +70,22 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				fill-x   [logic! none!]
 				fill-y   [logic! none!]
 				limits   [object! (range? limits) none!]
-				origin   [none! pair!]
+				origin   [pair! none!]
+				anchor   [integer! (anchor > 0) none!]
+				range    [pair! (all [range/1 <= 0 range/2 >= 0]) none!]
+				do-not-extend? [logic! none!]
 			]]
-			default origin:       0x0
-			default canvas:       infxinf
-			default fill-x:       no
-			default fill-y:       no
-			default dont-extend?: no
+			default origin: 0x0
+			default canvas: infxinf
+			default fill-x: no
+			default fill-y: no
+			default range:  0 by infxinf/x
+			default anchor: 1
+			default do-not-extend?: no
 			x: ortho y: axis
 			guide: axis2pair y
-			item-canvas: extend-canvas (subtract-canvas (constrain canvas limits) margin * 2) axis	;-- list is infinite along its axis
-			;@@ this should be documented in the canvas docs (to be written)
+			item-canvas: get-item-canvas canvas limits axis margin
+			;@@ this should be documented in the sizing/canvas docs (to be written)
 			;; NOTE: fill/:x does not affect whether items fill the final width or not
 			;;   they always do (and fill/:x cannot be true for inf width anyway)
 			;;   fill/:x affects whether list extends its width to finite canvas width if former is smaller, or not
@@ -98,23 +111,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;;   along main axis items canvas is always infinite
 			;;   but final list length is clipped/extended by limits/:y (hiding items or adding empty space)
 			
-			map:          make [] 2 * count
-			ith-space:    pick [[spaces/pick i][spaces/:i]] func?
-			deep-pattern: [(space) [offset (pos) size (space/size) drawn (drawn)]]
-			flat-pattern: [offset (pos) size (space/size) drawn (drawn)]
-			add-item:     [compose/only/deep/into deep-pattern tail map]
 			loop 2 [									;-- two render cycles
-				size: 0x0
-				pos:  origin + margin
-				repeat i count [
-					space:  do ith-space
-					;; fill across infinite dimension will be ignored in render
-					drawn:  render/on space item-canvas yes yes	;-- items always fill the width (render disables fill for infinity)
-					#assert [space/size +< (1e7 by 1e7)]		;-- sanity check that items are finite
-					do      add-item
-					pos:    pos + (space/size + spacing * guide)
-					size:   max size space/size					;-- accumulate width
-				]
+				size:  0x0
+				above: fill range/1 -1
+				below: fill range/2  1
 				
 				;; total width (size/:x) is used for new canvas when:
 				;; - fill/:x = off and total width < canvas width
@@ -122,29 +122,86 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				;; - total width > canvas width and count is finite
 				if switch sign? size/:x - item-canvas/:x [
 					-1 [not either x = 'x [fill-x][fill-y]]
-					 1 [not dont-extend?]
+					 1 [not do-not-extend?]
 				][
-					new-canvas: extend-canvas (subtract-canvas (constrain size + (margin * 2) limits) margin * 2) axis
+					new-canvas: get-item-canvas size + (margin * 2) limits axis margin	;-- only size/:x is accounted for
 					#debug sizing [#print "list c1=(item-canvas) c2=(new-canvas)"]
 					if new-canvas <> item-canvas [
 						item-canvas: new-canvas
-						add-item: [compose/only/into flat-pattern clear map/(i * 2)]
 						continue
 					]
 				]
 				break									;-- no second render cycle if canvas is the same
 			]
+			map: make [] 2 * either range/2 = infxinf/x [count][(min 1000 span? range) / 20]	;@@ avg+2dev, estimator/corrector; inf protection
+			append append map reverse/skip above 2 below
 			
-			size/:y: pos/:y - spacing/:y - origin/:y + margin/:y
-			size/:x: size/:x + (2 * margin/:x)
-			size: constrain size limits					;-- do not let it exceed the limits
-			#assert [size +< (1e7 by 1e7)]
+			item1: :map/2
+			item2: last map
+			; ?? item1 ?? item2
+			size/:y: item2/offset/:y + item2/size/:y - item1/offset/:y
+			size: size + (2 * margin)
+			filled-range: 0 by size/:y + item1/offset/:y - margin/:y	;-- filled range is not constrained (used by 'available?')
+			size: constrain size limits					;-- do not let size exceed the limits (this clips the drawn layout)
+			#assert [0x0 +<= size +< (1e7 by 1e7)]
+			;@@ omit some of these?
 			frame: compose/only [
-				size:        (size)
-				map:         (map)
-				list-canvas: (canvas)
-				item-canvas: (item-canvas)
+				size:         (size)
+				map:          (map)
+				axis:         (axis)
+				margin:       (margin)
+				spacing:      (spacing)
+				origin:       (origin)
+				anchor:       (anchor)
+				range:        (range)					;-- requested range to fill
+				filled-range: (filled-range)			;-- actually filled range (may be both bigger and smaller on both sides)
+				canvas:       (canvas)
+				fill-x:       (fill-x)
+				fill-y:       (fill-y)
+				item-canvas:  (item-canvas)
+				limits:       (if limits [copy limits])
 			]
+		]
+		
+		;; fills at least given amount of pixels with items after anchor (but may stop when runs out of items)
+		;; increases size, returns map
+		;; consideration: even if whole edge item is hidden (together with spacing), it still should be in the map
+		;; because when tabbing around list-view, we need to have this item to switch to it and then pan the view
+		fill: function [
+			length [integer!] sign [integer!] (1 = abs sign)
+			/extern origin margin spacing anchor ith-item item-canvas size
+		] with :create [
+			ith-item: pick [[spaces/pick i][spaces/:i]] func?
+			i:    anchor
+			pos:  origin + margin
+			if sign < 0 [i: i + sign]
+			map': make [] (min abs length 1000) / 10			;@@ estimate average item size for the program, for better guessing
+			item-pattern: [(item) [offset (pos) size (item/size) drawn (drawn)]]
+			add-item:     [compose/only/deep/into item-pattern tail map']
+			draw-next: [
+				unless item: do ith-item [break]				;-- stop if no more items
+				drawn: render/on item item-canvas yes yes		;-- items always fill the width (render disables fill for infinity)
+				#assert [item/size +< (1e7 by 1e7)]				;-- sanity check that items are finite
+				size:  max size item/size						;-- accumulate width
+				i:     i + sign
+			]
+			limit: pos/:y + length
+			forever pick [
+				[										;-- going down
+					do draw-next
+					do add-item
+					pos/:y: pos/:y + item/size/:y
+					if pos/:y > limit [break]					;-- stop if pos > length (last item box intersects bottom margin)
+					pos/:y: pos/:y + spacing/:y
+				][										;-- going up
+					do draw-next
+					pos/:y: pos/:y - spacing/:y - item/size/:y
+					do add-item
+					; ?? [i pos limit]
+					if pos/:y < limit [break]					;-- stop if pos < length (last item box intersects top margin)
+				]
+			] sign > 0
+			map'
 		]
 	]
 	
