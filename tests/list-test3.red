@@ -25,7 +25,7 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		lv: list-view 300x400 data= function [/pick i /size] [
+		lv: list-view multi-selectable focus 300x400 data= function [/pick i /size] [
 			either pick [
 				random/seed i
 				rejoin ["message " i ": " copy/part lorem random length? lorem]
@@ -42,6 +42,9 @@ view/no-wait/options [
 		invalidate lv; <everything>
 		b/draw: render b
 	]
+	across text "Jump to item:"
+	entry: field "1'000'000'000" [lv/jump-to face/data]
+	button "Go" [lv/jump-to entry/data]
 ] [offset: 10x10]
 ; debug-draw
 ; foreach-*ace/next path system/view/screens/1 [probe path]
