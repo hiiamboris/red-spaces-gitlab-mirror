@@ -22,7 +22,7 @@ if an item gets hidden, it should not receive keyboard events even if it's still
 + make content: 'a-word ! make `make` return a word with a style value!
 how to compose styles from the old ones? need a clear mechanism
 handler spec validation and auto addition of typesets - to help learning, minimize mistakes
-list & doc ideas that improve over vid/view, key differences
++ list & doc ideas that improve over vid/view, key differences
 debug func to list handlers for this or that space (with all path variants)
 should events receive full paths (from `screen`) or relative to host (from it's `space`)??
 in event handlers `self` =? `commands` right now, should be set to `space`? and get rid of `space` arg?
@@ -97,8 +97,9 @@ inspect https://nicepage.com/nicepage-review for anything useful
 allow size to be an integer in `field` - so it will infer height automatically from font and adjust it on the fly
 demo: very basic layout designer for simple webpage-like shite, one others should be able to build upon
     good example: https://discuss.streamlit.io/t/dynamic-grid-layout-ui/2097
+    also widget configurator: https://pub.dev/packages/flutter_treeview/example
 multi level popup menus (probably on separate borderless windows)
-demo: example of a glossy style sheet
++ demo: example of a glossy style sheet
 `arrange` func based on flow layouts that will work with faces?
 web preview component to preview the links in the chat
 widget: markdown renderer (unless Bolek adds it)
@@ -112,7 +113,7 @@ if only bgnd color is specified for a widget (e.g. label), use contrast-with to 
 rename field to input - a low level embeddable input field, while field should be high-level
 some help support for space types? in advanced console? maybe interactive, hyper-text?
 deeper design docs should include visual examples (snippets + gifs) how this or that works
-document resource usage howto:
++ document resource usage howto:
 	- draw can be heavy (10-20ms)
 	- spaces do not redraw unless `update` or `invalidate` is called
 	- cache? = yes usage
@@ -127,7 +128,7 @@ pekr's idea is to rename `host` to `spaces` in VID/S, and it's reasonable but.. 
 centered text style for (wrapped) captions, and h-alignment for text faces - controlled by para! [wrap?: on align: 'center]
 	also 'strike' style is supported by RTD, need to add it
 high level box-like container with caption support?
-have this idea of a series of short documents, "design cards", where tricky algorithms will be explained
++ have this idea of a series of short documents, "design cards", where tricky algorithms will be explained
 	on one hand, code will be more maintainable (algorithms get forgotten over the years) and others will be able to verify it
 	on another, it will inspire confidence in the work
 eventually field/area should have a blinking caret, but it's problematic because it should not cause redraws of everything
@@ -138,10 +139,14 @@ maybe a text-length? func that will measure size of any space's text as if it wa
 	aesthetically optimal paragraph size estimation may use sqrt of that for it's width	
 use 'look to optimize list invalidation as well (maybe box too? any other space?) (grid is optimized)	
 need to document sizing policy of all spaces (but it's not finally set in stone yet)
-incorporate focus-space into set-focus
++ incorporate focus-space into set-focus
 markdown viewer high-level widget with cross-paragraph selection capability and copying to clipboard
 inline date selector widget that copies its data into clipboard as date
-
+how can VID/S styles add auto-facets? e.g. this should not need `text=` part:
+	style ctext: cell [text] react [content/text: self/text]
+	ctext text="abc"
+consider unrolling quietly into `set-quiet in obj quote word:`
+	quote may slow it down a bit, but then it can be used in critical templates all around, since context will recognize the set-word 
 
 key aspects: draggable columns, rearrange by styles
 
@@ -4066,12 +4071,325 @@ rename field/history to field/timeline and base it on timelines ?
 	but timelines might be heavy for the field, e.g. if a grid consists of a lot of field cells it matters
 	current field weight: 16kB (not rendered), 25kB (rendered), timeline: 4kB
 	ok fine then, may just move timeline funcs out in case it becomes a problem
-    
-    
-;@@ on over events are too populous now, need to reduce the load
+gotcha in button style!
+	when button contains a button, both styles get bound to the same object
+	problem is, while below/above blocks are copied, blocks they refer to are not!
+	so it used `above: [(do overlay) (do focus?)]` with both overlay and focus being rebound before evaluated
+	can I prevent these bugs in the futuer? yes
+	but `using` itself is another problem, even if blocks are handled properly
+I have an idea of automatically creating a function for block styles...
+	let it collect all the set-word locals, but I will bind the body to space before evaluation, so nothing will leak out
+	only problem is how to distinguish it from the normal style function.. by the number of arguments?
+	one drawback is that if above/below contain blocks bound to the func, a no-context error will be raised on compose call
+	but it's better than weird silent glithes anyway
+	lol glad I did that, another bug in the same button style surfaced right away
+drop-downs are quite popular on the web, even though not on mobile itself, so I need to solve them
+	(drop-menu a better name? I hate how drop-down/drop-list do not reflect their distinction - editability)	
+	who clips inner spaces: scrollable, box/cell (e.g. for grid), grid headings & data, field text, rich-paragraph
+	box is the biggest issue - quite likely to contain a drop-down
+	scrollable - less likely a problem?
+	grid headers may be a problem - if drop-down is the heading cell (but cell is the first obstacle still)
+	field & rich-paragraph - irrelevant
+	can templates produce two draw blocks - one to be clipped, one not?
+	I could modify box to only use 'clip' when child size is less that its own
+	then child could pretend it's smaller than it is and get out of the box
+	but events still won't land on it :(
+	what if it starts a drag and captures pointer events, when shown? might work (might work for menus as well! although clipped by the host)
+	so new rule of thumb: don't use clip command unless required
+	another issue is that dragging will lock the path, so I cannot possibly use the scrollbar with it
+	perhaps adjust the locking behavior so it doesn't get out of the path but can dive in?
+tree widgets examples:
+	directory/torrents tree, structured (json, xml, Red) data view, music album list, memory usage details
+	always list of lists, but with a central data array, so - data pickers ftw
+so the biggest issue so far in composite widgets is new classes
+	if I add a new facet to any of the children and want auto-invalidation, I need to make a new class for it
+need to rethink how scrollable uses the canvas (it was written long before fill attrs and even canvas)
+	sometimes I want to have scrollable of unspecified size - just to ensure contents won't stick out of the canvas
+	so it should occupy the size of the content, but reduce it by finite canvas dimensions
+	should fill affect it? perhaps... it should extend smaller dimensions up to fill size
+	ow shit, canvas is given as empty by lists along some dimensions, so that doesn't work, or does it? lets call it by design
+	can I have another content-flow for this case?
+	or maybe 'vertical should extend to content/size/y, and horizontal - to content/size/x ?
+	but no, eventually canvas is limited by the finite window size
+	so it has to cut the content along one axis, but not the other
+	content-flow: 'vertical-infinite and 'horizontal-infinite ?
+	content-flow: 'extend-vertical and 'extend-horizontal ?
+	or let list report infinite canvas rather than zero? but that'll hide the list's orientation
+	making a special case for zero in scrollable also doesn't look like a good idea (though might work in the small)
+	list could report finite real canvas rather than zero? (with no filling)
+	ow shit it already reports infinity along main axis
+	why am I getting 0 then in scrollable
+	reaaaly need to rethink it..
+	done
+what to do with highlighting?
+	make 'highlight a global value? sort of makes sense to keep it a single item
+		but then if user hovers over a stack of spaces, only one space can be lit, even if they all support some decoration
+		another issue is it will not trigger invalidation if it's global (can't be reactive)
+	so then let e.g. list have a lit item? or 'item itself? it may leverage on-over event for styling itself
+	but how to standardize it?
+	I could have a global path (hash) that is updated by hittest, and let styles find themselves in it
+	seems like the best option for on-hover highlighting
+	but what if spaces are lit by e.g. timer or signaling an event? out of scope probably
+	and what will invalidate the space if not the over event? - so hover path is a bad idea because no invalidation triggers it
+	also how to animate highlight? makes sense to trigger it on over/away only, so over-event will be used
+	e.g over/in will set some highlight facet to 1, and over/away will animate to reduce it to 0 (invalidating every time)
+	and style will just read the facet value
+	animated parameter will trigger invalidation in this case
+	or alternatively (better?) animation framework may invalidate the targets on its own (but will have to know them)
+drop-down and z-order
+	even if drop-down is not clipped, how to keep siblings from painting over it?
+	spaces usually appear in tab order (layout order) - in lists and tubes
+	so next thing after drop-down (below it) will paint over it
+	so this clipping trick doesn't work in the general case - somehow need another layer
+	or virtual layer made by delaying some draw commands, putting them on top
+	to extract matrix from a frame I would have to parse whole draw block 
+	and what to look for? leave 'popup:' markers?
+	and when? I guess before a popup is drawn, it should parse the main block
+	delayed draw might work, but how will it play with the cache?
+	need to ensure cache fetch also changes delayed draws
+	but what if parent changes its matrix, and child that needs a layer never gets its draw called
+	so every invalidation should always update the matrix of the upper layer until it's cancelled by child's own draw 
+	for simplicity let there be only one upper layer block, easier to cancel?
+	doable in the general case: as post-render code that has the drawn block and the space,
+	it can locate the host, scan its draw block, infer matrix, add new draw code
+	too much complexity though... can't accept it
+how should list multi-selection work?
+	I could allow /selected as pair (range) on list itself, but
+	then every item style would have to look for itself within list items
+	and items cannot even be 'found' - need to iterate over data/pick
+	so a huge slowdown
+	also a change in /selected would have to invalidate all old selected items and new selected items
+	also selection doesn't have to be continuous
+	so it's better to make it a hash! and then each item could look for itself there
+	but how to invalidate if no on-deep-change tracking?
+	even if I allowed old value in on-change, it may be the 'same' hash, already changed
+	so either relying on manual invalidation or delegating selection drawing to the list itself
+	;@@ try it in the list
+how to unify tabbing between spaces and faces?
+	when in a face (not host) - may focus next non-host face or space in a host
+	when in a space (on host) - may focus next space (maybe across hosts), or next non-host face
+	so need a list of focusable faces and spaces (mixed)
+	tab trigger - global event func for non-hosts, local finalizer for spaces
+focus needs more thought
+	e.g. "no focus" should be valid condition, and focus/history should allow it?
+	actually, window always has focus, so "no focus" is only possible when:
+	- no Red window is active (but that can't be detected)
+	- no window exists in the program (cli mode)
+	then focus should initialize itself with the window path if it detects a window
+	also I may want to store last path on each host to restore it on host activation? maybe not.. 
+how can drop-field make its inner field not focusable, but make itself focusable instead?
+	or if I let field remain focusable, how to move on-key VID handlers from drop-field into the field?
+	but it should be focusable itself, since it has meaning for down and up keys (drop-box too)
+	will have to rename field then, but feed it events from drop-field?
+	or extend field handlers and add down key.. hhmm
+	for VID, I could push key- actors down into field.. but it will be weird that 'space' for them won't be drop-down itself
+	also drop-box has to be focusable itself, so for consistency drop-field should be too
+	then I must either rewrite field events or redispatch them
+	basically only key events cannot use 'pass' because they're focused, and this asks for a workaround for drop-field -> field
+	maybe unfocus them and let parents filter input of focused children?
+how can down key show drop menu if it has no path? how can it locate the drop-box on the host?
+	will have to scan all upper maps? a kludge, but the only way for now?
+list-view will have to handle key navigation differently depending on it's selectability
+	without selection support - pass keys to scrollbars
+	with item selected - move the selection up/down
+	but should list do this or list-view?
+	list is mostly for layout, so probably ok to empower list-view only with keys
+	any examples of pure list needing it?
+	basic assumption: if it's a list then its a known fixed set of items
+	but if it's unknown or dynamic then it's a list-view and we may want selection
+	I made menu popup a list - but my mistake, should have been list-view
+	I could add keys to the list and let list-view just pass them along? no reason? list+scrollable combo?
+what to do with list multi selection, duplicate items and sorting persistence?
+	unique items are unaffected by sort
+	unique spaces or data? spaces are volatile, so should be data
+	data picker then may return filtered list, and some selected items may not be visible, and it will be just fine
+	(and if I used indexes, it wouldn't have worked - since data picker receives contiguous index space)
+	just need a warning if data is not unique and selection is enabled, on data
+list-view configurable features:
+	- single selection - affects actors
+	- multi selection - affects actors
+	- cursor - always on the last selected item if selection is enabled, else just a thin frame around item
+	  or unify cursor and single selection? indeed
+	then:
+	/selectable = 'single | 'multi | none
+	cursor is enabled by both single&multi, also `if selectable` general test works
+		should there be /cursor facet? otherwise no way in multi selection to tell which item is the last selected one
+		or just use the last added item?
+		with ctrl+click selection one may unselect an item, and cursor will be there, unselected
+		so cursor is enabled by both modes but is independent of /selected, and its frame may be empty
+		and it's an item or index? filtering should not hide, and sorting should not move, and it should be easy to increment/decrement
+		so it's an index
+	VID keywords - 'selectable' and 'multi-selectable'
+list/selection should be a separate space or let item style handle it?
+	for rich-text it was separate because of distinct selection boxes
+	in list it can be one box per item, so simpler to leverage styles
+	but it will be list-view/list/item independent style
+when cursor moves how should invalidation work?
+	need to invalidate item under the old cursor, but no support for it yet
+	actors could do that, but preferable to automate it
+	but when /selected changes? can't track it without deep change detection
+	not cool!
+	perhaps the only way is to move decor from list items into list itself - it is easy to invalidate
+	but it's not that easy to turn selection into boxes then on this level.. scan the map?
+how pageup/pagedown should work in a list-view?
+	hittest on e.g. a bottom left corner then find the index of that item? but may miss it and hit spacing
+	locate-line is actually better - fault proof, but from where?
+	perhaps, 1 page from the top of current item under cursor (or from 0 if no cursor) when going down?
+	and from the bottom if going up?
+	for this to work, list layout's canvas for items should be stored in the frame data
+	but canvas for items depends on the largest item size (width), and that depends on the subset of items that fit the window
+	I guess then list-view cannot support width extension based on largest item, only finite list, else it's shaky
+		but is it so bad if it's shaky? oh yeah right, because width change invalidates all item heights
+			OTOH: if only canvas affects items height, it won't hurt to change its width as long as it won't change the canvas
+			when can width affect the canvas?  
+		what if it's width is set to that of widest item, but all items are still rendered on a lesser canvas?
+		case: redmark - may have items sticking out and currently it's worked around via wrapping scrollables
+		but scrollables are still better UI than whole canvas extended... 
+	infinite width in list-view is also tricky (because it relies on largest item)
+		either it should not contract width to largest item, and then never fill along x
+		or it will be unreliable across rolls
+		case: list-view in hlist (hlist extends canvas/x) with no fixed width limit
+		how should behave? 
+		best to dynamically set its width to that of the max item, but keep canvas infinite and no fill (width will vary on roll)
+		otherwise the only correct option is to set width to zero, which is unexpected UX
+		other case: single list-view on a sizeless host - needs to know list-view size to size itself (menus?)
+		makes sense if first size is used for the host, and then host will provide finite canvas
+	funny but filling the list width is actually faster than not filling it
+also, in style if cursor is an integer it should absolute, but how to match it to /list items if they are window-relative? 
+	need first visible item in /frame data to check against
+another issue - I can't stop the key from being passed to inf-scrollable and scrollable
+	but if I use pass/stop for that, it may pass keys into children as well
+	will have to rewrite keys with manual dispatch
+		relay-event 'inf-scrollable space path event ?
+		point is to also handle drop-box like cases
+		shit, process-event won't work - it only worked because the path was different
+	or maybe add more control than just 'stop flag? 'block flag?
+	a way to freely pass kb events?
+	remove focus from kb events?
+		that will complicate every container's kb handler with a path length check (e.g. path/3)
+		also a lot more code to eval on event esp. in deep trees (1 func per level)
+		and it doesn't solve the problem of passing event to other funcs in the same stack
+	problem is all these kludges are only needed by keys (though block flag may be useful for others)
+	'block makes most sense, but `block?` name is taken by type check... abort? intercept? deter? arrest? stop/now?
+while I was updating the core, adding canvas, filling, etc, list-view's locate-line stayed the same
+	it's super buggy now and needs a rewrite:
+	e.g. list-test4 has `vlist [box [hlist]]` and box gets drawn on finite from both sides canvas (in locate-line!)
+	it's also become hard to sync rendering logic across different funcs, since it's complex
+	idea is to let list layout serve 'available?' purposes by adding a range setting
+	also, currently list-view draws whole window and caches it, but on rolls it has to all be redrawn again
+	rolls are small, window is big, so it's inefficient
+	so perhaps I should make list-view only render the visible part of the window, and never cache it
+	hopefully this will make rolls real time
+	this couldn't have worked for list that is able to extend its width,
+	but should work for list-view since list-view has to fix its width and always fill it, it's constant
+		however, window has to measure its scrollbar, so it has to render all items within the window to know the size
+		(because window size can be less than max window size if items don't fill it wholly)
+		the only way around redrawing whole window on roll is to replace scrollbar with a scrollwheel, but it's hardly worth it
+	also, current pipeline first draws all items in locate-line, only then draws them in the layout
+	so even with caching it's still a bit (or a lot if not synced) heavier
+	locate-line should not do any renders (?) and use the interpolation mechanism I used for rich-paragraph
+	for that it will need to know heights of all items since the 1st
+	there's a way to avoid that: by making window 'floating' sort of, without a zero-based origin (making it unknown-based)
+	it will then be possible to jump to any list item, however far it is, and only render adjacent items
+	such height list may even be built from different points and then joined (but then base unknowns will differ for each point)
+	why origin is needed? just because I chose absolute addressing of items, in px from 0
+	window uses origin to tell its content which part it needs to render
+	jump to arbitrary item will be needed in a chat app, and it should not have any slowdowns
+	window/origin is not restricted in any way, so every jump may just reset it to 0x0, no origin consistency across jumps required 
+	I might have a layout separate from general list, specially for list-view, or adapt existing one, whats easier
+	then window/origin starting at 0x0 is a pure coincidence and I shouldn't exploit it in 'available?'
+	then I need an 'anchor' item in list-view, which by default may be the first one, but in case of jump - the one we jumped to
+	it will correspond to window's 0x0, as a local coordinate system origin
+	anchor will be an integer index (1 by default) for items/pick, but clipped between 1 and items/size
+	what if user changes /anchor? what should happen?
+	ideally it should only be changed together with the origin
+	so maybe that will reset origin to 0x0? pointless, because most likely I will use negative origin so item is centered
+	should it jump to the item, using current origin as offset? (unless set quietly internally)
+	or just invalidate and let next draw do the jump?
+	'roll' will do what? set origin and anchor and let it redraw? makes sense
+	when anchor is > max item index, draw should correct it to the max index?
+	or maybe leave it as is, and once new items are added they take the last item's place
+	maybe I don't have to force origin to be left top corner, but allow it to be left bottom
+	then setting anchor to 2e9 will automatically keep the log rolled down
+	the only difference the log will have is timestamp in place of an index
+	problem with the anchor is: when I hover over list-view, how do I know where on the list that point is?
+	in principle I know list's map and anchor item's coordinate within it
+	I know list's offset in a window as window/origin so I also know item's coordinate in the window
+	by offsetting it by list-view/origin I know anchor item's coordinate in the list-view
+		item-in-list-xy + window/origin = item-in-window-xy
+		item-in-list-xy + window/origin + list-view/origin = item-in-list-view-xy
+	ok so it works, and addition of origins works too, and list offset is still zero-based, just list-view/origin is not, it's anchor-based
+how will window be positioned on a bottom-aligned list?
+	setting it to -window-max-size will work for inf lists, but if it's finite it will be clipped to avoid showing empty region
+	then if such limited list receives new items, window moves with the addition (if anchor is inf), and I guess thats fine
+	what if list is smaller than the viewport? window should pan content to its top then
+how will window clip its offset and size (size even with top anchor) without preliminary renders ruining it?
+	even 'final' render may not be final if it's only final within this container, but the upper container is still adjusting itself
+	in on-time event? events are outside rendering cycle so guaranteed to work on final layout
+	should be fine to set window/size as usual, from list-view/draw, but offset has no backup...
+	perhaps offset will have to be counted backwards in bottom mode, i.e. flip the window coordinate space 
+how to avoid the call to available? used to count items to display?
+	if I add item range into list layout, doesn't help, since idk these items height
+	if I add pixel range? where will it start? I need to know and sum items in the window before anchor, to know it
+	or I need to derive this range from window/origin and express in negative start and positive end after origin (anchor)
+	in that case list layout will need to support both pixel range and anchor index, which complicates it
+	idea: let list-view define the frame, then available and list will read parameters from it
+	also: pixel range may let available? be served by list layout
+	can locate-line be list layout based? unlikely  
+one function I need to add is jump to specific item, possibly with the item appearing at the top/bottom/center/other offset
+	but how many items to have on top of it in the list? available doesn't cover returning item index
+	locate-line should be rewritten for that, and also use the frame data
+what's in the frame of list-view?
+	item-canvas - to sync item rendering
+		though available if based on list/draw doesn't need any direct frame access
+		but it needs to push existing frame into list/draw for consistency
+		so anything list/draw requires must be there, even if it was changed in the object itself
+		so, all settings except dont-extend
+		list-based available won't work because list itself is limited and available has to work on items outside it
+		so it must be locate-line based
+		but locate-line must then work with absolute offsets of list-view, and with non-rendered items (outside window)
+	item heights? - for fast locate-line
+	i1,i2 - first and last rendered item indexes - for locate-line
+to speed up window drawing need partial rendering in list layout
+	eg when rolling down, add a few items to the map instead of recreating whole window
+	but this also needs support of adding items before the 1st
+	can be a different function in the layout, not 'create', if matters
+	also may want a measuring func
+	use locate-line in list layout itself? provide it with the picker func, let it be able to locate backwards into negative indices 
+how negative index aligns with /size of space picker that implies strict positivity?
+	maybe add an anchor to the layout itself, so it's at least nonnegative?
+I simplified drawing range in list layout into drawing just length in given direction
+	however now it's possible e.g. to have window of 4000px, with item1/size=10 and last-item/size=100 and total size=4080
+	and going from above last item will be drawn, but going from below it will never reach first item because that exceeds 4000px
+	so I have to count list length after the anchor, not counting anchor itself
+	
 
-;@@ commit better 'attempt' when apply is working
-;@@ also simplify passing of arguments into layouts
+;@@ ensure layouts settings in the doc are synced to the code
+
+;@@ clock hittest inside the window (on list-view with big window) - does it need an optimization? binary search?
+
+;@@ draw an illustration of list-view/origin and window/origin, in docs
+;@@ explain how scrollbar imposes a performance limitation on the list
+;@@ (could be fixed by scrollwheel or decorrelating thumb size from viewport size)
+
+;@@ consider a vlist of plots: each plot is huge and can only be drawn on a viewport, but can list support it?
+	
+;@@ doc list & list-view changes
+	
+;@@ need to add single selection to lists or drop-down key support is nonsensical otherwise
+;@@ remove rendered-xy kludge
+
+;@@ using apply simplify passing of arguments into layouts
+;@@ test drop-down interactivity
+
+;@@ manual profiling model needs simplification, removal of all foreachs etc: just use last start marker as a destination for dt/ds
+
+		;; whether list-view/origin is counted from anchor item's top or bottom (bottom is useful for message logs)
+		;@@ TBD; not sure about the name though, maybe /direction or just /reversed or smth;
+		;@@ also top/bottom is for vertical lists only, and I'd rather have universal names
+		;@@ example of horizontal list-view analogous to message log is a realtime chart updated and scrolled to the right
+		; anchor-side: 'top			#type =  [word!] (find [top bottom] anchor-side) :invalidates-list
+		
 
 
 Paragraph layout design...

@@ -2252,7 +2252,7 @@ list-view-ctx: context [
         	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
         ]
         
-        ;; choose anchor item closest to the direction we're looking out into (avoids redrawing the whole window!)
+        ;; choose temp. anchor item closest to the direction we're looking out into (avoids redrawing the whole window!)
         set [anchor-item: anchor-geom:] either dir < 0 [
         	map-index: 1
         	list/map
@@ -2262,21 +2262,32 @@ list-view-ctx: context [
         ]
         #assert [anchor-item]
         y: req-axis
-        anchor: map-index->list-index list map-index
-        anchory: anchor-geom/offset/:y 
+        anchor:    map-index->list-index list map-index
+        anchory:   anchor-geom/offset/:y
+        margin:    list/frame/margin
+        window:    list/parent
+        frame:     construct list/frame					;-- for bind(with) to work
+        ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
+        ;; (this relies on list layout counting length *after* the anchor itself)
+        requested': max 0 requested + excess: either dir < 0
+        	[anchory - from]							;-- if anchor is above top 'from', need less pixels to fill
+        	[from - anchory - anchor-geom/size/:y]		;-- if it is below bottom 'from', similarly less
+        length:    requested' + margin/:y * dir
+        if length = 0 [length: dir]						;-- never request zero pixels, since zero has no sign
+        origin: 0x0
+        ; ;; since frame/origin may not align with window/origin because multiple rolls may happen before /draw
+        ; ;; I have to add correction to move anchory from frame coordinates into current coordinates:
+        ; anchory: anchory + (list/parent/origin/:y - frame/origin/:y)
+        ; origin:  list/parent/origin						;-- preserve x coordinate
+        ; origin/:y: anchory - from + either dir < 0 [anchor-geom/size/:y + margin/:y][negate margin/:y]
+        ; origin/:y: anchory + either dir < 0 [anchor-geom/size/:y + margin/:y][negate margin/:y]
         
-        frame: construct list/frame						;-- for bind(with) to work
-		;@@ this is a temporary kludge to fix the bug when roll happens multiple times w/o render and origin gets ahead of the map
-		fix: frame/window-origin/:y - list/parent/origin/:y
-		from: from + fix
-		
-        ;; anchor-relative range tells list layout how many items to render
-        range: (either dir < 0 [from - requested by from][0 by requested + from]) - anchory
-		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor range do-not-extend?]	;-- origin unused
+        ; length:  requested + margin/:y + (abs origin/:y) * dir
+		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits origin anchor length do-not-extend?]
 		frame: make-layout 'list :list/items settings
-		?? [fix range frame/filled-range]
-		range: (clip range/1 range/2 frame/filled-range) - from + anchory
-		result: either dir < 0 [negate range/1][range/2]
+		result: clip 0 requested frame/filled * dir - anchor-geom/size/:y - excess
+		; result: clip 0 requested (abs frame/filled) - abs origin/:y
+		?? [origin anchor anchory requested' length excess frame/filled result]
 		#print "available from (from) along (req-axis)/(dir): (result) of (requested)"
 		; ?? frame
 		result
@@ -2293,6 +2304,9 @@ list-view-ctx: context [
 		render box
 	]
 	
+	;@@ this can be optimized more by limiting first (full-width) draw of scrollable to just enough items to ensure we need a scrollbar
+	;@@ then only viewport will have to be filled rather than whole window (but it's tricky in this general model)
+	;@@ also I shouldn't redraw it fully if possible after a roll, just the new part, somehow
 	;; container/draw only supports finite number of `items`, infinite needs special handling
 	;; it's also too general, while this `draw` can be optimized better
 	list-draw: function [
@@ -2304,19 +2318,20 @@ list-view-ctx: context [
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
 		; canvas: constrain canvas lview/limits			;-- must already be constrained; this is list, not list-view (smaller by scrollers)
 		window: lview/window
+		anchor: lview/anchor
 		list:   lview/list
 		axis:   list/axis
 		fill-x: axis <> 'x								;-- always filled along finite axis
 		fill-y: axis <> 'y
-		anchor:   lview/anchor
-		; canvas:   extend-canvas canvas axis				;-- infinity will compress items along the main axis
+		origin: 0x0;window/origin
 		; guide:    axis2pair axis
 		; origin:   guide * (xy1 - o1 - list/margin)
-		origin:   0x0;window/origin
-		;@@ don't redraw it fully if possible after a roll, just the new part
-		range:    xy1/:axis by xy2/:axis; + origin/:axis 
-		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits origin anchor range do-not-extend?]
-		?? [xy1 xy2 range origin]
+		;; /roll ensures anchor is always near window border, so draw direction is chosen towards furthest of borders
+		;@@ might not work well if item/size >> window/size? should I bother?
+		length:   xy2/:axis - xy1/:axis * dir: pick [1 -1] (abs xy2/:axis) >= (abs xy1/:axis)
+		length: length + min 0 xy2/:axis
+		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits origin anchor length do-not-extend?]
+		?? [xy1 xy2 length origin]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
 		frame:    make-layout 'list :list/items settings
 		;@@ make compose-map generate rendered output? or another wrapper
@@ -2343,7 +2358,7 @@ list-view-ctx: context [
 		]
 		;@@ this is a temporary kludge to fix the bug when roll happens multiple times w/o render and origin gets ahead of the map
 		compose/into [window-origin: (window/origin)] tail frame
-		?? frame/map
+		; ?? frame/map
 		?? frame
 		list/frame: frame
 		list/size:  frame/size
@@ -2394,6 +2409,7 @@ list-view-ctx: context [
 	]
 
 	;@@ list-view & grid-view on child focus should scroll to child
+	;@@ expose top /margin & /spacing that are reflected into /list
 	declare-template 'list-view/inf-scrollable [
 		pages:  10
 		source: []	#on-change :invalidates-list		;-- no type check for it can be freely overridden
@@ -2454,22 +2470,35 @@ list-view-ctx: context [
 		
 		;@@ maybe rename roll to slide? it probably makes more sense
 		roll: function [/in path [path! block!] "Inject subpath into current styling path"] [
-			unless offset: inf-scrollable-ctx/roll self path [return none]
 			y: list/axis
-			;; change anchor to first or last item, depending on the roll direction
-	        set [new-anchor-item: new-anchor-geom:] either offset/:y < 0 [
-	        	map-index: 1							;-- window/origin shifted up/left, will draw more items below/right
-	        	list/map
-	        ][
-	        	map-index: half length? list/map		;-- window/origin shifted down/right, will draw more items above/left
-	        	list/map << 2
-	        ]
+			;; it's possible that multiple rolls occur without a draw, resulting in no visible item suitable as a new anchor
+			;; to avoid this I just limit max consecutive rolls to half the window
+			;@@ there must be a better solution for this, but I don't see a simple one
+			offset-since-drawn: window/origin - list/frame/window-origin
+			; ?? [window/origin list/frame/window-origin offset-since-drawn]
+			if (abs offset-since-drawn/:y) > half window/size/:y [return none]
+			unless offset: inf-scrollable-ctx/roll self path [return none]
+			; offset-since-drawn: window/origin - list/frame/window-origin
+			;; change anchor to first or last (still visible) item, depending on the roll direction
+			xy2: window/size + xy1: negate window/origin
+	        set [new-anchor-item: new-anchor-geom:] pos:
+	        	apply 'locate [
+	        		list/map
+	        		[item geom .. boxes-overlap? xy1 xy2 geom/offset geom/offset + geom/size]
+		        	;; if content in window shifted up/left, will draw more items below/right
+			        ;; if content in window shifted down/right, will draw more items above/left:
+	        		/back offset/:y < 0
+	        	]
+	        ?? [xy1 xy2] ?? list/map/2 ?? new-anchor-geom
 	        #assert [new-anchor-item]
+	        map-index: 1 + half skip? pos
 	        new-anchor: ~/map-index->list-index list map-index
-	        old-anchor-geom: second find/same/skip list/map list/items/pick anchor 2
-			window/origin: window/origin + (new-anchor-geom/offset - old-anchor-geom/offset)
+	        new-origin: new-anchor-geom/offset + window/origin ;offset-since-drawn
+	        new-origin/:y: new-origin/:y + either offset/:y < 0 [list/margin/:y + new-anchor-geom/size/:y][negate list/margin/:y]
+			window/origin: new-origin
 			self/anchor: new-anchor
-			?? [offset new-anchor new-anchor-geom/offset self/origin window/origin]
+			invalidate list
+			?? [offset new-anchor new-anchor-geom/offset new-anchor-geom/size self/origin window/origin]
 			offset
 		]
 		
