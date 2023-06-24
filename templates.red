@@ -2249,6 +2249,7 @@ list-view-ctx: context [
 		list [object!] req-axis [word!] dir [integer!] from [integer!] requested [integer!]
 	][
         if req-axis <> list/frame/axis [				;-- along orthogonal axis list doesn't extend
+        result: clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
         	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
         ]
         
@@ -2263,8 +2264,8 @@ list-view-ctx: context [
         #assert [anchor-item]
         y: req-axis
         anchor:    map-index->list-index list map-index
-        anchory:   anchor-geom/offset/:y
         margin:    list/frame/margin
+        anchory:   anchor-geom/offset/:y + margin/:y
         window:    list/parent
         frame:     construct list/frame					;-- for bind(with) to work
         ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
@@ -2274,12 +2275,12 @@ list-view-ctx: context [
         	[from - anchory - anchor-geom/size/:y]		;-- if it is below bottom 'from', similarly less
         length:    requested' + margin/:y * dir
         if length = 0 [length: dir]						;-- never request zero pixels, since zero has no sign
-        origin: 0x0
-		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits origin anchor length do-not-extend?]
+		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]	;-- origin is unused
 		frame: make-layout 'list :list/items settings
 		result: clip 0 requested frame/filled * dir - anchor-geom/size/:y - excess
 		; ?? [origin anchor anchory requested' length excess frame/filled result]
 		#debug list-view [#print "available from (from) along (req-axis)/(dir): (result) of (requested)"]
+		; #print "available from (from) along (req-axis)/(dir): (result) of (requested)"
 		result
 	]
 			
@@ -2318,7 +2319,7 @@ list-view-ctx: context [
 		length:   xy2/:axis - xy1/:axis * dir
 		;; window/origin is unused because window offsets the list by itself
 		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]
-		; ?? [xy1 xy2 length origin]
+		; ?? [xy1 xy2 length]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
 		frame:    make-layout 'list :list/items settings
 		;@@ make compose-map generate rendered output? or another wrapper
@@ -2393,10 +2394,11 @@ list-view-ctx: context [
 			]
 		#assert [new-anchor-item]
 		map-index:  1 + half skip? pos
-		new-origin: new-anchor-geom/offset + window/origin
+		new-origin: new-anchor-geom/offset - list/margin + window/origin
 		step/by 'new-origin/:y either moved/:y < 0
 			[list/margin/:y + new-anchor-geom/size/:y]
 			[negate list/margin/:y]
+			; ?? [window/origin new-origin]
 		window/origin: new-origin
 		lview/anchor:  ~/map-index->list-index list map-index
 		; ?? [offset lview/anchor new-anchor-geom/offset new-anchor-geom/size self/origin window/origin]

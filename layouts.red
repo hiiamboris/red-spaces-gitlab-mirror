@@ -146,6 +146,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			size:     size + (2 * margin)
 			filled:   size/:y * direction				;-- filled length is not constrained (used by 'available?')
 			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
+			; ?? size ?? limits
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
 			;@@ omit some of these?
 			frame: compose/only [
@@ -180,7 +181,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			count~:   either length < 1e9 [length / item-size-estimate/:y][count]
 			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
-			pos:      origin + (sign * margin)
+			pos:      origin + (1 by sign * margin)
 			add-item: [compose/only/deep/into [(item) [offset (pos) size (item/size) drawn (drawn)]] tail map']
 			draw-next: [
 				unless item: do ith-item [break]				;-- stop if no more items
