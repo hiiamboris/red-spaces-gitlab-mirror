@@ -75,6 +75,14 @@ get-safe: function [path [path! word!]] [				;@@ REP 113; this in case of error 
 	try [return x: get path] none						;@@ workaround for #5300 here
 ]
 
+; set-many: function [
+	; "Set each target to a result of the corresponding expression evaluation"
+	; targets [block!] exprs [block!]
+; ][
+	; forall targets [set :targets/1 do/next exprs 'exprs]
+	; exprs
+; ]
+
 
 ;@@ copy/deep does not copy inner maps unfortunately, so have to use this everywhere
 ;@@ need more generally applicable version (e.g. for block with blocks with maps), but seems to complex/slow for now
@@ -594,6 +602,19 @@ min-safe: function [a [scalar! none!] b [scalar! none!]] [
 
 max-safe: function [a [scalar! none!] b [scalar! none!]] [
 	any [all [a b max a b] a b]
+]
+
+update-EMA: function [
+	"Update exponential moving average with new parameter measurements"
+	estimate    [word! path!] "Current EMA"
+	measurement [number!]     "New measurement result"
+	period      [integer!]    "Averaging period"
+	/batch num: 1 [integer!]  "Apply a whole batch of identical measurements"
+][
+	weight: 1 - (1 / period) ** num
+	set estimate
+		to type? get estimate							;-- required when modifying component of a pair
+		add (get estimate) * weight measurement * (1 - weight)
 ]
 
 interpolate: function [

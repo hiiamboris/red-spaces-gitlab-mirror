@@ -32,6 +32,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			extend-canvas (subtract-canvas (constrain list-canvas limits) margin * 2) axis	;-- list is infinite along its axis
 		]
 		
+		;; used to preallocate map buffer when count is unknown/infinite, but length (in px) is provided
+		item-size-estimate: 100x20
+		
 		;; settings for list layout:
 		;;   axis             [word!]      x or y
 		;;   margin           [pair!]      >= 0x0, always added around edge items, even if 'range' limits displayed items
@@ -59,8 +62,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			#assert [count]								;-- this layout only supports finite number of items
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
+			#assert [any [count length]]				;-- this layout only supports finite number of items or limited length
+			default count: infxinf/x
 			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
@@ -72,7 +76,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				limits   [object! (range? limits) none!]
 				origin   [pair! none!]
 				anchor   [integer! (anchor > 0) none!]
-				length   [integer! none!]
+				length   [integer! (length <> 0) none!]			;-- zero has no sign, so ambiguous, may be a sign of bugs
 				do-not-extend? [logic! none!]
 			]]
 			default origin: 0x0
@@ -133,13 +137,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				break									;-- no second render cycle if canvas is the same
 			]
-			item1:   :map/2
-			item2:   last map
+			item1:    :map/2
+			item2:    last map
 			; ?? item1 ?? item2
-			size/:y: item2/offset/:y + item2/size/:y - item1/offset/:y
-			size:    size + (2 * margin)
-			filled:  size/:y * direction				;-- filled length is not constrained (used by 'available?')
-			size:    constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
+			size/:y:  item2/offset/:y + item2/size/:y - item1/offset/:y
+			item-len: max 1 size/:y + spacing/:y / n: half length? map	;-- don't let it become zero, or will overflow
+			update-ema/batch 'item-size-estimate/:y item-len 1000 n 
+			size:     size + (2 * margin)
+			filled:   size/:y * direction				;-- filled length is not constrained (used by 'available?')
+			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
 			;@@ omit some of these?
 			frame: compose/only [
@@ -167,11 +173,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; for the same reason it should draw at least one item even if length=0 or less than margin
 		fill: function [
 			length [integer!] (length >= 0) sign [integer!] (1 = abs sign)
-			/extern y spaces func? origin margin spacing anchor item-canvas size
+			/extern y spaces count func? origin margin spacing anchor item-canvas size
 		] with :create [
 			ith-item: pick [[spaces/pick i][spaces/:i]] func?
 			length:   max 0 length - (margin/:y * 2)	;-- w/o margin = length of items themselves (and their spacing)
-			map':     make [] (min length 1000) / 10			;@@ estimate average item size for the program, for better guessing
+			count~:   either length < 1e9 [length / item-size-estimate/:y][count]
+			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
 			pos:      origin + (sign * margin)
 			add-item: [compose/only/deep/into [(item) [offset (pos) size (item/size) drawn (drawn)]] tail map']
