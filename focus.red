@@ -45,7 +45,7 @@ focus: make classy-object! declare-class 'focus-context [
 	
 	add-to-history: function [space [object!]] [
 		#debug focus [#print "adding (space/type):(space/size) to focus history"]
-		default self/window: window-of space
+		self/window: window-of space
 		append hist: history space
 		remove/part hist hist << 10						;-- limit history length
 	]
