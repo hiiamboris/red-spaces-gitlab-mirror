@@ -121,11 +121,11 @@ define-handlers [
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
 		;; /in is used to provide proper styling context to out-of-tree render!
 		;@@ but it should be automatic now that there's /parent!
-		on-down     [space path event] [space/roll/in path]		;-- after button clicks
-		on-key-down [space path event] [space/roll/in path]		;-- during key holding
+		on-down     [space path event] [space/roll]		;-- after button clicks
+		on-key-down [space path event] [space/roll]		;-- during key holding
 		roll-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
-				path/-1/roll/in path
+				path/-1/roll
 			]
 		]
 	]
@@ -159,7 +159,7 @@ define-handlers [
 						point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
 						;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
 						space/move-to/margin point space/look-around
-						space/roll/in path				;-- sync roll to the move, else roll is delayed until next roll-timer hit
+						space/roll								;-- sync roll to the move, else roll is delayed until next roll-timer hit
 						;@@ there's some suspicious delay after roll but looks like WM_TIMER getting delayed
 					]
 				]

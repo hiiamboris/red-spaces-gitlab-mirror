@@ -2146,10 +2146,8 @@ inf-scrollable-ctx: context [
 	~: self
 	
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
-	roll: function [space [object!] path: [] [path! block! none!] "inf-scrollable should be the last item"] [
+	roll: function [space [object!]] [
 		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
-		path: keep-type as path! path object!			;-- filter out pairs!
-		clear find/tail/same path space					;-- get rid of children
 		window: space/window
 		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within its content
@@ -2161,20 +2159,17 @@ inf-scrollable-ctx: context [
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
-		path: rejoin [path space/window window/content] 
-		with-style path [								;-- spoof rendered path, needed for /available?'s inner renders
-			foreach x [x y] [
-				any [									;-- prioritizes left/up jump over right/down
-					all [
-						before/:x <= space/look-around
-						0 < avail: window/available? x -1 wofs'/:x space/jump-length
-						wofs'/:x: wofs'/:x - avail
-					]
-					all [
-						after/:x  <= space/look-around
-						0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
-						wofs'/:x: wofs'/:x + avail
-					]
+		foreach x [x y] [
+			any [									;-- prioritizes left/up jump over right/down
+				all [
+					before/:x <= space/look-around
+					0 < avail: window/available? x -1 wofs'/:x space/jump-length
+					wofs'/:x: wofs'/:x - avail
+				]
+				all [
+					after/:x  <= space/look-around
+					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
+					wofs'/:x: wofs'/:x + avail
 				]
 			]
 		]
@@ -2217,9 +2212,7 @@ inf-scrollable-ctx: context [
 		;; timer that calls `roll` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
 		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
-		roll: func [/in path [path! block!] "Inject subpath into current styling path"] [
-			~/roll self path
-		] #type [function!]
+		roll: does [~/roll self] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
@@ -2273,7 +2266,9 @@ list-view-ctx: context [
         requested': max 0 requested + anchor-geom/size/:y + (from - anchory * dir)
         length:    (max 1 requested' + margin/:y) * dir	;-- never request zero pixels, since zero has no sign
 		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]	;-- origin is unused
-		frame: make-layout 'list :list/items settings
+		path: when not same? list last current-path (get-host-path list)
+		#assert [path]
+		with-style path [frame: make-layout 'list :list/items settings]
 		;; filled includes whole size + single margin
 		filled: (abs frame/filled) - (from - anchory * dir) - either dir < 0 [anchor-geom/size/:y][0]
 		result: clip 0 requested filled
@@ -2368,7 +2363,7 @@ list-view-ctx: context [
 		] #type [function!]
 	]
 	
-	roll: function [lview [object!] path [path! block!]] [
+	roll: function [lview [object!]] [
 		list:   lview/list
 		window: lview/window
 		y:      list/axis
@@ -2379,7 +2374,7 @@ list-view-ctx: context [
 		offset-since-drawn: window/origin - list/frame/window-origin
 		if any [
 			(abs offset-since-drawn/:y) > half window/size/:y
-			not moved: inf-scrollable-ctx/roll lview path
+			not moved: inf-scrollable-ctx/roll lview
 		] [return none]
 		;; change anchor to first or last (still visible) item, depending on the roll direction
 		xy2: window/size + xy1: negate window/origin
@@ -2502,9 +2497,7 @@ list-view-ctx: context [
 		]
 		
 		;@@ maybe rename roll to slide? it probably makes more sense
-		roll: function [/in path [path! block!] "Inject subpath into current styling path"] [
-			~/roll self path
-		]
+		roll: does [~/roll self]
 		
 		; inf-scrollable-draw: :draw
 		; draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
@@ -2762,31 +2755,35 @@ grid-ctx: context [
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
 		hmin: make block! xlim + 1						;-- can't be static because has to be reentrant!
 		append hmin any [grid/heights/min 0]
-		for x: 1 xlim [
-			canvas: (grid/col-width? x) by infxinf/y
-			span: grid/get-span xy: x by y
-			if span/x < 0 [continue]					;-- skip cells of negative x span (counted at span = 0 or more)
-			cell1: grid/get-first-cell xy
-			height1: 0
-			if content: grid/cells/pick cell1 [
-				cspace: grid/wrap-space cell1 content
-				render/on cspace canvas yes no			;-- render to get the size; fill the cell's width
-				height1: cspace/size/y
-			]
-			case [
-				span/y = 1 [
-					#assert [0 < span/x]
-					append hmin height1
+		path: when not same? grid last current-path (get-host-path grid)	;-- let cells be rendered with proper style path
+		#assert [path] 
+		with-style path [
+			for x: 1 xlim [
+				canvas: (grid/col-width? x) by infxinf/y
+				span: grid/get-span xy: x by y
+				if span/x < 0 [continue]				;-- skip cells of negative x span (counted at span = 0 or more)
+				cell1: grid/get-first-cell xy
+				height1: 0
+				if content: grid/cells/pick cell1 [
+					cspace: grid/wrap-space cell1 content
+					render/on cspace canvas yes no		;-- render to get the size; fill the cell's width
+					height1: cspace/size/y
 				]
-				span/y + y = cell1/y [					;-- multi-cell vertically ends after this row
-					for y2: cell1/y y - 1 [
-						height1: height1 - (grid/spacing/y) - grid/row-height? y2
+				case [
+					span/y = 1 [
+						#assert [0 < span/x]
+						append hmin height1
 					]
-					append hmin height1
+					span/y + y = cell1/y [				;-- multi-cell vertically ends after this row
+						for y2: cell1/y y - 1 [
+							height1: height1 - (grid/spacing/y) - grid/row-height? y2
+						]
+						append hmin height1
+					]
+					;-- else just ignore this and use heights/min
 				]
-				;-- else just ignore this and use heights/min
+				x: x + max 0 span/x - 1					;-- skip horizontal span
 			]
-			x: x + max 0 span/x - 1						;-- skip horizontal span
 		]
 		height: second minmax-of hmin					;-- choose biggest of constraints
 		#debug grid-view [#print "calc-row-height (y) -> (height)"]

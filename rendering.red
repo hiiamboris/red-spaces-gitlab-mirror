@@ -108,7 +108,8 @@ context [
 	;; draw code has to be evaluated after current-path changes, for inner calls to render to succeed
 	set 'with-style function [							;-- exported for an ability to spoof the tree (for roll, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
-		space [path! (parse space [any object!]) object!]	;-- path support is useful for out of tree renders (like roll)	
+		space [path! (parse space [any object!]) object!]
+			"Inserted into current rendering path (if any)"		;-- path support is useful for out of tree renders (like roll)	
 		code  [block!]
 	][
 		top: tail current-path
