@@ -717,8 +717,8 @@ paragraph-ctx: context [
 	
 	size-text2: function [layout [object!]] [			;@@ it's a workaround for #4841
 		size1: size-text layout
-		size2: caret-to-offset/lower layout length? layout/text
-		max size1 size2
+		; size2: caret-to-offset/lower layout length? layout/text
+		; max size1 size2
 	]
 	
 	ellipsize: function [layout [object!] text [string!] canvas [pair!]] [
@@ -798,8 +798,9 @@ paragraph-ctx: context [
 			quietly layout/size: infxinf
 			if all [wrap? canvas/x < infxinf/x] [		;@@ perhaps this too should be a flag?
 				words: append clear "" as string! space/text
-				parse/case words [any [to whitespace! p: skip (change p #"^/")]]
-				quietly layout/text: words
+				trail: any [find/last/tail words non-space!  words]
+				parse/case/part words [any [to whitespace! p: skip (change p #"^/")]] trail
+				quietly layout/text: words				;@@ memoize results?
 				min-width: 1x0 * size-text2 layout
 				quietly layout/size: max 1x1 max canvas min-width
 			]
@@ -2249,7 +2250,6 @@ list-view-ctx: context [
 		list [object!] req-axis [word!] dir [integer!] from [integer!] requested [integer!]
 	][
         if req-axis <> list/frame/axis [				;-- along orthogonal axis list doesn't extend
-        result: clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
         	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
         ]
         
@@ -2265,20 +2265,19 @@ list-view-ctx: context [
         y: req-axis
         anchor:    map-index->list-index list map-index
         margin:    list/frame/margin
-        anchory:   anchor-geom/offset/:y + margin/:y
+        anchory:   anchor-geom/offset/:y
         window:    list/parent
         frame:     construct list/frame					;-- for bind(with) to work
         ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
         ;; (this relies on list layout counting length *after* the anchor itself)
-        requested': max 0 requested + excess: either dir < 0
-        	[anchory - from]							;-- if anchor is above top 'from', need less pixels to fill
-        	[from - anchory - anchor-geom/size/:y]		;-- if it is below bottom 'from', similarly less
-        length:    requested' + margin/:y * dir
-        if length = 0 [length: dir]						;-- never request zero pixels, since zero has no sign
+        requested': max 0 requested + anchor-geom/size/:y + (from - anchory * dir)
+        length:    (max 1 requested' + margin/:y) * dir	;-- never request zero pixels, since zero has no sign
 		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]	;-- origin is unused
 		frame: make-layout 'list :list/items settings
-		result: clip 0 requested frame/filled * dir - anchor-geom/size/:y - excess
-		; ?? [origin anchor anchory requested' length excess frame/filled result]
+		;; filled includes whole size + single margin
+		filled: (abs frame/filled) - (from - anchory * dir) - either dir < 0 [anchor-geom/size/:y][0]
+		result: clip 0 requested filled
+		; ?? [window/origin anchor anchor-geom/size/:y anchory from requested' length frame/filled filled result]
 		#debug list-view [#print "available from (from) along (req-axis)/(dir): (result) of (requested)"]
 		; #print "available from (from) along (req-axis)/(dir): (result) of (requested)"
 		result
@@ -2394,11 +2393,18 @@ list-view-ctx: context [
 			]
 		#assert [new-anchor-item]
 		map-index:  1 + half skip? pos
+		;; (changed) window/origin + old-anchor-geom is where old anchor is now located
+		;; (changed) window/origin + new-anchor-geom is where new anchor is now located
+		;; but to change the anchor is to move coordinate start from the old one into the new one
+		;; old anchor is known to have been at margin if it was on top, or at -margin-size/y on bottom
+		;; new window/origin should be chosen so that:
+		;; - when we move the window down, new anchor item offset should be at margin
+		;; - when we move the window up, it should be at -margin-size/y
 		new-origin: new-anchor-geom/offset - list/margin + window/origin
 		step/by 'new-origin/:y either moved/:y < 0
-			[list/margin/:y + new-anchor-geom/size/:y]
-			[negate list/margin/:y]
-			; ?? [window/origin new-origin]
+			[list/margin/:y * 2 + new-anchor-geom/size/:y]
+			[0]
+		; ?? [moved window/origin new-origin]
 		window/origin: new-origin
 		lview/anchor:  ~/map-index->list-index list map-index
 		; ?? [offset lview/anchor new-anchor-geom/offset new-anchor-geom/size self/origin window/origin]

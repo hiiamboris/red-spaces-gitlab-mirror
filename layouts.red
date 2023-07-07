@@ -38,7 +38,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; settings for list layout:
 		;;   axis             [word!]      x or y
 		;;   margin           [pair!]      >= 0x0, always added around edge items, even if 'range' limits displayed items
-		;;   spacing          [pair!]      >= 0x0
+		;;   spacing      [pair! integer!] >= 0x0 (integer used by the document!)
 		;;   canvas        [pair! none!]   >= 0x0
 		;;   fill-x fill-y [logic! none!]  fill along canvas axes flags: flag along 'axis' is ignored completely,
 		;;      while the opposite flag controls whether whole list width extends to canvas or not (but items always fill the width)
@@ -47,6 +47,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
 		;;   length       [integer! none!] in pixels, when to stop adding items (when negative, items are added above anchor) (used by list-view)
 		;;                                 default=unlimited, positive (forward) direction
+		;;                                 if > 0, counted from top of the anchor item, if < 0 - from the bottom of it
 		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
 		;;                                 (list-view has to maintain fixed width across rolls and scrolls)
 		;; result of all layouts is a frame object with size, map and possibly more; map geometries contain `drawn` block so it's not lost!
@@ -69,7 +70,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
 				margin   [pair! (0x0 +<= margin)]
-				spacing  [pair! (0x0 +<= spacing)]
+				spacing  [pair! (0x0 +<= spacing) integer! (0 <= spacing)]
 				canvas   [pair! (0x0 +<= canvas) none!]
 				fill-x   [logic! none!]
 				fill-y   [logic! none!]
@@ -85,6 +86,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default fill-y: no
 			default anchor: 1
 			default length: infxinf/x
+			spacing: spacing * 1x1						;-- pair normalization needed by document
 			direction: pick [1 -1] length >= 0
 			default do-not-extend?: no
 			x: ortho y: axis
@@ -143,8 +145,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			size/:y:  item2/offset/:y + item2/size/:y - item1/offset/:y
 			item-len: max 1 size/:y + spacing/:y / n: half length? map	;-- don't let it become zero, or will overflow
 			update-ema/batch 'item-size-estimate/:y item-len 1000 n 
+			filled:   size/:y + margin/:y * direction	;-- filled length is not constrained and only has 1 margin (used by 'available?')
 			size:     size + (2 * margin)
-			filled:   size/:y * direction				;-- filled length is not constrained (used by 'available?')
 			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
 			; ?? size ?? limits
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
