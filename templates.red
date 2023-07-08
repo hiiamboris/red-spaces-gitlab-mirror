@@ -2317,7 +2317,7 @@ list-view-ctx: context [
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn:    make [] 3 * (2 + length? frame/map) / 2
-		i:        1
+		i:        frame/range/1
 		foreach [item geom] frame/map [				;@@ use for-each
 			#assert [geom/drawn]						;@@ should never happen?
 			item-drawn:  take remove find geom 'drawn	;-- no reason to hold `drawn` in the map anymore

@@ -141,14 +141,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			item1:    :map/2
 			item2:    last map
-			; ?? item1 ?? item2
 			size/:y:  item2/offset/:y + item2/size/:y - item1/offset/:y
 			item-len: max 1 size/:y + spacing/:y / n: half length? map	;-- don't let it become zero, or will overflow
 			update-ema/batch 'item-size-estimate/:y item-len 1000 n 
 			filled:   size/:y + margin/:y * direction	;-- filled length is not constrained and only has 1 margin (used by 'available?')
 			size:     size + (2 * margin)
 			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
-			; ?? size ?? limits
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
 			;@@ omit some of these?
 			frame: compose/only [
@@ -159,6 +157,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				spacing:      (spacing)
 				origin:       (origin)
 				anchor:       (anchor)
+				range:        (range)
 				length:       (length)					;-- requested length to fill
 				filled:       (filled)					;-- actually filled length (may be both bigger and smaller)
 				canvas:       (canvas)
@@ -176,21 +175,26 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; for the same reason it should draw at least one item even if length=0 or less than margin
 		fill: function [
 			length [integer!] (length >= 0) sign [integer!] (1 = abs sign)
-			/extern y spaces count func? origin margin spacing anchor item-canvas size
+			/extern y spaces count func? origin margin spacing anchor range item-canvas size
 		] with :create [
 			ith-item: pick [[spaces/pick i][spaces/:i]] func?
 			length:   max 0 length - (margin/:y * 2)	;-- w/o margin = length of items themselves (and their spacing)
 			count~:   either length < 1e9 [length / item-size-estimate/:y][count]
 			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
+			range:    anchor * 1x1
 			pos:      origin + (1 by sign * margin)
-			add-item: [compose/only/deep/into [(item) [offset (pos) size (item/size) drawn (drawn)]] tail map']
+			add-item: [
+				compose/only/deep/into [
+					(item) [offset (pos) size (item/size) drawn (drawn)]
+				] tail map'
+			]
 			draw-next: [
 				unless item: do ith-item [break]				;-- stop if no more items
 				drawn: render/on item item-canvas yes yes		;-- items always fill the width (render disables fill for infinity)
 				#assert [item/size +< (1e7 by 1e7)]				;-- sanity check that items are finite
 				size:  max size item/size						;-- accumulate width
-				i:     i + sign
+				i:     sign + range/2: i						;-- `range/2: i` relies on guaranteed add-item after draw-next
 			]
 			do draw-next
 			length: length + item/size/:y				;-- don't count anchor in the length (required by list-view)
@@ -211,6 +215,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 			] sign > 0
 			if sign < 0 [reverse/skip map' 2]
+			range: order-pair range 
 			map'
 		]
 	]
