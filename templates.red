@@ -2255,12 +2255,12 @@ list-view-ctx: context [
         	list/map << 2
         ]
         #assert [anchor-item]
-        y: req-axis
-        anchor:    map-index->list-index list map-index
-        margin:    list/frame/margin
-        anchory:   anchor-geom/offset/:y
-        window:    list/parent
-        frame:     construct list/frame					;-- for bind(with) to work
+        y:       req-axis
+        anchor:  map-index->list-index list map-index
+        margin:  list/frame/margin
+        anchory: anchor-geom/offset/:y
+        window:  list/parent
+        frame:   construct list/frame					;-- for bind(with) to work
         ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
         ;; (this relies on list layout counting length *after* the anchor itself)
         requested': max 0 requested + anchor-geom/size/:y + (from - anchory * dir)
@@ -2274,7 +2274,6 @@ list-view-ctx: context [
 		result: clip 0 requested filled
 		; ?? [window/origin anchor anchor-geom/size/:y anchory from requested' length frame/filled filled result]
 		#debug list-view [#print "available from (from) along (req-axis)/(dir): (result) of (requested)"]
-		; #print "available from (from) along (req-axis)/(dir): (result) of (requested)"
 		result
 	]
 			
@@ -2313,7 +2312,6 @@ list-view-ctx: context [
 		length:   xy2/:axis - xy1/:axis * dir
 		;; window/origin is unused because window offsets the list by itself
 		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]
-		; ?? [xy1 xy2 length]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
 		frame:    make-layout 'list :list/items settings
 		;@@ make compose-map generate rendered output? or another wrapper
@@ -2328,7 +2326,7 @@ list-view-ctx: context [
 			;@@ skip invisible items to lighten the draw block (e.g. for inactive lists)? but that will disable list caching
 			compose/only/into [translate (item-offset) (item-drawn)] tail drawn
 			case/all [
-				find/same lview/selected item [
+				find lview/selected i [
 					compose/only/into [translate (item-offset) (draw-box selection-prototype item-size)] tail drawn
 				]
 				;@@ add paging support to this
@@ -2345,11 +2343,6 @@ list-view-ctx: context [
 		drawn
 	]
 
-	; ;; hack to avoid recreation of this func inside list-draw
-	; list-picker: func [/size /pick i] with :list-draw [
-		; either size [i2 - i1 + 1][list/items/pick i + i1 - 1]
-	; ]
-		
 	;@@ review this
 	;; new class needed to type icache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
@@ -2447,7 +2440,7 @@ list-view-ctx: context [
 			spc
 		] #type [function!]
 		
-		;; selected items list (space objects - filtering, sorting, list mutation doesn't affect them)
+		;; selected items indices list
 		;; hash by default so it can scale out of the box for the general case ;@@ auto convert block to hash? on >3-4 items?
 		selected:    make hash! 4	#type    [hash! block!] :invalidates-list
 		

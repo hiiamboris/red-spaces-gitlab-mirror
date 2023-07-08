@@ -148,11 +148,11 @@ define-handlers [
 						unless event/ctrl? [
 							;@@ ideally this should support selection ranges, that is, shift should unselect as well
 							either all [event/shift? space/selectable = 'multi] [
-								unless find/same space/selected item [	;@@ should be a wrapper for this
-									append space/selected item
+								unless find space/selected i [	;@@ should be a wrapper for this
+									append space/selected i
 								]
 							][
-								append clear space/selected item
+								append clear space/selected i
 							]
 						] 
 						space/cursor: i
@@ -166,7 +166,7 @@ define-handlers [
 				#" " [									;-- ctrl+space selected item toggle
 					item: if i: space/cursor [space/list/items/pick i]
 					if item [
-						either there: find/same space/selected item [remove there][append space/selected item]
+						either there: find space/selected i [remove there][append space/selected i]
 						space/selected: space/selected
 					]
 				]
