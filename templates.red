@@ -2171,12 +2171,12 @@ inf-scrollable-ctx: context [
 			any [										;-- prioritizes left/up jump over right/down
 				all [
 					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wofs'/:x space/jump-length
+					0 < avail: window/available? x -1 wofs'/:x space/slide-length
 					wofs'/:x: wofs'/:x - avail + min 0 before/:x	;-- important to include empty region (before < 0) into the jump!
 				]
 				all [
 					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
+					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/slide-length
 					wofs'/:x: wofs'/:x + avail - min 0 after/:x		;-- important to include empty region (after < 0) into the jump!
 				]
 			]
@@ -2211,9 +2211,9 @@ inf-scrollable-ctx: context [
 	]
 	
 	declare-template 'inf-scrollable/scrollable [		;-- `infinite-scrollable` is too long for a name
-		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when sliding (px) ;@@ maybe make it a pair?
+		slide-length: 200	#type [integer!] (slide-length > 0)	;-- how much more to show when sliding (px) ;@@ maybe make it a pair?
 		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers slide (px)
-		;@@ percents of window height could be supported for look-around? and maybe for jump-length?
+		;@@ percents of window height could be supported for look-around? and maybe for slide-length?
 
 		content: window: make-space 'window []	#type (space? window)
 
@@ -3384,10 +3384,10 @@ grid-view-ctx: context [
 	]
 
 	declare-template 'grid-view/inf-scrollable [
-		;@@ TODO: jump-length should ensure window size is bigger than viewport size + jump
+		;@@ TODO: slide-length should ensure window size is bigger than viewport size + slide
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
 		;@@ TODO: maybe a % of viewport instead of fixed jump size?
-		size: 0x0	#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
+		size: 0x0	#type =? #on-change [space word value] [quietly space/slide-length: min value/x value/y]
 		
 		;; reminder: window/slide may change this (together with window/origin) when sliding
 		;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable

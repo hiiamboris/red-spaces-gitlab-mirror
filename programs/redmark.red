@@ -151,7 +151,7 @@ red-mark: function [
 			style code-box: box color= opaque 'text 5% align= -1x0 margin= 10
 			; scrollable content-flow= 'vertical [vlist !(decode-markdown read/lines source)]
 			list-view with [
-				jump-length: 800
+				slide-length: 800
 				pages: 30
 				wrap-data: func [data] [data]
 				source: lay-out-vids !(decode-markdown read/lines source)

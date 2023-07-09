@@ -863,8 +863,8 @@ Introduces new facets:
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | object! none! | space to wrap, possibly infinite or half-infinite along any of X/Y axes, or just huge |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on inf-scrollable's resize or auto adjustment) |
-| `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
-| `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
+| `slide-length` | integer! `>= 0` | maximum jump the window makes when it comes near its borders |
+| `look-around` | integer! `>= 0` | determines how near is "near its borders", in pixels |
 | `slide-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
 | `slide-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `slide` | function! | can be called to manually check for a jump |
@@ -1027,8 +1027,8 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
 | `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
-| `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
-| `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
+| `slide-length` | integer! `>= 0` | maximum jump the window makes when it comes near its borders |
+| `look-around` | integer! `>= 0` | determines how near is "near its borders", in pixels |
 | `slide-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
 | `slide-timer/rate` | integer! float! time! | rate at which it checks for a jump |
 | `slide` | function! | can be called to manually check for a jump |
@@ -1230,8 +1230,8 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | object! = `grid` | set to inner `grid` and should not be changed |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on grid-view's resize or auto adjustment) |
-| `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
-| `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
+| `slide-length` | integer! `>= 0` | maximum jump the window makes when it comes near its borders |
+| `look-around` | integer! `>= 0` | determines how near is "near its borders", in pixels |
 
 Adds new facets:
 
