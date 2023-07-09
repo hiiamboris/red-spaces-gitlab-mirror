@@ -2318,11 +2318,15 @@ list-view-ctx: context [
 		;@@ might not work well if item/size >> window/size? should I bother?
 		dir:      pick [1 -1] (abs xy2/:axis) >= (abs xy1/:axis)
 		length:   either dir < 0 [xy1/:axis][xy2/:axis]	;-- draw a little extra to include the sticking out item part
+		moved?:   window/origin <> list/frame/window-origin
 		; ?? [dir length window/origin xy1 xy2]
+		; clear lview/item-cache
 		;; window/origin is unused because window offsets the list by itself
 		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
 		frame:    make-layout 'list :list/items settings
+		;; cache cleanup only makes sense after a slide, and after recent draw so we have up to date frame/range
+		if moved? [clean-item-cache lview]
 		;@@ make compose-map generate rendered output? or another wrapper
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn:    make [] 3 * (2 + length? frame/map) / 2
@@ -2352,9 +2356,26 @@ list-view-ctx: context [
 		quietly list/map: frame/map
 		drawn
 	]
+	
+	clean-item-cache: function [lview [object!] "Forget outdated items in item-cache"] [
+		unless range: lview/list/frame/range [exit]		;-- has to be drawn to clean up
+		max-range-distance: 300							;@@ arbitrary constants.. expose them?
+		max-item-age: 0:3
+		range: range + (max-range-distance * -1x1)
+		now-time: now/precise/utc
+		pos: lview/item-cache
+		while [all [
+			not tail? set [i: _: time:] pos
+			i <> clip i range/1 range/2
+			max-item-age < difference now-time time 
+		]] [
+			pos: skip pos 3
+		]
+		remove/part head pos pos
+	]
 
 	;@@ review this
-	;; new class needed to type icache & available facets
+	;; new class needed to type item-cache & available facets
 	;; externalized, otherwise will recreate the class on every new list-view
 	list-template: declare-class 'list-in-list-view/list [
 		type: 'list										;-- styled normally
@@ -2471,16 +2492,16 @@ list-view-ctx: context [
 			select [x horizontal y vertical] list/axis
 		] #type [function!]
 		
-		;@@ remove cache somehow!
-		icache: make map! 10
-		list/items: func [/pick i [integer!] /size] with list [
+		item-cache: make hash! 48
+		list/items: func [/pick i [integer!] /size /local item] with list [
 			either pick [
 				; wrap-data data/pick i
 				all [
 					0 < i i <= any [data/size infxinf/x]		;-- since data/pick can return any value, this is the only way to limit it
 					any [
-						icache/:i
-						icache/:i: wrap-data data/pick i
+						select item-cache i						;-- no /skip needed because datatypes enforce it
+						also item: wrap-data data/pick i
+							repend item-cache [i item now/utc/precise] 
 					]
 				]
 			][data/size]
