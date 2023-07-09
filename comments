@@ -4362,8 +4362,45 @@ I simplified drawing range in list layout into drawing just length in given dire
 	however now it's possible e.g. to have window of 4000px, with item1/size=10 and last-item/size=100 and total size=4080
 	and going from above last item will be drawn, but going from below it will never reach first item because that exceeds 4000px
 	so I have to count list length after the anchor, not counting anchor itself
+there's a very funny size-text bug in list-view: some items extend its list width over the viewport even though I have forbidden it
+	 turns out, with 100px spent in margins, text "lorem ipsum dolor " (ending with space) does not get wrapped
+	 and produces 187px width with only 184px allowed
+	 width estimation is correct, esp. if I wanted to place a caret after it
+	 but rich-text is also correct in not wrapping it, otherwise "dolor" won't get wrapped and "dolor " will
+	 so there is a mismatch between requested /size and final /size as well as resulting look
+	 however size-text2 is relied upon heavily by rich-text (paragraph) layout, each space matters
+having list-view/selected being a list of space objects is problematic
+	as it requires persistent icache, or at least persistence of wrapped items within /selected
+	otherwise a few window slides around and selected items will point into nowhere
+	also if data is sorted, icache becomes invalid, and there's no way to know what data pointed to what space object
+	otoh, having it as list of integers is also invalidated by sort/filter...
+so why /selected should be a list of integers (doc it maybe):
+	- the only unique thing about data is item index
+	- item index changes during mutation (sort/filter), so it loses connection with the items
+	- list-view cannot possibly track this connection, unless it does sort/filter on its own, which is not scalable
+	- this would have worked for list (not list-view) but selection is hardly useful there
+scrollable/move-to has a syncing problem:
+	it counts viewport from current origin, but also modifies the origin
+	viewport however is not that simple and also depends on window/origin
+	and on roll both are changed, so whatever point on the map I choose it's no longer a valid reference
+there's some really nasty bug in list-view/on-key-down, spent hours on it
+	when I enable roll after move-to, and it kicks in, item often becomes misaligned by 17 or 33px vertically
+	where could this number possibly come from?
+	it's not from font size / line height (tried changing)
+	it's not from scrollbar (tried changing)
+	it seems unrelated to window/origin jumps (which are designed to keep viewport in the same place)
+	it's not rendering path related (it's always the same)
+		could be because some upper styles do not apply? no, checked that
+	two consecutive rolls interfering with one another? no it's not happening
+	wtf????? will have to design a new test just in order to isolate the bug, it's the only way
+	dunno how but I fixed it:
+		in inf-scrollable/roll it always rolled by the amount returned by `available?`, capped at requested 200
+		but sometimes calculated before & after become negative, indicating that current viewport includes empty undrawn region
+		maybe this region was sometimes bigger than the 200 pixels requested, and this led to glitches (esp with big list items)
+		I just include empty region into the jump now and it's flawless 
+	  
 	
-
+;@@ focus needs debugging across multiple windows - need 2 windows in focus-test
 ;@@ ensure layouts settings in the doc are synced to the code
 
 ;@@ clock hittest inside the window (on list-view with big window) - does it need an optimization? binary search?

@@ -493,40 +493,45 @@ scrollable-space: context [
 	~: self
 
 	set-origin: function [
-		space  [object!]
-		origin [pair! word!]
+		space   [object!]
+		origin  [pair! word!]
+		no-clip [logic!]
 	][
-		csize: space/content/size
-		box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
-		space/origin: clip origin box - csize 0x0
+		unless no-clip [
+			csize: space/content/size
+			box:   min csize space/viewport					;-- if viewport > content, let origin be 0x0 always
+			origin: clip origin box - csize 0x0
+		]
+		space/origin: origin
 	]
 	
 	;@@ or /line /page /forth /back /x /y ? not without apply :(
 	;@@ TODO: less awkward spec possible?
 	move-by: function [
-		space  [object!]
-		amount [word! integer!]
-		dir    [word!]
-		axis   [word!]
-		scale  [number! none!]
+		space   [object!]
+		amount  [word! integer!]
+		dir     [word!]
+		axis    [word!]
+		scale   [number! none!]
+		no-clip [logic!]
 	][
 		dir:  select [forth 1 back -1] dir
 		unit: axis2pair axis
 		default scale: either amount = 'page [0.8][1]
 		switch amount [line [amount: 16] page [amount: space/size]]
-		set-origin space space/origin - (amount * scale * unit * dir)
+		set-origin space space/origin - (amount * scale * unit * dir) no-clip
 	]
 
 	move-to: function [
 		space     [object!]
 		xy        [pair! word!]
 		margin: 0 [integer! pair! none!]				;-- space to reserve around XY
+		no-clip   [logic!]
 	][
-		mrg:   1x1 * margin
-		csize: select space/content 'size
+		mrg: 1x1 * margin
 		switch xy [
 			head [xy: 0x0]
-			tail [xy: csize * 0x1]						;-- no right answer here, csize or csize*0x1
+			tail [xy: space/content/size * 0x1]			;-- no right answer here, csize or csize*0x1
 		]
 		box: space/viewport
 		mrg: clip 0x0 mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
@@ -540,7 +545,7 @@ scrollable-space: context [
 			]
 		]
 		; ?? [box mrg xy1 xy2 xy dxy space/origin]
-		set-origin space space/origin - dxy
+		set-origin space space/origin - dxy no-clip
 	]
 
 	into: function [space [object!] xy [pair!] child [object! none!]] [
@@ -686,23 +691,25 @@ scrollable-space: context [
 			dir    [word!]          "'forth or 'back"
 			axis   [word!]          "'x or 'y"
 			/scale factor [number!] "Default: 0.8 for page, 1 for the rest"
+			/no-clip "Allow showing empty regions external to window"
 		][
-			~/move-by self amount dir axis factor
+			~/move-by self amount dir axis factor no-clip
 		] #type [function!]
 
 		move-to: func [
 			"Ensure point XY of content is visible, scroll only if required"
 			xy          [pair! word!]    "'head or 'tail or an offset pair"
 			/margin mrg [integer! pair!] "How much space to reserve around XY (default: 0)"
+			/no-clip "Allow showing empty regions external to window"
 		][
-			~/move-to self xy mrg
+			~/move-to self xy mrg no-clip
 		] #type [function!]
 		
 		clip-origin: func [
 			"Change the /origin facet, ensuring no empty area is shown"
 			origin [pair!] "Clipped between (viewport - scrollable/size) and 0x0"
 		][
-			~/set-origin self origin
+			~/set-origin self origin no
 		] #type [function!]
 	
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
@@ -2159,17 +2166,18 @@ inf-scrollable-ctx: context [
 		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
+		; ?? [before after space/look-around wsize viewport space/origin window/origin]
 		foreach x [x y] [
-			any [									;-- prioritizes left/up jump over right/down
+			any [										;-- prioritizes left/up jump over right/down
 				all [
 					before/:x <= space/look-around
 					0 < avail: window/available? x -1 wofs'/:x space/jump-length
-					wofs'/:x: wofs'/:x - avail
+					wofs'/:x: wofs'/:x - avail + min 0 before/:x	;-- important to include empty region (before < 0) into the jump!
 				]
 				all [
 					after/:x  <= space/look-around
 					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/jump-length
-					wofs'/:x: wofs'/:x + avail
+					wofs'/:x: wofs'/:x + avail - min 0 after/:x		;-- important to include empty region (after < 0) into the jump!
 				]
 			]
 		]
@@ -2304,12 +2312,13 @@ list-view-ctx: context [
 		anchor:   lview/anchor
 		list:     lview/list
 		axis:     list/axis
-		fill-x:   axis <> 'x								;-- always filled along finite axis
+		fill-x:   axis <> 'x							;-- always filled along finite axis
 		fill-y:   axis <> 'y
 		;; /roll ensures anchor is always near window border, so draw direction is chosen towards furthest of borders
 		;@@ might not work well if item/size >> window/size? should I bother?
 		dir:      pick [1 -1] (abs xy2/:axis) >= (abs xy1/:axis)
-		length:   xy2/:axis - xy1/:axis * dir
+		length:   either dir < 0 [xy1/:axis][xy2/:axis]	;-- draw a little extra to include the sticking out item part
+		; ?? [dir length window/origin xy1 xy2]
 		;; window/origin is unused because window offsets the list by itself
 		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
@@ -2337,6 +2346,7 @@ list-view-ctx: context [
 			i: i + 1
 		]
 		compose/into [window-origin: (window/origin)] tail frame
+		; ?? window/origin
 		list/frame: frame
 		list/size:  frame/size
 		quietly list/map: frame/map
@@ -2388,7 +2398,7 @@ list-view-ctx: context [
 		;; new window/origin should be chosen so that:
 		;; - when we move the window down, new anchor item offset should be at margin
 		;; - when we move the window up, it should be at -margin-size/y
-		new-origin: new-anchor-geom/offset - list/margin + window/origin
+		new-origin: window/origin + (new-anchor-geom/offset - list/margin)
 		step/by 'new-origin/:y either moved/:y < 0
 			[list/margin/:y * 2 + new-anchor-geom/size/:y]
 			[0]

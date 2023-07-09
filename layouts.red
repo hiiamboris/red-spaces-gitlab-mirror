@@ -178,13 +178,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			/extern y spaces count func? origin margin spacing anchor range item-canvas size
 		] with :create [
 			ith-item: pick [[spaces/pick i][spaces/:i]] func?
-			length:   max 0 length - (margin/:y * 2)	;-- w/o margin = length of items themselves (and their spacing)
+			;; requested length does not include margin, otherwise if margin is big it may happen that window intersects the margin
+			; length:   max 0 length - (margin/:y * 2)	;-- w/o margin = length of items themselves (and their spacing)
 			count~:   either length < 1e9 [length / item-size-estimate/:y][count]
 			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
 			range:    anchor * 1x1
 			pos:      origin + (1 by sign * margin)
 			add-item: [
+				; ?? [i pos item/size] 
 				compose/only/deep/into [
 					(item) [offset (pos) size (item/size) drawn (drawn)]
 				] tail map'

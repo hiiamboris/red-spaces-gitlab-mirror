@@ -145,6 +145,13 @@ define-handlers [
 					i: clip 1 count step + any [space/cursor 0]
 					item: space/list/items/pick i
 					if geom: select/same space/list/map item [	;-- item has to be drawn, to scroll to it
+						new-anchor-item: space/list/items/pick space/anchor
+						old-anchor-item: space/list/items/pick space/list/frame/anchor
+						new-anchor-offset: select select/same space/list/map new-anchor-item 'offset
+						old-anchor-offset: select select/same space/list/map old-anchor-item 'offset
+						async-offset: new-anchor-offset - old-anchor-offset
+						; if async-offset <> 0x0 [exit]
+						if space/list/frame/window-origin <> space/window/origin [exit]
 						unless event/ctrl? [
 							;@@ ideally this should support selection ranges, that is, shift should unselect as well
 							either all [event/shift? space/selectable = 'multi] [
@@ -157,11 +164,28 @@ define-handlers [
 						] 
 						space/cursor: i
 						point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
+						; point: geom/offset + space/list/frame/window-origin + either down? [geom/size * 0x1][0x0] 
 						;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
-						space/move-to/margin point space/look-around
-						space/roll								;-- sync roll to the move, else roll is delayed until next roll-timer hit
+						; point: point + async-offset
+						space/move-to/margin/no-clip point space/look-around
+						; old-origin: space/window/origin
+						; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
+						offset: space/roll						;-- sync roll to the move, else roll is delayed until next roll-timer hit
+						; if offset [
+							; #assert [space/list/frame/window-origin <> space/window/origin]
+							; #assert [
+								; space/list/frame/window-origin + geom/offset + offset
+							; ]
+							; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
+							; space/origin/y: space/origin/y + offset/y
+							; space/move-to/margin/no-clip point - offset space/look-around
+						; ]
+						; ?? [space/list/frame/range i offset point space/list/frame/window-origin space/window/origin space/list/frame/anchor space/anchor]
+						; ?? [space/list/frame/range i offset point space/list/frame/window-origin old-origin space/window/origin space/list/size]
 						;@@ there's some suspicious delay after roll but looks like WM_TIMER getting delayed
 					]
+					; unless geom [?? i]
+					; ?? i
 				]
 				#" " [									;-- ctrl+space selected item toggle
 					item: if i: space/cursor [space/list/items/pick i]
