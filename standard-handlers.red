@@ -119,8 +119,6 @@ define-handlers [
 	;@@ TODO: when dragging and slide succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `slide` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		;; /in is used to provide proper styling context to out-of-tree render!
-		;@@ but it should be automatic now that there's /parent!
 		on-down     [space path event] [space/slide]	;-- after button clicks
 		on-key-down [space path event] [space/slide]	;-- during key holding
 		slide-timer: [
@@ -134,63 +132,40 @@ define-handlers [
 	list-view: extends 'inf-scrollable [
 		on-key-down [space path event] [
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
+			list: space/list
 			switch/default event/key [
 				down up [
-					;@@ how to default space/cursor to first *visible* item ? locate-line needs canvas
-					;@@ somehow it should remember last canvas and work on it
-					;@@ OTOH, 1 is fine too - first item in the window
-					; unless old [old: list-view-ctx/locate-line space/list]	;@@ use a kit
-					step: pick [1 -1] down?: event/key = 'down
+					step:  pick [1 -1] down?: event/key = 'down
 					count: any [space/data/size 1.#inf]			;-- list may be unlimited
-					i: clip 1 count step + any [space/cursor 0]
-					item: space/list/items/pick i
-					if geom: select/same space/list/map item [	;-- item has to be drawn, to scroll to it
-						new-anchor-item: space/list/items/pick space/anchor
-						old-anchor-item: space/list/items/pick space/list/frame/anchor
-						new-anchor-offset: select select/same space/list/map new-anchor-item 'offset
-						old-anchor-offset: select select/same space/list/map old-anchor-item 'offset
-						async-offset: new-anchor-offset - old-anchor-offset
-						; if async-offset <> 0x0 [exit]
-						if space/list/frame/window-origin <> space/window/origin [exit]
-						unless event/ctrl? [
-							;@@ ideally this should support selection ranges, that is, shift should unselect as well
-							either all [event/shift? space/selectable = 'multi] [
-								unless find space/selected i [	;@@ should be a wrapper for this
-									append space/selected i
-								]
-							][
-								append clear space/selected i
-							]
-						] 
-						space/cursor: i
-						point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
-						; point: geom/offset + space/list/frame/window-origin + either down? [geom/size * 0x1][0x0] 
-						;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
-						; point: point + async-offset
-						space/move-to/margin/no-clip point space/look-around
-						; old-origin: space/window/origin
-						; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
-						offset: space/slide						;-- sync slide to the move, else slide is delayed until next slide-timer hit
-						; if offset [
-							; #assert [space/list/frame/window-origin <> space/window/origin]
-							; #assert [
-								; space/list/frame/window-origin + geom/offset + offset
-							; ]
-							; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
-							; space/origin/y: space/origin/y + offset/y
-							; space/move-to/margin/no-clip point - offset space/look-around
-						; ]
-						; ?? [space/list/frame/range i offset point space/list/frame/window-origin space/window/origin space/list/frame/anchor space/anchor]
-						; ?? [space/list/frame/range i offset point space/list/frame/window-origin old-origin space/window/origin space/list/size]
-					]
-					; unless geom [?? i]
-					; ?? i
+					range: list/frame/range
+					i: either space/cursor
+						[clip range/1 range/2 step + space/cursor]
+						[pick range down?]
+					item:  list/items/pick i
+					unless geom: select/same/skip list/map item 2 [exit]	;-- item has to be drawn, to scroll to it
+					; if list/frame/window-origin <> space/window/origin [exit]
+					
+					;; change cursor and selection
+					unless event/ctrl? [
+						either all [event/shift? space/selectable = 'multi]
+							[include-into space/selected i]		;@@ should shift unselect as well?
+							[append clear space/selected i]
+					] 
+					space/cursor: i
+					
+					;; move viewport to make cursor fully visible
+					point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
+					;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
+					space/move-to/margin/no-clip point space/look-around
+					; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
+					space/slide							;-- sync slide to the move, else slide is delayed until next slide-timer hit
+					; ?? [list/frame/range i offset point list/frame/window-origin space/window/origin list/frame/anchor space/anchor]
 				]
 				#" " [									;-- ctrl+space selected item toggle
-					item: if i: space/cursor [space/list/items/pick i]
+					item: if i: space/cursor [list/items/pick i]
 					if item [
-						either there: find space/selected i [remove there][append space/selected i]
-						space/selected: space/selected
+						alter space/selected i
+						trigger 'space/selected			;-- it cannot detect deep change, so need explicit reset
 					]
 				]
 			] [exit]
