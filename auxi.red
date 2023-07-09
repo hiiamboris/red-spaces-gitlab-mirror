@@ -391,6 +391,13 @@ toggle: function [
 	set flag not get flag
 ]
 
+trigger: function [
+	"Trigger on-change reaction on the target"
+	target [word! path!]
+][
+	set/any target get/any target
+]
+
 
 flush: function [
 	"Grab a copy of SERIES, clearing the original"
