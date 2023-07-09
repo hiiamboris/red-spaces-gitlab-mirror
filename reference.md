@@ -865,9 +865,9 @@ Introduces new facets:
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on inf-scrollable's resize or auto adjustment) |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
-| `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
-| `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
-| `roll` | function! | can be called to manually check for a jump |
+| `slide-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
+| `slide-timer/rate` | integer! float! time! | rate at which it checks for a jump |
+| `slide` | function! | can be called to manually check for a jump |
 
 `inf-scrollable` uses two origins (`origin` and `window/origin`) to provide pagination across unlimited (or big) dimensions. `window/origin` determines offset of window's content from window's left top corner. `inf-scrollable/origin` determines offset of window's lert top corner from viewport's left top corner. So both are normally negative pairs. You can jump around `inf-scrollable` by setting these two origins to desired offsets.
 
@@ -1029,9 +1029,9 @@ A lot of facets are inherited from [`inf-scrollable`](#inf-scrollable) and [`lis
 | `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
 | `jump-length` | integer! `>= 0` | maximum jump the window makes when it comes near it's borders |
 | `look-around` | integer! `>= 0` | determines how near is "near it's borders", in pixels |
-| `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
-| `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
-| `roll` | function! | can be called to manually check for a jump |
+| `slide-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
+| `slide-timer/rate` | integer! float! time! | rate at which it checks for a jump |
+| `slide` | function! | can be called to manually check for a jump |
 | `content` | object! = `window` | set to `window`, should not be changed |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | object! = `list` | set to inner `list`, should not be changed |
@@ -1224,9 +1224,9 @@ Inherits all of [`inf-scrollable`](#inf-scrollable) facets:
 | `scroll-timer` | scroller space object! | controls scrolling when user clicks and holds scroller's arrow or paging area between arrow and thumb |
 | `scroll-timer/rate` | integer! float! time! | rate at which it scrolls |
 | `viewport` | `func [] -> pair!` | size of the viewport (region without scrollbars) on the last frame |
-| `roll-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
-| `roll-timer/rate` | integer! float! time! | rate at which it checks for a jump |
-| `roll` | function! | can be called to manually check for a jump |
+| `slide-timer` | timer space object! | controls jumping of the window e.g. if user drags the thumb or holds a PageDown key, or clicks and holds the pointer in scroller's paging area |
+| `slide-timer/rate` | integer! float! time! | rate at which it checks for a jump |
+| `slide` | function! | can be called to manually check for a jump |
 | `window` | window space object! | used to limit visible (rendered) area to finite (and sane) size |
 | `window/content` | object! = `grid` | set to inner `grid` and should not be changed |
 | `window/pages` | integer! pair! | used to automatically adjust maximum window size to a multiple of canvas: `canvas * pages` (e.g. on grid-view's resize or auto adjustment) |

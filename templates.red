@@ -2153,17 +2153,17 @@ inf-scrollable-ctx: context [
 	~: self
 	
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
-	roll: function [space [object!]] [
-		#debug grid-view [#print "origin in inf-scrollable/roll: (space/origin)"]
+	slide: function [space [object!]] [
+		#debug grid-view [#print "origin in inf-scrollable/slide: (space/origin)"]
 		window: space/window
 		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within its content
 		#assert [window/size]
 		wsize:  window/size
 		before: negate space/origin						;-- area before the current viewport offset
-		#assert [find/same space/map window]			;-- roll attempt on an empty viewport, or map is invalid?
+		#assert [find/same space/map window]			;-- slide attempt on an empty viewport, or map is invalid?
 		viewport: space/viewport
-		#assert [0x0 +< viewport]						;-- roll on empty viewport is most likely an unwanted roll
+		#assert [0x0 +< viewport]						;-- slide on empty viewport is most likely an unwanted slide
 		if zero? area? viewport [return no]
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
 		; ?? [before after space/look-around wsize viewport space/origin window/origin]
@@ -2184,21 +2184,21 @@ inf-scrollable-ctx: context [
 		;; transfer offset from scrollable into window, in a way detectable by on-change
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
-			#debug sizing [#print "rolling (space/size) with (space/content) by (wofs' - wofs)"]
+			#debug sizing [#print "sliding (space/size) with (space/content) by (wofs' - wofs)"]
 			space/origin: space/origin + (wofs' - wofs)	;-- may be watched (e.g. by grid-view)
 			window/origin: negate wofs'					;-- invalidates both scrollable and window
-			wofs' - wofs								;-- let caller know that roll has happened
+			wofs' - wofs								;-- let caller know that slide has happened
 		]
 	]
 	
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
-		timer: space/roll-timer
+		timer: space/slide-timer
 		render timer									;-- timer has to appear in the tree for timers to work
 		drawn: space/scrollable-draw/on canvas fill-x fill-y
 		any-scrollers?: not zero? add area? space/hscroll/size area? space/vscroll/size
 		timer/rate: either any-scrollers? [4][0]		;-- timer is turned off when unused
-		;; scrollable/draw removes roll-timer, have to restore
+		;; scrollable/draw removes slide-timer, have to restore
 		;; the only benefit of this is to count spaces more accurately:
 		;; (can't use repend, as map may be a static block)
 		quietly space/map: compose [
@@ -2211,16 +2211,16 @@ inf-scrollable-ctx: context [
 	]
 	
 	declare-template 'inf-scrollable/scrollable [		;-- `infinite-scrollable` is too long for a name
-		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when rolling (px) ;@@ maybe make it a pair?
-		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers roll-edge (px)
+		jump-length: 200	#type [integer!] (jump-length > 0)	;-- how much more to show when sliding (px) ;@@ maybe make it a pair?
+		look-around: 50		#type [integer!] (look-around > 0)	;-- zone after head and before tail that triggers slide (px)
 		;@@ percents of window height could be supported for look-around? and maybe for jump-length?
 
 		content: window: make-space 'window []	#type (space? window)
 
-		;; timer that calls `roll` when dragging
+		;; timer that calls `slide` when dragging
 		;; rate is turned on only when at least 1 scrollbar is visible (timer resource optimization)
-		roll-timer: make-space 'timer [type: 'roll-timer]	#type (space? roll-timer)
-		roll: does [~/roll self] #type [function!]
+		slide-timer: make-space 'timer [type: 'slide-timer]	#type (space? slide-timer)
+		slide: does [~/slide self] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
@@ -2314,7 +2314,7 @@ list-view-ctx: context [
 		axis:     list/axis
 		fill-x:   axis <> 'x							;-- always filled along finite axis
 		fill-y:   axis <> 'y
-		;; /roll ensures anchor is always near window border, so draw direction is chosen towards furthest of borders
+		;; /slide ensures anchor is always near window border, so draw direction is chosen towards furthest of borders
 		;@@ might not work well if item/size >> window/size? should I bother?
 		dir:      pick [1 -1] (abs xy2/:axis) >= (abs xy1/:axis)
 		length:   either dir < 0 [xy1/:axis][xy2/:axis]	;-- draw a little extra to include the sticking out item part
@@ -2366,20 +2366,20 @@ list-view-ctx: context [
 		] #type [function!]
 	]
 	
-	roll: function [lview [object!]] [
+	slide: function [lview [object!]] [
 		list:   lview/list
 		window: lview/window
 		y:      list/axis
-		;; it's possible that multiple rolls occur without a draw, resulting in no visible item suitable as a new anchor
-		;; to avoid this I just limit max consecutive rolls to half the window
+		;; it's possible that multiple slides occur without a draw, resulting in no visible item suitable as a new anchor
+		;; to avoid this I just limit max consecutive slides to half the window
 		;@@ there must be a better solution for this, but I don't see a simple one
-		#assert [list/frame/window-origin  "list must be drawn before rolling"]
+		#assert [list/frame/window-origin  "list must be drawn before sliding"]
 		offset-since-drawn: window/origin - list/frame/window-origin
 		if any [
 			(abs offset-since-drawn/:y) > half window/size/:y
-			not moved: inf-scrollable-ctx/roll lview
+			not moved: inf-scrollable-ctx/slide lview
 		] [return none]
-		;; change anchor to first or last (still visible) item, depending on the roll direction
+		;; change anchor to first or last (still visible) item, depending on the slide direction
 		xy2: window/size + xy1: negate window/origin
 		set [new-anchor-item: new-anchor-geom:] pos:
 			apply 'locate [
@@ -2399,9 +2399,7 @@ list-view-ctx: context [
 		;; - when we move the window down, new anchor item offset should be at margin
 		;; - when we move the window up, it should be at -margin-size/y
 		new-origin: window/origin + (new-anchor-geom/offset - list/margin)
-		step/by 'new-origin/:y either moved/:y < 0
-			[list/margin/:y * 2 + new-anchor-geom/size/:y]
-			[0]
+		if moved/:y < 0 [new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y]
 		; ?? [moved window/origin new-origin]
 		window/origin: new-origin
 		lview/anchor:  ~/map-index->list-index list map-index
@@ -2499,8 +2497,7 @@ list-view-ctx: context [
 			window/origin: 0x0
 		]
 		
-		;@@ maybe rename roll to slide? it probably makes more sense
-		roll: does [~/roll self]
+		slide: does [~/slide self]
 		
 		; inf-scrollable-draw: :draw
 		; draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
@@ -3392,7 +3389,7 @@ grid-view-ctx: context [
 		;@@ TODO: maybe a % of viewport instead of fixed jump size?
 		size: 0x0	#type =? #on-change [space word value] [quietly space/jump-length: min value/x value/y]
 		
-		;; reminder: window/roll may change this (together with window/origin) when rolling
+		;; reminder: window/slide may change this (together with window/origin) when sliding
 		;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
 		origin: 0x0	#type =? #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
 		

@@ -309,27 +309,27 @@ However the behavior is defined in the [`standard-handlers.red` file](standard-h
 define-handlers [									;) `define-handlers` is used to define events
 	inf-scrollable: extends 'scrollable [			;) `extends` copies event handlers from another space
 		on-down [space path event] [				;) event names follow those of View
-			space/roll								;) `roll` moves the window inside an infinite space
+			space/slide								;) `slide` moves the window inside an infinite space
 		]
 		on-key-down [space path event] [			;) these handlers do not override those of `scrollable`!
-			space/roll								;) they are called after the inherited ones
+			space/slide								;) they are called after the inherited ones
 		]
-		roll-timer: [								;) roll-timer is a timer space owned by each inf-scrollable
+		slide-timer: [								;) slide-timer is a timer space owned by each inf-scrollable
 			on-time [space path event delay] [		;) it has it's own event handler
 				scrollable: path/-1					;) path/-1 is the outer space (inf-scrollable)
-				scrollable/roll
+				scrollable/slide
 			]
 		]
 	]
 ]
 ```
-Note that the above example defines events both for `inf-scrollable` template and `inf-scrollable/roll-timer` specialized timer.
+Note that the above example defines events both for `inf-scrollable` template and `inf-scrollable/slide-timer` specialized timer.
 
 Event handler description **DSL quick reference**:
 
 | Example | Syntax | Description |
 | - | - | - |
-| `template-name: [...]` | `set-word! block!` or `set-word! 'extends lit-word! block!` | Defines events for spaces with the given name, optional `extends` modifier inherits handlers from another space. Can define handlers for spaces belonging to other spaces (like `roll-timer:` above) |
+| `template-name: [...]` | `set-word! block!` or `set-word! 'extends lit-word! block!` | Defines events for spaces with the given name, optional `extends` modifier inherits handlers from another space. Can define handlers for spaces belonging to other spaces (like `slide-timer:` above) |
 | `on-event [space path event] [...]` | `word! block! block!` | Defines handler for a specific event. Internally uses `function` constructor, so inner set-words are collected |
 
 ### Event handler spec
@@ -344,7 +344,7 @@ It's possible to provide typesets: `space [object!] path [block!] event [event! 
 | `event` | `event!` or `none!` | View event that triggered the handler. Can be `none` for `focus`/`unfocus` events, because they do not come from View, but are generated internally (and it's impossible to create an event value from Red). |
 | `delay` | `percent!` | `0%` is the ideal value. But timers do not get called at a precise time. They can be called early (`delay < 0%`), but usually they are late (`delay > 0%`). `delay = 100%` means *it's late by one timer period*. This value can be used to produce smoother animations. |
 
-Access to full tree path gives handlers ability to access their parent objects, like the `roll-timer` above calls a function `roll` from it's parent to affect it.
+Access to full tree path gives handlers ability to access their parent objects, like the `slide-timer` above calls a function `slide` from it's parent to affect it.
 
 Path received by the handler is relative to the space that defined it. E.g. for `screen/window/base/list-view/thumb`, if `list-view` receives the event then `path` is `skip [screen window base list-view thumb] 3`
 

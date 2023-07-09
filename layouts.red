@@ -49,7 +49,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;                                 default=unlimited, positive (forward) direction
 		;;                                 if > 0, counted from top of the anchor item, if < 0 - from the bottom of it
 		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
-		;;                                 (list-view has to maintain fixed width across rolls and scrolls)
+		;;                                 (list-view has to maintain fixed width across slides and scrolls)
 		;; result of all layouts is a frame object with size, map and possibly more; map geometries contain `drawn` block so it's not lost!
 		;; settings are passed as a list of bound words, not as context
 		;; this is done to make the list explicit, to avoid unexpected settings being read from the space object

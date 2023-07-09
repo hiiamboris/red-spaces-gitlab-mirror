@@ -116,16 +116,16 @@ define-handlers [
 	]
 
 	;-- *************************************************************************************
-	;@@ TODO: when dragging and roll succeeds, the canvas jumps
-	;@@       need to update drag-parameter from `roll` or something..
+	;@@ TODO: when dragging and slide succeeds, the canvas jumps
+	;@@       need to update drag-parameter from `slide` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
 		;; /in is used to provide proper styling context to out-of-tree render!
 		;@@ but it should be automatic now that there's /parent!
-		on-down     [space path event] [space/roll]		;-- after button clicks
-		on-key-down [space path event] [space/roll]		;-- during key holding
-		roll-timer: [
+		on-down     [space path event] [space/slide]	;-- after button clicks
+		on-key-down [space path event] [space/slide]	;-- during key holding
+		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
-				path/-1/roll
+				path/-1/slide
 			]
 		]
 	]
@@ -170,7 +170,7 @@ define-handlers [
 						space/move-to/margin/no-clip point space/look-around
 						; old-origin: space/window/origin
 						; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
-						offset: space/roll						;-- sync roll to the move, else roll is delayed until next roll-timer hit
+						offset: space/slide						;-- sync slide to the move, else slide is delayed until next slide-timer hit
 						; if offset [
 							; #assert [space/list/frame/window-origin <> space/window/origin]
 							; #assert [
@@ -182,7 +182,6 @@ define-handlers [
 						; ]
 						; ?? [space/list/frame/range i offset point space/list/frame/window-origin space/window/origin space/list/frame/anchor space/anchor]
 						; ?? [space/list/frame/range i offset point space/list/frame/window-origin old-origin space/window/origin space/list/size]
-						;@@ there's some suspicious delay after roll but looks like WM_TIMER getting delayed
 					]
 					; unless geom [?? i]
 					; ?? i
