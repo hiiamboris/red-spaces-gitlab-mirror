@@ -45,9 +45,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   limits        [object! none!]
 		;;   origin         [pair! none!]  unrestricted, offsets whole map, default=0x0
 		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
-		;;   length       [integer! none!] in pixels, when to stop adding items (when negative, items are added above anchor) (used by list-view)
-		;;                                 default=unlimited, positive (forward) direction
-		;;                                 if > 0, counted from top of the anchor item, if < 0 - from the bottom of it
+		;;   length       [integer! none!] in pixels, when to stop adding items (used by list-view), default=unlimited
+		;;   reverse?       [logic! none!] true if items should be counted back from the anchor (used by list-view), default=false
 		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
 		;;                                 (list-view has to maintain fixed width across slides and scrolls)
 		;; result of all layouts is a frame object with size, map and possibly more; map geometries contain `drawn` block so it's not lost!
@@ -57,9 +56,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		create: function [
 			"Build a list layout out of given spaces and settings as bound words"
 			spaces [block! function!] "List of spaces or a picker func [/size /pick i]"
-			settings [block!] "Any subset of [axis margin spacing canvas fill-x fill-y limits origin anchor length do-not-extend?]"
+			settings [block!] "Any subset of [axis margin spacing canvas fill-x fill-y limits origin anchor length reverse? do-not-extend?]"
 			;; settings - imported locally to speed up and simplify access to them:
-			/local axis margin spacing canvas fill-x fill-y limits origin anchor length do-not-extend?
+			/local axis margin spacing canvas fill-x fill-y limits origin anchor length reverse? do-not-extend?
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
@@ -77,17 +76,19 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				limits   [object! (range? limits) none!]
 				origin   [pair! none!]
 				anchor   [integer! (anchor > 0) none!]
-				length   [integer! (length <> 0) none!]			;-- zero has no sign, so ambiguous, may be a sign of bugs
+				length   [integer! (length >= 0) none!]
+				reverse? [logic! none!]
 				do-not-extend? [logic! none!]
 			]]
-			default origin: 0x0
-			default canvas: infxinf
-			default fill-x: no
-			default fill-y: no
-			default anchor: 1
-			default length: infxinf/x
+			default origin:   0x0
+			default canvas:   infxinf
+			default fill-x:   no
+			default fill-y:   no
+			default anchor:   1
+			default length:   infxinf/x
+			default reverse?: no
 			spacing: spacing * 1x1						;-- pair normalization needed by document
-			direction: pick [1 -1] length >= 0
+			direction: either reverse? [-1][1]
 			default do-not-extend?: no
 			x: ortho y: axis
 			guide: axis2pair y
@@ -139,13 +140,20 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				break									;-- no second render cycle if canvas is the same
 			]
-			item1:    :map/2
-			item2:    last map
-			size/:y:  item2/offset/:y + item2/size/:y - item1/offset/:y
+			if direction < 0 [reverse/skip map 2]		;-- order items top-down
+			geom1:    map/2
+			geom2:    last map
+			size/:y:  geom2/offset/:y + geom2/size/:y - geom1/offset/:y
 			item-len: max 1 size/:y + spacing/:y / n: half length? map	;-- don't let it become zero, or will overflow
 			update-ema/batch 'item-size-estimate/:y item-len 1000 n 
-			filled:   size/:y + margin/:y * direction	;-- filled length is not constrained and only has 1 margin (used by 'available?')
 			size:     size + (2 * margin)
+			if direction < 0 [							;-- make all offsets positive
+				shift: size
+				shift/:x: 0
+				foreach [_ geom] map [geom/offset: geom/offset + shift]
+			]
+			range:    order-pair range 
+			filled:   size/:y - margin/:y				;-- filled length is not constrained and only has 1 margin (used by 'available?')
 			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
 			;@@ omit some of these?
@@ -159,6 +167,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				anchor:       (anchor)
 				range:        (range)
 				length:       (length)					;-- requested length to fill
+				reverse?:     (reverse?)
 				filled:       (filled)					;-- actually filled length (may be both bigger and smaller)
 				canvas:       (canvas)
 				fill-x:       (fill-x)
@@ -200,7 +209,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			do draw-next
 			length: length + item/size/:y				;-- don't count anchor in the length (required by list-view)
-			limit: pos/:y + (sign * length) 
+			limit:  pos/:y + (sign * length) 
 			forever pick [
 				[										;-- going down
 					do add-item
@@ -216,8 +225,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					do draw-next
 				]
 			] sign > 0
-			if sign < 0 [reverse/skip map' 2]
-			range: order-pair range 
 			map'
 		]
 	]
