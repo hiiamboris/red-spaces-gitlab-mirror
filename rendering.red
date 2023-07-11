@@ -106,6 +106,7 @@ context [
 	]
 	
 	;; draw code has to be evaluated after current-path changes, for inner calls to render to succeed
+	;@@ apply at least host style when path is given; other styles carryover should not be endorsed
 	set 'with-style function [							;-- exported for an ability to spoof the tree (for slide, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
 		space [path! (parse space [any object!]) object!]

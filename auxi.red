@@ -462,14 +462,14 @@ delimit: function [
 
 ;@@ make a REP with this? (need use cases)
 ;@@ this is no good, because it treats paths as series
-; native-swap: :system/words/swap
-; swap: function [a [word! series!] b [word! series!]] [
-	; either series? a [
-		; native-swap a b
-	; ][
-		; set a before (b) get a
-	; ]
-; ]
+native-swap: :system/words/swap
+swap: function [a [word! series!] b [word! series!]] [
+	either series? a [
+		native-swap a b
+	][
+		set a before (b) get a
+	]
+]
 
 only: function [
 	"Turn falsy values into empty block (useful for composing Draw code)"
@@ -592,7 +592,8 @@ opaque: function [
 ]
 
 
-range: func [a [integer!] b [integer!]] [
+list-range: function [a [integer!] b [integer!]] [
+	if b < a [swap 'a 'b]
 	collect [while [a <= b] [keep a  a: a + 1]]
 ]
 

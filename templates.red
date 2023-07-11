@@ -2120,7 +2120,8 @@ window-ctx: context [
 		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
 		quietly window/map: compose/deep [(content) [offset: (org) size: (size)]]
-		either cdraw [ compose/only [translate (org) (cdraw)] ][ []]
+		?? window/map
+		when cdraw (compose/only [translate (org) (cdraw)])
 	]
 	
 	declare-template 'window/space [
@@ -2248,7 +2249,11 @@ list-view-ctx: context [
 	]
 	
 	available?: function [
-		list [object!] req-axis [word!] dir [integer!] from [integer!] requested [integer!]
+		list      [object!]
+		req-axis  [word!] (find [x y] req-axis)
+		dir       [integer!] (1 = abs dir) 
+		from      [integer!] 
+		requested [integer!] (requested >= 0)
 	][
         if req-axis <> list/frame/axis [				;-- along orthogonal axis list doesn't extend
         	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
@@ -2263,24 +2268,26 @@ list-view-ctx: context [
         	list/map << 2
         ]
         #assert [anchor-item]
-        y:       req-axis
-        anchor:  map-index->list-index list map-index
-        margin:  list/frame/margin
-        anchory: anchor-geom/offset/:y
-        window:  list/parent
-        frame:   construct list/frame					;-- for bind(with) to work
+        y:          req-axis
+        anchor:     map-index->list-index list map-index
+        margin:     list/frame/margin
+        anchory:    anchor-geom/offset/:y
+        window:     list/parent
+        frame:      construct list/frame				;-- for bind(with) to work
         ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
         ;; (this relies on list layout counting length *after* the anchor itself)
         requested': max 0 requested + anchor-geom/size/:y + (from - anchory * dir)
-        length:    (max 1 requested' + margin/:y) * dir	;-- never request zero pixels, since zero has no sign
-		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]	;-- origin is unused
-		path: when not same? list last current-path (get-host-path list)
+        length:     requested' + margin/:y
+        reverse?:   dir
+		settings:   with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length reverse? do-not-extend?]	;-- origin is unused
+		path:       when not same? list last current-path (get-host-path list)
 		#assert [path]
 		with-style path [frame: make-layout 'list :list/items settings]
 		;; filled includes whole size + single margin
-		filled: (abs frame/filled) - (from - anchory * dir) - either dir < 0 [anchor-geom/size/:y][0]
-		result: clip 0 requested filled
+		filled:     frame/filled - (from - anchory * dir) - either dir < 0 [anchor-geom/size/:y][0]
+		result:     clip 0 requested filled
 		; ?? [window/origin anchor anchor-geom/size/:y anchory from requested' length frame/filled filled result]
+		; ?? frame/map
 		#debug list-view [#print "available from (from) along (req-axis)/(dir): (result) of (requested)"]
 		result
 	]
@@ -2309,20 +2316,19 @@ list-view-ctx: context [
 	][
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
 		window:   lview/window
-		anchor:   lview/anchor
+		anchor:   lview/anchor/index
 		list:     lview/list
 		axis:     list/axis
 		fill-x:   axis <> 'x							;-- always filled along finite axis
 		fill-y:   axis <> 'y
-		;; /slide ensures anchor is always near window border, so draw direction is chosen towards furthest of borders
-		;@@ might not work well if item/size >> window/size? should I bother?
-		dir:      pick [1 -1] (abs xy2/:axis) >= (abs xy1/:axis)
-		length:   either dir < 0 [xy1/:axis][xy2/:axis]	;-- draw a little extra to include the sticking out item part
+		; ?? [xy1 xy2 window/origin lview/origin]
+		dir:      pick [-1 1] reverse?: lview/anchor/reverse?
+		length:   xy2/:axis - min 0 xy1/:axis			;-- start drawing since the anchor
 		moved?:   window/origin <> list/frame/window-origin
 		; ?? [dir length window/origin xy1 xy2]
 		; clear lview/item-cache
 		;; window/origin is unused because window offsets the list by itself
-		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length do-not-extend?]
+		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length reverse? do-not-extend?]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
 		frame:    make-layout 'list :list/items settings
 		;; cache cleanup only makes sense after a slide, and after recent draw so we have up to date frame/range
@@ -2331,7 +2337,7 @@ list-view-ctx: context [
 		;@@ will have to provide canvas directly to it, or use it from geom/size
 		drawn:    make [] 3 * (2 + length? frame/map) / 2
 		i:        frame/range/1
-		foreach [item geom] frame/map [				;@@ use for-each
+		foreach [item geom] frame/map [					;@@ use for-each
 			#assert [geom/drawn]						;@@ should never happen?
 			item-drawn:  take remove find geom 'drawn	;-- no reason to hold `drawn` in the map anymore
 			item-offset: geom/offset
@@ -2354,6 +2360,7 @@ list-view-ctx: context [
 		list/frame: frame
 		list/size:  frame/size
 		quietly list/map: frame/map
+		; ?? list/map
 		drawn
 	]
 	
@@ -2412,18 +2419,29 @@ list-view-ctx: context [
 			]
 		#assert [new-anchor-item]
 		map-index:  1 + half skip? pos
-		;; (changed) window/origin + old-anchor-geom is where old anchor is now located
-		;; (changed) window/origin + new-anchor-geom is where new anchor is now located
-		;; but to change the anchor is to move coordinate start from the old one into the new one
-		;; old anchor is known to have been at margin if it was on top, or at -margin-size/y on bottom
-		;; new window/origin should be chosen so that:
-		;; - when we move the window down, new anchor item offset should be at margin
-		;; - when we move the window up, it should be at -margin-size/y
-		new-origin: window/origin + (new-anchor-geom/offset - list/margin)
-		if moved/:y < 0 [new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y]
+		; ;; (changed) window/origin + old-anchor-geom is where old anchor is now located
+		; ;; (changed) window/origin + new-anchor-geom is where new anchor is now located
+		; ;; but to change the anchor is to move coordinate start from the old one into the new one
+		; ;; old anchor is known to have been at margin if it was on top, or at -margin-size/y on bottom
+		; ;; new window/origin should be chosen so that:
+		; ;; - when we move the window down, new anchor item offset should be at margin
+		; ;; - when we move the window up, it should be at -margin-size/y
+		; new-origin: window/origin + (new-anchor-geom/offset - list/margin)
+		geom1: list/map/2
+		?? new-anchor-geom ?? geom1 ?? [lview/anchor/offset window/origin moved]
+		probe lview/anchor/offset: window/origin/:y + new-anchor-geom/offset/:y + 
+			either lview/anchor/reverse?: moved/:y < 0 [
+				new-anchor-geom/size/:y + list/margin/:y - window/size/:y
+			][
+				negate list/margin/:y
+			]
+		; if moved/:y < 0 [new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y]
+		; if lview/anchor/reverse?: moved/:y < 0 [
+			; new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y - window/size/:y
+		; ]
 		; ?? [moved window/origin new-origin]
-		window/origin: new-origin
-		lview/anchor:  ~/map-index->list-index list map-index
+		; window/origin: new-origin
+		lview/anchor/index:  ~/map-index->list-index list map-index
 		; ?? [offset lview/anchor new-anchor-geom/offset new-anchor-geom/size self/origin window/origin]
 		moved
 	]
@@ -2447,13 +2465,53 @@ list-view-ctx: context [
 		; lview/inf-scrollable-draw/on/window canvas fill-x fill-y wxy1 wxy2
 	; ]
 
+	kit: make-kit 'list-view [
+		move-to: function [
+			"Pan the view to the item with the given index"
+			index    [integer!] (all [0 < index index <= any [space/data/size infxinf/x]])
+			location [word!] "Any of [after before]" (find [after before] location)	;@@ 'center to be supported down the road
+			/margin mrg: 0 [integer!] "How much to reserve around the item"
+		][
+			space/anchor/index: index
+			space/anchor/offset: 0
+			space/origin: either space/anchor/reverse?: location = 'before [
+				viewport: space/viewport				;-- call the func to get the VP size
+				as-pair 0 negate space/window/size/y - viewport/y - mrg
+			][
+				as-pair 0 0 - mrg
+			]
+			;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
+		]
+		
+	]
+	
 	invalidates-list: function [lview [object!] word [word!] value [any-type!]] [
 		if object? :lview/list [invalidate lview/list]
 	]
 
+	on-anchor-change: function [anchor [object!] word [word!] value [any-type!]] [
+		if anchor/parent [invalidate anchor/parent/list]
+	]
+	
+	;; not a space! object (unlike caret) because it makes no sense to draw it
+	anchor-spec: declare-class 'list-view-anchor [
+		;; used for invalidation
+		parent:   none		#type =? [object! (space? parent) none!]
+		
+		;; index of the first (or last if /reverse?) visible item in the window
+		index:    1			#type =? [integer!] (index > 0) :on-anchor-change
+		
+		;; item filling direction starting at /index
+		reverse?: no		#type =? [logic!]               :on-anchor-change
+		
+		;; offset from margin to the top <=0 (or bottom >=0 if /reverse?) of the anchor item
+		offset:   0			#type =? [integer!]             :on-anchor-change
+	]
+		
 	;@@ list-view & grid-view on child focus should scroll to child
 	;@@ expose top /margin & /spacing that are reflected into /list
 	declare-template 'list-view/inf-scrollable [
+		kit:    ~/kit
 		pages:  10
 		source: []	#on-change :invalidates-list		;-- no type check for it can be freely overridden
 		data: func [/pick i [integer!] /size] [			;-- can be overridden
@@ -2480,8 +2538,9 @@ list-view-ctx: context [
 		;; current item (for keyboard navigation purposes), doesn't have to be selected 
 		cursor:      none			#type =? [integer! (cursor > 0) none!] :invalidates-list
 
-		;; index of the first visible item in the window
-		anchor:      1				#type =? [integer!] (anchor > 0) :invalidates-list	
+		;; see anchor description in the spec above
+		anchor: make classy-object! anchor-spec
+		anchor/parent: self
 		
 		; frame:       []				#type    [map! block! object!]
 		; cache:       [size map frame]
@@ -2495,7 +2554,6 @@ list-view-ctx: context [
 		item-cache: make hash! 48
 		list/items: func [/pick i [integer!] /size /local item] with list [
 			either pick [
-				; wrap-data data/pick i
 				all [
 					0 < i i <= any [data/size infxinf/x]		;-- since data/pick can return any value, this is the only way to limit it
 					any [
@@ -2511,11 +2569,29 @@ list-view-ctx: context [
 			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
 		
-		;@@ move to kit, and need direction support
-		jump-to: function [i [integer!]] [
-			#assert [i <= any [data/size infxinf/x]]
-			self/anchor: i
-			window/origin: 0x0
+		;; this wrapper is neede to auto-position window/origin based on /anchor
+		;; it has to draw the list, calculate new origin and change it in the drawn block
+		;@@ unfortunately this means knowledge of the block format produced by window-draw, and of its spec
+		;@@ maybe list-draw should offset the list instead? shift all items
+		window-draw: :window/draw
+		window/draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+			; old-origin: window/origin
+			quietly window/origin: 0x0
+			drawn: window-draw/:on canvas fill-x fill-y
+			if :drawn/1 = 'translate [					;-- window isn't empty
+				shift: either anchor/reverse? [
+					#assert [anchor/offset >= 0]
+					anchor-geom: last list/map
+					overhang: anchor-geom/offset/y + anchor-geom/size/y + list/margin/y - window/size/y
+					anchor/offset - overhang
+				][
+					#assert [anchor/offset <= 0]
+					anchor/offset
+				]
+				?? [shift overhang anchor/offset]
+				quietly window/origin: window/map/2/offset: drawn/2: make-pair [0x0 list/axis shift]
+			]
+			drawn
 		]
 		
 		slide: does [~/slide self]
