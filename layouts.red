@@ -46,6 +46,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   origin         [pair! none!]  unrestricted, offsets whole map, default=0x0
 		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
 		;;   length       [integer! none!] in pixels, when to stop adding items (used by list-view), default=unlimited
+		;;                                 does not include anchor size and both margins
 		;;   reverse?       [logic! none!] true if items should be counted back from the anchor (used by list-view), default=false
 		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
 		;;                                 (list-view has to maintain fixed width across slides and scrolls)

@@ -524,7 +524,7 @@ scrollable-space: context [
 
 	move-to: function [
 		space     [object!]
-		xy        [pair! word!]
+		xy        [pair! word!] "Point in content coordinates or [head tail]"
 		margin: 0 [integer! pair! none!]				;-- space to reserve around XY
 		no-clip   [logic!]
 	][
@@ -544,8 +544,8 @@ scrollable-space: context [
 				xy/:x > xy2/:x [dxy/:x: xy/:x - xy2/:x]
 			]
 		]
-		; ?? [box mrg xy1 xy2 xy dxy space/origin]
 		set-origin space space/origin - dxy no-clip
+		; ?? [box mrg xy1 xy2 xy dxy space/origin]
 	]
 
 	into: function [space [object!] xy [pair!] child [object! none!]] [
@@ -633,10 +633,10 @@ scrollable-space: context [
 		;; (else may stack up to 99% of all rendering time)
 		;@@ maybe move this into the scrollers?
 		csize': max 1x1 csize							;-- avoid division by zero
-		quietly hscroll/amount: 100% * min 1.0 viewport/x / csize'/x
-		quietly hscroll/offset: 100% * clip 0 1 (negate origin/x) / csize'/x
-		quietly vscroll/amount: 100% * min 1.0 viewport/y / csize'/y
-		quietly vscroll/offset: 100% * clip 0 1 (negate origin/y) / csize'/y
+		quietly hscroll/amount: 100% * amnt: min 1.0 viewport/x / csize'/x
+		quietly hscroll/offset: 100% * clip 0 1 - amnt (negate origin/x) / csize'/x
+		quietly vscroll/amount: 100% * amnt: min 1.0 viewport/y / csize'/y
+		quietly vscroll/offset: 100% * clip 0 1 - amnt (negate origin/y) / csize'/y
 		
 		;@@ TODO: fast flexible tight layout func to build map? or will slow down?
 		unless fits? [render space/scroll-timer]				;-- scroll-timer has to appear in the tree for timers
@@ -1197,7 +1197,7 @@ list-ctx: context [
 			]
 			cloned
 		]
-		format:   does [container-ctx/format space select [x "^-" y "^/"] axis]
+		format: does [container-ctx/format space select [x "^-" y "^/"] axis]
 		frame: object [
 			sections: does [~/get-sections space]
 		]
@@ -1487,7 +1487,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		frame: object [
 			sections: does [~/get-sections space]
 		]
-		format:   does [container-ctx/format space ""]
+		format: does [container-ctx/format space ""]
 	]
 		
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
@@ -2104,24 +2104,26 @@ window-ctx: context [
 			return quietly window/map: []
 		]
 		#assert [space? content]
-		-org: negate org: window/origin
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
 		size: window/pages * finite-canvas canvas
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
-			cdraw: render/window/on content -org -org + size canvas fill-x fill-y	;@@ off fill flags when window is less than content?
-			; ?? [canvas size window/pages content/size]
-			;; once content is rendered, it's size is known and may be less than requested,
+			-org: negate window/origin
+			;@@ maybe off fill flags when window is less than content? or off them always?
+			cdraw: render/window/on content -org -org + size canvas fill-x fill-y
+			;; window/origin may have been modified by render of content! (e.g. list-view)
+			
+			;; once content is rendered, its size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
-			if content/size [size: min size content/size]	;-- size has to be finite
+			if content/size [							;-- size has to be finite
+				size: clip 0x0 size content/size + window/origin
+			]
 		]
-		; ?? [size org content/size]
+		#debug sizing [if window/size <> size [#print "resizing window to (size)"]]
 		window/size: size
-		#debug sizing [#print "window resized to (window/size)"]
 		;; let right bottom corner on the map also align with window size
-		quietly window/map: compose/deep [(content) [offset: (org) size: (size)]]
-		?? window/map
-		when cdraw (compose/only [translate (org) (cdraw)])
+		quietly window/map: compose/deep [(content) [offset: (window/origin) size: (content/size)]]
+		when cdraw (compose/only [translate (window/origin) (cdraw)])
 	]
 	
 	declare-template 'window/space [
@@ -2169,16 +2171,16 @@ inf-scrollable-ctx: context [
 		after:  wsize - (before + viewport)				;-- area from the end of viewport to the end of window
 		; ?? [before after space/look-around wsize viewport space/origin window/origin]
 		foreach x [x y] [
-			any [										;-- prioritizes left/up jump over right/down
+			any [										;-- prioritizes left/up slide over right/down
 				all [
 					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wofs'/:x space/slide-length
-					wofs'/:x: wofs'/:x - avail + min 0 before/:x	;-- important to include empty region (before < 0) into the jump!
+					0 < avail: window/available? x -1 wofs/:x space/slide-length
+					wofs'/:x: wofs'/:x - avail
 				]
 				all [
 					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wofs'/:x + wsize/:x space/slide-length
-					wofs'/:x: wofs'/:x + avail - min 0 after/:x		;-- important to include empty region (after < 0) into the jump!
+					0 < avail: window/available? x  1 wofs/:x + wsize/:x space/slide-length
+					wofs'/:x: wofs'/:x + avail
 				]
 			]
 		]
@@ -2268,25 +2270,24 @@ list-view-ctx: context [
         	list/map << 2
         ]
         #assert [anchor-item]
-        y:          req-axis
-        anchor:     map-index->list-index list map-index
-        margin:     list/frame/margin
-        anchory:    anchor-geom/offset/:y
-        window:     list/parent
-        frame:      construct list/frame				;-- for bind(with) to work
-        ;; since 'from' may not align with the anchor top/bottom margin, add the difference to 'requested':
-        ;; (this relies on list layout counting length *after* the anchor itself)
-        requested': max 0 requested + anchor-geom/size/:y + (from - anchory * dir)
-        length:     requested' + margin/:y
-        reverse?:   dir
-		settings:   with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length reverse? do-not-extend?]	;-- origin is unused
-		path:       when not same? list last current-path (get-host-path list)
+        y:        req-axis
+        anchor:   map-index->list-index list map-index
+        margin:   list/frame/margin
+        window:   list/parent
+        frame:    construct list/frame					;-- for bind(with) to work
+        reverse?: dir < 0
+        ;; since 'from' may not align with the 'start' level, add the difference to requested 'length':
+        ;; (this relies on list layout counting length *after* the anchor itself and not including the margins)
+        start:    anchor-geom/offset/:y + either dir > 0 [anchor-geom/size/:y][0]	;-- from where length is counted
+        length:   max 0 requested + (from - start * dir)
+		settings: with [frame 'local] [axis margin spacing canvas fill-x fill-y limits anchor length reverse? do-not-extend?]	;-- origin is unused
+		path:     when not same? list last current-path (get-host-path list)	;-- ensures proper styling
 		#assert [path]
 		with-style path [frame: make-layout 'list :list/items settings]
-		;; filled includes whole size + single margin
-		filled:     frame/filled - (from - anchory * dir) - either dir < 0 [anchor-geom/size/:y][0]
-		result:     clip 0 requested filled
-		; ?? [window/origin anchor anchor-geom/size/:y anchory from requested' length frame/filled filled result]
+		;; filled includes whole items span + single margin, so bigger than length by anchor size and some
+		filled:   frame/filled - anchor-geom/size/:y - (from - start * dir)
+		result:   clip 0 requested filled
+		; if result <> 0 [?? [window/origin anchor anchor-geom/offset/:y anchor-geom/size/:y start from length frame/filled filled result]]			
 		; ?? frame/map
 		#debug list-view [#print "available from (from) along (req-axis)/(dir): (result) of (requested)"]
 		result
@@ -2321,12 +2322,12 @@ list-view-ctx: context [
 		axis:     list/axis
 		fill-x:   axis <> 'x							;-- always filled along finite axis
 		fill-y:   axis <> 'y
-		; ?? [xy1 xy2 window/origin lview/origin]
-		dir:      pick [-1 1] reverse?: lview/anchor/reverse?
-		length:   xy2/:axis - min 0 xy1/:axis			;-- start drawing since the anchor
-		moved?:   window/origin <> list/frame/window-origin
-		; ?? [dir length window/origin xy1 xy2]
-		; clear lview/item-cache
+		reverse?: lview/anchor/reverse?
+		length:   xy2/:axis - xy1/:axis
+		moved?:   any [									;-- determine if window offset will change
+			lview/anchor/offset <> list/frame/anchor-offset
+			lview/anchor/index  <> list/frame/anchor
+		]
 		;; window/origin is unused because window offsets the list by itself
 		settings: with [list 'local] [axis margin spacing canvas fill-x fill-y limits anchor length reverse? do-not-extend?]
 		; return list/container-draw/layout 'list settings	;@@ how can it support selected and cursor? put them into list?
@@ -2355,12 +2356,27 @@ list-view-ctx: context [
 			]
 			i: i + 1
 		]
-		compose/into [window-origin: (window/origin)] tail frame
-		; ?? window/origin
+		
+		;; automatic window positioning based on anchor data
+		anchor: lview/anchor
+		shift: either anchor/reverse? [
+			#assert [anchor/offset >= 0]
+			#assert [not list/limits]							;-- else /size may be constrained and shouldn't be relied upon
+			anchor/offset - (frame/size/:axis - length)			;-- subtract extra part overhanging after the length
+		][
+			#assert [anchor/offset <= 0]
+			anchor/offset
+		]
+		window/origin: make-pair [0x0 axis shift]				;@@ or move the list instead? a bit slower
+		
+		; ?? [xy1 xy2 length frame/filled shift overhang anchor/offset window/origin lview/origin]
+		compose/into [
+			window-origin: (window/origin)
+			anchor-offset: (anchor/offset)
+		] tail frame
 		list/frame: frame
 		list/size:  frame/size
 		quietly list/map: frame/map
-		; ?? list/map
 		drawn
 	]
 	
@@ -2397,16 +2413,17 @@ list-view-ctx: context [
 	slide: function [lview [object!]] [
 		list:   lview/list
 		window: lview/window
+		anchor: lview/anchor
 		y:      list/axis
+		
 		;; it's possible that multiple slides occur without a draw, resulting in no visible item suitable as a new anchor
 		;; to avoid this I just limit max consecutive slides to half the window
 		;@@ there must be a better solution for this, but I don't see a simple one
-		#assert [list/frame/window-origin  "list must be drawn before sliding"]
-		offset-since-drawn: window/origin - list/frame/window-origin
 		if any [
-			(abs offset-since-drawn/:y) > half window/size/:y
+			(abs anchor/offset) > half window/size/:y
 			not moved: inf-scrollable-ctx/slide lview
 		] [return none]
+		
 		;; change anchor to first or last (still visible) item, depending on the slide direction
 		xy2: window/size + xy1: negate window/origin
 		set [new-anchor-item: new-anchor-geom:] pos:
@@ -2418,69 +2435,64 @@ list-view-ctx: context [
 				/back moved/:y < 0
 			]
 		#assert [new-anchor-item]
-		map-index:  1 + half skip? pos
-		; ;; (changed) window/origin + old-anchor-geom is where old anchor is now located
-		; ;; (changed) window/origin + new-anchor-geom is where new anchor is now located
-		; ;; but to change the anchor is to move coordinate start from the old one into the new one
-		; ;; old anchor is known to have been at margin if it was on top, or at -margin-size/y on bottom
-		; ;; new window/origin should be chosen so that:
-		; ;; - when we move the window down, new anchor item offset should be at margin
-		; ;; - when we move the window up, it should be at -margin-size/y
-		; new-origin: window/origin + (new-anchor-geom/offset - list/margin)
-		geom1: list/map/2
-		?? new-anchor-geom ?? geom1 ?? [lview/anchor/offset window/origin moved]
-		probe lview/anchor/offset: window/origin/:y + new-anchor-geom/offset/:y + 
+		anchor/index: ~/map-index->list-index list 1 + half skip? pos
+		
+		;; window/origin is affected indirectly here via anchor/offset,
+		;; because only after list/draw it is possible to know full rendered list extent
+		anchor/offset: window/origin/:y + new-anchor-geom/offset/:y + 
 			either lview/anchor/reverse?: moved/:y < 0 [
 				new-anchor-geom/size/:y + list/margin/:y - window/size/:y
 			][
 				negate list/margin/:y
 			]
-		; if moved/:y < 0 [new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y]
-		; if lview/anchor/reverse?: moved/:y < 0 [
-			; new-origin/:y: new-origin/:y + (list/margin/:y * 2) + new-anchor-geom/size/:y - window/size/:y
-		; ]
-		; ?? [moved window/origin new-origin]
-		; window/origin: new-origin
-		lview/anchor/index:  ~/map-index->list-index list map-index
-		; ?? [offset lview/anchor new-anchor-geom/offset new-anchor-geom/size self/origin window/origin]
+			
+		; ?? [moved xy1 xy2 new-anchor-geom/offset new-anchor-geom/size anchor/index anchor/offset list/frame/size]
 		moved
 	]
-	; draw: function [
-		; lview [object!]
-		; canvas: infxinf [pair! none!]
-		; fill-x: no [logic! none!]
-		; fill-y: no [logic! none!]
-		; wxy1 [none! pair!]
-		; wxy2 [none! pair!]
-	; ][
-		
-		; item-canvas: layouts/list/get-item-canvas canvas lview/limits lview/axis lview/margin
-		; lview/frame: make map! compose [
-			; axis:        (lview/axis)
-			; margin:      (lview/margin)
-			; spacing:     (lview/spacing)
-			; limits:      (if lview/limits [copy lview/limits])
-			; item-canvas: (item-canvas)
-		; ]
-		; lview/inf-scrollable-draw/on/window canvas fill-x fill-y wxy1 wxy2
-	; ]
 
 	kit: make-kit 'list-view [
+		selected: does [space/selected]
+	
+		slide: function ["If window is near its borders, let it slide to show more data"] [~/slide space]
+		
 		move-to: function [
 			"Pan the view to the item with the given index"
 			index    [integer!] (all [0 < index index <= any [space/data/size infxinf/x]])
 			location [word!] "Any of [after before]" (find [after before] location)	;@@ 'center to be supported down the road
-			/margin mrg: 0 [integer!] "How much to reserve around the item"
+			/margin mrg [integer!] "How much to reserve around the item"
 		][
-			space/anchor/index: index
+			default mrg: mrg': space/list/margin along y: space/list/axis
+			space/anchor/index:  index
 			space/anchor/offset: 0
 			space/origin: either space/anchor/reverse?: location = 'before [
 				viewport: space/viewport				;-- call the func to get the VP size
-				as-pair 0 negate space/window/size/y - viewport/y - mrg
+				as-pair 0 negate space/window/size/:y - viewport/:y - mrg' + mrg
 			][
-				as-pair 0 0 - mrg
+				as-pair 0 mrg - mrg'
 			]
+			; ?? space/origin
 			;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
+		]
+		
+		;@@ should this support rich text (if list items are rich text)?
+		copy-items: function [
+			"Copy text of given items"
+			items [block! hash! (parse items [any integer!]) pair!] "A list or a range of item indices"
+			/clip "Write it into clipboard"
+			; /text
+		][
+			if pair? items [
+				limit: any [space/list/items/size infxinf/x]
+				items: list-range clip 1 limit items
+			]
+			format: copy {}								;-- used when item has no format
+			result: to string! map-each/eval i items [
+				item: space/list/items/pick i
+				text: batch item [format]
+				[text #"^/"]
+			]
+			if clip [write-clipboard result]
+			result
 		]
 		
 	]
@@ -2569,31 +2581,32 @@ list-view-ctx: context [
 			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
 		
-		;; this wrapper is neede to auto-position window/origin based on /anchor
-		;; it has to draw the list, calculate new origin and change it in the drawn block
-		;@@ unfortunately this means knowledge of the block format produced by window-draw, and of its spec
-		;@@ maybe list-draw should offset the list instead? shift all items
-		window-draw: :window/draw
-		window/draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		; ;; this wrapper is neede to auto-position window/origin based on /anchor
+		; ;; it has to draw the list, calculate new origin and change it in the drawn block
+		; ;@@ unfortunately this means knowledge of the block format produced by window-draw, and of its spec
+		; ;@@ maybe list-draw should offset the list instead? shift all items
+		; window-draw: :window/draw
+		; window/draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
 			; old-origin: window/origin
-			quietly window/origin: 0x0
-			drawn: window-draw/:on canvas fill-x fill-y
-			if :drawn/1 = 'translate [					;-- window isn't empty
-				shift: either anchor/reverse? [
-					#assert [anchor/offset >= 0]
-					anchor-geom: last list/map
-					overhang: anchor-geom/offset/y + anchor-geom/size/y + list/margin/y - window/size/y
-					anchor/offset - overhang
-				][
-					#assert [anchor/offset <= 0]
-					anchor/offset
-				]
-				?? [shift overhang anchor/offset]
-				quietly window/origin: window/map/2/offset: drawn/2: make-pair [0x0 list/axis shift]
-			]
-			drawn
-		]
+			; quietly window/origin: 0x0
+			; drawn: window-draw/:on canvas fill-x fill-y
+			; if :drawn/1 = 'translate [					;-- window isn't empty
+				; shift: either anchor/reverse? [
+					; #assert [anchor/offset >= 0]
+					; anchor-geom: last list/map
+					; overhang: anchor-geom/offset/y + anchor-geom/size/y + list/margin/y - window/size/y
+					; anchor/offset - overhang
+				; ][
+					; #assert [anchor/offset <= 0]
+					; anchor/offset
+				; ]
+				; ?? [shift overhang anchor/offset]
+				; quietly window/origin: window/map/2/offset: drawn/2: make-pair [0x0 list/axis shift]
+			; ]
+			; drawn
+		; ]
 		
+		;@@ remove it and keep the one in the kit?
 		slide: does [~/slide self]
 		
 		; inf-scrollable-draw: :draw
