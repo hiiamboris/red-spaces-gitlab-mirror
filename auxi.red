@@ -638,40 +638,10 @@ interpolate: function [
 	50% = interpolate -100% 200% 0.5
 ]
 
-context [
-	set 'binary-search function [
-		"Look for optimum F(x)=Fopt on a segment [X1..X2] using binary search, return [X1 F1 X2 F2]"
-		'word [word! set-word!] "Argument name for the loop"
-		X1    [number!]
-		X2    [number!]
-		Fopt  [number!] "Optimum to find"
-		error [number!] "Minimum acceptable error to stop search (along X or F)"
-		F     [block!]  "Function F(x)"
-		/with "Provide F(X1) and F(X2) if they are known"
-			F1: (call-f X1) [number!] 
-			F2: (call-f X2) [number!] 
-	][
-		#assert [fopt = clip fopt f1 f2  "Optimum value should be within [F1,F2]"]
-		sign: sign? (f2 - f1) * (x2 - x1)				;-- + if ascending
-		repeat n 1e3 [
-			df: abs f2 - f1
-			dx: abs x2 - x1
-			if error >= max df dx [break]				;-- found it already; segment is too narrow
-			y: call-f x: x1 + x2 / 2
-			;; in / case: y < fopt < y2 means x is new x1; in \ case: x is new x2
-			either positive? fopt - y * sign [x1: x f1: y][x2: x f2: y]		;-- use new low or high boundary
-		]
-		; print `"Spent (n - 1) iterations in search"`
-		if n = 1e3 [ERROR "Binary search deadlocked"]	;-- too much precision will slow it down, better to error out
-		reduce [x1 f1 x2 f2]
-	]
-	
-	call-f: func [x] with :binary-search [set word x do f]
-]
-
 build-index: reproject: reproject-range: none			;-- don't make these global, keep in spaces/ctx
 context [
 	;@@ can parts of this context be generalized and put into /common?
+	;@@ maybe indexed search can be included into %search.red?
 	
 	set 'build-index function [
 		"Build an index of given length for fast search over points"
