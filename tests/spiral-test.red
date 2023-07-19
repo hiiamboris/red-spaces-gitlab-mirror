@@ -60,7 +60,7 @@ declare-template 'spiral/space [
 		rmid: full/y / -2 + absolute p/y	;-- radius of the middle line of the string
 		wavg: full/x / len					;-- average char width
 		p: p - (wavg / 2)					;-- offset the typesetter to center the average char
-		drawn: clear []		;@@ this is a bug, really
+		drawn: make [] len * 3
 		;@@ TODO: initial angle
 		append drawn compose [translate (size / 2)]
 		repeat i len [			;@@ should be for-each [/i c]
