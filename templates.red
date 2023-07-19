@@ -2121,8 +2121,9 @@ window-ctx: context [
 		]
 		#debug sizing [if window/size <> size [#print "resizing window to (size)"]]
 		window/size: size
-		;; let right bottom corner on the map also align with window size
-		quietly window/map: compose/deep [(content) [offset: (window/origin) size: (content/size)]]
+		;; map should never contain infinite sizes: clip the drawn child area to window
+		mapsize: size - window/origin
+		quietly window/map: compose/deep [(content) [offset: (window/origin) size: (mapsize)]]
 		when cdraw (compose/only [translate (window/origin) (cdraw)])
 	]
 	

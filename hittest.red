@@ -23,12 +23,14 @@ into-map: function [
 		either list [
 			foreach child list [
 				box: select/same map child
+				#assert [box/size  "map should not contain infinite sizes"]
 				if within? xy o: box/offset box/size [
 					return reduce [child  xy - o]
 				]
 			]
 		][
 			foreach [child box] map [
+				#assert [box/size  "map should not contain infinite sizes"]
 				if within? xy o: box/offset box/size [
 					return reduce [child  xy - o]
 				]
