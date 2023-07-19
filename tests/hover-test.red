@@ -11,8 +11,8 @@ Red [
 		2. box color should indicate when pointer is in or out of it
 		   even if no physical pointer movement happens
 		   (because box rotates, there is movement in its own coordinate space)
-		3. no over events occur when pointer is held in place outside the rotating box
-		   except when dragging out of the box, when it should keep receiving the events
+		3. when pointer is held in place outside the rotating box, timer should keep triggering on-over
+		   so crosshair should still be around the pointer, save for minor inter-frame lag
 	}
 ]
 
