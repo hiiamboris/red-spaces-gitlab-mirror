@@ -722,10 +722,11 @@ paragraph-ctx: context [
 	whitespace!: charset " ^-"							;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
 	non-space!: negate whitespace!
 	
-	size-text2: function [layout [object!]] [			;@@ it's a workaround for #4841
+	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
 		size1: size-text layout
-		; size2: caret-to-offset/lower layout length? layout/text
-		; max size1 size2
+		size2: caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
+		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
+		max size1 size2
 	]
 	
 	ellipsize: function [layout [object!] text [string!] canvas [pair!]] [
