@@ -109,7 +109,7 @@ context [
 	;@@ apply at least host style when path is given; other styles carryover should not be endorsed
 	set 'with-style function [							;-- exported for an ability to spoof the tree (for slide, basically)
 		"Draw calls should be wrapped with this to apply styles properly"
-		space [path! (parse space [any object!]) object!]
+		space [block! path! (parse space [any object!]) object!]
 			;@@ maybe when path given it should override the current one?
 			"Inserted into current rendering path (if any)"		;-- path support is useful for out of tree renders (like slide)
 		code  [block!]
