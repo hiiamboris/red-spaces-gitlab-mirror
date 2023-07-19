@@ -119,8 +119,8 @@ define-handlers [
 	;@@ TODO: when dragging and slide succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `slide` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-down     [space path event] [space/slide]	;-- after button clicks
-		on-key-down [space path event] [space/slide]	;-- during key holding
+		on-wheel  [space path event] [space/slide]		;-- faster wheel-scrolling, without slide-timer delays
+		on-key-up [space path event] [space/slide]		;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
@@ -130,46 +130,117 @@ define-handlers [
 
 	;-- *************************************************************************************
 	list-view: extends 'inf-scrollable [
+		on-down [space path event] [
+			; ?? [space/origin space/window/origin space/anchor/offset]		
+			unless space/selectable [exit]				;-- this handler is only responsible for selection
+			if set [item:] locate path [obj - .. obj/type = 'item] [
+				range: space/list/frame/range
+				i: range/1 + half -1 + index? find/same space/list/map item
+				case [
+					event/shift? [
+						old: any [space/cursor range/1]
+						space/selected: union space/selected
+							to space/selected list-range space/cursor: i old	;@@ #5344
+					]
+					event/ctrl? [alter space/selected space/cursor: i]
+					'default [append clear space/selected space/cursor: i]
+				]
+				trigger 'space/selected					;-- not automatic since /cursor may stay in place, and /selected is undetected
+				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
+			]
+			;; let scrollable get the event, for dragging viewport by item
+		]
+		
 		on-key-down [space path event] [
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
-			list: space/list
+			list:  space/list
+			y:     list/axis
+			range: list/frame/range
+			
 			switch/default event/key [
-				down up [
-					step:  pick [1 -1] down?: event/key = 'down
-					count: any [space/data/size 1.#inf]			;-- list may be unlimited
-					range: list/frame/range
-					i: either space/cursor
-						[clip range/1 range/2 step + space/cursor]
-						[pick range down?]
-					item:  list/items/pick i
-					unless geom: select/same/skip list/map item 2 [exit]	;-- item has to be drawn, to scroll to it
-					; if list/frame/window-origin <> space/window/origin [exit]
-					
-					;; change cursor and selection
-					unless event/ctrl? [
-						either all [event/shift? space/selectable = 'multi]
-							[include-into space/selected i]		;@@ should shift unselect as well?
-							[append clear space/selected i]
-					] 
-					space/cursor: i
-					
-					;; move viewport to make cursor fully visible
-					point: geom/offset + space/window/origin + either down? [geom/size * 0x1][0x0] 
-					;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
-					space/move-to/margin/no-clip point space/look-around
-					; space/origin/y: 0 - point/y + ((pick space/viewport 'y) - space/look-around)
-					space/slide							;-- sync slide to the move, else slide is delayed until next slide-timer hit
-					; ?? [list/frame/range i offset point list/frame/window-origin space/window/origin list/frame/anchor space/anchor]
-				]
-				#" " [									;-- ctrl+space selected item toggle
+				#"C" [batch space [copy-items/clip selected]]
+				
+				#" " [									;-- space/ctrl+space selected item toggle
 					item: if i: space/cursor [list/items/pick i]
 					if item [
 						alter space/selected i
 						trigger 'space/selected			;-- it cannot detect deep change, so need explicit reset
 					]
 				]
-			] [exit]
-			stop/now
+				
+				;@@ this logic must be in the kit rather (typical nav actions), only triggered here
+				down up page-down page-up home end [
+					sign: pick [1 -1] down?: to logic! find [down page-down end] event/key
+					old-cursor: either space/cursor
+						[clip range/1 range/2 space/cursor]
+						[pick range down?]
+					new-cursor: switch event/key [
+						down up [
+							either space/cursor
+								[clip range/1 range/2 space/cursor + sign]
+								[pick range down?]
+						]
+						page-down page-up [
+							old-geom: pick list/map 2 * (old-cursor - range/1 + 1)
+							#assert [block? old-geom]
+							old-y: old-geom/offset/:y + either down? [0][old-geom/size/:y]
+							vp:    space/viewport
+							new-y: (max 1 vp/:y - list/spacing/:y) * sign + old-y
+							new-y: new-y + list/frame/window-origin/:y	;-- item-before/after requires window-relative coordinates
+							new-cursor: clip range/1 range/2 either down? [
+								i: any [
+									batch space [frame/item-before new-y]	;-- may return none if no more items
+									range/2									;-- select farthest item then
+								]
+								max range/1 + i - 1 old-cursor + sign		;-- move at least by one item
+							][
+								i: any [
+									batch space [frame/item-after new-y]	;-- may return none if no more items
+									range/1									;-- select farthest item then
+								]
+								min range/1 + i - 1 old-cursor + sign		;-- move at least by one item
+							]
+						]
+						home [range/1]
+						end  [range/2]
+					]
+					item:  list/items/pick new-cursor
+					unless geom: select/same/skip list/map item 2 [exit]	;-- item has to be drawn, to scroll to it
+					; if list/frame/window-origin <> space/window/origin [exit]
+					
+					;; change cursor and selection
+					unless event/ctrl? [
+						new-selected: either all [event/shift? space/selectable = 'multi] [
+							indices: list-range old-cursor new-cursor	;@@ should shift unselect as well?
+							union space/selected indices
+						][
+							new-cursor
+						]
+						append clear space/selected new-selected
+					] 
+					space/cursor: new-cursor
+					
+					;; move viewport to make cursor item fully visible (at least to an extent possible):
+					;; it's possible that when user hits 'down' the item is above the viewport (and vice versa)
+					;; so it's not enough to pan to just one point, need both (with one having bigger priority)
+					point1: space/window/origin + geom/offset 
+					point2: point1 + (geom/size * axis2pair y)
+					unless down? [swap 'point1 'point2]
+					;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
+					; margin: make-pair [0x0 list/axis space/look-around]
+					foreach point [point1 point2] [
+						;@@ need to think how to enable margin here - complicated!
+						;@@ item margin may be bigger than list/margin, then I need to call 'available?' and clip the margin accordingly
+						; space/move-to/margin/no-clip get point margin
+						;@@ use the kit
+						space/move-to/no-clip get point
+					]
+					space/slide							;-- sync slide to the move, else slide is delayed until next slide-timer hit
+					; ?? [list/frame/range i offset point list/frame/window-origin space/window/origin list/frame/anchor space/anchor]
+				]
+				
+			] [exit]									;-- unhandled keys belong to inf-scrollable
+			stop/now									;-- handled keys are not passed into inf-scrollable
 		]
 	]
 
