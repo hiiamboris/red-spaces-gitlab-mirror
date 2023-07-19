@@ -67,10 +67,10 @@ define-handlers [
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
 			code: switch event/key [
-				down       [[space/move-by 'line 'forth 'y]]
-				up         [[space/move-by 'line 'back  'y]]
-				right      [[space/move-by 'line 'forth 'x]]
-				left       [[space/move-by 'line 'back  'x]]
+				down       [[space/move-by pick [page line] event/ctrl? 'forth 'y]]
+				up         [[space/move-by pick [page line] event/ctrl? 'back  'y]]
+				right      [[space/move-by pick [page line] event/ctrl? 'forth 'x]]
+				left       [[space/move-by pick [page line] event/ctrl? 'back  'x]]
 				page-down  [[space/move-by 'page 'forth 'y]]
 				page-up    [[space/move-by 'page 'back  'y]]
 				home       [[space/move-to 'head]]
