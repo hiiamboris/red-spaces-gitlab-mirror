@@ -52,7 +52,7 @@ timers: context [
 			unless number? rate-old [rate-old: 0:0:1 / rate-old]
 			if rate <= rate-old [exit]
 		]
-		#debug [print ["switching timer host to" mold/flat/part face 100]]
+		#debug timer [print ["switching timer host to" mold/flat/part face 100]]
 		set 'timer-host face
 		update-resolution
 	]
