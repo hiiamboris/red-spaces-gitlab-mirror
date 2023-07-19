@@ -2349,7 +2349,6 @@ list-view-ctx: context [
 				find lview/selected i [
 					compose/only/into [translate (item-offset) (draw-box selection-prototype item-size)] tail drawn
 				]
-				;@@ add paging support to this
 				lview/cursor = i [
 					compose/only/into [translate (item-offset) (draw-box cursor-prototype item-size)] tail drawn
 				]
@@ -2425,7 +2424,10 @@ list-view-ctx: context [
 		] [return none]
 		
 		;; change anchor to first or last (still visible) item, depending on the slide direction
-		xy2: window/size + xy1: negate window/origin
+		xy2: window/size + xy1: negate window/origin	;-- new window box inside list map
+		extra: lview/look-around + list/spacing/:y
+		xy1/:y: xy1/:y - extra							;-- let anchor start a bit outside the window
+		xy2/:y: xy2/:y + extra
 		set [new-anchor-item: new-anchor-geom:] pos:
 			apply 'locate [
 				list/map
@@ -2445,6 +2447,7 @@ list-view-ctx: context [
 			][
 				negate list/margin/:y
 			]
+		#assert [either lview/anchor/reverse? [anchor/offset >= 0][anchor/offset <= 0]]
 			
 		; ?? [moved xy1 xy2 new-anchor-geom/offset new-anchor-geom/size anchor/index anchor/offset list/frame/size]
 		moved
@@ -2455,6 +2458,7 @@ list-view-ctx: context [
 	
 		slide: function ["If window is near its borders, let it slide to show more data"] [~/slide space]
 		
+		;@@ must be in the frame!
 		move-to: function [
 			"Pan the view to the item with the given index"
 			index    [integer!] (all [0 < index index <= any [space/data/size infxinf/x]])
@@ -2495,6 +2499,48 @@ list-view-ctx: context [
 			result
 		]
 		
+		frame: object [
+			;@@ move this into list? hardly makes sense to make offsets window-relative
+			;@@ OTOH, list is limited and has no continuation around window borders
+			;@@ unify these two into 'next-item' with a refinement?
+			;; an item is "before y" if y >= its (offset/y + size/y)
+			item-before: function [
+				"Get item index before given window offset along primary axis; or none"
+				offset [integer! pair!]
+			][
+				list: space/list
+				y:    list/axis
+				if pair? offset [offset: offset/:y]
+				first-geom: second map: list/frame/map
+				if any [
+					empty? map
+					offset < (first-geom/offset/:y + first-geom/size/:y)
+				] [return none]
+				first search/mode/for i: 1 n: half length? map [
+					geom: pick map i * 2
+					geom/offset/:y + geom/size/:y
+				] 'interp offset - list/frame/window-origin/:y
+			]
+			
+			;; an item is "after y" if y < its offset/y
+			item-after: function [
+				"Get item index after given window offset along primary axis; or none"
+				offset [integer! pair!]
+			][
+				list: space/list
+				y:    list/axis
+				if pair? offset [offset: offset/:y]
+				last-geom: last map: list/frame/map
+				if any [
+					empty? map
+					offset >= last-geom/offset/:y
+				] [return none]
+				third search/mode/for i: 1 n: half length? map [
+					geom: pick map i * 2
+					geom/offset/:y
+				] 'interp offset - list/frame/window-origin/:y + 1	;-- +1 to ensure strict 'y < offset'
+			]
+		]
 	]
 	
 	invalidates-list: function [lview [object!] word [word!] value [any-type!]] [
@@ -3206,7 +3252,7 @@ grid-ctx: context [
 					
 					;; now find height estimate HE corresponding to the closest width to TW using binary search
 					set [H-: TW+: HE: TWE:]						;-- use lower width as estimate since it's <= TW
-						binary-search/with HE H- H+ TW tolerance HE2TWE TW2 TW1		;@@ use `apply` to make it readable!
+						apply 'search [HE: H- H+ HE2TWE /with on TW2 TW1 /for on TW /error on tolerance /mode on 'binary]
 					#assert [(abs TWE - TW) <= tolerance]
 									
 					;; find final widths W from height estimate HE
