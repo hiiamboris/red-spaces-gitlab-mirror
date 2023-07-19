@@ -504,7 +504,7 @@ doc-ctx: context [
 			/block "Always return paragraph list"
 			/clip  "Write it into clipboard"
 		][
-			slice: either block [extract/block range][extract range]	;@@ use apply
+			slice: extract/:block range
 			if clip [clipboard/write slice]
 			if text [slice: slice/format]
 			slice
