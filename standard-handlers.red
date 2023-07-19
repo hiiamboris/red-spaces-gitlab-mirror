@@ -119,8 +119,10 @@ define-handlers [
 	;@@ TODO: when dragging and slide succeeds, the canvas jumps
 	;@@       need to update drag-parameter from `slide` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-wheel  [space path event] [space/slide]		;-- faster wheel-scrolling, without slide-timer delays
-		on-key-up [space path event] [space/slide]		;-- most useful for fast seamless scrolling on pageup/pagedown
+		on-wheel    [space path event] [space/slide]	;-- faster wheel-scrolling, without slide-timer delays
+		;; trick here is that inf-scrollable/on-key fires after scrollable/on-key-down:
+		;@@ (otherwise I would have to extend the handler dialect to add delayed handlers, child after parent - maybe I should?)
+		on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
@@ -147,6 +149,7 @@ define-handlers [
 				]
 				trigger 'space/selected					;-- not automatic since /cursor may stay in place, and /selected is undetected
 				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
+				;@@ also it will conflict with current touch-friendly dragging, so must be optional
 			]
 			;; let scrollable get the event, for dragging viewport by item
 		]
