@@ -162,7 +162,8 @@ focus-space: function [
 	if space =? old: focus/current [					;-- no refocusing into the same target, but need to ensure host is focused
 		host: host-of space
 		;@@ may error out without /parent check - e.g. if click on host hides it, then click continue on focusable child
-		if host/parent [native-set-focus host]
+		;@@ may also error out without host check - e.g. in non-compliant trees like grid-test5-7
+		all [host host/parent native-set-focus host]
 		return no
 	]
 	#debug focus [#print "moving focus from (mold/only reduce [old]) to (mold/only reduce [space])"]
@@ -220,7 +221,9 @@ register-previewer
 		#debug focus [#print "attempting to focus (space-id space)"]
 		path: get-host-path space
 		#assert [path "detected click on an out-of-tree widget"]
-		if focus/deep-check path [state enabled?] [		;-- don't focus on a just-destroyed host (popup)
+		all [
+			path										;-- can be none in non-compliant trees, like in grid-test5-7
+			focus/deep-check path [state enabled?]		;-- don't focus on a just-destroyed host (popup)
 			focus-space space
 		]
 	]
