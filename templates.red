@@ -2487,9 +2487,11 @@ list-view-ctx: context [
 			/clip "Write it into clipboard"
 			; /text
 		][
-			if pair? items [
+			items: either pair? items [
 				limit: any [space/list/items/size infxinf/x]
-				items: list-range clip 1 limit items
+				list-range clip 1 limit items
+			][
+				sort copy items							;-- copy should always be ordered
 			]
 			format: copy {}								;-- used when item has no format
 			result: to string! map-each/eval i items [
