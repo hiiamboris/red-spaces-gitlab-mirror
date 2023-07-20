@@ -2,14 +2,15 @@ Red [needs: view]
 
 ;; fun: this demo contains 1787 spaces! and no lag except for the initial tree construction delay!
 
-; recycle/off					
-#include %../../common/include-once.red
-; #include %../../common/assert.red
-; #include %../../common/debug.red
+; recycle/off 
+#include %../everything.red
+#process off	;@@ omg native #include is just impossibly stupid and harmful
+do/expand [
 #include %../../common/composite.red
 #include %../../common/contrast-with.red
+; #include %../../common/assert.red
+; #include %../../common/debug.red
 ; #do [disable-space-cache?: on]
-#include %../everything.red
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
@@ -116,3 +117,4 @@ prof/reset
 ; debug-draw
 either system/build/config/gui-console? [print "---"][do-events]
 prof/show
+]

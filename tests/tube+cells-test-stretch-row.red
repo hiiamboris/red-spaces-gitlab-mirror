@@ -1,12 +1,14 @@
 Red [needs: view]
 
 ; recycle/off					
-#include %../../common/include-once.red
+; #include %../../common/include-once.red
+#include %../everything.red
 ; #include %../../common/assert.red
 ; #include %../../common/debug.red
+#process off
+do/expand [
 #include %../../common/composite.red
 #include %../../common/contrast-with.red
-#include %../everything.red
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
@@ -91,3 +93,4 @@ prof/reset
 ; debug-draw
 either system/build/config/gui-console? [print "---"][do-events]
 prof/show
+]
