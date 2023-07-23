@@ -6,7 +6,7 @@ Red [
 ]
 
 #include %../everything.red
-
+; #do [disable-space-cache?: on]
 
 lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
 
@@ -27,10 +27,9 @@ view/no-wait/options [
 	b: host [
 		lv: list-view multi-selectable focus 300x400 data= function [/pick i /size] [
 			either pick [
-				random/seed i
 				rejoin ["message " i ": " copy/part lorem random length? lorem]
 			][none]									;-- /size = none for unlimited
-		]
+		] with [list/margin: 10x20]
 	]
 	on-over [
 		status/text: mold hittest face/space event/offset
@@ -39,12 +38,13 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
-		invalidate lv; <everything>
-		b/draw: render b
+		; invalidate lv; <everything>
+		; b/draw: render b
 	]
 	across text "Jump to item:"
-	entry: field "1'000'000'000" [lv/jump-to face/data]
-	button "Go" [lv/jump-to entry/data]
+	entry: field "1'000'000'000" [batch lv [move-to/margin entry/data 30]]
+	button "🔽" [batch lv [move-to/after/margin/no-clip  entry/data 30]]
+	button "🔼" [batch lv [move-to/before/margin/no-clip entry/data 30]]
 ] [offset: 10x10]
 ; debug-draw
 ; foreach-*ace/next path system/view/screens/1 [probe path]
