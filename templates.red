@@ -2581,13 +2581,20 @@ list-view-ctx: context [
 		select-range: function [
 			"Redefine selection or extend up to a given limit"
 			limit [word! integer! pair!] "Pair specifies a range of items"
-			/keep "Do not remove current selection"
+			/mode "Specify selection mode (default: 'replace)"
+				sel-mode: 'replace [word!] (find [replace include exclude invert] sel-mode)
 		][
 			if word?    limit [limit: locate limit]
 			if integer? limit [limit: here by limit]
-			unless keep [clear space/selected]
+			old: space/selected
 			new: make hash! list-range limit/1 limit/2
-			append space/selected exclude new space/selected
+			new: switch sel-mode [
+				replace [new]
+				include [union old new]
+				exclude [exclude old new]
+				invert  [difference old new]
+			]
+			append clear old new
 			trigger 'space/selected
 		]
 			
