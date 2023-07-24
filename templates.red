@@ -2472,8 +2472,8 @@ list-view-ctx: context [
 				sort copy items							;-- copy should always be ordered
 			]
 			format: copy {}								;-- used when item has no format
-			result: to string! map-each/eval i items [
-				item: space/list/items/pick i
+			result: to string! map-each/eval/drop i items [
+				unless item: space/list/items/pick i [continue]
 				text: batch item [format]
 				[text #"^/"]
 			]
