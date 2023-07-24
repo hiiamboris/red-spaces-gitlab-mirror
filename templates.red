@@ -1869,7 +1869,7 @@ rich-content-ctx: context [								;-- rich content
 			space/data
 		]
 	
-	]
+	];kit: make-kit 'rich-content/rich-paragraph [
 		
 	on-data-change: function [space [object!] word [word!] data [block!]] [
 		;@@ maybe postpone all this until next render?
@@ -2453,10 +2453,80 @@ list-view-ctx: context [
 		moved
 	]
 
+	;@@ move this into list? hardly makes sense to make offsets window-relative
+	;@@ OTOH, list is limited and has no continuation around window borders
+	;; an item is "before y" if y >= its (offset/y + size/y)
+	;; an item is "after y"  if y < its offset/y
+	get-next-item: function [
+		space  [object!]
+		offset [integer! pair!]
+		dir    [word!] (find [before after] dir)
+	][
+		list: space/list
+		y:    list/axis
+		if pair? offset [offset: offset/:y]
+		if empty? map: list/frame/map [return none]
+		
+		if either dir = 'before [
+			first-geom: second map
+			offset < (first-geom/offset/:y + first-geom/size/:y)
+		][
+			last-geom: last map
+			offset >= last-geom/offset/:y
+		] [return none]
+		
+		used-size: pick [1 0] dir = 'before
+		target: offset - list/frame/window-origin/:y
+		if dir <> 'before [target: target + 1]			;-- +1 to ensure strict 'y < offset'
+		found: search/mode/for i: 1 n: half length? map [
+			geom: pick map i * 2
+			geom/offset/:y + (geom/size/:y * used-size)
+		] 'interp target
+		#assert [found]
+		pick found pick [1 3] dir = 'before
+	]
+				
+	axial-shift: function [
+		"Find a new item index further along main axis"
+		space [object!]
+		index [integer!] "From given item (must be in the map)"
+		shift [integer!] "Maximum positive or negative distance to travel"
+	][
+		list:      space/list
+		range:     list/frame/range
+		index:     clip range/1 range/2 index			;-- if not visible, choose nearest
+		if shift = 0 [return index]
+		old-geom:  pick list/map 2 * (index - range/1 + 1)
+		#assert [block? old-geom]
+		old-y:     old-geom/offset/:y					;-- shift down counts from item's top
+		if shift < 0 [old-y: old-y + old-geom/size/:y]	;-- shift up counts from item's bottom
+		new-y:     old-y + shift
+		new-y:     new-y + list/frame/window-origin/:y	;-- item-before/after requires window-relative coordinates
+		sign:      sign? shift
+		new-index: clip range/1 range/2 either shift > 0 [
+			i: any [
+				get-next-item space new-y 'before		;-- may return none if no more items
+				range/2									;-- select farthest item then
+			]
+			max range/1 + i - 1 index + sign			;-- move at least by one item
+		][
+			i: any [
+				get-next-item space new-y 'after		;-- may return none if no more items
+				range/1									;-- select farthest item then
+			]
+			min range/1 + i - 1 index + sign			;-- move at least by one item
+		]
+	]
+
 	kit: make-kit 'list-view [
-		selected: does [space/selected]
+		here: function ["Get index of the item under cursor (or nearest within current window)"] [
+			range: space/list/frame/range
+			either space/cursor [clip range/1 range/2 space/cursor][range/1]
+		]
+		length:    func ["Get number of items in the list (can be infinite)"] [any [space/data/size infxinf/x]]
+		selected:  func ["Get a list of selected items indices"] [space/selected]
 	
-		slide: function ["If window is near its borders, let it slide to show more data"] [~/slide space]
+		slide: func ["If window is near its borders, let it slide to show more data"] [~/slide space]
 		
 		;@@ should this support rich text (if list items are rich text)?
 		copy-items: function [
@@ -2481,51 +2551,82 @@ list-view-ctx: context [
 			result
 		]
 		
+		locate: function [
+			"Get index of a named item"
+			name [word!]
+		][
+			switch/default name [
+				far-head  [1]
+				far-tail  [length]
+				head      [pick frame/displayed 1]
+				tail      [pick frame/displayed 2]
+				line-up   [max 1 here - 1]
+				line-down [min length here + 1]
+				page-up   [frame/page-above here]
+				page-down [frame/page-below here]
+			] [here]									;-- unknown words assume current index
+		]
+		
+		move-cursor: function [
+			"Redefine cursor and move viewport to make it fully visible"
+			target [word! integer!]
+			/margin mrg [integer!] "How much to reserve around the item"
+		][
+			if word? target [target: locate target]
+			target: clip 1 length target
+			frame/move-to/:margin target mrg
+			space/cursor: target
+		]
+		
+		select-range: function [
+			"Redefine selection or extend up to a given limit"
+			limit [word! integer! pair!] "Pair specifies a range of items"
+			/keep "Do not remove current selection"
+		][
+			if word?    limit [limit: locate limit]
+			if integer? limit [limit: here by limit]
+			unless keep [clear space/selected]
+			new: make hash! list-range limit/1 limit/2
+			append space/selected exclude new space/selected
+			trigger 'space/selected
+		]
+			
 		frame: object [
-			;@@ move this into list? hardly makes sense to make offsets window-relative
-			;@@ OTOH, list is limited and has no continuation around window borders
-			;@@ unify these two into 'next-item' with a refinement?
-			;; an item is "before y" if y >= its (offset/y + size/y)
+			displayed: func ["Get a range of currently displayed items"] [space/list/frame/range]
+		
 			item-before: function [
 				"Get item index before given window offset along primary axis; or none"
 				offset [integer! pair!]
 			][
-				list: space/list
-				y:    list/axis
-				if pair? offset [offset: offset/:y]
-				first-geom: second map: list/frame/map
-				if any [
-					empty? map
-					offset < (first-geom/offset/:y + first-geom/size/:y)
-				] [return none]
-				first search/mode/for i: 1 n: half length? map [
-					geom: pick map i * 2
-					geom/offset/:y + geom/size/:y
-				] 'interp offset - list/frame/window-origin/:y
+				~/get-next-item space offset 'before
 			]
 			
-			;; an item is "after y" if y < its offset/y
 			item-after: function [
 				"Get item index after given window offset along primary axis; or none"
 				offset [integer! pair!]
 			][
-				list: space/list
-				y:    list/axis
-				if pair? offset [offset: offset/:y]
-				last-geom: last map: list/frame/map
-				if any [
-					empty? map
-					offset >= last-geom/offset/:y
-				] [return none]
-				third search/mode/for i: 1 n: half length? map [
-					geom: pick map i * 2
-					geom/offset/:y
-				] 'interp offset - list/frame/window-origin/:y + 1	;-- +1 to ensure strict 'y < offset'
+				~/get-next-item space offset 'after
+			]
+			
+			page-above: function [
+				"Get index of an item one page above the given one"
+				index [integer!]
+			][
+				viewport: space/viewport
+				~/axial-shift space index negate max 1 viewport/:y
+			]
+			
+			page-below: function [
+				"Get index of an item one page below the given one"
+				index [integer!]
+			][
+				viewport: space/viewport
+				~/axial-shift space index max 1 viewport/:y
 			]
 			
 			move-to: function [
 				"Pan the view to given window offset or item with the given index"
-				target [integer! (all [0 < target target <= any [space/data/size infxinf/x]]) pair!]
+				target [integer! (all [0 < target target <= length]) pair! word!]
 					"Item index or window offset"
 				;; normally direction is chosen from the current offset
 				;@@ /center to be supported down the road
@@ -2535,6 +2636,7 @@ list-view-ctx: context [
 				/no-clip "When an offset is given, allow panning outside the window"
 			][
 				#assert [not all [before after]]
+				if word? target [target: locate target]
 				list:     space/list
 				window:   space/window
 				viewport: space/viewport
@@ -2593,7 +2695,7 @@ list-view-ctx: context [
 				; ?? space/origin
 				;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
 			];move-to: function [
-		
+					
 		]
 	]
 	
