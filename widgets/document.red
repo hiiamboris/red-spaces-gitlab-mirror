@@ -604,7 +604,7 @@ doc-ctx: context [
 					[indent (base + i) (new-indent)]
 			]
 		]
-	]
+	];kit: make-kit 'document [
 	
 	;; these are low level functions bypassing undo mechanism
 	remove-range: function [doc [object!] range [pair!]] [
