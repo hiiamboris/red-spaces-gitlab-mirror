@@ -2458,78 +2458,6 @@ list-view-ctx: context [
 	
 		slide: function ["If window is near its borders, let it slide to show more data"] [~/slide space]
 		
-		;@@ must be in the frame!
-		move-to: function [
-			"Pan the view to given window offset or item with the given index"
-			target [integer! (all [0 < target target <= any [space/data/size infxinf/x]]) pair!]
-				"Item index or window offset"
-			;; normally direction is chosen from the current offset
-			;@@ /center to be supported down the road
-			/after   "Place the viewport so that item or offset is at its top"
-			/before  "Place the viewport so that item or offset is at its bottom"
-			/margin   mrg [integer!] "How much to reserve around the item"
-			/no-clip "When an offset is given, allow panning outside the window"
-		][
-			#assert [not all [before after]]
-			list:     space/list
-			window:   space/window
-			viewport: space/viewport
-			range:    list/frame/range
-			default mrg: mrg': list/margin along y: list/axis	;-- list/margin is already included, will subtract it
-			direction: case [after ['after] before ['before]]
-			
-			unless pair? point: target [
-				unless target-within-range?: target = clip target range/1 range/2 [
-					;; have to move the window (and the anchor)
-					default direction: case [					;-- default direction based on direction to target from current window
-						target < range/1 ['after]
-						target > range/2 ['before]
-					]
-					space/anchor/index:    target
-					space/anchor/offset:   0
-					space/anchor/reverse?: back?: direction = 'before
-					originy: either back?
-						[negate space/window/size/:y - viewport/:y + mrg - mrg']
-						[mrg - mrg']
-					scrollable-ctx/set-origin space make-pair [0x0 y originy] yes
-					exit										;-- done here
-				]
-				
-				;; window can stay, just scroll the viewport
-				target-geom: pick list/map target - range/1 + 1 * 2
-				target-xy1:  target-geom/offset + window/origin + space/origin	;-- target from viewport
-				target-xy2:  target-xy1 + target-geom/size
-				xy1: make-pair [0x0 y mrg - mrg']				;-- viewport with margins considered
-				xy1: min xy1 viewport / 2						;-- cap at half viewport to avoid margin inversion
-				xy2: viewport - xy1
-				if all [
-					not direction
-					all [xy1/:y <= target-xy1/:y target-xy1/:y <= xy2/:y]
-					all [xy1/:y <= target-xy2/:y target-xy2/:y <= xy2/:y]
-				][
-					exit										;-- already visible and no direction forced, so do nothing
-				]
-				
-				default direction: pick [after before]			;-- default direction based on target center offset from viewport center
-					target-xy1/:y + target-xy2/:y < (xy2/:y + xy1/:y)
-				point: target-geom/offset + window/origin
-				if direction = 'before [point/:y: point/:y + target-geom/size/:y]
-				; ?? target-geom
-				; ?? [direction point mrg space/origin window/origin]
-			];unless pair? point: target [
-			
-			if pre-move: case [							;-- trick to enforce /before and /after locations
-				after  [make-pair [0x0 y point/:y + viewport/:y]]
-				before [make-pair [0x0 y point/:y - viewport/:y]]
-			][
-				scrollable-ctx/move-to space pre-move 0x0 yes
-			]
-			mrg: make-pair [0x0 y mrg]					;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
-			scrollable-ctx/move-to space point mrg no-clip
-			; ?? space/origin
-			;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
-		];move-to: function [
-		
 		;@@ should this support rich text (if list items are rich text)?
 		copy-items: function [
 			"Copy text of given items"
@@ -2594,6 +2522,78 @@ list-view-ctx: context [
 					geom/offset/:y
 				] 'interp offset - list/frame/window-origin/:y + 1	;-- +1 to ensure strict 'y < offset'
 			]
+			
+			move-to: function [
+				"Pan the view to given window offset or item with the given index"
+				target [integer! (all [0 < target target <= any [space/data/size infxinf/x]]) pair!]
+					"Item index or window offset"
+				;; normally direction is chosen from the current offset
+				;@@ /center to be supported down the road
+				/after   "Place the viewport so that item or offset is at its top"
+				/before  "Place the viewport so that item or offset is at its bottom"
+				/margin   mrg [integer!] "How much to reserve around the item"
+				/no-clip "When an offset is given, allow panning outside the window"
+			][
+				#assert [not all [before after]]
+				list:     space/list
+				window:   space/window
+				viewport: space/viewport
+				range:    list/frame/range
+				default mrg: mrg': list/margin along y: list/axis	;-- list/margin is already included, will subtract it
+				direction: case [after ['after] before ['before]]
+				
+				unless pair? point: target [
+					unless target-within-range?: target = clip target range/1 range/2 [
+						;; have to move the window (and the anchor)
+						default direction: case [					;-- default direction based on direction to target from current window
+							target < range/1 ['after]
+							target > range/2 ['before]
+						]
+						space/anchor/index:    target
+						space/anchor/offset:   0
+						space/anchor/reverse?: back?: direction = 'before
+						originy: either back?
+							[negate space/window/size/:y - viewport/:y + mrg - mrg']
+							[mrg - mrg']
+						scrollable-ctx/set-origin space make-pair [0x0 y originy] yes
+						exit										;-- done here
+					]
+					
+					;; window can stay, just scroll the viewport
+					target-geom: pick list/map target - range/1 + 1 * 2
+					target-xy1:  target-geom/offset + window/origin + space/origin	;-- target from viewport
+					target-xy2:  target-xy1 + target-geom/size
+					xy1: make-pair [0x0 y mrg - mrg']				;-- viewport with margins considered
+					xy1: min xy1 viewport / 2						;-- cap at half viewport to avoid margin inversion
+					xy2: viewport - xy1
+					if all [
+						not direction
+						all [xy1/:y <= target-xy1/:y target-xy1/:y <= xy2/:y]
+						all [xy1/:y <= target-xy2/:y target-xy2/:y <= xy2/:y]
+					][
+						exit										;-- already visible and no direction forced, so do nothing
+					]
+					
+					default direction: pick [after before]			;-- default direction based on target center offset from viewport center
+						target-xy1/:y + target-xy2/:y < (xy2/:y + xy1/:y)
+					point: target-geom/offset + window/origin
+					if direction = 'before [point/:y: point/:y + target-geom/size/:y]
+					; ?? target-geom
+					; ?? [direction point mrg space/origin window/origin]
+				];unless pair? point: target [
+				
+				if pre-move: case [							;-- trick to enforce /before and /after locations
+					after  [make-pair [0x0 y point/:y + viewport/:y]]
+					before [make-pair [0x0 y point/:y - viewport/:y]]
+				][
+					scrollable-ctx/move-to space pre-move 0x0 yes
+				]
+				mrg: make-pair [0x0 y mrg]					;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
+				scrollable-ctx/move-to space point mrg no-clip
+				; ?? space/origin
+				;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
+			];move-to: function [
+		
 		]
 	]
 	

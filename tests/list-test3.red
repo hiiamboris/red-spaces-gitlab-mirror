@@ -42,9 +42,9 @@ view/no-wait/options [
 		; b/draw: render b
 	]
 	across text "Jump to item:"
-	entry: field "1'000'000'000" [batch lv [move-to/margin entry/data 30]]
-	button "🔽" [batch lv [move-to/after/margin/no-clip  entry/data 30]]
-	button "🔼" [batch lv [move-to/before/margin/no-clip entry/data 30]]
+	entry: field "1'000'000'000" [batch lv [frame/move-to/margin entry/data 30]]
+	button "🔽" [batch lv [frame/move-to/after/margin/no-clip  entry/data 30]]
+	button "🔼" [batch lv [frame/move-to/before/margin/no-clip entry/data 30]]
 ] [offset: 10x10]
 ; debug-draw
 ; foreach-*ace/next path system/view/screens/1 [probe path]
