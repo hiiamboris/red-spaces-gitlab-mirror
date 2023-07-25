@@ -592,9 +592,12 @@ opaque: function [
 ]
 
 
-list-range: function [a [integer!] b [integer!]] [
-	if b < a [swap 'a 'b]
-	collect [while [a <= b] [keep a  a: a + 1]]
+list-range: function [a [integer!] b [integer!]] [		;-- directional by design (used by list-view selection)
+	step:   sign? range: b - a
+	result: make [] 1 + abs range
+	append result a
+	while [a <> b] [append result a: a + step]			;@@ use map-each
+	result
 ]
 
 min-safe: function [a [scalar! none!] b [scalar! none!]] [
