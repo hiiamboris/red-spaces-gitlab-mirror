@@ -122,7 +122,7 @@ define-handlers [
 		on-wheel    [space path event] [space/slide]	;-- faster wheel-scrolling, without slide-timer delays
 		;; trick here is that inf-scrollable/on-key fires after scrollable/on-key-down:
 		;@@ (otherwise I would have to extend the handler dialect to add delayed handlers, child after parent - maybe I should?)
-		on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
+		; on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
@@ -178,7 +178,7 @@ define-handlers [
 				
 				down up page-down page-up home end [
 					old: batch space [here]
-					new: switch event/key [
+					target: switch event/key [
 						up        ['line-up]
 						down      ['line-down]
 						page-up   ['page-up]
@@ -186,19 +186,47 @@ define-handlers [
 						home      [either event/ctrl? ['far-head]['head]]
 						end       [either event/ctrl? ['far-tail]['tail]]
 					]
-					new: batch space [locate new]
-					case [
-						all [multi? event/ctrl? event/shift?] [
-							batch space [select-range/mode old by new 'include]
+					new: batch space [locate target]
+					far-jump?: find [far-head far-tail] target
+					
+					;; do not(!) move to items that are not drawn yet (too many bugs with that)
+					;; (must avoid anchor-moving branch of kit/move-to)
+					unless far-jump? [
+						range: space/list/frame/range
+						new:   clip range/1 range/2 new
+					]
+					select?: case [
+						;; dangerous to select items with far-jump (can be billions)
+						all [multi? event/shift? not far-jump?]	['range]
+						any [far-jump? not event/ctrl?] ['single]
+					]
+					switch select? [
+						range [
+							either event/ctrl? [
+								range: old by new
+								mode: 'include
+							][
+								;; a trick to determine selection range start while it does not exist explicitly:
+								;; not fully inaccurate, but good enough
+								;@@ perhaps kit should be smart enough to understand "extend selection"
+								start: case [
+									old = first space/selected [last space/selected]
+									old = last space/selected [first space/selected]
+									'else [old]
+								]
+								range: start by new
+								mode: 'replace
+							]
+							batch space [select-range/mode range mode]
 						]
-						all [multi? event/shift?] [
-							batch space [select-range/mode old by new 'replace]
-						]
-						not event/ctrl? [
+						single [
 							batch space [select-range/mode new by new 'replace]
 						]
 					]
-					batch space [move-cursor new]
+					batch space [
+						move-cursor/no-clip new
+						slide
+					]
 				]
 				
 			] [exit]									;-- unhandled keys belong to inf-scrollable

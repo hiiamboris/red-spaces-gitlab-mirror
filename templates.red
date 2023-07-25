@@ -529,7 +529,7 @@ scrollable-ctx: context [
 		mrg: 1x1 * margin
 		switch xy [
 			head [xy: 0x0]
-			tail [xy: space/content/size * 0x1]			;-- no right answer here, csize or csize*0x1
+			tail [xy: space/content/size * 0x1]			;-- no right answer here, csize or csize*0x1 ;@@ won't work for infinity
 		]
 		box: space/viewport
 		mrg: clip 0x0 mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
@@ -2368,7 +2368,7 @@ list-view-ctx: context [
 		]
 		window/origin: make-pair [0x0 axis shift]				;@@ or move the list instead? a bit slower
 		
-		; ?? [xy1 xy2 length frame/filled shift overhang anchor/offset window/origin lview/origin]
+		; ?? [xy1 xy2 length frame/filled shift anchor/index anchor/offset window/origin lview/origin]
 		compose/into [
 			window-origin: (window/origin)
 			anchor-offset: (anchor/offset)
@@ -2414,6 +2414,8 @@ list-view-ctx: context [
 		window: lview/window
 		anchor: lview/anchor
 		y:      list/axis
+		if list/frame/anchor <> anchor/index [exit]		;-- forbid slide after anchor is changed (otherwise it resets anchor back)
+		; if window/origin <> list/frame/window-origin [exit]
 		
 		;; it's possible that multiple slides occur without a draw, resulting in no visible item suitable as a new anchor
 		;; to avoid this I just limit max consecutive slides to half the window
@@ -2493,6 +2495,7 @@ list-view-ctx: context [
 		shift [integer!] "Maximum positive or negative distance to travel"
 	][
 		list:      space/list
+		y:         list/axis
 		range:     list/frame/range
 		index:     clip range/1 range/2 index			;-- if not visible, choose nearest
 		if shift = 0 [return index]
@@ -2571,10 +2574,11 @@ list-view-ctx: context [
 			"Redefine cursor and move viewport to make it fully visible"
 			target [word! integer!]
 			/margin mrg [integer!] "How much to reserve around the item"
+			/no-clip "Allow panning outside the window"
 		][
 			if word? target [target: locate target]
 			target: clip 1 length target
-			frame/move-to/:margin target mrg
+			frame/move-to/:margin/:no-clip target mrg
 			space/cursor: target
 		]
 		
@@ -2619,16 +2623,16 @@ list-view-ctx: context [
 				"Get index of an item one page above the given one"
 				index [integer!]
 			][
-				viewport: space/viewport
-				~/axial-shift space index negate max 1 viewport/:y
+				dist: pick space/viewport space/list/axis
+				~/axial-shift space index negate max 1 dist
 			]
 			
 			page-below: function [
 				"Get index of an item one page below the given one"
 				index [integer!]
 			][
-				viewport: space/viewport
-				~/axial-shift space index max 1 viewport/:y
+				dist: pick space/viewport space/list/axis
+				~/axial-shift space index max 1 dist
 			]
 			
 			move-to: function [
@@ -2653,8 +2657,9 @@ list-view-ctx: context [
 				
 				unless pair? point: target [
 					unless target-within-range?: target = clip target range/1 range/2 [
+						; if window/origin <> list/frame/window-origin [exit]
 						;; have to move the window (and the anchor)
-						default direction: case [					;-- default direction based on direction to target from current window
+						default direction: case [				;-- default direction based on direction to target from current window
 							target < range/1 ['after]
 							target > range/2 ['before]
 						]
@@ -2665,39 +2670,44 @@ list-view-ctx: context [
 							[negate space/window/size/:y - viewport/:y + mrg - mrg']
 							[mrg - mrg']
 						scrollable-ctx/set-origin space make-pair [0x0 y originy] yes
-						exit										;-- done here
+						; ?? [direction target space/origin window/origin list/frame/window-origin]
+						exit									;-- done here
 					]
 					
 					;; window can stay, just scroll the viewport
 					target-geom: pick list/map target - range/1 + 1 * 2
 					target-xy1:  target-geom/offset + window/origin + space/origin	;-- target from viewport
+					; target-xy1:  target-geom/offset + list/frame/window-origin + space/origin	;-- target from viewport
 					target-xy2:  target-xy1 + target-geom/size
-					xy1: make-pair [0x0 y mrg - mrg']				;-- viewport with margins considered
-					xy1: min xy1 viewport / 2						;-- cap at half viewport to avoid margin inversion
+					xy1: make-pair [0x0 y mrg - mrg']			;-- viewport with margins considered
+					xy1: min xy1 viewport / 2					;-- cap at half viewport to avoid margin inversion
 					xy2: viewport - xy1
 					if all [
 						not direction
 						all [xy1/:y <= target-xy1/:y target-xy1/:y <= xy2/:y]
 						all [xy1/:y <= target-xy2/:y target-xy2/:y <= xy2/:y]
 					][
-						exit										;-- already visible and no direction forced, so do nothing
+						exit									;-- already visible and no direction forced, so do nothing
 					]
 					
-					default direction: pick [after before]			;-- default direction based on target center offset from viewport center
+					default direction: pick [after before]		;-- default direction based on target center offset from viewport center
 						target-xy1/:y + target-xy2/:y < (xy2/:y + xy1/:y)
 					point: target-geom/offset + window/origin
+					; point: target-geom/offset + list/frame/window-origin
 					if direction = 'before [point/:y: point/:y + target-geom/size/:y]
-					; ?? [direction point mrg space/origin window/origin]
+					; ?? target-geom
+					; ?? [direction target point mrg space/origin window/origin list/frame/window-origin target-xy1 target-xy2]
 				];unless pair? point: target [
 				
-				if pre-move: case [							;-- trick to enforce /before and /after locations
+				if pre-move: case [								;-- trick to enforce /before and /after locations
 					after  [make-pair [0x0 y point/:y + viewport/:y]]
 					before [make-pair [0x0 y point/:y - viewport/:y]]
 				][
 					scrollable-ctx/move-to space pre-move 0x0 yes
 				]
-				mrg: make-pair [0x0 y mrg]					;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
+				mrg: make-pair [0x0 y mrg]						;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
 				scrollable-ctx/move-to space point mrg no-clip
+				; scrollable-ctx/set-origin space (viewport * 0x1) - point yes
 				; ?? space/origin
 				;@@ can't call /slide here because it needs to draw the items first... but it would be good for UX
 			];move-to: function [
