@@ -202,22 +202,8 @@ define-handlers [
 					]
 					switch select? [
 						range [
-							either event/ctrl? [
-								range: old by new
-								mode: 'include
-							][
-								;; a trick to determine selection range start while it does not exist explicitly:
-								;; not fully inaccurate, but good enough
-								;@@ perhaps kit should be smart enough to understand "extend selection"
-								start: case [
-									old = first space/selected [last space/selected]
-									old = last space/selected [first space/selected]
-									'else [old]
-								]
-								range: start by new
-								mode: 'replace
-							]
-							batch space [select-range/mode range mode]
+							mode: either event/ctrl? ['include]['extend]
+							batch space [select-range/mode old by new mode]
 						]
 						single [
 							batch space [select-range/mode new by new 'replace]

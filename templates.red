@@ -2540,7 +2540,7 @@ list-view-ctx: context [
 		][
 			items: either pair? items [
 				limit: any [space/list/items/size infxinf/x]
-				list-range clip 1 limit items
+				list-range clip 1 limit order-pair items
 			][
 				sort copy items							;-- copy should always be ordered
 			]
@@ -2586,11 +2586,17 @@ list-view-ctx: context [
 			"Redefine selection or extend up to a given limit"
 			limit [word! integer! pair!] "Pair specifies a range of items"
 			/mode "Specify selection mode (default: 'replace)"
-				sel-mode: 'replace [word!] (find [replace include exclude invert] sel-mode)
+				sel-mode: 'replace [word!] (find [replace include exclude invert extend] sel-mode)
 		][
 			if word?    limit [limit: locate limit]
 			if integer? limit [limit: here by limit]
 			old: space/selected
+			;; a trick to determine selection range start while it does not exist explicitly:
+			;; not fully inaccurate, but good enough: uses first selected item as the start
+			if all [sel-mode = 'extend old/1] [
+				sel-mode: 'replace
+				limit/1:  old/1
+			]
 			new: make hash! list-range limit/1 limit/2
 			new: switch sel-mode [
 				replace [new]
