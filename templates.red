@@ -2561,7 +2561,7 @@ list-view-ctx: context [
 				head      [pick frame/displayed 1]
 				tail      [pick frame/displayed 2]
 				line-up   [max 1 here - 1]
-				line-down [min length here + 1]
+				line-down [either space/cursor [min length here + 1][1]]
 				page-up   [frame/page-above here]
 				page-down [frame/page-below here]
 			] [here]									;-- unknown words assume current index
@@ -2687,7 +2687,6 @@ list-view-ctx: context [
 						target-xy1/:y + target-xy2/:y < (xy2/:y + xy1/:y)
 					point: target-geom/offset + window/origin
 					if direction = 'before [point/:y: point/:y + target-geom/size/:y]
-					; ?? target-geom
 					; ?? [direction point mrg space/origin window/origin]
 				];unless pair? point: target [
 				

@@ -156,90 +156,49 @@ define-handlers [
 		
 		on-key-down [space path event] [
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
-			list:  space/list
-			y:     list/axis
-			range: list/frame/range
+			list:   space/list
+			y:      list/axis
+			range:  list/frame/range
+			multi?: space/selectable = 'multi
 			
+			;@@ would be nice to use key->plan here but it's tuned for editing text paragraphs
 			switch/default event/key [
 				#"C" [batch space [copy-items/clip selected]]
 				
 				#" " [									;-- space/ctrl+space selected item toggle
-					item: if i: space/cursor [list/items/pick i]
-					if item [
-						alter space/selected i
-						trigger 'space/selected			;-- it cannot detect deep change, so need explicit reset
+					if i: space/cursor [
+						mode: case [
+							multi? ['invert]
+							find space/selected i ['exclude]
+							'else ['include]
+						]
+						batch space [select-range/mode here mode]
 					]
 				]
 				
-				;@@ this logic must be in the kit rather (typical nav actions), only triggered here
 				down up page-down page-up home end [
-					sign: pick [1 -1] down?: to logic! find [down page-down end] event/key
-					old-cursor: either space/cursor
-						[clip range/1 range/2 space/cursor]
-						[pick range down?]
-					new-cursor: switch event/key [
-						down up [
-							either space/cursor
-								[clip range/1 range/2 space/cursor + sign]
-								[pick range down?]
-						]
-						page-down page-up [
-							old-geom: pick list/map 2 * (old-cursor - range/1 + 1)
-							#assert [block? old-geom]
-							old-y: old-geom/offset/:y + either down? [0][old-geom/size/:y]
-							vp:    space/viewport
-							new-y: (max 1 vp/:y - list/spacing/:y) * sign + old-y
-							new-y: new-y + list/frame/window-origin/:y	;-- item-before/after requires window-relative coordinates
-							new-cursor: clip range/1 range/2 either down? [
-								i: any [
-									batch space [frame/item-before new-y]	;-- may return none if no more items
-									range/2									;-- select farthest item then
-								]
-								max range/1 + i - 1 old-cursor + sign		;-- move at least by one item
-							][
-								i: any [
-									batch space [frame/item-after new-y]	;-- may return none if no more items
-									range/1									;-- select farthest item then
-								]
-								min range/1 + i - 1 old-cursor + sign		;-- move at least by one item
-							]
-						]
-						home [range/1]
-						end  [range/2]
+					old: batch space [here]
+					new: switch event/key [
+						up        ['line-up]
+						down      ['line-down]
+						page-up   ['page-up]
+						page-down ['page-down]
+						home      [either event/ctrl? ['far-head]['head]]
+						end       [either event/ctrl? ['far-tail]['tail]]
 					]
-					item:  list/items/pick new-cursor
-					unless geom: select/same/skip list/map item 2 [exit]	;-- item has to be drawn, to scroll to it
-					; if list/frame/window-origin <> space/window/origin [exit]
-					
-					;; change cursor and selection
-					unless event/ctrl? [
-						new-selected: either all [event/shift? space/selectable = 'multi] [
-							indices: list-range old-cursor new-cursor	;@@ should shift unselect as well?
-							union space/selected indices
-						][
-							new-cursor
+					new: batch space [locate new]
+					case [
+						all [multi? event/ctrl? event/shift?] [
+							batch space [select-range/mode old by new 'include]
 						]
-						append clear space/selected new-selected
-					] 
-					space/cursor: new-cursor
-					
-					;; move viewport to make cursor item fully visible (at least to an extent possible):
-					;; it's possible that when user hits 'down' the item is above the viewport (and vice versa)
-					;; so it's not enough to pan to just one point, need both (with one having bigger priority)
-					point1: space/window/origin + geom/offset 
-					point2: point1 + (geom/size * axis2pair y)
-					unless down? [swap 'point1 'point2]
-					;@@ this is not what look-around was meant for... make it another facet? account for list-view height?
-					; margin: make-pair [0x0 list/axis space/look-around]
-					foreach point [point1 point2] [
-						;@@ need to think how to enable margin here - complicated!
-						;@@ item margin may be bigger than list/margin, then I need to call 'available?' and clip the margin accordingly
-						; space/move-to/margin/no-clip get point margin
-						;@@ use the kit
-						space/move-to/no-clip get point
+						all [multi? event/shift?] [
+							batch space [select-range/mode old by new 'replace]
+						]
+						not event/ctrl? [
+							batch space [select-range/mode new by new 'replace]
+						]
 					]
-					space/slide							;-- sync slide to the move, else slide is delayed until next slide-timer hit
-					; ?? [list/frame/range i offset point list/frame/window-origin space/window/origin list/frame/anchor space/anchor]
+					batch space [move-cursor new]
 				]
 				
 			] [exit]									;-- unhandled keys belong to inf-scrollable
