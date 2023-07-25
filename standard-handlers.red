@@ -136,18 +136,17 @@ define-handlers [
 			; ?? [space/origin space/window/origin space/anchor/offset]		
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
 			if set [item:] locate path [obj - .. obj/type = 'item] [
-				range: space/list/frame/range
-				i: range/1 + half -1 + index? find/same space/list/map item
-				case [
-					event/shift? [
-						old: any [space/cursor range/1]
-						space/selected: union space/selected
-							to space/selected list-range space/cursor: i old	;@@ #5344
-					]
-					event/ctrl? [alter space/selected space/cursor: i]
-					'default [append clear space/selected space/cursor: i]
+				i: space/list/frame/range/1 + half -1 + index? find/same space/list/map item
+				mode: case [
+					event/shift? ['extend]
+					event/ctrl?  ['invert]
+					'default     ['replace]
 				]
-				trigger 'space/selected					;-- not automatic since /cursor may stay in place, and /selected is undetected
+				range: either event/shift? [i][i by i]
+				batch space [
+					select-range/mode range mode
+					move-cursor i 
+				]
 				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
 				;@@ also it will conflict with current touch-friendly dragging, so must be optional
 			]
