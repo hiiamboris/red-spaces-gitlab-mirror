@@ -2593,9 +2593,9 @@ list-view-ctx: context [
 			old: space/selected
 			;; a trick to determine selection range start while it does not exist explicitly:
 			;; not fully inaccurate, but good enough: uses first selected item as the start
-			if all [sel-mode = 'extend old/1] [
+			if sel-mode = 'extend [
 				sel-mode: 'replace
-				limit/1:  old/1
+				if old/1 [limit/1: old/1]
 			]
 			new: make hash! list-range limit/1 limit/2
 			new: switch sel-mode [
