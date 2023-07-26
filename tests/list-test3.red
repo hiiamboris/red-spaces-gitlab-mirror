@@ -42,7 +42,7 @@ view/no-wait/options [
 		; b/draw: render b
 	]
 	across text "Jump to item:"
-	entry: field "1'000'000'000" [batch lv [frame/move-to move-cursor entry/data]]
+	entry: field "1'000'000'000" [batch lv [move-cursor entry/data]]
 	button "🔽" [batch lv [frame/move-to/after/no-clip  move-cursor entry/data]]
 	button "🔼" [batch lv [frame/move-to/before/no-clip move-cursor entry/data]]
 ] [offset: 10x10]
