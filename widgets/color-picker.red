@@ -43,8 +43,7 @@ context expand-directives with spaces/ctx [
 				drop: function [offset [pair!]] [
 					parent/lightness: 100% * clip 0 1 offset/x / size/x
 				]
-				draw: function [/on canvas] [
-					set [canvas: fill:] decode-canvas canvas	;@@ use the fill flag?
+				draw: function [/on canvas fill-x fill-y] [		;@@ use the fill flags?
 					width: first finite-canvas canvas
 					self/size: width by 20
 					pos: clip 3 width - 3 width * parent/lightness
@@ -62,10 +61,9 @@ context expand-directives with spaces/ctx [
 					parent/saturation: 100% - clip 0 1 offset/y / size/y
 					parent/hue:         360 * clip 0 1 offset/x / size/x
 				]
-				draw: function [/on canvas /local x] [
-					set [canvas: fill:] decode-canvas canvas	;@@ use the fill flag?
+				draw: function [/on canvas fill-x fill-y /local x] [	;@@ use the fill flags?
 					width: first canvas: finite-canvas canvas
-					height: canvas/y * max 0 fill/y
+					height: either fill-y [canvas/y][0]
 					self/size: width by height
 					hue: clip 0 1 parent/hue / 360 // 1
 					sat: clip 0 1 (1 - parent/saturation)
