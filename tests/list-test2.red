@@ -11,7 +11,9 @@ Red [
 lorem: {Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.}
 
 list1d: map-each i 100 [
+; list1d: map-each i 20 [
 	rejoin ["message " i ": " copy/part lorem random length? lorem]
+	; rejoin ["message " i ": " copy/part lorem 800]
 ]
 
 ;-- drunken scrollbars animation
@@ -29,7 +31,9 @@ counter: 0
 view/no-wait/options [
 	below
 	b: host [
-		lv: list-view 300x400 source= list1d
+		; lv: list-view focus selectable 300x400 source= list1d
+		lv: list-view focus multi-selectable 300x400 source= list1d
+			; with [list/margin: 80x0]
 	]
 	on-over [
 		status/text: mold hittest face/space event/offset

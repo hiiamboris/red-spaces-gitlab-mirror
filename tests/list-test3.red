@@ -38,13 +38,13 @@ view/no-wait/options [
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
-		; invalidate lv; <everything>
+		invalidate lv; <everything>
 		; b/draw: render b
 	]
 	across text "Jump to item:"
-	entry: field "1'000'000'000" [batch lv [frame/move-to/margin entry/data 30]]
-	button "🔽" [batch lv [frame/move-to/after/margin/no-clip  entry/data 30]]
-	button "🔼" [batch lv [frame/move-to/before/margin/no-clip entry/data 30]]
+	entry: field "1'000'000'000" [batch lv [frame/move-to move-cursor entry/data]]
+	button "🔽" [batch lv [frame/move-to/after/no-clip  move-cursor entry/data]]
+	button "🔼" [batch lv [frame/move-to/before/no-clip move-cursor entry/data]]
 ] [offset: 10x10]
 ; debug-draw
 ; foreach-*ace/next path system/view/screens/1 [probe path]
