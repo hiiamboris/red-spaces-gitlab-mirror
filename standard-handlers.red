@@ -116,13 +116,11 @@ define-handlers [
 	]
 
 	;-- *************************************************************************************
-	;@@ TODO: when dragging and slide succeeds, the canvas jumps
-	;@@       need to update drag-parameter from `slide` or something..
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
 		on-wheel    [space path event] [space/slide]	;-- faster wheel-scrolling, without slide-timer delays
 		;; trick here is that inf-scrollable/on-key fires after scrollable/on-key-down:
 		;@@ (otherwise I would have to extend the handler dialect to add delayed handlers, child after parent - maybe I should?)
-		; on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
+		on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
@@ -209,8 +207,8 @@ define-handlers [
 						]
 					]
 					batch space [
-						move-cursor/no-clip new
-						slide
+						move-cursor/no-clip new			;-- /no-clip is safe as long as given margin does not exceed list/margin
+						; slide
 					]
 				]
 				
