@@ -400,8 +400,9 @@ doc-ctx: context [
 		extract: function [
 			"Extract paragraphs intersecting the document range"
 			range [pair!]
+			 /block "Always extract as paragraph list"
 		][
-			~/extract space range
+			~/extract/:block space range
 		]
 		
 		record: function [
@@ -978,8 +979,8 @@ define-handlers [
 				batch doc key->plan event doc/selected
 			]
 			;; these show/hide the caret - /draw will check if document is focused or not
-			on-focus   [doc path event] [probe doc/caret/visible?: yes]
-			on-unfocus [doc path event] [probe doc/caret/visible?: no]
+			on-focus   [doc path event] [doc/caret/visible?: yes]
+			on-unfocus [doc path event] [doc/caret/visible?: no]
 		]; document: [
 	]; editor: extends 'scrollable [
 ]; doc-ctx: context [
