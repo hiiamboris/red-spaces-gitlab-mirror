@@ -3934,7 +3934,7 @@ field-ctx: context [
 		length? field/text
 	]
 	
-	playback: function [field [object!] offset [integer!] selected [pair! none!] text [string!]] [
+	playback: function [field [object!] offset [integer!] selected [pair! none!] text [any-string!]] [
 		#assert [not same? text field/text]
 		change/part field/text text tail field/text
 		#assert [all [0 <= offset offset <= length? text]]
@@ -3944,8 +3944,8 @@ field-ctx: context [
 	
 	push-to-timeline: function [
 		field [object!]
-		left  [block!] (parse left  [integer! [pair! | none!] string!])
-		right [block!] (parse right [integer! [pair! | none!] string!])
+		left  [block!] (parse left  [integer! [pair! | none!] any-string!])
+		right [block!] (parse right [integer! [pair! | none!] any-string!])
 	][
 		left:  reduce ['playback field left/1  left/2  left/3]
 		right: reduce ['playback field right/1 right/2 right/3]
@@ -4083,7 +4083,7 @@ field-ctx: context [
 		insert-items: function [
 			"Insert text at given offset"
 			offset [integer!]
-			text   [string!]
+			text   [any-string!]
 		][
 			unless empty? text [
 				offset: clip offset 0 length
