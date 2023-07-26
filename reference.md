@@ -1004,6 +1004,7 @@ Note that list:
 - contains spaces, not data
 - is finite
 - adjusts it's size to fit the given spaces
+- is not interactive
 
 
 ## List-view
@@ -1048,16 +1049,24 @@ Adds new facets:
 | `source` | block! | data to render in the list (items of any type - see [`data-view`](#data-view)) |
 | `data` | `func [/pick i [integer!] /size]` | picker function (see below) |
 | `wrap-data` | `func [item-data [any-type!]] -> space object!` | function that converts any `data` item into a `data-view` space; can be overridden for more control |
+| `cursor` | integer! none! | index of the item under cursor (useful when key navigation is enabled) |
+| `selected` | hash! block! | list of indices of selected items (can be filled regardless of /selectable value) |
+| `selectable` | word! none! | `none` or one of `[single multi]`, latter enables interactive single or multiple item selection as well as cursor |
+| `kit` | object! | shared [kit object](#kit) |
 
 `data`'s interface:
 - called as `data/size` it should return the number of items to render, or `none` if data is infinite
 - called as `data/pick i` it should return i-th item (i > 0)
 
-Default `data` just acts as a wrapper around `source`, picking from it and returning it's length. But can be redefined to use any other source. In this case `source` will be unused.
+Default `/data` just acts as a wrapper around `source`, picking from it and returning it's length. But can be redefined to use any other source. In this case `source` will be unused.
+
+Note that `/selected` facet holds item indices. If `data` is mutated, it is programmer's responsibility to change `/selected` accordingly, because the only unique thing in `list-view` is items index and `list-view` cannot possibly know how it changes.
 
 Note that list-view:
 - contains data (not spaces), which it converts into spaces automatically using [`data-view`](#data-view) space. By overriding `list/items` it's possible to make an infinite list of spaces (though why?)
-- can be infinite along it's axis (indexes from 1 to infinity)
+- can be infinite along its axis (indexes from 1 to infinity)
+- is interactive (like all scrollables)
+- may have cursor and selection (controlled by /selectable)
 
 
 ## Tube
