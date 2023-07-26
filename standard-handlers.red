@@ -135,12 +135,13 @@ define-handlers [
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
 			if set [item:] locate path [obj - .. obj/type = 'item] [
 				i: space/list/frame/range/1 + half -1 + index? find/same space/list/map item
+				multi?: space/selectable = 'multi
 				mode: case [
-					event/shift? ['extend]
-					event/ctrl?  ['invert]
-					'default     ['replace]
+					all [event/shift? multi?] ['extend]
+					all [event/ctrl?  multi?] ['invert]
+					'default                  ['replace]
 				]
-				range: either event/shift? [i][i by i]
+				range: either all [event/shift? multi?] [i][i by i]
 				batch space [
 					select-range/mode range mode
 					move-cursor i 
@@ -167,7 +168,7 @@ define-handlers [
 						mode: case [
 							multi? ['invert]
 							find space/selected i ['exclude]
-							'else ['include]
+							'else ['replace]
 						]
 						batch space [select-range/mode here mode]
 					]
