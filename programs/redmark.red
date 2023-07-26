@@ -143,6 +143,7 @@ red-mark: function [
 	source [file!] "Filename to view"
 ][
 	resize: does [maybe host/size: host/parent/size - 20]
+	; resize: does [maybe host/size: host/parent/size - 20x60]
 	view/flags reshape [
 		title !(rejoin ["RedMark - " to-local-file clean-path source])
 		on-resize :resize on-resizing :resize
@@ -156,8 +157,8 @@ red-mark: function [
 				wrap-data: func [data] [data]
 				source: lay-out-vids !(decode-markdown read/lines source)
 			]
-		] on-over [status/text: mold hittest host/space event/offset]
-		status: text 600x30
+		]; on-over [status/text: mold hittest host/space event/offset]
+		; status: text 600x30
 		at 0x0 text 0x0 rate 0:0:3 on-time [prof/show prof/reset]
 	] 'resize
 ]
