@@ -2597,6 +2597,8 @@ list-view-ctx: context [
 				sel-mode: 'replace
 				if old/1 [limit/1: old/1]
 			]
+			#assert [1e6 >= span? limit]				;-- warn about too big selections (as it's most likely a mistake)
+			if 1e6 < span? limit [limit/1: limit/2]		;-- also defend from out of memory errors ;@@ clip it within 1M, not reset to 1 item?
 			new: make hash! list-range limit/1 limit/2
 			new: switch sel-mode [
 				replace [new]
