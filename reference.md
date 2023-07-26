@@ -938,6 +938,15 @@ By default, four layouts are available out of the box: `list` (used in vlist/hli
 | limits | range! none! | none | /min <= /max | constraints on the size (unlimited by default) |
 | origin | pair! | 0x0 | unrestricted | point at which list's coordinate system origin is located |
 
+The following additional settings are only used to work with infinite lists:
+
+| setting | types | default | constraints | description |
+|-|-|-|-|-|
+| anchor | integer! none! | 1 | > 0 | index of the first listed item |
+| length | integer! none! | none = unlimited | >= 0 | how many pixels to fill after the anchor |
+| reverse? | logic! none! | false | | if true, additional items are counted backwards from the anchor |
+| do-not-extend? | logic! none! | false | | if true, items sticking out of the canvas do not extend the list's secondary axis (width stability) |
+
 #### Settings for tube layout
 
 | setting | types | default | constraints | description |
