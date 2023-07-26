@@ -120,7 +120,7 @@ define-handlers [
 		on-wheel    [space path event] [space/slide]	;-- faster wheel-scrolling, without slide-timer delays
 		;; trick here is that inf-scrollable/on-key fires after scrollable/on-key-down:
 		;@@ (otherwise I would have to extend the handler dialect to add delayed handlers, child after parent - maybe I should?)
-		on-key [space path event] [space/slide]			;-- most useful for fast seamless scrolling on pageup/pagedown
+		on-key [space path event] [space/slide pass]	;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
