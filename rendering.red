@@ -206,14 +206,15 @@ context [
 		]
 		index:  (either on [1][0]) + (either window [2][0]) + (either space [4][0])
 		do pick [
-			[draw                                             ]
-			[draw/on                      canvas fill-x fill-y]
-			[draw/window          xy1 xy2                     ]
-			[draw/window/on       xy1 xy2 canvas fill-x fill-y]
-			[draw           space                             ]
-			[draw/on        space         canvas fill-x fill-y]
-			[draw/window    space xy1 xy2                     ]
-			[draw/window/on space xy1 xy2 canvas fill-x fill-y]
+			;; return below shields from the bug of refinements accepting less arguments than they should
+			[return draw                                             ]
+			[return draw/on                      canvas fill-x fill-y]
+			[return draw/window          xy1 xy2                     ]
+			[return draw/window/on       xy1 xy2 canvas fill-x fill-y]
+			[return draw           space                             ]
+			[return draw/on        space         canvas fill-x fill-y]
+			[return draw/window    space xy1 xy2                     ]
+			[return draw/window/on space xy1 xy2 canvas fill-x fill-y]
 		] index + 1
 	]
 					
