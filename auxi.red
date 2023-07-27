@@ -144,7 +144,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 
 inside?: make op! function [
 	"Test if POINT is inside the SPACE"
-	point [pair!] space [object!]
+	point [pair!] space [object! block!]				;-- box used to test against map geometry
 ][
 	to logic! any [
 		none = space/size								;-- infinite spaces contain any point ;@@ but should none mean infinite?

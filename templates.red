@@ -547,13 +547,12 @@ scrollable-ctx: context [
 	]
 
 	into: function [space [object!] xy [pair!] child [object! none!]] [
-		if r: into-map space/map xy child [
-			if r/1 =? space/content [
-				r/2: r/2 - space/origin
-				unless any [child  0x0 +<= r/2 +< space/content/size] [r: none]
-			]
+		all [
+			r: into-map space/map xy child
+			r/1 =? space/content
+			r/2: r/2 - space/origin
+			if any [child  r/2 inside? space/content] [r]
 		]
-		r
 	]
 
 	;; sizing policy (for cell, scrollable, window):
@@ -1174,6 +1173,20 @@ container-ctx: context [
 list-ctx: context [
 	~: self
 		
+	;; map generally has no direction, but list map has, and it can be leveraged
+	into: function [list [object!] xy [pair!] item [object! none!]] [
+		if item [return into-map list/map xy item]
+		y: list/axis
+		i: first search/mode/for i: 1 half length? list/map [
+			geom: pick list/map i * 2
+			geom/offset/:y
+		] 'interp xy/:y
+		set [item: geom:] skip list/map i - 1 * 2
+		; ?? [i geom/offset geom/size xy]
+		xy: xy - geom/offset
+		if xy inside? geom [reduce [item xy]]
+	]
+	
 	get-sections: function [list [object!]] [
 		case [
 			not empty? cache: list/sec-cache ['done]
@@ -1220,6 +1233,7 @@ list-ctx: context [
 		frame:     []									;-- last frame parameters used by kit and list-view
 		cache:     [size map frame sec-cache]			;@@ put sec-cache into container or not?
 		
+		into: func [xy [pair!] /force item [object! none!]] [~/into self xy item]
 		container-draw: :draw	#type [function!]
 		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
@@ -1464,7 +1478,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 				set [child: geom:] map
 				if child [								;-- x-1D = size-1D/x leads to the tail
 					child-xy: (to pair! xy-1D) - geom/offset
-					if 0x0 +<= child-xy +< geom/size [reduce [child child-xy]]
+					if child-xy inside? geom [reduce [child child-xy]]
 				] 
 			] 
 		]
