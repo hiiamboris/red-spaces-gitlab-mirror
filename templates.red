@@ -547,11 +547,13 @@ scrollable-ctx: context [
 	]
 
 	into: function [space [object!] xy [pair!] child [object! none!]] [
-		r: into-map space/map xy child
-		all [
-			r/1 =? space/content
-			r/2: r/2 - space/origin
-			if any [child  r/2 inside? space/content] [r]
+		if r: into-map space/map xy child [
+			all [
+				r/1 =? space/content
+				r/2: r/2 - space/origin
+				not any [child  r/2 inside? space/content]
+				r: none
+			]
 		]
 		r
 	]
