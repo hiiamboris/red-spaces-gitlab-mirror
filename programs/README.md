@@ -4,7 +4,7 @@
 
 A GUI tool to browse current interpreter's state.
 
-Binaries: [Windows](red-inspector.exe), [Linux](red-inspector), [Mac 32-bit](red-inspector-mac). 
+Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector-mac). 
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-red-inspector.gif)
 
@@ -59,7 +59,7 @@ A livecoding tool to experiment with various VID/S layouts.
 
 World's smallest markdown viewer.
 
-Binaries: [Windows](redmark.exe), [Linux](redmark), [Mac 32-bit](redmark-mac). 
+Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark-mac). 
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-redmark.gif)
 
