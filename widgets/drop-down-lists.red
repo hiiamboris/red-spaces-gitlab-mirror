@@ -87,6 +87,7 @@ context with spaces/ctx expand-directives [
 			margin:  drop-down/margin
 			limits:  drop-down/size .. (drop-down/size * (1 by drop-down/list-pages))
 			content: make-space 'list-view [
+				selectable: 'single
 				source: drop-down/data
 				wrap-data: function [item-data [any-type!]] [
 					item: make-space 'data-view item-template
@@ -160,11 +161,16 @@ context with spaces/ctx expand-directives [
 				unless set [item: item-xy:] locate path [obj - .. /type = 'item] [pass exit]
 				item/lit?: item-xy inside? item
 			]
-			list-view: extends 'list-view [
+			list-view: [;extends 'list-view [
 				on-key [space path event] [
 					switch/default event/key [
 						#"^[" [popups/hide event/face]			;-- hide on escape
 						#"^-" [popups/hide event/face pass]		;@@ this should not be required: just on-key-down on tab hiding popup
+						#"^M" [
+							owner: space/parent/owner
+							owner/selected: owner/data/(space/cursor)
+							popups/hide event/face
+						]
 					] [pass]
 				]
 				on-unfocus [space path event] [
