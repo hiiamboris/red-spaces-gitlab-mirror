@@ -720,10 +720,15 @@ paragraph-ctx: context [
 	whitespace!: charset " ^-"							;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
 	non-space!: negate whitespace!
 	
+	#if linux? [										;@@ workaround for #5353
+		caret-to-offset: function [face [object!] pos [integer!] /lower] [
+			system/words/caret-to-offset/:lower face max 1 pos
+		]
+	]
+	
 	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
 		size1: size-text layout
-		len: max 1 length? layout/text							;@@ workaround for #5353
-		size2: caret-to-offset/lower layout len					;-- include trailing whitespaces
+		size2: caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
 		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
 		max size1 size2
 	]
