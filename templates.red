@@ -333,7 +333,6 @@ cell-ctx: context [
 
 	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [#print "cell/draw with (if space/content [space-id space/content]) on (canvas) (fill-x) (fill-y)"]
-; #print "cell/draw with (if space/content [space-id space/content]) on (canvas) (fill-x) (fill-y)"
 		space/sec-cache: copy []						;-- alloc new (minimal) sections block for new canvas
 		unless space/content [
 			set-empty-size space canvas fill-x fill-y
@@ -357,9 +356,8 @@ cell-ctx: context [
 				drawn: compose/only [clip 0x0 (space/size) (drawn)]
 			]
 		]
-; ?? [canvas fill-x fill-y space/size]
 		quietly space/map: compose/deep [(space/content) [offset: (offset) size: (space/size)]]
-		#debug sizing [print ["box with" space/content "on" canvas "->" space/size]]
+		#debug sizing [#print "box with (mold space/content) on (canvas) -> (space/size)"]
 		drawn
 	]
 	
@@ -724,7 +722,8 @@ paragraph-ctx: context [
 	
 	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
 		size1: size-text layout
-		size2: caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
+		len: max 1 length? layout/text							;@@ workaround for #5353
+		size2: caret-to-offset/lower layout len					;-- include trailing whitespaces
 		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
 		max size1 size2
 	]
