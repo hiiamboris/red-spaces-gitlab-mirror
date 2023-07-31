@@ -235,6 +235,7 @@ popups: context [
 			distance? primed/anchor face-to-window event/offset event/face
 		]
 		maybe-hide-hint: function [event [event! map! object!]] [
+			unless event/face/parent [exit]				;-- ignore late over events processed after hiding the host
 			if any [
 				event/away?								;-- moved off the hint; away event should never be missed as it won't repeat!
 				10 <= travel event						;-- distinguish pointer move from sensor jitter
