@@ -23,13 +23,13 @@ context [
 	start-offset: none						;-- separate from `start-drag`, which is userspace thing, and this one is hidden
 
 	;-- for `down` it doesn't matter if we use previewer or finalizer
-	register-finalizer [down] func [space [object!] path [block!] event [event! object!]] [
+	register-finalizer [down] func [space [object!] path [block!] event [event! map! object!]] [
 		start-offset: event/offset
 	]
 
 	;@@ is it ok that click event will follow up event for normal handlers? but some finalizers will have it unordered
 	;@@ or maybe we should schedule some code to be run after the finalizers have finished?
-	register-finalizer [up] function [space [object! none!] path [block!] event [event! object!]] [
+	register-finalizer [up] function [space [object! none!] path [block!] event [event! map! object!]] [
 		if all [
 			event/face							;@@ partial workaround for #5124 - but can do nothing with View internal bugs
 			20 >= distance? start-offset event/offset	;-- it's a click, not a drag

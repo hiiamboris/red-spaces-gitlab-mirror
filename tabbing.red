@@ -26,7 +26,7 @@ insert-event-func spaces-tab-handler: function [face event] [
 ;; handler for spaces
 ;; has to be `key` event (if it's key-down, the following `key` event after refocus goes into the wrong space)
 ;@@ consider consuming the next key-up event when refocused
-register-finalizer [key] function [space [object!] path [block!] event [event! object!]] [
+register-finalizer [key] function [space [object!] path [block!] event [event! map! object!]] [
 	all [
 		event/key = #"^-"
 		not stop?										;-- was not eaten by any space

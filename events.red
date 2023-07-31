@@ -1,34 +1,11 @@
 Red [
-	title:   "Event processing pipeline for Draw-based widgets"
+	title:   "Event processing pipeline for Spaces"
 	author:  @hiiamboris
 	license: BSD-3
 ]
 
 
-;-- requires auxi.red (make-free-list), styles (to fix svmc/), error-macro.red, vid.red
-
-
-;-- event function that pushes events over to each space
-context [
-	;@@ TODO: scan previewers/finalizers against this list
-	supported-events: make hash! [
-		down up  mid-down mid-up  alt-down alt-up  aux-down aux-up
-		dbl-click over wheel
-		key key-down key-up enter
-		; focus unfocus 	-- internally generated ;@@ but maybe these will be required too
-		time
-	]
-	;; sometimes this gets window as 'host', likely when no face is in focus
-	insert-event-func function [host event] [
-		all [
-			host? host									;@@ maybe /content field not /space?
-			host/space									;-- /space is assigned?
-			find supported-events event/type
-			events/dispatch host event
-			none										;-- the event can be processed by other handlers
-		]
-	]
-]
+;-- requires auxi.red (make-free-list), styles (to fix svmc/), error-macro.red, event-scheduler.red
 
 
 events: context [
@@ -37,7 +14,7 @@ events: context [
 	on-time: none										;-- set by timers.red
 
 	;-- previewers and finalizers are called before/after handlers
-	;-- both have the same args format: [space [object!] path [block!] event [event! object! none!]]
+	;-- both have the same args format: [space [object!] path [block!] event [event! object! map! none!]]
 	;-- stop? command indicates that event was "eaten" and becomes true after:
 	;-- any previewer or finalizer calls `stop`
 	;-- any normal event handler does not call `pass`
@@ -52,14 +29,23 @@ events: context [
 	handlers: #()
 
 
-	register-as: function [map [map!] types [block!] handler [function!]] [
+	event-prototype: make map! collect [
+		foreach word system/catalog/accessors/event! [keep to set-word! word keep none]
+	]
+	
+	copy-event: function [event [event!]] [
+		also result: copy event-prototype
+		foreach word system/catalog/accessors/event! [result/:word: :event/:word]
+	]
+	
+	register-as: function [map [map!] types [block!] handler [function!] /local blk] [
 		delist-from map :handler						;-- duplicate protection, in case of multiple includes etc.
 		#assert [										;-- validate the spec to help detect bugs
 			any [
 				parse spec-of :handler [
 					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
 					word! opt quote [block!]
-					word! opt [quote [event!] | quote [event! object!] | quote [object! event!]]
+					word! opt [set blk block! if ([event! map! object!] = sort copy blk)]
 					opt [word! opt [quote [percent!] | quote [percent! none!] | quote [none! percent!]]]
 					opt [/local to end]
 				]
@@ -114,15 +100,15 @@ events: context [
 	export [register-previewer register-finalizer delist-previewer delist-finalizer]
 
 
-	do-previewers: func [path [block!] event [event! object!] args [block!]] [
+	do-previewers: func [path [block!] event [event! object! map!] args [block!]] [
 		do-global previewers path event args
 	]
 
-	do-finalizers: func [path [block!] event [event! object!] args [block!]] [
+	do-finalizers: func [path [block!] event [event! object! map!] args [block!]] [
 		do-global finalizers path event args
 	]
 
-	do-global: function [map [map!] path [block!] event [event! object!] args [block!]] [
+	do-global: function [map [map!] path [block!] event [event! object! map!] args [block!]] [
 		unless list: map/(event/type) [exit]
 		space: path/1									;-- space can be none if event falls into space-less area of the host
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
@@ -173,6 +159,7 @@ events: context [
 	define-handlers: function [
 		"Define event handlers for any number of spaces"
 		def [block!] "[name: [on-event [space path event] [...]] ...]"
+		/local blk
 	] reshape [
 		prefix: copy [handlers]
 
@@ -223,13 +210,12 @@ events: context [
 			insert list function spec bind body commands		;-- latest must come first so it can block handlers of its prototype
 		]
 
-		=spec-def=: [								;-- just validation, to protect from errors
+		=spec-def=: [									;-- just validation, to protect from errors
 			#expect word! opt [ahead block! #expect quote [object!]]	;-- space [object!]
-			#expect word! opt [ahead block! #expect quote [block!]]	;-- path [block!]
+			#expect word! opt [ahead block! #expect quote [block!]]		;-- path [block!]
 			#expect word! opt [
-				quote [event! object!]
-			|	quote [object! event!]
-			|	ahead block! #expect quote [event!]
+				set blk block! if ([event! map! object!] = sort copy blk)
+			|	ahead block! #expect quote [event! map! object!]
 			]
 			opt [if (name = 'on-time) not [refinement! | end]
 				#expect word! opt [ahead block! #expect quote [percent!]]
@@ -264,10 +250,11 @@ events: context [
 	;; other events' path does not (tree node format)
 	;; focus/unfocus events have not 'event' arg!
 	;@@ any way to unify these 2 formats?
-	dispatch: function [face [object!] event [event!] /local result /extern resolution last-on-time] [
+	dispatch: function [face [object!] event [event! object! map!] /local result /extern resolution last-on-time] [
 		focused?: no
 		with-stop [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
+			; #debug events [print ["dispatching" event/type "event from" face/type]]
 			buf: cache/get
 			path: switch/default event/type [
 				over wheel up mid-up alt-up aux-up
@@ -320,7 +307,7 @@ events: context [
 	]
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
-	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object!] args [block!]] [
+	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object! map!] args [block!]] [
 		space: first path: clone path cache/get			;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
@@ -334,7 +321,7 @@ events: context [
 	;; e.g.: up event closes the menu face, over event slips in and changes template
 	do-handlers: function [
 		"Evaluate normal event handlers applicable to PATH"
-		path [block!] event [event! object!] args [block!] focused? [logic!]
+		path [block!] event [event! object! map!] args [block!] focused? [logic!]
 		/local word _
 	][
 		if commands/stop? [exit]
@@ -382,7 +369,7 @@ events: context [
 	process-event: function [
 		"Process the EVENT calling all respective event handlers"
 		path  [block!] "Path on the space tree to lookup handlers in"
-		event [event! object!] "View event or simulated"
+		event [event! object! map!] "View event or simulated"
 		args  [block!] "Extra arguments to the event handler"
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][

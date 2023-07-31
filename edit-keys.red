@@ -29,7 +29,7 @@ context [
 
 	set 'key->plan function [
 		"Turn keyboard event into an edit plan"
-		event    [event! object!]
+		event    [event! map! object!]
 		selected [pair! none!] "Current selection state"
 	][
 		key: event/key

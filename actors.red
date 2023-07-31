@@ -29,7 +29,7 @@ actors: context [
 
 	;; previewer so it takes priority over event handlers and can stop them
 	register-previewer supported-events function [
-		space [object! none!] path [block!] event [event! object!] delay [percent! none!]
+		space [object! none!] path [block!] event [event! object! map!] delay [percent! none!]
 	][
 		all [
 			space

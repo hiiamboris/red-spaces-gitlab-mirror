@@ -7,7 +7,7 @@ Red [
 
 ;-- requires events.red (on load)
 
-is-key-printable?: function [event [event! object!]] [
+is-key-printable?: function [event [event! map! object!]] [
 	to logic! all [
 		char? char: event/key
 		char >= #" "

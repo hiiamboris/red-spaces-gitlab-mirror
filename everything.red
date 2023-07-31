@@ -88,7 +88,8 @@ do/expand [
 				#include %cache.red
 				#include %rendering.red
 				#include %layouts.red
-				#include %events.red
+				#include %event-scheduler.red
+				#include %events.red					;-- requires auxi, event-scheduler, layouts, styles
 				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %source.red
 				#include %clipboard.red

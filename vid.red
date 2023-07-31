@@ -194,6 +194,7 @@ VID: context [
 			rate:       100						#type =  [integer! time! none!]		;-- for space timers to work
 			;; render generation number, used to detect live spaces (0 = never rendered):
 			generation: 0.0						#type =  [float!]
+			queue:      make [] 200				#type    [block!]	;-- queued events to process
 		])
 	]
 	

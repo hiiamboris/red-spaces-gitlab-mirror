@@ -216,7 +216,7 @@ context [
 
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks on host may change focus
-	function [space [object!] path [block!] event [event! object!]] [
+	function [space [object!] path [block!] event [event! map! object!]] [
 		;@@ should it avoid focusing if stop flag is set?
 		#debug focus [#print "attempting to focus (space-id space)"]
 		path: get-host-path space
