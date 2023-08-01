@@ -413,7 +413,7 @@ before: function [
 	also get path set path :value 
 ]
 
-explode: function [										;@@ use split or map-each when fast
+explode: function [										;@@ use map-each when fast; split produces strings not chars :(
 	"Split string into a block of characters"
 	string [string!]
 	/into buffer [any-list!]

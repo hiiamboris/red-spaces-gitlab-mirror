@@ -132,9 +132,7 @@ context [
 	
 	decode-block: function [text [string!]] [
 		list: decode-text text
-		lines: make [] 4
-		=line=: [keep copy line any [not "^/" skip]]
-		parse list [collect after lines [=line= any ["^/" =line=]]]	;@@ use split when it works on blocks
+		lines: split list "^/"
 		map-each/eval line lines [['rich-content line]]
 	]
 	
