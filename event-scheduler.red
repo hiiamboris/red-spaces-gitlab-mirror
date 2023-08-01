@@ -110,6 +110,10 @@ scheduler: context [
 		]
 
 		set 'group-next-event function [host [object!]] [
+			unless attempt [window-of host] [					;-- ignore out-of-tree events (host or window has been destroyed?)
+				remove-next-event host
+				return true
+			]
 			;; find grouping candidate
 			rest: skip this: host/queue period
 			type: this/:ievent/type
