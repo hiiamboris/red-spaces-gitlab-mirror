@@ -4,7 +4,10 @@ Red [
 	author:  @hiiamboris
 	license: BSD-3
 	notes: {
-		This is currently replacing do-events, because it needs to
+		Scheduler is an attempt to work around https://github.com/red/red/issues/4881
+		which freezes some tests (grid-test4-7) and slows down others on GTK.
+		
+		This implementation is currently replacing do-events, because it needs to
 		gather all pending events and then start processing right away.
 		There's no other way I know of of triggering any code "right away" after the last event.
 		
@@ -16,6 +19,31 @@ Red [
 		And they have no knowledge of pending events, nor any way to know if lockup happened.
 		So I can imagine no logic (other than relying on delay anomalies) that would let me to
 		temporarily switch events processing from do-events into the event function.
+		
+		On design...
+		
+		Generally there are 3 groups of events:
+		- priority events - keys, clicks, change, focus and more
+		  these cannot be skipped and usually require fast UI response
+		- groupable events - over, wheel, moving, resizing, drawing
+		  these can be skipped if there's another similar event pending but no other events inbetween except 'time
+		  because the order of input is of importance and we can't mix it
+		  wheel is a bit different: as it reports relative change, this change must be summed when grouping
+		  these require less fast UI response
+		- time event - unordered with the other events, so can always be skipped if another time event is pending
+		  since in Spaces it's the heaviest event that renders everything, it can also be most delayed
+		
+		In Spaces some of these e.g. moving, resizing, change are unused (not applicable to base face).
+		'drawing is also not reported to the base at the moment, but even if it was, Spaces do not handle it.
+		The remaining events - input and time - are prioritized using "delay norms" that are big for 'time and small for input.
+		An event is only skipped (grouped) in two cases:
+		- no other events inbetween 
+		- the event inbetween (of different type) has lesser delay to norm value
+		Since effectively we have only 'time and 'input groups, it's always just a choice whether to delay the timer or fire it.
+		Delay is measured since time last event of the same type finished processing,
+		so the bigger the delay gets the more likely this event will be scheduled again,
+		and on the other hand, if similar event just finished it is likely to get skipped.
+		So it leads to a fair distribution of events across timeline, removing deadlocks.
 	}
 ]
 
