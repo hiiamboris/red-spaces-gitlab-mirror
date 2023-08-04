@@ -74,7 +74,7 @@ doc-ctx: context [
 				plen less prange/1 [continue]			;-- not reached the first intersecting paragraph
 				prange/2 less 0    [break]				;-- won't be no intersections anymore
 				'else [
-					prange: either extend [0 by plen][clip prange 0 plen]
+					prange: either extend [0 thru plen][clip prange 0 plen]
 					unless relative [prange: prange + pofs]
 					repend mapped [para prange]			;-- empty paragraphs are not skipped by design
 				]
@@ -175,7 +175,7 @@ doc-ctx: context [
 					'rich-text-span = data1/name
 					'rich-text-span = data2/name
 				][
-					p/2: rng1/1 by rng2/2
+					p/2: rng1/1 thru rng2/2
 					append data1/data data2/data
 				][
 					append/part edit1 s e
@@ -186,7 +186,7 @@ doc-ctx: context [
 					set [_: rng1:] p: find/last edit1 'remove
 					any [rng1/1 = rng2/1  rng1/1 = rng2/2]
 				][
-					p/2: (min rng1/1 rng2/1) + (0 by add span? rng1 span? rng2)
+					p/2: (min rng1/1 rng2/1) + (0 thru add span? rng1 span? rng2)
 				][
 					append/part edit1 s e
 				]
@@ -248,7 +248,7 @@ doc-ctx: context [
 		]
 		
 		everything: function ["Get full range of text"] [		;-- used by macro language, e.g. `select-range everything`
-			0 by length
+			0 thru length
 		]
 		
 		selected: function ["Get selection range or none"] [	;-- used by macro language, e.g. `remove-range selected`
@@ -264,7 +264,7 @@ doc-ctx: context [
 			offset [integer!]
 		][
 			if set [para: pofs: plen:] ~/caret->paragraph space offset [
-				reduce [para 0 by plen + pofs]			;@@ use range for the other func too?
+				reduce [para 0 thru plen + pofs]				;@@ use range for the other func too?
 			]
 		]
 		
@@ -276,7 +276,7 @@ doc-ctx: context [
 				second caret->paragraph para
 			][
 				plen: batch para [length]
-				0 by plen + get-paragraph-offset space para
+				0 thru plen + get-paragraph-offset space para
 			]
 		]
 		
@@ -342,7 +342,7 @@ doc-ctx: context [
 		frame: object [
 			point->caret: function [
 				"Get caret offset and side near the point XY on last frame"
-				point [pair!]
+				point [planar!]
 			][
 				~/point->caret space point
 			]
@@ -445,7 +445,7 @@ doc-ctx: context [
 			limit [word! pair! none! (not by) integer!]
 			/by "Move selection edge by an integer number of items"
 		][
-			set [ofs: sel:] field-ctx/compute-selection space limit by here length selected
+			set [ofs: sel:] field-ctx/compute-selection space limit thru here length selected
 			record
 				[move (here) select (selected)]
 				[move (ofs)  select (sel)]
@@ -531,7 +531,7 @@ doc-ctx: context [
 				]
 			]
 			if 0 <> data/length [
-				range: 0 by data/length + offset
+				range: 0 thru data/length + offset
 				record [remove (range)] [insert (range) (data)]
 			]
 		]
@@ -542,7 +542,7 @@ doc-ctx: context [
 			data [object! (any [space? data  'clipboard-format = class? data]) string!]
 		][
 			if word?    limit [limit: locate limit]
-			if integer? limit [limit: order-pair limit by here]
+			if integer? limit [limit: order-pair limit thru here]
 			remove-range limit
 			insert-items limit/1 data
 		]
@@ -646,7 +646,7 @@ doc-ctx: context [
 			'multiline [
 				;; edit first paragraph, but remember the after-insertion part
 				batch dst-para [
-					stashed: copy-range range: dst-loc by infxinf/x
+					stashed: copy-range range: dst-loc thru 2e9
 					change-range range list/1/data 
 				]
 				;; insert other paragraphs into doc/content
@@ -694,7 +694,7 @@ doc-ctx: context [
 		map-selection space value
 	]
 	
-	point->caret: function [doc [object!] point [pair!]] [		;@@ accept path maybe too?
+	point->caret: function [doc [object!] point [planar!]] [	;@@ accept path maybe too?
 		path: hittest doc point
 		set [para: xy:] skip path 2
 		if all [not para  not empty? doc/map] [					;-- doesn't land on a paragraph - need to find nearest
@@ -738,14 +738,14 @@ doc-ctx: context [
 			all [dir = 'up   prow = 1]					;-- first row in the paragraph
 			all [dir = 'down prow = nrows]				;-- last row in the paragraph
 		]
-		shift: 0 by (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
+		shift: as-point2D 0 (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
 		xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
 		xy: clip xy 0x0 doc/size - 0x1
 		caret': point->caret doc xy
 		if caret' [										;-- may be none if outside the document
 			limits: either dir = 'down					;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
-				[caret + 1 by doc/length]
-				[0 by (caret - 1)]
+				[caret + 1 thru doc/length]
+				[0 thru (caret - 1)]
 			caret'/offset: clip limits/1 limits/2 caret'/offset
 		]
 		caret'
@@ -790,7 +790,7 @@ doc-ctx: context [
 		]
 	]
 
-	draw: function [doc [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [doc [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		;; trick for caret changes to invalidate the document: need to render it once (though it's never displayed)
 		unless doc/caret/parent [render doc/caret]
 		
@@ -847,8 +847,8 @@ doc-ctx: context [
 		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
 		page-size: function [] [						;-- needs access to the parent viewport for paging
 			vp: any [get-safe 'parent/viewport 0x0]
-			max 0 to integer! (pick vp 'y) * 90%
-		] #type [integer! function!] (page-size >= 0)
+			max 0 (pick vp 'y) * 90%
+		] #type [linear! function!] (page-size >= 0)
 		
 		length:   0					#type [integer!]	;-- read-only, auto-updated on edits
 		caret:    make-space 'caret caret-template #type [object!] :invalidates-look
@@ -858,7 +858,7 @@ doc-ctx: context [
 		modified?: no									;-- set by edit as a flag to adjust origin on next render
 		
 		list-draw: :draw			#type [function!]
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 	editor-kit: make-kit 'editor [
@@ -869,7 +869,7 @@ doc-ctx: context [
 				cbox: batch doc [frame/caret-box here doc/caret/side]
 				if cbox [
 					height: cbox/2/y - cbox/1/y
-					space/move-to/margin (cbox/1 + cbox/2 / 2) 0 by height / 2 + 30	;@@ expose this hardcoded lookaround value?
+					space/move-to/margin (cbox/1 + cbox/2 / 2) (0 . height) / 2 + 30	;@@ expose this hardcoded lookaround value?
 				]
 			]
 		]
@@ -883,7 +883,7 @@ doc-ctx: context [
 		content-flow: 'vertical
 		
 		scrollable-draw: :draw
-		draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		draw: function [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 			if all [
 				content/modified?
 				0x0 +< canvas							;-- don't adjust until size is final
@@ -944,7 +944,7 @@ define-handlers [
 					batch doc [
 						caret: frame/point->caret path/2
 						if caret [
-							select-range start/offset by caret/offset
+							select-range start/offset thru caret/offset
 							move-caret/side caret/offset caret/side
 						]
 					]

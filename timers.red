@@ -24,7 +24,7 @@ timers: context [
 	
 	;@@ find a way someday to make timers an optional module
 	; modify-class 'space-object! [
-		; #type =? [none! integer! float! time!] :on-rate-change
+		; #type =? [none! linear! time!] :on-rate-change
 		; (any [none? rate zero? rate positive? rate])
 		; rate: none
 	; ]	

@@ -6,14 +6,14 @@ box: make-space 'box [
 	margin: 25
 	color: yello
 	draw: function [/on canvas fill-x fill-y] [
-		render/on content 50x50 yes yes
-		render/on content 50x25 yes yes
+		render/on content (50,50) yes yes
+		render/on content (50,25) yes yes
 		print "--->"
-		r: render/on content 50x50 yes yes
+		r: render/on content (50,50) yes yes
 		print "<---"
-		self/map: compose/deep [(content) [offset: (margin * 1x1) size: (content/size)]]
+		self/map: compose/deep [(content) [offset: (margin * (1,1)) size: (content/size)]]
 		self/size: canvas
-		probe compose/only [pen off fill-pen (color) box 0x0 (self/size) translate (margin * 1x1) (r)]
+		probe compose/only [pen off fill-pen (color) box (0,0) (self/size) translate (margin * (1,1)) (r)]
 	]
 	content: make-space 'box [
 		margin: 10

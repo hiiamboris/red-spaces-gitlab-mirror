@@ -153,7 +153,11 @@ VID: context [
 		grid [
 			template: grid
 			layout:   lay-out-grid						;-- uses custom layout function
-			facets:   [pair! bounds  @(props/tight)]
+			facets:   [
+				pair!    bounds
+				point2D! bounds
+				@(props/tight)
+			]
 		]
 	];; styles
 	
@@ -185,7 +189,7 @@ VID: context [
 			
 			type:       'base					#type =  [word!]	;-- word will be used to lookup styles and event handlers
 			;; no size by default - used by init-spaces-tree as a hint to resize the host itself:
-			size:       0x0						#type =? [pair! none!]  :host-on-change
+			size:       (0,0)					#type =? [planar! none!]  :host-on-change
 			;; makes host background opaque otherwise it loses mouse clicks on most of it's part:
 			;; (except for some popups that must be almost transparent)
 			color:      svmc/panel				#type =  [tuple! none!] :host-on-change
@@ -219,7 +223,7 @@ VID: context [
 		;; for this reason, `host` template contains `size: 0x0`
 		;; which is used as a hint to estimate size automatically
 		;; user can then explicitly set host size to nonzero, in which case it's not changed
-		if face/size = 0x0 [face/size: none]
+		if zero? face/size [face/size: none]
 		drawn: render face
 		#assert [face/size]								;-- should be set by `render-face`, `size: none` blows up `layout`
 		#debug draw [prin "host/draw: " probe drawn] 
@@ -541,7 +545,7 @@ VID: context [
 			]
 			(repend def/facets ['limits lo .. hi])
 		]
-		limit!: make typeset! [integer! float! pair! none!]
+		limit!: make typeset! [linear! planar! none!]
 		=size-component-1=: [
 			set x limit!
 		|	set x [word! | get-word!] if (all [

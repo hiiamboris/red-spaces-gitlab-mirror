@@ -98,14 +98,14 @@ rich: context [											;@@ what would be a better name?
 			"Convert source range into RTD range"
 			range [pair!]
 		][
-			range/1 + 1 by span? range
+			range/1 + 1 thru span? range
 		]
 	
 		from-rtd-pair: function [
 			"Convert RTD range into source range"
 			range [pair!]
 		][
-			0 by range/2 + range/1 - 1
+			0 thru range/2 + range/1 - 1
 		]
 		
 		#assert [2x5 = to-rtd-pair   1x6]
@@ -118,7 +118,7 @@ rich: context [											;@@ what would be a better name?
 		offset:     0
 		flush: [
 			if range-code > 0 [
-				range: range-start by offset
+				range: range-start thru offset
 				attrs: index->attrs range-code
 				repend ranges [range attrs]
 			]
@@ -204,7 +204,7 @@ rich: context [											;@@ what would be a better name?
 		attr  [word!]
 		value
 	][
-		if range = 'all [range: 0 by infxinf/x]
+		if range = 'all [range: 0 thru 2e9]
 		range: clip range 0 half length? data			;-- avoid runaway repeat if range is infinite
 		repeat i span? range [							;@@ use for-each!
 			code: pick data i2: range/1 + i * 2

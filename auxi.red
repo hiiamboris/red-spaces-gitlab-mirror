@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by abs half range! range? make-range .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
+exports: [by thru . abs half linear! linear? planar! planar? range! range? make-range .. using when only mix clip ortho boxes-overlap? infxinf opaque batch]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -25,7 +25,8 @@ exports: [by abs half range! range? make-range .. using when only mix clip ortho
 	; s
 ; ]
 
-by:   make op! :as-pair
+by: thru: make op! :as-pair
+.:        make op! :as-point2D							;@@ unfortunately, comma is not for the taking :(
 abs: :absolute
 svf:  system/view/fonts
 svm:  system/view/metrics
@@ -33,19 +34,24 @@ svmc: system/view/metrics/colors
 
 digit!: charset [#"0" - #"9"]							;@@ add typical charsets to /common repo
 
-INFxINF: 2e9 by 2e9										;-- used too often to always type it numerically
+INFxINF: (1.#inf, 1.#inf)								;-- used too often to always type it numerically
 ;@@ consider: OxINF Ox-INF INFxO -INFxO (so far they don't seem useful)
 
 half: func [x] [x / 2]
-round-down: func [x] [to integer! x]
+round-down: func [x] [round/to/floor   x 1]
 round-up:   func [x] [round/to/ceiling x 1]
+
+planar!: make typeset! [pair! point2D!]
+linear!: make typeset! [integer! float!]				;@@ or real! ? real is more like single datatype, while linear is a typeset
+planar?: func [value [any-type!]] [find planar! type? :value]
+linear?: func [value [any-type!]] [find linear! type? :value]
 
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
-	pair [pair! (0x0 +<= pair) integer! (0 <= pair)]
+	pair [planar! (0x0 +<= pair) linear! (0 <= pair)]
 	axis [word!] (find [x y] axis)
 ][
-	pick 1x1 * pair axis
+	pick pair * 1x1 axis
 ]
 
 block-of?: make op! func [
@@ -75,6 +81,22 @@ get-safe: function [path [path! word!]] [				;@@ REP 113; this in case of error 
 	; forall targets [set :targets/1 do/next exprs 'exprs]
 	; exprs
 ; ]
+
+
+offset-to-caret: func [									;@@ until native support for point
+	{Given a coordinate, returns the corresponding caret position}
+	face [object!]
+	pt   [planar!]
+][
+	system/view/platform/text-box-metrics face to pair! pt 1
+]
+offset-to-char: func [									;@@ until native support for point
+	{Given a coordinate, returns the corresponding character position}
+	face [object!]
+	pt   [planar!]
+][
+	system/view/platform/text-box-metrics face to pair! pt 5
+]
 
 
 ;@@ copy/deep does not copy inner maps unfortunately, so have to use this everywhere
@@ -129,27 +151,25 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
 +<=: make op! func [
 	"Chainable pair comparison (non-strict)"
-	a [pair! none!] b [pair! none!]
+	a [planar! none!] b [planar! none!]
 ][
-	all [a b a = min a b  b]
+	; all [a b a = min a b  b]							;@@ bugged with inf/nan
+	all [a b a/x <= b/x a/y <= b/y  b]
 ]
 +<:  make op! func [
 	"Chainable pair comparison (strict)"    
-	a [pair! none!] b [pair! none!]
+	a [planar! none!] b [planar! none!]
 ][
-	all [a b a = min a b - 1  b]
+	all [a b a/x < b/x a/y < b/y  b]
 ]
 ;+>:  make op! func [a b] [a = max a b + 1]
 ;+>=: make op! func [a b] [a = max a b]
 
 inside?: make op! function [
 	"Test if POINT is inside the SPACE"
-	point [pair!] space [object! block!]				;-- box used to test against map geometry
+	point [planar!] space [object! block!]				;-- block used to test against map geometry, ignores /offset
 ][
-	to logic! any [
-		none = space/size								;-- infinite spaces contain any point ;@@ but should none mean infinite?
-		within? point 0x0 space/size
-	]
+	within? point 0x0 space/size
 ]
 
 host-of: function [space [object!]] [
@@ -160,7 +180,7 @@ host-box-of: function [									;@@ temporary until REP #144
 	"Get host coordinates of a space (kludge! not scaling aware!)"
 	space [object!] (space? space)
 ][
-	box: reduce [0x0 space/size]	
+	box: reduce [(0,0) space/size]	
 	while [parent: space/parent] [
 		if host? parent [return box]
 		#assert [select parent 'map]
@@ -176,30 +196,28 @@ host-box-of: function [									;@@ temporary until REP #144
 ;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
 	"Get intersection size of boxes A1-A2 and B1-B2, or none if they do not intersect"
-	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
-	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
+	A1 [planar!] "inclusive" A2 [planar!] "non-inclusive"
+	B1 [planar!] "inclusive" B2 [planar!] "non-inclusive"
 ][
-	0x0 +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
+	(0,0) +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
 ]
 
-vec-length?: function [v [pair!]] [						;-- this is still 2x faster than compiled `distance? 0x0 v`
+vec-length?: function [v [planar!]] [					;-- this is still 2x faster than compiled `distance? 0x0 v`
 	v/x ** 2 + (v/y ** 2) ** 0.5
 ]
 
 closest-box-point?: function [
 	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
-	B1 [pair!] "inclusive" B2 [pair!] "inclusive"
-	/to origin: 0x0 [pair!] "defaults to 0x0"
+	B1 [planar!] "inclusive" B2 [planar!] "inclusive"
+	/to origin: (0,0) [planar!] "defaults to 0x0"
 ][
-	as-pair
-		case [origin/x < B1/x [B1/x] B2/x < origin/x [B2/x] 'else [origin/x]]
-		case [origin/y < B1/y [B1/y] B2/y < origin/y [B2/y] 'else [origin/y]]
+	clip origin B1 B2
 ]
 
 box-distance?: function [
 	"Get distance between closest points of box A1-A2 and box B1-B2 (negative if overlap)"
-	A1 [pair!] "inclusive" A2 [pair!] "non-inclusive"
-	B1 [pair!] "inclusive" B2 [pair!] "non-inclusive"
+	A1 [planar!] "inclusive" A2 [planar!] "non-inclusive"
+	B1 [planar!] "inclusive" B2 [planar!] "non-inclusive"
 ][
 	either isec: boxes-overlap? A1 A2 B1 B2 [			;-- case needed by box arrangement algo
 		negate min isec/x isec/y
@@ -245,7 +263,7 @@ context [
 	set 'obtain function [
 		"Get a series of type TYPE with a buffer of at least SIZE length"
 		type [datatype!] "Any series type" (any [map! = type find series! type])
-		size [integer! float!]  "Minimal length before reallocation, >= 1"
+		size [linear!]   "Minimal length before reallocation, >= 1"
 	][
 		size:   max 1 size								;-- else log will be infinite
 		name:   to word! type							;-- datatype is not supported by maps
@@ -503,14 +521,36 @@ remake: function [proto [object! datatype!] spec [block!]] [
 	construct/only/with compose/only spec proto
 ]
 
-area?: func [xy [pair!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
-span?: func [xy [pair!]] [abs xy/y - xy/x]				;@@ or range? but range? tests for range! class
-order-pair: function [xy [pair!]] [either xy/1 <= xy/2 [xy][reverse xy]]
+area?: func [xy [planar!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
+span?: func [xy [planar!]] [abs xy/y - xy/x]			;@@ or range? but range? tests for range! class
+order-pair: function [xy [planar!]] [either xy/1 <= xy/2 [xy][reverse xy]]
 order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a block of any number of paths?
 	if greater? get a get b [set a before (b) get a]
 ]
 
 skip?: func [series [series!]] [-1 + index? series]
+
+native-min: :system/words/min
+native-max: :system/words/max
+max: func [												;@@ point/pair bugs workaround
+	"Returns the greater of the two values"
+	a [scalar! series!] b [scalar! series!]				;@@ wonder if anyone ever used it on series
+][
+	either point2D? b [native-max b a][native-max a b]
+]
+min: func [												;@@ point/pair bugs workaround
+	"Returns the lesser of the two values"
+	a [scalar! series!] b [scalar! series!]				;@@ wonder if anyone ever used it on series
+][
+	either point2D? b [native-min b a][native-min a b]
+]
+
+#assert [
+	(2,3)      = max (1,3) 2x2 
+	(2,3)      = max 2x2 (1,3) 
+	(2,1.#inf) = max 2x2 (1,1.#inf) 
+	(2,1.#inf) = max (1,1.#inf) 2x2 
+]
 
 ;@@ remove it if PR #5194 gets merged
 clip: func [
@@ -518,8 +558,10 @@ clip: func [
 	a [scalar!] b [scalar!] c [scalar!]
 	return: [scalar!]
 ][
-	min max a b max min a b c
+	min max a b max min a b c							;-- 'a' should come first to determine output type
 ]
+
+#assert [(8,16) = clip 8x16 (20,0) (0,1.#inf)]
 
 ;@@ this should be just `clip` but min/max have no vector support
 clip-vector: function [v1 [vector!] v2 [vector!] v3 [vector!]] [
@@ -735,7 +777,7 @@ context [
 		sc: 400 / 8
 		view [
 			base white 400x400 all-over on-over [try [
-				trace: map-each [x y] f/points [as-pair sc * x sc * y]
+				trace: map-each [x y] f/points [as-point2D sc * x sc * y]
 				x: event/offset/x / sc
 				y: event/offset/y / sc
 				y1: sc * reproject    f x
@@ -776,22 +818,25 @@ context [
 ;; constraining is used by `render` to impose soft limits on space sizes
 constrain: function [
 	"Clip SIZE within LIMITS"
-	size    [pair!] "use infxinf for unlimited; negative size will become zero"
+	size    [planar!] "use infxinf for unlimited; negative size will become zero"
 	limits  [object! (range? limits) none!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
 	min: switch/default type?/word limits/min [
-		pair!           [limits/min]
-		integer! float! [limits/min by 0]				;-- numeric limits only affect /x
-	] [0x0]												;-- none and invalid treated as 0x0
+		pair! point2D!  [limits/min]
+		integer! float! [limits/min . 0]				;-- numeric limits only affect /x
+	] [(0,0)]											;-- none and invalid treated as 0x0
 	max: switch/default type?/word limits/max [
-		pair!           [limits/max]
-		integer! float! [limits/max by infxinf/y]		;-- numeric limits only affect /x
+		pair! point2D!  [limits/max]
+		integer! float! [limits/max . infxinf/y]		;-- numeric limits only affect /x
 	] [infxinf]											;-- none and invalid treated as infinity
 	clip size min max
 ]
 
-#assert [infxinf = constrain infxinf none]
+#assert [
+	infxinf = constrain infxinf none
+	(20,16) = constrain 8x16 20 .. none
+]
 
 ;@@ rewrite this using inoutfunc?
 for: function ['word [word! set-word!] i1 [integer! pair!] i2 [integer! pair!] (same? type? i1 type? i2) code [block!]] [
@@ -828,8 +873,8 @@ closest-number: function [n [number!] list [block!]] [
 ]
 
 
-polar2cartesian: func [radius [float! integer!] angle [float! integer!]] [
-	(radius * cosine angle) by (radius * sine angle)
+polar2cartesian: func [radius [linear!] angle [linear!]] [
+	as-point2D (radius * cosine angle) (radius * sine angle)
 ]
 
 ortho: func [
@@ -844,7 +889,7 @@ ortho: func [
 set-pair: function [
 	"Set words to components of a pair value"
 	words [block!]
-	pair  [pair! block!] "Can be a block (works same as set native then)"
+	pair  [planar! block!] "Can be a block (works same as set native then)"
 ][
 	set words/1 pair/1
 	set words/2 pair/2
@@ -858,12 +903,12 @@ set-pair: function [
 	b = 5
 ]]
 
-make-pair: function [
+make-pair: function [									;@@ rename to make-point
 	"Construct a pair out of default value and possible axis replacements"
 	spec [block!] "Reduced, /x /y and /1 are used"
 ][
 	reduce/into spec spec: clear []
-	as-pair any [spec/x spec/1/1] any [spec/y spec/1/2]
+	as-point2D any [spec/x spec/1/1] any [spec/y spec/1/2]
 ]
 
 axis2pair: func [xy [word!]] [
@@ -916,7 +961,7 @@ normalize-alignment: function [
 
 decode-canvas: function [
 	"Turn pair canvas into positive value and fill flags"
-	canvas [pair!] "can be positive or infinite (no fill), negative (fill)"
+	canvas [point2D!] "can be positive or infinite (no fill), negative (fill)"
 ][
 	reduce/into [
 		abs canvas
@@ -926,44 +971,49 @@ decode-canvas: function [
 ]
 
 #assert [
-	(reduce [infxinf no no]) = decode-canvas infxinf
-	(reduce [10x20   no no]) = decode-canvas  10x20
-	(reduce [10x20 yes yes]) = decode-canvas -10x-20
-	(reduce [10x0    no no]) = decode-canvas  10x0		;-- zero is fill=false
+	(reduce [infxinf   no  no]) = decode-canvas infxinf
+	(reduce [(10, 20)  no  no]) = decode-canvas ( 10,  20)
+	(reduce [(10, 20) yes yes]) = decode-canvas (-10, -20)
+	(reduce [(10,  0)  no  no]) = decode-canvas ( 10,   0)	;-- zero is fill=false
 ]
 
 encode-canvas: function [
-	|canvas| [pair!] (0x0 +<= |canvas|)
+	|canvas| [point2D!] (0x0 +<= |canvas|)
 	fill-x   [logic!]
 	fill-y   [logic!]
 ][
-	add (pick [-1 1] fill-x) by (pick [-1 1] fill-y) * |canvas| % infxinf	;-- finite part may flip sign
-		|canvas| / infxinf * infxinf					;-- infinite part stays positive
+	x-sign: any [all [fill-x |canvas|/x < 1.#inf -1] 1]	;-- finite part may flip sign
+	y-sign: any [all [fill-y |canvas|/y < 1.#inf -1] 1]	;-- infinite part stays positive
+	x-sign . y-sign * |canvas|
 ]
 
 #localize [#assert [
 	reencode: func [b] [encode-canvas b/1 b/2 b/3]
-	infxinf = reencode decode-canvas  infxinf
-	 10x20  = reencode decode-canvas  10x20
-	-10x-20 = reencode decode-canvas -10x-20
-	 10x0   = reencode decode-canvas  10x0
-	infxinf = encode-canvas infxinf yes yes				;-- must not become negative infinity
-	infxinf = encode-canvas infxinf yes no
+	infxinf   = reencode decode-canvas  infxinf
+	( 10, 20) = reencode decode-canvas ( 10, 20)
+	(-10,-20) = reencode decode-canvas (-10,-20)
+	( 10,  0) = reencode decode-canvas ( 10,  0)
+	infxinf   = encode-canvas infxinf yes yes			;-- must not become negative infinity
+	infxinf   = encode-canvas infxinf yes no
 ]]
 
 
 finite-canvas: function [
 	"Turn infinite dimensions of CANVAS into zero"
-	canvas [pair!]
+	canvas [point2D!] (0x0 +<= canvas)
 ][
-	canvas % infxinf
+	case/all [
+		canvas/x = 1.#inf [canvas/x: 0]
+		canvas/y = 1.#inf [canvas/y: 0]
+	]
+	canvas
 ]
 
-#assert [0x20 = finite-canvas infxinf/x by 20]
+#assert [(0,20) = finite-canvas infxinf/x . 20]
 
 extend-canvas: function [
 	"Make one of CANVAS dimensions infinite"
-	canvas [pair!]
+	canvas [point2D!]
 	axis   [word!] "X or Y" (find [x y] axis)
 ][
 	canvas/:axis: infxinf/x
@@ -973,18 +1023,22 @@ extend-canvas: function [
 ;; useful to subtract margins, but only from finite dimensions
 subtract-canvas: function [
 	"Subtract PAIR from CANVAS if it's finite, rounding negative results to 0x0"
-	canvas [pair!] (0x0 +<= canvas)
-	pair   [pair!]
+	canvas [point2D!]
+	pair   [planar!]
 ][
-	mask: 1x1 - (canvas / infxinf)						;-- 0x0 (infinite) to 1x1 (finite)
-	max 0x0 canvas - (pair * mask)
+	max canvas - pair 0x0
 ]
 
-#assert [( 60 by infxinf/y) = subtract-canvas  100 by infxinf/y 40x30]
-#assert [( 0  by infxinf/y) = subtract-canvas   20 by infxinf/y 40x30]
+#assert [( 60, 1.#inf) = subtract-canvas (100, 1.#inf) 40x30]
+#assert [(  0, 1.#inf) = subtract-canvas ( 20, 1.#inf) 40x30]
 
-fill-canvas: function [canvas [pair!] fill-x [logic!] fill-y [logic!]] [
-	(make integer! fill-x) by (make integer! fill-y) * finite-canvas canvas		;-- non-filled dimensions become zero
+fill-canvas: function [
+	"Set unfilled and infinite canvas dimensions to zero"
+	canvas [point2D!] fill-x [logic!] fill-y [logic!]
+][
+	as-point2D
+		either all [fill-x canvas/x < 1.#inf] [canvas/x][0] 
+		either all [fill-y canvas/y < 1.#inf] [canvas/y][0] 
 ]
 
 top: func [
@@ -1152,8 +1206,8 @@ batch: function ["Evaluate plan within space's kit" space [object!] plan [block!
 ;; it's not totally error-proof but I haven't come up with a better plan
 generate-sections: function [
 	"Generate sections block out of list of spaces; returns none if nothing to dissect"
-	map     [block!]   "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
-	width   [integer!] "Total width (may be affected by limits/min)" (width >= 0)
+	map     [block!]  "A list in map format: [space [size: ...] ...]" (parse map [end | object! block! to end])
+	width   [linear!] "Total width (may be affected by limits/min)" (width >= 0)
 	buffer  [block!]
 ][
 	case [

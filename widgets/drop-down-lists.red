@@ -42,7 +42,7 @@ context with spaces/ctx expand-directives [
 		content:    reduce [spaces/box spaces/button]
 		margin: spacing: 5
 		
-		list-pages: 5		#type [integer! float!]		;-- max drop-menu vertical size in drop-box's heights
+		list-pages: 5		#type [linear!]				;-- max drop-menu vertical size in drop-box's heights
 	]
 	
 	;; they have to handle keys themselves (drop-box has no focusable field anyway)
@@ -78,7 +78,7 @@ context with spaces/ctx expand-directives [
 		"Drop down the list of choices for drop list widgets"
 		window    [object!]
 		drop-down [object!]
-		offset    [pair!]
+		offset    [planar!]
 	][
 		;@@ list must have a single selection support and key navigation!
 		list: make-space 'cell [
@@ -108,7 +108,7 @@ context with spaces/ctx expand-directives [
 
 	show-list-on-key: function [space path event] [
 		box:    host-box-of space
-		corner: box/1/x by box/2/y
+		corner: box/1/x . box/2/y
 		menu:   show-list event/window space face-to-window corner event/face
 		set-focus menu/content							;-- let list-view handle up/down now
 	]

@@ -25,19 +25,21 @@ invalidates-look: function [space [object!] word [word!] value [any-type!]] [
 ]
 
 ;; normalizes /margin & /spacing to a pair, for easier handling
-on-margin-spacing-change: function [space [object!] word [word!] value [integer! pair!]] [
-	invalidates space word quietly space/:word: value * 1x1
+on-margin-spacing-change: function [space [object!] word [word!] value [linear! planar!]] [
+	;@@ need to add 'old' value to on-change, to avoid invalidation on assigning '0' to (0,0)
+	;@@ tricky because of error throw and because assignment must be either explicit here, or modified value returned
+	invalidates space word quietly space/:word: (1,1) * value 
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
-	type:	'space		#type [word!] =					;-- used for styling and event handler lookup, may differ from template name!
-	size:   0x0			#type [pair! (0x0 +<= size)] =?	;-- none (infinite) must be allowed explicitly by templates supporting it
-	parent: none		#type [object! none!]
-	draw:   :no-draw  	#type [function!]
+	type:	'space		#type = [word!]					;-- used for styling and event handler lookup, may differ from template name!
+	size:   (0,0)		#type = [point2D! (0x0 +<= size)]	;-- none (infinite) must be allowed explicitly by templates supporting it
+	parent: none		#type   [object! none!]
+	draw:   :no-draw  	#type   [function!]
 	;; `drawn` is an exception and not held in the space, so just `size`:
-	cache:  [size]		#type [block! none!]
-	cached: tail copy [0x0 0.0 #[none]]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
-	limits: none		#type [object! (range? limits)  none!] =? :invalidates
+	cache:  [size]		#type   [block! none!]
+	cached: tail copy [(0,0) 0.0 #[none]]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
+	limits: none		#type =? [object! (range? limits)  none!] :invalidates
 	; rate: none
 ]
 
@@ -47,12 +49,12 @@ modify-class 'space [
 	map:     []		#type [block!]
 	into:    none	#type [function!]
 	;; rate change -> invalidation -> next render puts it into rated-spaces list
-	rate:    none	#type =  [integer! float! time! (rate >= 0) none!]
+	rate:    none	#type =  [linear! time! (rate >= 0) none!]
 	color:   none	#type =? :invalidates-look [tuple! none!]
-	margin:  0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (margin * 1x1))
-	spacing: 0		#type =? :on-margin-spacing-change [integer! pair!] (0x0 +<= (spacing * 1x1))
-	weight:  0		#type =? :invalidates [number!] (weight >= 0)
-	origin:  0x0	#type =? :invalidates-look [pair!]
+	margin:  0x0	#type =  :on-margin-spacing-change [linear! planar!] (0x0 +<= ((1,1) * margin))
+	spacing: 0x0	#type =  :on-margin-spacing-change [linear! planar!] (0x0 +<= ((1,1) * spacing))
+	weight:  0		#type =  :invalidates [number!] (weight >= 0)
+	origin:  (0,0)	#type =  :invalidates-look [point2D!]
 	font:    none	#type =? :invalidates [object! none!]	;-- can be set in style, as well as margin ;@@ check if it's really a font
 	command: []		#type [block! paren!]
 	kit:     none	#type [object!]
@@ -182,7 +184,7 @@ compose-map: function [
 	"Build a Draw block from MAP"
 	map "List of [space [offset XxY size XxY] ...]"
 	/only list [block!] "Select which spaces to include"
-	/window xy1 [pair!] xy2 [pair!] "Specify viewport"	;@@ it's unused; remove it?
+	/window xy1 [point2D!] xy2 [point2D!] "Specify viewport"	;@@ it's unused; remove it?
 ][
 	r: make [] round/ceiling/to (1.5 * length? map) 1	;-- 3 draw tokens per 2 map items
 	foreach [space box] map [
@@ -209,9 +211,9 @@ declare-template 'timer/space [							;-- template space for timers
 no-draw: does [[]]
 
 ;; used internally for empty spaces size estimation
-set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+set-empty-size: function [space [object!] canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 	canvas: either positive? space/weight
-		[fill-canvas canvas fill-x fill-y][0x0]			;-- don't stretch what isn't supposed to stretch
+		[fill-canvas canvas fill-x fill-y][(0,0)]		;-- don't stretch what isn't supposed to stretch
 	space/size: constrain canvas space/limits
 ]
 
@@ -219,7 +221,7 @@ set-empty-size: function [space [object!] canvas [pair!] fill-x [logic!] fill-y 
 context [
 	~: self
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		set-empty-size space canvas fill-x fill-y
 		[]
 	]
@@ -227,7 +229,7 @@ context [
 	put templates '<-> declare-template 'stretch/space [	;@@ affected by #5137
 		weight: 1
 		cache:  none
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 			~/draw self canvas fill-x fill-y
 		]
 	]
@@ -237,7 +239,7 @@ rectangle-ctx: context [
 	~: self
 	
 	declare-template 'rectangle/space [
-		size:   20x10	#on-change :invalidates
+		size:   (20,10)	#on-change :invalidates
 		margin: 0
 		draw:   does [compose [box (margin) (size - margin)]]
 	]
@@ -249,21 +251,20 @@ triangle-ctx: context [
 	
 	draw: function [space [object!]] [
 		set [p1: p2: p3:] select [
-			n [0x2 1x0 2x2]								;--   n
-			e [0x0 2x1 0x2]								;-- w   e
-			w [2x0 0x1 2x2]								;--   s
-			s [0x0 1x2 2x0]
+			n [(0,2) (1,0) (2,2)]						;--   n
+			e [(0,0) (2,1) (0,2)]						;-- w   e
+			w [(2,0) (0,1) (2,2)]						;--   s
+			s [(0,0) (1,2) (2,0)]
 		] space/dir
-		m: space/margin
-		r: space/size / 2 - m
+		rad: space/size / 2 - space/margin
 		compose/deep [
-			translate (m) [triangle (p1 * r) (p2 * r) (p3 * r)]
+			translate (space/margin) [triangle (p1 * rad) (p2 * rad) (p3 * rad)]
 		]
 	]
 		
 	declare-template 'triangle/space [
-		size:    16x10	#on-change :invalidates
-		dir:     'n		#type =    :invalidates [word!] (find [n s w e] dir)
+		size:    (16,10)	#on-change :invalidates
+		dir:     'n			#type =    :invalidates [word!] (find [n s w e] dir)
 		margin:  0
 		
 		;@@ need `into` here? or triangle will be a box from the clicking perspective?
@@ -274,7 +275,7 @@ triangle-ctx: context [
 image-ctx: context [
 	~: self
 	
-	draw: function [image [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [image [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		mrg2: 2 * mrg: image/margin
 		switch type?/word image/data [
 			none! [
@@ -291,10 +292,10 @@ image-ctx: context [
 				limits:        image/limits
 				isize:         image/data/size
 				;; `constrain` isn't applicable here because doesn't preserve the ratio, and because of canvas handling
-				if all [limits  limits/min  low-lim:  max 0x0 limits/min - mrg2] [	;@@ REP #113 & 122
+				if all [limits  limits/min  low-lim:  max (0,0) limits/min - mrg2] [	;@@ REP #113 & 122
 					min-scale: max  low-lim/x / isize/x  low-lim/y / isize/y	;-- use bigger one to not let it go below low limit
 				]
-				if all [limits  limits/max  high-lim: max 0x0 limits/max - mrg2] [	;@@ REP #113 & 122
+				if all [limits  limits/max  high-lim: max (0,0) limits/max - mrg2] [	;@@ REP #113 & 122
 					max-scale: min  high-lim/x / isize/x  high-lim/y / isize/y	;-- use lower one to not let it go above high limit
 				]
 				if all [image/weight > 0  canvas <> infxinf] [		;-- if inf canvas, will be unscaled, otherwise uses finite dimension
@@ -312,7 +313,7 @@ image-ctx: context [
 				default canvas-scale: 1.0
 				scale: clip canvas-scale min-scale max-scale 
 				; echo [canvas fill low-lim high-lim scale min-scale max-scale lim isize]
-				image/size: isize * scale + (2 * mrg)
+				image/size: (to point2D! isize) * scale + (2 * mrg)
 				reduce ['image image/data mrg image/size - mrg]
 			]
 		]
@@ -323,7 +324,7 @@ image-ctx: context [
 		weight: 0
 		data:   none	#type =? :invalidates [none! image! block!]		;-- images are not recyclable, so `none` by default
 		
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -331,7 +332,7 @@ image-ctx: context [
 cell-ctx: context [
 	~: self
 
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [#print "cell/draw with (if space/content [space-id space/content]) on (canvas) (fill-x) (fill-y)"]
 		space/sec-cache: copy []						;-- alloc new (minimal) sections block for new canvas
 		unless space/content [
@@ -342,14 +343,14 @@ cell-ctx: context [
 		mrg2:    space/margin * 2
 		content: space/content
 		drawn:   render/on content (subtract-canvas canvas mrg2) fill-x fill-y
-		size:    mrg2 + content/size
+		size:    content/size + mrg2
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 		size:    max size fill-canvas canvas fill-x fill-y		;-- only extends along fill-enabled axes
 		space/size: constrain size space/limits
 		; #print "size: (size) space/size: (space/size) fill: (fill)"
 		
 		free:   space/size - content/size - mrg2
-		offset: space/margin + max 0x0 free * (space/align + 1) / 2
+		offset: (to point2D! space/margin) + max (0,0) free * (space/align + 1) / 2
 		unless tail? drawn [
 			drawn: compose/only [translate (offset) (drawn)]
 			unless fits?: content/size +<= space/size [			;-- only use clipping when required! (for drop-downs)
@@ -403,7 +404,7 @@ cell-ctx: context [
 		;; but to do that we'll have to render content fully first to get it's size and align it
 		;; which defies the meaning of /only...
 		;; the only way to use /only is to apply it on top of current offset, but this may be harmful
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 	declare-template 'cell/box [margin: 1x1]			;-- same thing just with a border and background ;@@ margin - in style?
@@ -414,20 +415,20 @@ cell-ctx: context [
 scrollbar: context [
 	~: self
 	
-	into: func [space [object!] xy [pair!] child [object! none!]] [
+	into: func [space [object!] xy [planar!] child [object! none!]] [
 		any [space/axis = 'x  xy: reverse xy]
 		into-map space/map xy child
 	]
 	
 	arrange: function [content [block!]] [				;-- like list layout but simpler/faster
 		map: make block! 2 * length? content
-		pos: 0x0
+		pos: (0,0)
 		foreach name content [	;@@ should be map-each
 			space: get name
 			append map compose/deep [
 				(space) [offset: (pos) size: (space/size)]
 			]
-			pos: space/size * 1x0 + pos
+			pos: space/size * (1,0) + pos
 		]
 		map
 	]
@@ -435,22 +436,22 @@ scrollbar: context [
 	draw: function [space [object!]] [
 		size2: either space/axis = 'x [space/size][reverse space/size]
 		h: size2/y  w-full: size2/x
-		w-arrow: to integer! size2/y * space/arrow-size
+		w-arrow: size2/y * space/arrow-size
 		w-inner: w-full - (2 * w-arrow)
 		;-- in case size is too tight to fit the scrollbar - compress inner first, arrows next
-		if w-inner < 0 [w-arrow: to integer! w-full / 2  w-inner: 0]
-		w-thumb: to integer! case [						;-- 3 strategies for the thumb
+		if w-inner < 0 [w-arrow: w-full / 2  w-inner: 0]
+		w-thumb: case [									;-- 3 strategies for the thumb
 			w-inner >= (2 * h) [max h w-inner * space/amount]	;-- make it big enough to aim at
 			w-inner >= 8       [      w-inner * space/amount]	;-- better to have tiny thumb than none at all
 			'else              [0]								;-- hide thumb, leave just the arrows
 		]
-		w-pgup: to integer! w-inner - w-thumb + (w-inner * space/amount) * space/offset
+		w-pgup: w-inner - w-thumb + (w-inner * space/amount) * space/offset
 		w-pgdn: w-inner - w-pgup - w-thumb
-		quietly space/back-arrow/size:  w-arrow by h
-		quietly space/back-page/size:   w-pgup  by h
-		quietly space/thumb/size:       w-thumb by h
-		quietly space/forth-page/size:  w-inner - w-thumb - w-pgup by h	;-- compensates for previous rounding errors
-		quietly space/forth-arrow/size: w-arrow by h
+		quietly space/back-arrow/size:  w-arrow . h
+		quietly space/back-page/size:   w-pgup  . h
+		quietly space/thumb/size:       w-thumb . h
+		quietly space/forth-page/size:  w-inner - w-thumb - w-pgup . h	;-- compensates for previous rounding errors
+		quietly space/forth-arrow/size: w-arrow . h
 		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
 		
 		foreach item list [invalidate/only get item]
@@ -465,12 +466,12 @@ scrollbar: context [
 	declare-template 'scrollbar/space [
 		;@@ maybe leverage canvas size?
 		;@@ size should not cause invalidation here, or each deep cache fetch sets it, repainting whole tree
-		size:       100x16	;#type =? :invalidates		;-- opposite axis defines thickness
+		size:       (100,16)	;#type =? :invalidates		;-- opposite axis defines thickness
 		axis:       'x		#type =  :invalidates [word!] (find [x y] axis)
-		offset:     0%		#type =? :invalidates-look [number!] (all [0 <= offset offset <= 1])
-		amount:     100%	#type =? :invalidates-look [number!] (all [0 <= amount amount <= 1])
+		offset:     0%		#type =  :invalidates-look [number!] (all [0 <= offset offset <= 1])
+		amount:     100%	#type =  :invalidates-look [number!] (all [0 <= amount amount <= 1])
 		;; arrow length in percents of scroller's thickness:
-		arrow-size: 90%		#type =? :invalidates-look [number!] (0 <= arrow-size) 
+		arrow-size: 90%		#type =  :invalidates-look [number!] (0 <= arrow-size) 
 		
 		map:         []
 		cache:       [size map]
@@ -480,7 +481,7 @@ scrollbar: context [
 		forth-page:  make-space 'rectangle [type: 'forth-page  draw: :no-draw]     #type (space? forth-page)	;-- go forth a page
 		forth-arrow: make-space 'triangle  [type: 'forth-arrow margin: 2  dir: 'e] #type (space? forth-arrow)	;-- go forth a step
 		
-		into: func [xy [pair!] /force space [object! none!]] [~/into self xy space]
+		into: func [xy [planar!] /force space [object! none!]] [~/into self xy space]
 		draw: does [~/draw self]
 	]
 ]
@@ -490,7 +491,7 @@ scrollable-ctx: context [
 
 	set-origin: function [
 		space   [object!]
-		origin  [pair! word!]
+		origin  [point2D! word!]
 		no-clip [logic!]
 	][
 		unless no-clip [
@@ -520,20 +521,20 @@ scrollable-ctx: context [
 
 	move-to: function [
 		space     [object!]
-		xy        [pair! word!] "Point in content coordinates or [head tail]"
-		margin: 0 [integer! pair! none!]				;-- space to reserve around XY
+		xy        [planar! word!] "Point in content coordinates or [head tail]"
+		margin: 0 [linear! planar! none!]		;-- space to reserve around XY
 		no-clip   [logic!]
 	][
-		mrg: 1x1 * margin
+		mrg: margin * (1,1)
 		switch xy [
-			head [xy: 0x0]
+			head [xy: (0,0)]
 			tail [xy: space/content/size * 0x1]			;-- no right answer here, csize or csize*0x1 ;@@ won't work for infinity
 		]
 		box: space/viewport
-		mrg: clip 0x0 mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
+		mrg: clip (0,0) mrg box - 1 / 2					;-- if box < 2xmargin, choose half box size as margin
 		xy1: mrg - space/origin							;-- left top margin point in content's coordinates
 		xy2: xy1 + box - (mrg * 2)						;-- right bottom margin point
-		dxy: 0x0
+		dxy: (0,0)
 		foreach x [x y] [
 			case [
 				xy/:x < xy1/:x [dxy/:x: xy/:x - xy1/:x]
@@ -544,7 +545,7 @@ scrollable-ctx: context [
 		; ?? [box mrg xy1 xy2 xy dxy space/origin]
 	]
 
-	into: function [space [object!] xy [pair!] child [object! none!]] [
+	into: function [space [object!] xy [planar!] child [object! none!]] [
 		if r: into-map space/map xy child [
 			all [
 				r/1 =? space/content
@@ -559,7 +560,7 @@ scrollable-ctx: context [
 	;; sizing policy (for cell, scrollable, window):
 	;; - use content/size if it fits the canvas (no scrolling needed) and no fill flag is set
 	;; - use canvas/size if it's less than content/size or if fill flag is set
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		;; apply limits in the earnest - canvas size will become the upper limit
 		;@@ maybe render should do this?
 		canvas: constrain canvas space/limits
@@ -589,7 +590,7 @@ scrollable-ctx: context [
 		;; an unfortunate slowdown, but mostly alleviated by caching
 		hscroll:   space/hscroll
 		vscroll:   space/vscroll
-		scrollers: vscroll/size/x by hscroll/size/y
+		scrollers: vscroll/size/x . hscroll/size/y
 		cdrawn:    render/on content ccanvas cfill-x cfill-y
 		sshow:     0x0											;-- scrollers show mask 0=hidden, 1=visible
 		if all [
@@ -616,8 +617,8 @@ scrollable-ctx: context [
 			viewport: subtract-canvas canvas scrollers * reverse sshow	;-- viewport may be infinite if canvas is
 		]
 		;; quiet to avoid deep invalidation
-		quietly hscroll/size: (viewport/x * sshow/x) by hscroll/size/y	;-- masking avoids infinite size
-		quietly vscroll/size: vscroll/size/x by (viewport/y * sshow/y)
+		quietly hscroll/size: (viewport/x * sshow/x) . hscroll/size/y	;-- masking avoids infinite size
+		quietly vscroll/size: vscroll/size/x . (viewport/y * sshow/y)
 		
 		;; final size is viewport + free space filled by fill flags + scrollbars
 		free:   subtract-canvas viewport csize
@@ -641,10 +642,10 @@ scrollable-ctx: context [
 		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
 		viewport: space/size - (scrollers * reverse sshow)		;-- include 'free' size in the viewport
 		quietly space/map: reshape-light [
-			@(content) [offset: 0x0 size: @(viewport)]
+			@(content) [offset: (0,0) size: @(viewport)]
 		/?	@(hscroll) [offset: @(viewport * 0x1) size: @(hscroll/size)]	/if sshow/x = 1
 		/?	@(vscroll) [offset: @(viewport * 1x0) size: @(vscroll/size)]	/if sshow/y = 1
-		/?	@(space/scroll-timer) [offset: 0x0 size: 0x0]					/if not fits?	;-- list it for tree correctness
+		/?	@(space/scroll-timer) [offset: (0,0) size: (0,0)]				/if not fits?	;-- list it for tree correctness
 		]
 		
 		invalidate/only hscroll									;-- let scrollers know they were changed
@@ -660,7 +661,7 @@ scrollable-ctx: context [
 		; limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
 		
 		;; at which point `content` to place: >0 to right below, <0 to left above:
-		origin:       0x0
+		origin:       (0,0)
 		weight:       1
 		content:      none		#type =? :invalidates [object! none!]	;-- should be defined (overwritten) by the user
 		content-flow: 'planar	#type =  :invalidates [word!] (find [planar horizontal vertical] content-flow)
@@ -674,7 +675,7 @@ scrollable-ctx: context [
 		map:   []
 		cache: [size map]
 
-		into: func [xy [pair!] /force child [object! none!]] [
+		into: func [xy [planar!] /force child [object! none!]] [
 			~/into self xy child
 		]
 		
@@ -696,8 +697,8 @@ scrollable-ctx: context [
 
 		move-to: func [
 			"Ensure point XY of content is visible, scroll only if required"
-			xy          [pair! word!]    "'head or 'tail or an offset pair"
-			/margin mrg [integer! pair!] "How much space to reserve around XY (default: 0)"
+			xy          [planar! word!]    "'head or 'tail or an offset pair"
+			/margin mrg [linear! planar!] "How much space to reserve around XY (default: 0)"
 			/no-clip "Allow showing empty regions external to window"
 		][
 			~/move-to self xy mrg no-clip
@@ -705,12 +706,12 @@ scrollable-ctx: context [
 		
 		clip-origin: func [
 			"Change the /origin facet, ensuring no empty area is shown"
-			origin [pair!] "Clipped between (viewport - scrollable/size) and 0x0"
+			origin [point2D!] "Clipped between (viewport - scrollable/size) and (0,0)"
 		][
 			~/set-origin self origin no
 		] #type [function!]
 	
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -727,13 +728,13 @@ paragraph-ctx: context [
 	]
 	
 	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
-		size1: size-text layout
-		size2: caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
+		size1: to point2D! size-text layout
+		size2: to point2D! caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
 		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
 		max size1 size2
 	]
 	
-	ellipsize: function [layout [object!] text [string!] canvas [pair!]] [
+	ellipsize: function [layout [object!] text [string!] canvas [point2D!]] [
 		;; save existing buffer for reuse (if it's different from text)
 		buffer: unless layout/text =? text [layout/text]
 		len: length? text
@@ -763,7 +764,7 @@ paragraph-ctx: context [
 			
 			;; this only works if text width is >= ellipsis, otherwise ellipsis itself gets wrapped to an invisible line
 			;@@ more complex logic could account for ellipsis itself spanning 2-3 lines, but is it worth it?
-			ellipsis-location: (max 0 canvas/x - ellipsis-width) by last-line-dy
+			ellipsis-location: (max 0 canvas/x - ellipsis-width) . last-line-dy
 			last-visible-char: -1 + offset-to-char layout ellipsis-location
 			unless buffer [buffer: make string! last-visible-char + 3]
 			quietly layout/text: append append/part clear buffer text last-visible-char "..."
@@ -779,7 +780,7 @@ paragraph-ctx: context [
 	;; wrap=off elli=on -> canvas=fixed, but wrapping should be off, i.e. layout/size=inf (don't use none! draw relies on this)
 	;; wrap=elli=on -> canvas=fixed
 	;@@ font won't be recreated on `make paragraph!`, but must be careful
-	lay-out: function [space [object!] canvas [pair!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
+	lay-out: function [space [object!] canvas [point2D!] (0x0 +<= canvas) "positive!" ellipsize? [logic!] wrap? [logic!]] [
 		canvas: subtract-canvas canvas mrg2: space/margin * 2
 		width:  canvas/x								;-- should not depend on the margin, only on text part of the canvas
 		;; cache of layouts is needed to avoid changing live text object! ;@@ REP #124
@@ -790,7 +791,7 @@ paragraph-ctx: context [
 			flags: either pair? :flags/1 [				;-- flags may be already provided in low-level form 
 				copy flags
 			][
-				compose [(1 by length? space/text) (space/flags)]
+				compose [(1 thru length? space/text) (space/flags)]
 			]
 			;; remove only after copying!
 			remove find flags 'wrap						;-- leave no custom flags, otherwise rich-text throws an error
@@ -802,7 +803,7 @@ paragraph-ctx: context [
 		quietly layout/data: flags						;-- support of font styles - affects width
 		either all [ellipsize? canvas +< infxinf] [		;-- size has to be limited from both directions for ellipsis to be present
 			;; ellipsization prioritizes the canvas, so may split long words
-			quietly layout/size:  max 1x1 canvas
+			quietly layout/size:  max (1,1) canvas
 			quietly layout/extra: ellipsize layout (as string! space/text)
 				either wrap? [canvas][canvas * 1x0]		;-- without wrapping should be a single line
 		][
@@ -813,8 +814,8 @@ paragraph-ctx: context [
 				trail: any [find/last/tail words non-space!  words]
 				parse/case/part words [any [to whitespace! p: skip (change p #"^/")]] trail
 				quietly layout/text: words				;@@ memoize results?
-				min-width: 1x0 * size-text2 layout
-				quietly layout/size: max 1x1 max canvas min-width
+				min-width: (1,0) * size-text2 layout
+				quietly layout/size: max (1,1) max canvas min-width
 			]
 			quietly layout/text:  copy as string! space/text	;-- copy so it doesn't update its look until re-rendered!
 			; system/view/platform/update-view layout
@@ -831,13 +832,13 @@ paragraph-ctx: context [
 		type: 'selection
 		cache: none										;-- this way I can avoid cloning /cached facet
 	]
-	draw-box: function [xy1 [pair!] xy2 [pair!]] [
+	draw-box: function [xy1 [planar!] xy2 [planar!]] [
 		selection: copy selection-prototype
-		quietly selection/size: xy2 - xy1
+		quietly selection/size: (to point2D! xy2) - xy1
 		compose/only [translate (xy1) (render selection)]		;@@ need to avoid allocation
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!]] [	;-- text ignores fill flags
+	draw: function [space [object!] canvas: infxinf [point2D! none!]] [	;-- text ignores fill flags
 		space/sec-cache: copy []						;-- reset computed sections
 		if canvas/x < infxinf/x [						;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
@@ -859,7 +860,7 @@ paragraph-ctx: context [
 		;; so just the rendered size is reported
 		;; and one has to wrap it into a data-view space to stretch
 		mrg2: 2 * mrg: space/margin
-		text-size: max 0x0 (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
+		text-size: max (0,0) (constrain layout/extra + mrg2 space/limits) - mrg2	;-- don't make it narrower than min limit
 		space/size: mrg2 + text-size					;@@ full size, regardless if canvas height is smaller?
 		#debug sizing [#print "paragraph=(space/text) on (canvas) -> (space/size)"]
 		
@@ -875,7 +876,7 @@ paragraph-ctx: context [
 			unless caret/parent =? space [render caret]	;-- this lets caret invalidation (e.g. /visible? change) propagate to text
 			if all [caret/visible?  not ellipsize?] [
 				box: caret->box space caret/offset caret/side
-				quietly caret/size: caret/size/x by second box/2 - box/1	;@@ need an option for caret to be of char's width
+				quietly caret/size: caret/size/x . second box/2 - box/1	;@@ need an option for caret to be of char's width
 				invalidate/only caret
 				cdrawn: render caret
 				drawn: compose/only [push (drawn) translate (box/1) (cdrawn)]
@@ -921,14 +922,14 @@ paragraph-ctx: context [
 		]
 		
 		everything: function ["Get full range of text"] [		;-- used by macro language, e.g. `select everything`
-			0 by length
+			0 thru length
 		]
 		
 		selected: function ["Get selection range or none"] [
 			all [sel: space/selected  sel/1 <> sel/2  sel]
 		]
 		
-		select-range: function ["Replace selection" range [pair! none!]] [
+		select-range: function ["Replace selection" range [point2D! none!]] [
 			space/selected: if range [clip range 0 length]
 		]
 		
@@ -939,7 +940,7 @@ paragraph-ctx: context [
 			
 			point->caret: function [
 				"Get caret offset and side near the point XY on last frame"
-				xy [pair!]
+				xy [planar!]
 			][
 				layout: get-layout space
 				caret:  offset-to-caret layout xy			;-- these never fail if layout/text is set
@@ -1042,7 +1043,7 @@ paragraph-ctx: context [
 	declare-template 'caret/rectangle [
 		cache:  none
 		;; size/y should be set by parent's /draw to line-height
-		size:   1x10
+		size:   (1,10)
 		width:  1		#type =? :invalidates [integer!] (width > 0)
 						#on-change [space word value] [space/size/x: width]
 		;; offset and side do not affect the caret itself, but serve for it's location descriptors within the parent
@@ -1071,7 +1072,7 @@ paragraph-ctx: context [
 		
 		layout: none	#type [object! none!]			;-- last rendered layout, text size is kept in layout/extra
 		quietly cache: [size layout sec-cache]
-		quietly draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas]
+		quietly draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas]
 	]
 
 	;; unlike text, paragraph is wrapped
@@ -1098,9 +1099,9 @@ container-ctx: context [
 		cont [object!]
 		type [word!]
 		settings [block!]
-		; xy1 [pair! none!]								;@@ unlikely window can be supported by general container
-		; xy2 [pair! none!]
-		; canvas [pair! none!]
+		; xy1 [point2D! none!]								;@@ unlikely window can be supported by general container
+		; xy2 [point2D! none!]
+		; canvas [point2D! none!]
 	][
 		; #assert [(none? xy1) = none? xy2]				;-- /only is ignored to simplify call in absence of `apply`
 		len: cont/items/size
@@ -1117,7 +1118,7 @@ container-ctx: context [
 			#assert [drw]
 			; skip?: all [xy2  not boxes-overlap?  pos pos + siz  0x0 xy2 - xy1]
 			; unless skip? [
-			org: any [geom/origin 0x0]
+			org: any [geom/origin (0,0)]
 			compose/only/deep/into [
 				;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
 				; clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
@@ -1128,7 +1129,7 @@ container-ctx: context [
 		]
 		quietly cont/map: frame/map		;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
 		cont/size: constrain frame/size cont/limits		;@@ is this ok or layout needs to know the limits?
-		cont/origin: any [frame/origin 0x0]
+		cont/origin: any [frame/origin (0,0)]
 		compose/only [translate (negate cont/origin) (drawn)]
 	]
 	
@@ -1151,7 +1152,7 @@ container-ctx: context [
 
 	declare-template 'container/space [
 		kit:     ~/kit
-		origin:  0x0									;-- used by ring layout to center itself around the pointer
+		origin:  (0,0)									;-- used by ring layout to center itself around the pointer
 		content: []		#type :invalidates 				;-- no type check as user may redefine it and /items freely
 		
 		items: func [/pick i [integer!] /size] [
@@ -1161,12 +1162,12 @@ container-ctx: context [
 		
 		map:   []
 		cache: [size map]
-		into: func [xy [pair!] /force child [object! none!]] [
+		into: func [xy [planar!] /force child [object! none!]] [
 			into-map map xy + origin child
 		]
 
 		draw: func [
-			; /on canvas [pair! none!]					;-- not used: layout gets it in settings instead
+			; /on canvas [point2D! none!]					;-- not used: layout gets it in settings instead
 			/layout type [word!] settings [block!]
 		][
 			#assert [layout "container/draw requires layout to be provided"]
@@ -1181,7 +1182,7 @@ list-ctx: context [
 	~: self
 		
 	;; map generally has no direction, but list map has, and it can be leveraged
-	into: function [list [object!] xy [pair!] item [object! none!]] [
+	into: function [list [object!] xy [planar!] item [object! none!]] [
 		if item [return into-map list/map xy item]
 		y: list/axis
 		i: first search/mode/for i: 1 half length? list/map [
@@ -1222,7 +1223,7 @@ list-ctx: context [
 		]
 	]
 
-	draw: function [list [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
+	draw: function [list [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
 		list/sec-cache: copy []							;-- reset computed sections
 		settings: with list [axis margin spacing canvas fill-x fill-y limits]
 		list/container-draw/layout 'list settings
@@ -1230,8 +1231,8 @@ list-ctx: context [
 		
 	declare-template 'list/container [
 		kit:       ~/kit
-		size:      0x0	#type [pair! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
-		axis:      'x	#type =  :invalidates [word!] (find [x y] axis)
+		size:      (0,0)	#type [point2D! (0x0 +<= size) none!]		;-- 'none' to allow infinite lists
+		axis:      'x		#type =  :invalidates [word!] (find [x y] axis)
 		;; default spacing/margins must be tight, otherwise they accumulate pretty fast in higher level widgets
 		margin:    0
 		spacing:   0
@@ -1240,9 +1241,9 @@ list-ctx: context [
 		frame:     []									;-- last frame parameters used by kit and list-view
 		cache:     [size map frame sec-cache]			;@@ put sec-cache into container or not?
 		
-		into: func [xy [pair!] /force item [object! none!]] [~/into self xy item]
+		into: func [xy [planar!] /force item [object! none!]] [~/into self xy item]
 		container-draw: :draw	#type [function!]
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1251,9 +1252,9 @@ ring-ctx: context [
 	
 	declare-template 'ring/container [
 		;; in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
-		angle:  0	#type =? :invalidates-look [integer! float!]
+		angle:  0	#type =  :invalidates-look [linear!]
 		;; minimum distance (pixels) from the center to the nearest point of arranged items
-		radius: 50	#type =? :invalidates [integer! float!]
+		radius: 50	#type =  :invalidates [linear!]
 		;; whether items should be considered round, not rectangular
 		round?: no	#type =? :invalidates [logic!]
 
@@ -1299,7 +1300,7 @@ tube-ctx: context [
 		]
 	]
 
-	draw: function [tube [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
+	draw: function [tube [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [		
 		settings: with tube [margin spacing align axes canvas fill-x fill-y limits]
 		drawn:  tube/container-draw/layout 'tube settings
 		#debug sizing [#print "tube with (tube/content/type) on (mold canvas) -> (tube/size)"]
@@ -1318,7 +1319,7 @@ tube-ctx: context [
 						] axes)
 		
 		container-draw: :draw	#type [function!]
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1335,10 +1336,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	;@@ another way is to project y<0 to 0x0 and y>size/y to size - need to think what's better UX-wise
 	map-2D->1D: function [
 		"Translate a point in 2D (rolled) space into a point in 1D (map) space"
-		frame [object!]      "Rendered frame data"
-		xy    [pair! block!] "Margin must be subtracted already"
+		frame [object!] "Rendered frame data"
+		xy    [planar!] "Margin must be subtracted already"
 	][
-		if empty? frame/map [return copy [0 0]]
+		if empty? frame/map [return (0,0)]
 		set-pair [x: y:] xy
 		x-2D: clip x 0 frame/size-2D/x
 		y-2D: clip y 0 frame/size-2D/y
@@ -1348,12 +1349,12 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		x-1D:  reproject/inverse frame/x1D->x1D' x-1D'
 		y0-2D: pick frame/y-levels rows-above * 3 + 1
 		y-1D:  clip (y-2D - y0-2D) 0 frame/size-1D/y
-		reduce [x-1D y-1D]								;-- pairs will round it (not always desired)
+		(x-1D . y-1D)
 	]
 	
 	map-x1D->x1D': function [
 		frame [object!] "Rendered frame data"
-		x-1D  [integer! float!]
+		x-1D  [linear!]
 		side  [word!] (find [left right] side) "Skip indentation to left or to right"
 	][
 		#assert [all [0 <= x-1D x-1D <= frame/size-1D/x]  "Map point must be within total size"]
@@ -1363,7 +1364,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	map-x1D'->row: function [
 		"Translate an X offset (without margin) in 1D' (unrolled) space into a closest row number"
 		frame [object!]      "Rendered frame data"
-		x-1D' [integer! float!]
+		x-1D' [linear!]
 		side  [word!] (find [left right] side) "Map contested points to previous or next row"
 	][
 		rows-above: to integer! rows-above': x-1D' / frame/size-2D/x
@@ -1378,7 +1379,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	map-x1D->row: function [
 		"Translate an X offset (without margin) in 1D (map) space into a closest row number"
 		frame [object!]      "Rendered frame data"
-		x     [integer! float!]
+		x     [linear!]
 		side  [word!] (find [left right] side) "Map contested points to previous or next row"
 	][
 		#assert [all [0 <= x x <= frame/size-1D/x]  "Map point must be within total size"]
@@ -1391,10 +1392,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	map-1D->2D: function [
 		"Translate a point in 1D (map) space into a point in 2D (rolled) space (without margin)"
 		frame [object!]      "Rendered frame data"
-		xy    [pair! block!]
+		xy    [planar!]
 		side  [word!] (find [left right] side) "Map contested points to previous or next row"
 	][
-		if empty? frame/map [return copy [0 0]]
+		if empty? frame/map [return (0,0)]
 		set-pair [x-1D: y-1D:] xy
 		#assert [all [0 <= x-1D x-1D <= frame/size-1D/x]  "Map point must be within total size"]
 		x-1D': map-x1D->x1D' frame x-1D side
@@ -1405,7 +1406,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		#assert [y0-2D]
 		y-2D:  clip y1-2D y2-2D (y0-2D + y-1D)			;-- do not let it step into other rows
 		; ?? [rows-above x-1D' side x-2D y-2D]
-		reduce [x-2D y-2D]
+		(x-2D . y-2D)
 	]
 	
 	;; return row number for the row that is closest to a 2D point
@@ -1413,11 +1414,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	map-2D->row: function [
 		"Translate a point (without margin) in 2D (rolled) space into a closest row number"
 		frame [object!]      "Rendered frame data"
-		xy    [pair! block!]
+		xy    [planar!]
 	][
-		set-pair [x-2D: y-2D:] xy
-		y-2D: clip y-2D 0 frame/size-2D/y
-		1 + reproject/truncate frame/y2D->row y-2D
+		y-2D: clip xy/y 0 frame/size-2D/y
+		1 + reproject/truncate frame/y2D->row xy/y
 	]
 	
 	map-row->box: function [
@@ -1435,8 +1435,8 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		x2-1D:  reproject/inverse frame/x1D->x1D' x2-1D': min (offset-1D' + width) frame/size-1D'/x
 		x1-1D': reproject/up      frame/x1D->x1D' x1-1D
 		x2-1D': reproject         frame/x1D->x1D' x2-1D
-		xy1: x1-1D' - offset-1D' by y1
-		xy2: x2-1D' - offset-1D' by y2
+		xy1: x1-1D' - offset-1D' . y1
+		xy2: x2-1D' - offset-1D' . y2
 		reduce [xy1 xy2]
 	]
 	
@@ -1444,7 +1444,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	;@@ base /into on this
 	locate-child: function [
 		"Find a child closest to XY and return: [child child-xy child-2D-origin]"
-		space [object!] xy [pair!] "Margin must be subtracted already"
+		space [object!] xy [planar!] "Margin must be subtracted already"
 	][
 		frame: space/frame
 		if empty? frame/map [return none]
@@ -1454,21 +1454,21 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		if tail? map [map: skip map -2]					;-- map last x1D to last child
 		set [child: geom:] map
 		#assert [child]
-		oxy-2D: to pair! map-1D->2D frame geom/offset 'right
-		child-xy: (to pair! xy-1D) - geom/offset		;-- point in the child is in 1D space (it can be wrapped!)
+		oxy-2D: map-1D->2D frame geom/offset 'right
+		child-xy: xy-1D - geom/offset					;-- point in the child is in 1D space (it can be wrapped!)
 		reduce [child child-xy oxy-2D + frame/margin]
 	]
 		
 	;; /map is kept in 1D space, so /into is required for translation from 2D
-	into: function [space [object!] xy [pair!] child [object! none!]] [
+	into: function [space [object!] xy [planar!] child [object! none!]] [
 		unless frame: space/frame [return none]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
-		xy-2D: xy - frame/margin
+		xy-2D: (to point2D! xy) - frame/margin
 		either child [
-			child-xy: 0x0
+			child-xy: (0,0)
 			if geom: select/same frame/map child [		;-- can be none if content changed (see %hovering.red)
-				oxy-2D: to pair! map-1D->2D frame geom/offset 'right
+				oxy-2D: map-1D->2D frame geom/offset 'right
 				child-xy: xy-2D - oxy-2D
 			]
 			reduce [child child-xy]
@@ -1480,11 +1480,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 				xy-2D/1 ~= xy'-2D/1						;-- neglect the rounding error from double conversion
 				xy-2D/2 ~= xy'-2D/2
 			][
-				set-pair [x-1D: y-1D:] xy-1D
-				map: skip frame/map 2 * reproject/truncate frame/x1D->map x-1D
+				map: skip frame/map 2 * reproject/truncate frame/x1D->map xy-1D/x
 				set [child: geom:] map
 				if child [								;-- x-1D = size-1D/x leads to the tail
-					child-xy: (to pair! xy-1D) - geom/offset
+					child-xy: xy-1D - geom/offset
 					if child-xy inside? geom [reduce [child child-xy]]
 				] 
 			] 
@@ -1510,11 +1509,11 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		format: does [container-ctx/format space ""]
 	]
 		
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		space/sec-cache: copy []						;-- reset computed sections
 		settings: with space [margin spacing align baseline canvas fill-x fill-y limits indent force-wrap?]
 		frame: make-layout 'paragraph :space/items settings
-		size: space/margin * 2 + frame/size-2D
+		size: (2,2) * space/margin + frame/size-2D
 		quietly space/frame: frame
 		quietly space/size:  constrain size space/limits	;-- size may be bigger than limits if content doesn't fit
 		quietly space/map:   frame/map
@@ -1536,10 +1535,10 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 		frame:       []		#type  [object! block!]				;-- internal frame data used by /into
 		sec-cache:   []
 		cache:       [size map frame sec-cache]
-		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
+		into: func [xy [planar!] /force child [object! none!]] [~/into self xy child]
 		
 		;; container-draw is not used due to tricky geometry
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1555,13 +1554,13 @@ rich-content-ctx: context [								;-- rich content
 		foreach [child geom] map [
 			range: select/same ranges child
 			#assert [select/same ranges child]
-			xy2: geom/size * 0x1 + xy1: geom/offset
+			xy2: (0,1) * geom/size + xy1: geom/offset
 			either 1 >= n: span? range [
 				if n = 1 [repend boxes [xy1 xy2]]		;-- span can be zero (empty text), it's not counted then 
 			][
 				#assert [object? select child 'layout]
 				#assert [1 = rich-text/line-count? child/layout]
-				xy2: xy1 + (0 by rich-text/line-height? child/layout 1)		;-- caret of line size, ignoring margin
+				xy2: xy1 + (0 . rich-text/line-height? child/layout 1)		;-- caret of line size, ignoring margin
 				repeat i n [
 					offset: caret-to-offset child/layout i 
 					repend boxes [xy1 + offset xy2 + offset]
@@ -1592,7 +1591,7 @@ rich-content-ctx: context [								;-- rich content
 	][
 		if box-1D: caret->box-1D space caret [
 			repeat i 2 [								;@@ use map-each
-				xy: to pair! rich-paragraph-ctx/map-1D->2D space/frame box-1D/:i side
+				xy: rich-paragraph-ctx/map-1D->2D space/frame box-1D/:i side
 				box-1D/:i: space/frame/margin + xy
 			]
 			box-1D										;@@ result is pixel-rounded, need more precision?
@@ -1600,7 +1599,7 @@ rich-content-ctx: context [								;-- rich content
 	]
 	
 	;@@ consider removing/splitting this func
-	locate-point: function [space [object!] xy [pair!] "with margin"] [
+	locate-point: function [space [object!] xy [planar!] "with margin"] [
 		xy: xy - space/frame/margin
 		if set [child: child-xy:] rich-paragraph-ctx/locate-child space xy [
 			#assert [find/same space/ranges child]
@@ -1617,7 +1616,7 @@ rich-content-ctx: context [								;-- rich content
 		]
 	]
 	
-	xy->caret: function [space [object!] xy [pair!] "with margin"] [
+	xy->caret: function [space [object!] xy [planar!] "with margin"] [
 		if found: locate-point space xy [found/4]
 	]
 	
@@ -1655,7 +1654,7 @@ rich-content-ctx: context [								;-- rich content
 		cache: none										;-- this way I can avoid cloning /cached facet
 	]
 	
-	draw-box: function [xy1 [pair!] xy2 [pair!]] [
+	draw-box: function [xy1 [planar!] xy2 [planar!]] [
 		selection: copy selection-prototype
 		quietly selection/size: xy2 - xy1
 		compose/only [translate (xy1) (render selection)]
@@ -1698,14 +1697,14 @@ rich-content-ctx: context [								;-- rich content
 		; ?? [caret/offset caret/side box] 
 		#assert [not empty? box]
 		#assert [box/1/y < box/2/y]
-		quietly caret/size: box/2 - box/1 + (caret/width by 0)
+		quietly caret/size: box/2 - box/1 + (caret/width . 0)
 		invalidate/only caret
 		drawn: render caret
 		compose/only [translate (box/1) (drawn)]
 	]
 		
 	;; adds selection and caret
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		drawn: space/rich-paragraph-draw/on canvas fill-x fill-y
 		if space/selected [
 			sdrawn: draw-selection space
@@ -1725,7 +1724,7 @@ rich-content-ctx: context [								;-- rich content
 		]
 		
 		everything: function ["Get full range of text"] [		;-- used by macro language, e.g. `select-range everything`
-			0 by length
+			0 thru length
 		]
 		
 		selected: function ["Get selection range or none"] [	;-- used by macro language, e.g. `remove-range selected`
@@ -1743,7 +1742,7 @@ rich-content-ctx: context [								;-- rich content
 			
 			point->caret: function [
 				"Get caret offset and side near the point XY on last frame"
-				xy [pair!]
+				xy [planar!]
 			][
 				set [_: _: index: offset:] ~/locate-point space xy
 				side: pick [right left] offset < index
@@ -1926,7 +1925,7 @@ rich-content-ctx: context [								;-- rich content
 		data:    []	#type [block!] (even? length? data) :on-data-change		
 		
 		rich-paragraph-draw: :draw	#type [function!]
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -1959,7 +1958,7 @@ switch-ctx: context [
 		state: off		#type =? :invalidates-look [logic!]
 		; command: []
 		data: make-space 'data-view []	#type (space? data)		;-- general viewer to be able to use text/images
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 			also data/draw/on canvas fill-x fill-y		;-- draw avoids extra 'data-view' style in the tree
 			size: data/size
 		]
@@ -2100,8 +2099,8 @@ window-ctx: context [
 		space     [object!]
 		axis      [word!]   
 		dir       [integer!]
-		from      [integer!]
-		requested [integer!]
+		from      [linear!]
+		requested [linear!]
 	][
 		cspace: space/content
 		either function? cavail?: select cspace 'available? [	;-- use content/available? when defined
@@ -2117,7 +2116,7 @@ window-ctx: context [
 	;; (considering content can be smaller and window has to follow it)
 	;; but only xy1-xy2 has to appear in the render result block and map!
 	;; area outside of canvas and within xy1-xy2 may stay not rendered as long as it's size is guaranteed
-	draw: function [window [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [window [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug grid-view [#print "window/draw is called on canvas=(canvas)"]
 		unless content: window/content [
 			set-empty-size window canvas fill-x fill-y
@@ -2126,7 +2125,7 @@ window-ctx: context [
 		#assert [space? content]
 		;; there's no size for infinite spaces so pages*canvas is used as drawing area
 		;; no constraining by /limits here, since window is not supposed to be limited ;@@ should it be constrained?
-		size: window/pages * finite-canvas canvas
+		size: (finite-canvas canvas) * window/pages
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
 			-org: negate window/origin
 			;@@ maybe off fill flags when window is less than content? or off them always?
@@ -2136,7 +2135,7 @@ window-ctx: context [
 			;; once content is rendered, its size is known and may be less than requested,
 			;; in which case window should be contracted too, else we'll be scrolling over an empty window area
 			if content/size [							;-- size has to be finite
-				size: clip 0x0 size content/size + window/origin
+				size: clip (0,0) size content/size + window/origin
 			]
 		]
 		#debug sizing [if window/size <> size [#print "resizing window to (size)"]]
@@ -2150,8 +2149,8 @@ window-ctx: context [
 	declare-template 'window/space [
 		;; window size multiplier in canvas sizes (= size of inf-scrollable)
 		;; when drawn, auto adjusts it's `size` up to `canvas * pages` (otherwise scrollbars will always be visible)
-		pages:   10x10	#type =? :invalidates [pair! integer! float!]
-		origin:  0x0									;-- content's offset (negative)
+		pages:   10x10	#type = :invalidates [planar! linear!]
+		origin:  (0,0)									;-- content's offset (negative)
 		
 		;; window does not require content's size, so content can be an infinite space!
 		content: none	#type =? :invalidates [object! none!]
@@ -2163,13 +2162,13 @@ window-ctx: context [
 			"Returns number of pixels up to REQUESTED from AXIS=FROM in direction DIR"
 			axis      [word!]    "x/y"
 			dir       [integer!] "-1/1"
-			from      [integer!] "axis coordinate to look ahead from"
-			requested [integer!] "max look-ahead required"
+			from      [linear!] "axis coordinate to look ahead from"
+			requested [linear!] "max look-ahead required"
 		][
 			~/available? self axis dir from requested
 		] #type [function!]
 	
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2215,7 +2214,7 @@ inf-scrollable-ctx: context [
 		]
 	]
 	
-	draw: function [space [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		#debug sizing [#print "inf-scrollable draw is called on (canvas)"]
 		timer: space/slide-timer
 		render timer									;-- timer has to appear in the tree for timers to work
@@ -2227,7 +2226,7 @@ inf-scrollable-ctx: context [
 		;; (can't use repend, as map may be a static block)
 		quietly space/map: compose [
 			(space/map)
-			(timer) [offset 0x0 size 0x0]
+			(timer) [offset (0,0) size (0,0)]
 		]
 		#debug sizing [#print "inf-scrollable with (space/content/type) on (mold canvas) -> (space/size) window: (space/window/size)"]
 		#assert [any [not find/same space/map space/window  space/window/size]  "window should have a finite size if it's exposed"]
@@ -2247,7 +2246,7 @@ inf-scrollable-ctx: context [
 		slide: does [~/slide self] #type [function!]
 
 		scrollable-draw: :draw	#type [function!]
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]
 
@@ -2275,8 +2274,8 @@ list-view-ctx: context [
 		list      [object!]
 		req-axis  [word!] (find [x y] req-axis)
 		dir       [integer!] (1 = abs dir) 
-		from      [integer!] 
-		requested [integer!] (requested >= 0)
+		from      [linear!] 
+		requested [linear!] (requested >= 0)
 	][
         if req-axis <> list/frame/axis [				;-- along orthogonal axis list doesn't extend
         	return clip 0 requested either dir < 0 [from][list/frame/size/:req-axis - from]
@@ -2319,7 +2318,7 @@ list-view-ctx: context [
 	;@@ similar to rich-content - possible to unify?
 	selection-prototype: make-space 'space [type: 'selection cache: none]	;-- disabled cache to avoid cloning /cached facet
 	cursor-prototype:    make-space 'space [type: 'cursor    cache: none]
-	draw-box: function [prototype [object!] size [pair!]] [
+	draw-box: function [prototype [object!] size [point2D!]] [
 		box: copy prototype
 		quietly box/size: size
 		render box
@@ -2332,9 +2331,9 @@ list-view-ctx: context [
 	;; it's also too general, while this `draw` can be optimized better
 	list-draw: function [
 		lview  [object!]
-		canvas [pair!] (canvas +< infxinf)				;-- window is never infinite
-		xy1    [pair!]
-		xy2    [pair!]
+		canvas [point2D!] (canvas +< infxinf)			;-- window is never infinite
+		xy1    [point2D!]
+		xy2    [point2D!]
 	][
 		#debug sizing [#print "list-view/list draw is called on (canvas), window: (xy1)..(xy2)"]
 		window:   lview/window
@@ -2387,7 +2386,7 @@ list-view-ctx: context [
 			#assert [anchor/offset <= 0]
 			anchor/offset
 		]
-		window/origin: make-pair [0x0 axis shift]				;@@ or move the list instead? a bit slower
+		window/origin: make-pair [(0,0) axis shift]				;@@ or move the list instead? a bit slower
 		
 		; ?? [xy1 xy2 length frame/filled shift anchor/index anchor/offset window/origin lview/origin]
 		compose/into [
@@ -2424,7 +2423,7 @@ list-view-ctx: context [
 		type: 'list										;-- styled normally
 		axis: 'y
 		
-		available?: func [axis [word!] dir [integer!] from [integer!] requested [integer!]] [
+		available?: func [axis [word!] dir [integer!] from [linear!] requested [linear!]] [
 			;; must pass positive canvas (uses last rendered list-view size)
 			~/available? self axis dir from requested
 		] #type [function!]
@@ -2482,12 +2481,12 @@ list-view-ctx: context [
 	;; an item is "after y"  if y < its offset/y
 	get-next-item: function [
 		space  [object!]
-		offset [integer! pair!]
+		offset [linear! planar!]
 		dir    [word!] (find [before after] dir)
 	][
 		list: space/list
 		y:    list/axis
-		if pair? offset [offset: offset/:y]
+		if planar? offset [offset: offset/:y]
 		if empty? map: list/frame/map [return none]
 		
 		if either dir = 'before [
@@ -2513,7 +2512,7 @@ list-view-ctx: context [
 		"Find a new item index further along main axis"
 		space [object!]
 		index [integer!] "From given item (must be in the map)"
-		shift [integer!] "Maximum positive or negative distance to travel"
+		shift [linear!]  "Maximum positive or negative distance to travel"
 	][
 		list:      space/list
 		y:         list/axis
@@ -2547,7 +2546,7 @@ list-view-ctx: context [
 			range: space/list/frame/range
 			either space/cursor [clip range/1 range/2 space/cursor][range/1]
 		]
-		length:    func ["Get number of items in the list (can be infinite)"] [any [space/data/size infxinf/x]]
+		length:    func ["Get number of items in the list (can be infinite)"] [any [space/data/size 2'000'000'000]]	;@@ not sure about 2e9
 		selected:  func ["Get a list of selected items indices"] [space/selected]
 	
 		slide: func ["If window is near its borders, let it slide to show more data"] [~/slide space]
@@ -2610,7 +2609,7 @@ list-view-ctx: context [
 				sel-mode: 'replace [word!] (find [replace include exclude invert extend] sel-mode)
 		][
 			if word?    limit [limit: locate limit]
-			if integer? limit [limit: here by limit]
+			if integer? limit [limit: here thru limit]
 			old: space/selected
 			;; a trick to determine selection range start while it does not exist explicitly:
 			;; not fully inaccurate, but good enough: uses first selected item as the start
@@ -2636,14 +2635,14 @@ list-view-ctx: context [
 		
 			item-before: function [
 				"Get item index before given window offset along primary axis; or none"
-				offset [integer! pair!]
+				offset [linear! planar!]
 			][
 				~/get-next-item space offset 'before
 			]
 			
 			item-after: function [
 				"Get item index after given window offset along primary axis; or none"
-				offset [integer! pair!]
+				offset [linear! planar!]
 			][
 				~/get-next-item space offset 'after
 			]
@@ -2666,13 +2665,13 @@ list-view-ctx: context [
 			
 			move-to: function [
 				"Pan the view to given window offset or item with the given index"
-				target [integer! (all [0 < target target <= length]) pair! word!]
+				target [integer! (all [0 < target target <= length]) planar! word!]
 					"Item index or window offset"
 				;; normally direction is chosen from the current offset
 				;@@ /center to be supported down the road
 				/after   "Place the viewport so that item or offset is at its top"
 				/before  "Place the viewport so that item or offset is at its bottom"
-				/margin   mrg [integer!] "How much to reserve around the item"
+				/margin   mrg [linear!] "How much to reserve around the item"
 				/no-clip "When an offset is given, allow panning outside the window"
 			][
 				#assert [not all [before after]]
@@ -2698,7 +2697,7 @@ list-view-ctx: context [
 						originy: either back?
 							[negate space/window/size/:y - viewport/:y + mrg - mrg']
 							[mrg - mrg']
-						scrollable-ctx/set-origin space make-pair [0x0 y originy] yes
+						scrollable-ctx/set-origin space make-pair [(0,0) y originy] yes
 						; ?? [direction target space/origin window/origin list/frame/window-origin]
 						exit									;-- done here
 					]
@@ -2708,7 +2707,7 @@ list-view-ctx: context [
 					target-xy1:  target-geom/offset + window/origin + space/origin	;-- target from viewport
 					; target-xy1:  target-geom/offset + list/frame/window-origin + space/origin	;-- target from viewport
 					target-xy2:  target-xy1 + target-geom/size
-					xy1: make-pair [0x0 y mrg - mrg']			;-- viewport with margins considered
+					xy1: make-pair [(0,0) y mrg - mrg']			;-- viewport with margins considered
 					xy1: min xy1 viewport / 2					;-- cap at half viewport to avoid margin inversion
 					xy2: viewport - xy1
 					if all [
@@ -2729,12 +2728,12 @@ list-view-ctx: context [
 				];unless pair? point: target [
 				
 				if pre-move: case [								;-- trick to enforce /before and /after locations
-					after  [make-pair [0x0 y point/:y + viewport/:y]]
-					before [make-pair [0x0 y point/:y - viewport/:y]]
+					after  [make-pair [(0,0) y point/:y + viewport/:y]]
+					before [make-pair [(0,0) y point/:y - viewport/:y]]
 				][
 					scrollable-ctx/move-to space pre-move 0x0 yes
 				]
-				mrg: make-pair [0x0 y mrg]						;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
+				mrg: make-pair [(0,0) y mrg]					;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
 				scrollable-ctx/move-to space point mrg no-clip
 				; scrollable-ctx/set-origin space (viewport * 0x1) - point yes
 				; ?? space/origin
@@ -2758,13 +2757,13 @@ list-view-ctx: context [
 		parent:   none		#type =? [object! (space? parent) none!]
 		
 		;; index of the first (or last if /reverse?) visible item in the window
-		index:    1			#type =? [integer!] (index > 0) :on-anchor-change
+		index:    1			#type =? [integer!] (index > 0)	:on-anchor-change
 		
 		;; item filling direction starting at /index
-		reverse?: no		#type =? [logic!]               :on-anchor-change
+		reverse?: no		#type =? [logic!]				:on-anchor-change
 		
 		;; offset from margin to the top <=0 (or bottom >=0 if /reverse?) of the anchor item
-		offset:   0			#type =? [integer!]             :on-anchor-change
+		offset:   0			#type =  [linear!]				:on-anchor-change
 	]
 		
 	;@@ list-view & grid-view on child focus should scroll to child
@@ -2824,7 +2823,7 @@ list-view-ctx: context [
 			][data/size]
 		]
 		
-		list/draw: func [/window xy1 [pair!] xy2 [pair!] /on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		list/draw: func [/window xy1 [point2D!] xy2 [point2D!] /on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 			~/list-draw self canvas xy1 xy2				;-- doesn't use fill flags (main axis always infinite, secondary fills if finite)
 		]
 		
@@ -2833,9 +2832,9 @@ list-view-ctx: context [
 		; ;@@ unfortunately this means knowledge of the block format produced by window-draw, and of its spec
 		; ;@@ maybe list-draw should offset the list instead? shift all items
 		; window-draw: :window/draw
-		; window/draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [
+		; window/draw: function [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
 			; old-origin: window/origin
-			; quietly window/origin: 0x0
+			; quietly window/origin: (0,0)
 			; drawn: window-draw/:on canvas fill-x fill-y
 			; if :drawn/1 = 'translate [					;-- window isn't empty
 				; shift: either anchor/reverse? [
@@ -2848,7 +2847,7 @@ list-view-ctx: context [
 					; anchor/offset
 				; ]
 				; ?? [shift overhang anchor/offset]
-				; quietly window/origin: window/map/2/offset: drawn/2: make-pair [0x0 list/axis shift]
+				; quietly window/origin: window/map/2/offset: drawn/2: make-pair [(0,0) list/axis shift]
 			; ]
 			; drawn
 		; ]
@@ -2857,7 +2856,7 @@ list-view-ctx: context [
 		slide: does [~/slide self]
 		
 		; inf-scrollable-draw: :draw
-		; draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+		; draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!] /window xy1 [none! point2D!] xy2 [none! point2D!]] [
 			; ~/draw self canvas fill-x fill-y xy1 xy2
 		; ]
 	]
@@ -2877,8 +2876,8 @@ list-view-ctx: context [
 grid-ctx: context [
 	~: self
 	
-	into: function [grid [object!] xy [pair!] cell [object! none!]] [	;-- faster than generic map-based into
-		if cell [return into-map grid/map xy cell]		;-- let into-map handle it ;@@ slow! need a better solution!
+	into: function [grid [object!] xy [planar!] cell [object! none!]] [	;-- faster than generic map-based into
+		if cell [return into-map grid/map xy cell]				;-- let into-map handle it ;@@ slow! need a better solution!
 		set [cell: offset:] locate-point grid xy yes
 		mcell: grid/get-first-cell cell
 		if cell <> mcell [
@@ -2957,7 +2956,7 @@ grid-ctx: context [
 	]
 
 	get-offset-from: function [grid [object!] c1 [pair!] c2 [pair!]] [
-		r: 0x0
+		r: (0,0)
 		foreach [x wh?] [x grid/col-width? y grid/row-height?] [
 			x1: min c1/:x c2/:x
 			x2: max c1/:x c2/:x
@@ -2985,9 +2984,9 @@ grid-ctx: context [
 	;; doesn't care about pinned cells, treats grid as continuous
 	locate-line: function [
 		grid  [object!]
-		level [integer!] "pixels from 0"
-		array [map!]     "widths or heights"
-		axis  [word!]    "x or y"
+		level [linear!] "pixels from 0"
+		array [map!]    "widths or heights"
+		axis  [word!]   "x or y"
 	][
 		mg: grid/margin/:axis
 		if level < mg [return reduce ['margin 1 level]]		;-- within the first margin case
@@ -3047,18 +3046,18 @@ grid-ctx: context [
 	]
 	sub-def*: func [from n /local r j] with :locate-line [
 		#debug grid-view [#print "sub-def (from) (n) def: (def)"]
-		either integer? def [
+		either linear? def [
 			if n <> sub* n sp + def [size: def throw 1]	;-- point is within a row/col of default size
-		][											;-- `default: auto` case where each row size is different
+		][												;-- `default: auto` case where each row size is different
 			#assert [array =? grid/heights]
 			repeat j n [
 				size: grid/row-height? from + j
-				if 0 = sub* 1 sp + size [throw 1]	;-- point is within the last considered row (size is valid)
+				if 0 = sub* 1 sp + size [throw 1]		;-- point is within the last considered row (size is valid)
 			]
 		]
 	]
 
-	locate-point: function [grid [object!] xy [pair!] screen? [logic!]] [
+	locate-point: function [grid [object!] xy [planar!] screen? [logic!]] [
 		if screen? [
 			unless (pinned: grid/pinned) +<= pinned-area: 0x0 [	;-- nonzero pinned rows or cols?
 				pinned-area: grid/spacing + grid/get-offset-from 1x1 (pinned + 1x1)
@@ -3068,7 +3067,7 @@ grid-ctx: context [
 		]
 		
 		bounds: grid/calc-bounds
-		r: copy [0x0 0x0]
+		r: copy [0x0 (0,0)]
 		foreach [x array wh?] reduce [
 			'x grid/widths  :grid/col-width?
 			'y grid/heights :grid/row-height?
@@ -3083,7 +3082,7 @@ grid-ctx: context [
 					][
 						idx: bounds/:x
 						ofs: ofs + wh? idx
-						#assert [idx]			;-- 2nd margin is only possible if bounds are known
+						#assert [idx]					;-- 2nd margin is only possible if bounds are known
 					]
 				]
 			]
@@ -3116,7 +3115,7 @@ grid-ctx: context [
 		#assert [path] 
 		with-style path [
 			for x: 1 xlim [
-				canvas: (grid/col-width? x) by infxinf/y
+				canvas: (grid/col-width? x) . 1.#inf
 				span: grid/get-span xy: x by y
 				if span/x < 0 [continue]				;-- skip cells of negative x span (counted at span = 0 or more)
 				cell1: grid/get-first-cell xy
@@ -3166,7 +3165,7 @@ grid-ctx: context [
 	]
 		
 	cell-size?: function [grid [object!] xy [pair!]] [
-		as-pair  cell-width? grid xy  cell-height? grid xy 
+		as-point2D (cell-width? grid xy) (cell-height? grid xy) 
 	]
 		
 	calc-size: function [grid [object!]] [
@@ -3176,7 +3175,7 @@ grid-ctx: context [
 		bounds: grid/calc-bounds
 		bounds: bounds/x by bounds/y					;-- turn block into pair
 		#debug grid-view [#assert [0 <> area? bounds]]
-		r: grid/margin * 2 + (grid/spacing * max 0x0 bounds - 1)
+		r: (2,2) * grid/margin + (grid/spacing * max (0,0) bounds - 1)
 		repeat x bounds/x [r/x: r/x + grid/col-width?  x]
 		repeat y bounds/y [r/y: r/y + grid/row-height? y]
 		#debug grid-view [#print "grid/calc-size -> (r)"]
@@ -3186,7 +3185,7 @@ grid-ctx: context [
 	;@@ TODO: at least for the chosen range, cell/drawn should be invalidated and cell/size recalculated
 	draw-range: function [
 		"Used internally by DRAW. Returns map slice & draw code for a range of cells"
-		grid [object!] cell1 [pair!] cell2 [pair!] start [pair!] "Offset from origin to cell1"
+		grid [object!] cell1 [pair!] cell2 [pair!] start [point2D!] "Offset from origin to cell1"
 	][
 		size:  cell2 - cell1 + 1
 		drawn: make [] size: area? size
@@ -3212,9 +3211,9 @@ grid-ctx: context [
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
 			
 			mcspace: grid/wrap-space mcell content
-			canvas: (cell-width? grid mcell) by infxinf/y	;-- sum of spanned column widths
+			canvas: (cell-width? grid mcell) . 1.#inf		;-- sum of spanned column widths
 			render/on mcspace canvas yes no					;-- render content to get it's size - in case it was invalidated
-			mcsize: canvas/x by cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
+			mcsize: canvas/x . cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			mcdraw: render/on mcspace mcsize yes yes		;-- re-render to draw the full background
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
@@ -3229,11 +3228,11 @@ grid-ctx: context [
 	;; uses canvas only to figure out what cells are visible (and need to be rendered)
 	draw: function [
 		grid [object!]
-		canvas: infxinf [pair! none!]
+		canvas: infxinf [point2D! none!]
 		fill-x: no [logic! none!]
 		fill-y: no [logic! none!]
-		wxy1 [none! pair!]
-		wxy2 [none! pair!]
+		wxy1 [none! point2D!]
+		wxy2 [none! point2D!]
 	][
 		#debug grid-view [#print "grid/draw is called with window xy1=(wxy1) xy2=(wxy2)"]
 		#assert [any [not grid/infinite?  all [canvas +< infxinf wxy1 wxy2]]]	;-- bounds must be defined for an infinite grid
@@ -3250,14 +3249,14 @@ grid-ctx: context [
 		frame/bounds: grid/cells/size					;-- may call calc-size to estimate number of cells
 		#assert [frame/bounds]
 		;-- locate-point calls row-height which may render cells when needed to determine the height
-		default wxy1: 0x0
+		default wxy1: (0,0)
 		unless wxy2 [wxy2: wxy1 + calc-size grid]
-		xy1: max 0x0 wxy1 - grid/origin
-		xy2: max 0x0 min xy1 + canvas wxy2
+		xy1: max (0,0) wxy1 - grid/origin
+		xy2: max (0,0) min xy1 + canvas wxy2
 
 		;; affects xy1 so should come before locate-point
 		unless (pinned: grid/pinned) +<= 0x0 [			;-- nonzero pinned rows or cols?
-			xy0: grid/margin + xy1						;-- location of drawn pinned cells relative to grid's origin
+			xy0: xy1 + grid/margin						;-- location of drawn pinned cells relative to grid's origin
 			set [map: drawn-common-header:] draw-range grid 1x1 pinned xy0
 			xy1: xy1 + grid/get-offset-from 1x1 (pinned + 1x1)	;-- location of unpinned cells relative to origin
 		]
@@ -3266,8 +3265,10 @@ grid-ctx: context [
 		xy2: max xy1 xy2
 		set [cell1: offs1:] grid/locate-point xy1
 		set [cell2: offs2:] grid/locate-point xy2
-		all [none? grid/size  not grid/infinite?  calc-size grid]
-		#assert [any [grid/infinite? grid/size]]		;-- must be set by calc-size or carried over from the previous render
+		if none? grid/size [
+			either grid/infinite? [grid/size: infxinf][calc-size grid]
+		]
+		#assert [grid/size]								;-- must be set by calc-size or carried over from the previous render
 
 		quietly grid/map: make block! 2 * area? cell2 - cell1 + 1
 		if map [append grid/map map]
@@ -3276,13 +3277,13 @@ grid-ctx: context [
 		if pinned/x > 0 [
 			set [map: drawn-row-header:] draw-range grid
 				(1 by cell1/y) (pinned/x by cell2/y)
-				xy0/x by (xy1/y - offs1/y)
+				xy0/x . (xy1/y - offs1/y)
 			append grid/map map
 		]
 		if pinned/y > 0 [
 			set [map: drawn-col-header:] draw-range grid
 				(cell1/x by 1) (cell2/x by pinned/y)
-				(xy1/x - offs1/x) by xy0/y
+				(xy1/x - offs1/x) . xy0/y
 			append grid/map map
 		]
 
@@ -3296,10 +3297,10 @@ grid-ctx: context [
 		;@@ current clipping mode was meant for spanned heading cells mainly, and for normal cells translation
 		reshape [
 			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
-			clip  0x0         !(xy1)            !(drawn-common-header)	/if drawn-common-header
-			clip !(xy1 * 1x0) !(xy2/x by xy1/y) !(drawn-col-header)		/if drawn-col-header
-			clip !(xy1 * 0x1) !(xy1/x by xy2/y) !(drawn-row-header)		/if drawn-row-header
-			clip !(xy1)       !(xy2)            !(drawn-normal)
+			clip  0x0         !(xy1)           !(drawn-common-header)	/if drawn-common-header
+			clip !(xy1 * 1x0) !(xy2/x . xy1/y) !(drawn-col-header)		/if drawn-col-header
+			clip !(xy1 * 0x1) !(xy1/x . xy2/y) !(drawn-row-header)		/if drawn-row-header
+			clip !(xy1)       !(xy2)           !(drawn-normal)
 		]
 	]
 	
@@ -3308,11 +3309,11 @@ grid-ctx: context [
 		"Measure single column's extent on the canvas of WIDTHxINF (returned size/x may be less than WIDTH)"
 		grid  [object!]  "Uses only Y part from margin and spacing"
 		index [integer!] "Column's index, >= 1"
-		width [integer!] "Allowed column width in pixels"
+		width [linear!]  "Allowed column width in pixels"
 		row1  [integer!] "Limit estimation to a given row span"
 		row2  [integer!]
 	][
-		size: grid/margin * 0x2
+		size: (0,2) * grid/margin
 		spc:  grid/spacing/y
 		if row2 > row1 [size/y: size/y - spc]
 		for irow row1 row2 [
@@ -3320,16 +3321,16 @@ grid-ctx: context [
 			unless space: grid/cells/pick cell [continue]
 			cspace: grid/wrap-space cell space			;-- apply cell style too (may influence min. size by margin, etc)
 			canvas': either integer? h: any [grid/heights/:irow grid/heights/default] [	;-- row may be fixed
-				render/on cspace width by h no no		;-- fixed rows only affect column's width, no filling
+				render/on cspace width . h no no		;-- fixed rows only affect column's width, no filling
 			][
-				render/on cspace width by infxinf/y no no
+				render/on cspace width . 1.#inf no no
 				h: cspace/size/y
 			]
 			span: grid/get-span cell1: grid/get-first-cell cell
 			irow: cell1/y + span/y - 1
 			;@@ make an option to ignore spanned cells?
 			;@@ and theoretically I could subtract spacing from the spanned cells (in case it's big), but lazy for now
-			size/y: size/y + spc + to integer! h / span/x		;-- span/x is accounted for only approximately
+			size/y: size/y + spc + (h / span/x)			;-- span/x is accounted for only approximately
 			size/x: max size/x cspace/size/x
 		]
 		size
@@ -3343,7 +3344,7 @@ grid-ctx: context [
 	autofit: function [
 		"Automatically adjust GRID column widths to minimize grid height"
 		grid        [object!]
-		total-width [integer!] "Total grid width to fit into"
+		total-width [linear!] "Total grid width to fit into"
 		method      [word!]    "One of supported fitting methods: [hyperbolic weighted simple-weighted]"	;@@
 	][
 		#assert [not grid/infinite? "Adjustment of infinite grid will take infinite time!"]
@@ -3351,7 +3352,7 @@ grid-ctx: context [
 		bounds: grid/cells/size
 		nx: bounds/x  ny: bounds/y
 		if any [nx <= 1 ny <= 0] [exit]					;-- nothing to fit - single column or no rows
-		
+
 		margin:    grid/margin
 		spacing:   grid/spacing
 		widths:    grid/widths							;-- modifies widths map in place
@@ -3468,7 +3469,6 @@ grid-ctx: context [
 		if grid/frame/limits [grid/frame/limits: reduce [W1 H1 W2 H2]]	;-- save min/max sizes
 		
 		;; set widths map to found W vector
-		W: quantize W
 		changed?: no
 		repeat i nx [
 			if widths/:i <> W/:i [
@@ -3545,12 +3545,13 @@ grid-ctx: context [
 	;@@ base it on container?
 	declare-template 'grid/space [
 		kit:  ~/kit
-		;; grid's /size can be 'none' in two cases: either it's infinite, or it's size was invalidated and needs a calc-size() call
-		size: none	#type [pair! none!]
+		;; grid's /size can be 'none' if it was invalidated and needs a calc-size() call
+		;@@ need a better solution than this
+		size: none	#type [point2D! none!]
 		
 		margin:  5
 		spacing: 5
-		origin:  0x0			;-- scrolls unpinned cells (should be <= 0x0), mirror of grid-view/window/origin ;@@ make it read-only
+		origin:  (0,0)			;-- scrolls unpinned cells (should be <= (0,0)), mirror of grid-view/window/origin ;@@ make it read-only
 		content: make map! 8	#on-change :invalidates			;-- XY coordinate -> space (not cell, but cells content)
 		spans:   make map! 4	#type [map!]					;-- XY coordinate -> it's XY span (not user-modifiable!!)
 		;; widths/min used in `autofit` func to ensure no column gets zero size even if it's empty
@@ -3562,14 +3563,14 @@ grid-ctx: context [
 			#type [map!] :invalidates
 		autofit: 'area-total									;-- automatically adjust column widths? method name or none
 			#type = :invalidates [word! (find ~/fit-types autofit) none!]
-		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = 0x0
-			#type =? :invalidates-look (0x0 +<= pinned)
+		pinned:  0x0						;-- how many rows & columns should stay pinned (as headers), no effect if origin = (0,0)
+			#type =? :invalidates-look [pair!] (0x0 +<= pinned)
 		bounds:  [x: auto y: auto]								;-- max number of rows & cols
 			#type :invalidates [block! function! pair!]
 			(all [										;-- 'auto=bound /cells, integer=fixed, none=infinite (only within a window!)
 				bounds: bounds							;-- call it if it's a function
-				any [none =? bounds/x  'auto = bounds/x  all [integer? bounds/x  bounds/x >= 0]]
-				any [none =? bounds/y  'auto = bounds/y  all [integer? bounds/y  bounds/y >= 0]]
+				any [none =? bounds/x  'auto = bounds/x  all [linear? bounds/x  bounds/x >= 0]]
+				any [none =? bounds/y  'auto = bounds/y  all [linear? bounds/y  bounds/y >= 0]]
 			])
 			
 		;; data about the last rendered frame, may be used by /draw to avoid extra recalculations
@@ -3619,7 +3620,7 @@ grid-ctx: context [
 			either pick [content/:xy][calc-bounds]
 		] #type [function!] :invalidates				;@@ should clear frame/cells too!
 		
-		into: func [xy [pair!] /force child [object! none!]] [~/into self xy child]
+		into: func [xy [planar!] /force child [object! none!]] [~/into self xy child]
 		
 		;-- userspace functions for `spans` reading & modification
 		;-- they are required to be able to get any particular cell's multi-cell without full `spans` traversal
@@ -3657,7 +3658,7 @@ grid-ctx: context [
 		
 		locate-point: function [
 			"Map XY point on a grid into a cell it lands on, return [cell-xy offset]"
-			xy [pair!]
+			xy [planar!]
 			/screen "Point is on rendered viewport, not on the grid"
 			; return: [block!] "offset can be negative for leftmost and topmost cells"
 		][
@@ -3707,7 +3708,7 @@ grid-ctx: context [
 		;; hidden because /size should be valid now, and this function triggered out of tree rendering
 		; calc-size: function ["Estimate total size of the grid in pixels"] [~/calc-size self]
 
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!] /window xy1 [none! pair!] xy2 [none! pair!]] [
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!] /window xy1 [none! point2D!] xy2 [none! point2D!]] [
 			~/draw self canvas fill-x fill-y xy1 xy2
 		]
 	]
@@ -3718,7 +3719,13 @@ grid-view-ctx: context [
 	~: self
 	
 	;; gets called before grid/draw by window/draw to estimate the max window size and thus config scrollbars accordingly
-	available?: function [grid [object!] axis [word!] dir [integer!] from [integer!] (from >= 0) requested [integer!] (requested >= 0)] [	
+	available?: function [
+		grid      [object!]
+		axis      [word!]
+		dir       [integer!]
+		from      [linear!] (from >= 0)
+		requested [linear!] (requested >= 0)
+	][	
 		#debug grid-view [print ["grid/available? is called at" axis dir from requested]]	
 		bounds: grid/bounds
 		#assert [bounds "data/size is none!"]
@@ -3744,14 +3751,14 @@ grid-view-ctx: context [
 		;@@ TODO: slide-length should ensure window size is bigger than viewport size + slide
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
 		;@@ TODO: maybe a % of viewport instead of fixed jump size?
-		size: 0x0	#type =? #on-change [space word value] [quietly space/slide-length: min value/x value/y]
+		size: (0,0)		#type = #on-change [space word value] [quietly space/slide-length: min value/x value/y]
 		
 		;; reminder: window/slide may change this (together with window/origin) when sliding
 		;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
-		origin: 0x0	#type =? #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
+		origin: (0,0)	#type = #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
 		
 		content-flow: 'planar
-		source: make map! [size: 0x0]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
+		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch type?/word :source [
 				block! [
@@ -3797,7 +3804,7 @@ grid-view-ctx: context [
 				space
 			]
 			
-			available?: function [axis [word!] dir [integer!] from [integer!] requested [integer!]] [	
+			available?: function [axis [word!] dir [integer!] from [linear!] requested [linear!]] [	
 				~/available? self axis dir from requested
 			]
 			
@@ -3865,18 +3872,18 @@ button-ctx: context [
 ;@@ this should not be generally available, as it's for the tests only - remove it!
 declare-template 'rotor/space [
 	content: none	#type =? :invalidates [object! none!]
-	angle:   0		#type =  :invalidates-look [integer! float!]
+	angle:   0		#type =  :invalidates-look [linear!]
 
-	ring: make-space 'space [type: 'ring size: 360x10]
+	ring: make-space 'space [type: 'ring size: (360,10)]
 	tight?: no
 	;@@ TODO: zoom for round spaces like spiral
 
 	map: reduce [							;-- unused, required only to tell space iterators there's inner faces
-		ring [offset 0x0 size 999x999]					;-- 1st = placeholder for `content` (see `draw`)
+		ring [offset (0,0) size (1e3,1e3)]				;-- 1st = placeholder for `content` (see `draw`)
 	]
 	cache: [size map]
 	
-	into: function [xy [pair!] /force child [object! none!]] [
+	into: function [xy [planar!] /force child [object! none!]] [
 		unless spc: content [return none]
 		r1: to 1 either tight? [
 			(min spc/size/x spc/size/y) + 50 / 2
@@ -3886,7 +3893,7 @@ declare-template 'rotor/space [
 		r2: r1 + 10
 		c: cosine angle  s: negate sine angle
 		p0: p: xy - (size / 2)							;-- p0 is the center
-		p: as-pair  p/x * c - (p/y * s)  p/x * s + (p/y * c)	;-- rotate the coordinates
+		p: as-point2D  p/x * c - (p/y * s)  p/x * s + (p/y * c)	;-- rotate the coordinates
 		xy: p + (size / 2)
 		xy1: size - spc/size / 2
 		if any [child =? content  r1 > distance? 0x0 p] [
@@ -3895,7 +3902,7 @@ declare-template 'rotor/space [
 		r: p/x ** 2 + (p/y ** 2) ** 0.5
 		a: (arctangent2 0 - p0/y p0/x) // 360					;-- ring itself does not rotate
 		if any [child =? ring  all [r1 <= r r <= r2]] [
-			return reduce [ring  as-pair a r2 - r]
+			return reduce [ring  as-point2D a r2 - r]
 		]
 		none
 	]
@@ -3910,7 +3917,7 @@ declare-template 'rotor/space [
 		][
 			distance? 0x0 spc/size / 2
 		]
-		self/size: r1 + 10 * 2x2
+		self/size: r1 + 10 * (2,2)
 		compose/deep/only [
 			push [
 				line-width 10
@@ -3940,7 +3947,7 @@ field-ctx: context [
 	;; caret is separate space so it can be styled, but no `field-caret` template is needed, so it's just a class
 	caret-template: declare-class 'field-caret/caret [
 		type: 'caret
-		look-around: 10		#type =? [integer!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
+		look-around: 10		#type = [linear!] (look-around >= 0)	;-- how close caret is allowed to come to field borders
 	]
 	
 	non-ws: negate ws: charset " ^-"
@@ -3992,7 +3999,7 @@ field-ctx: context [
 		]
 		
 		everything: function ["Get full range of text"] [
-			0 by length
+			0 thru length
 		]
 		
 		selected: function ["Get selection range or none"] [
@@ -4006,12 +4013,12 @@ field-ctx: context [
 		frame: object [
 			point->caret: function [
 				"Get caret location [0..length] closest to given offset on last frame"
-				xy [pair! integer!] "If integer, Y=0"
+				xy [planar! linear!] "If integer, Y=0"
 			][
-				if integer? xy [xy: xy by 0]
+				if number? xy [xy: xy . 0]
 				-1 + offset-to-caret
 					space/spaces/text/layout
-					xy - space/margin - (space/origin by 0)
+					xy - space/margin - (space/origin . 0)
 			]
 			
 			adjust-origin: function [
@@ -4152,7 +4159,7 @@ field-ctx: context [
 			'else [
 				switch/default limit [
 					none #[none] [sel: none]
-					all [sel: 0 by length]
+					all [sel: 0 thru length]
 				][
 					ofs: batch space [locate limit]		;-- document's locate can return a block
 					if block? ofs [ofs: ofs/offset]		;-- ignores returned side
@@ -4167,7 +4174,7 @@ field-ctx: context [
 				sel/2 = offset [sel/1]
 				'else [offset]							;-- if caret is not at selection's edge, ignore previous selection
 			]
-			sel: other by ofs
+			sel: other thru ofs
 		][												;-- selection override
 			if sel [sel: clip sel 0 length]
 			ofs: either sel [sel/2][offset]				;-- 'select none' doesn't move the caret
@@ -4196,7 +4203,7 @@ field-ctx: context [
 		clip field/origin min-org max-org
 	]
 			
-	draw: function [field [object!] canvas: infxinf [pair! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+	draw: function [field [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		ctext: field/spaces/text						;-- text content
 		invalidate/only ctext							;-- ensure text is rendered too ;@@ TODO: maybe I can avoid this?
 		drawn: render/on ctext infxinf no no			;-- this sets the size
@@ -4204,11 +4211,11 @@ field-ctx: context [
 		cmargin: field/caret/look-around
 		;; fill the provided canvas, but clip if text is larger (adds cmargin to optimal size so it doesn't jump):
 		width: first either fill-x [canvas][min ctext/size + cmargin canvas]	
-		field/size: constrain width by ctext/size/y field/limits
+		field/size: constrain width . ctext/size/y field/limits
 		mrg: field/margin
 		;; draw does not adjust the origin, only event handlers do (this ensures it's only adjusted on a final canvas)
 		#assert [ctext/layout]							;-- should be set after draw, others may rely
-		ofs: field/origin by 0
+		ofs: field/origin . 0
 		quietly field/map: compose/deep [
 			(ctext) [offset: (ofs) size: (ctext/size)]
 		]
@@ -4235,8 +4242,8 @@ field-ctx: context [
 	declare-template 'field/space [
 		kit:      ~/kit
 		;; own facets:
-		weight:   1		#type =? :invalidates [number!] (weight >= 0)
-		origin:   0		#type =? :invalidates-look [integer!] (origin <= 0)		;-- offset(px) of text within the field
+		weight:   1		#type = :invalidates [number!] (weight >= 0)
+		origin:   0		#type = :invalidates-look [linear!] (origin <= 0)	;-- offset(px) of text within the field
 		timeline: make timeline! [limit: 50]	 #type [object!]	;-- saved states
 		map:      []
 		cache:    [size map]
@@ -4250,13 +4257,13 @@ field-ctx: context [
 		
 		;; these mirror spaces/text facets:
 		selected: none				#type =? :on-change [pair! none!]	;-- none or pair (offsets of selection start & end)
-		margin:   0					#type =? :on-change	;-- default = no margin
+		margin:   0					#type =  :on-change	;-- default = no margin
 		flags:    []				#type    :on-change	;-- [bold italic underline strike] supported ;@@ TODO: check for absence of `wrap`
 		text:     spaces/text/text	#type    :on-change
 		font:     spaces/text/font	#type =? :on-change
 		color:    none				#type =? :on-change	;-- placeholder for user to control
 				
-		draw: func [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
 ]

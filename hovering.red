@@ -38,7 +38,7 @@ context [
 	detect-away: function [
 		host        [object!]
 		event       [event!]
-		host-offset [pair!]								;-- no event/offset for 'time' event, have to use the old one
+		host-offset [planar!]							;-- no event/offset for 'time' event, have to use the old one
 	][
 		case [
 			not host/space   [exit]						;-- not initialized - no hittesting

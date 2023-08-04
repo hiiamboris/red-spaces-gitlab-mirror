@@ -187,7 +187,7 @@ context [
 			]
 		]
 		
-		draw: function [space [object!] canvas: infxinf [none! pair!] fill-x: no [logic! none!] fill-y: no [logic! none!] /extern depth] [
+		draw: function [space [object!] canvas: infxinf [none! point2D!] fill-x: no [logic! none!] fill-y: no [logic! none!] /extern depth] [
 			depth: depth + 1
 			if all [
 				limit < depth
@@ -205,7 +205,7 @@ context [
 		declare-template 'data-view/data-view [
 			wrap?: on
 			old-draw: :draw
-			draw: function [/on canvas [pair!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+			draw: function [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 		]
 		
 		set-style 'image [

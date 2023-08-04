@@ -158,7 +158,7 @@ layouts: reduce [
 
 ;; VID code for a tube containing 3 icons
 triplet: compose/only [
-	tube with [limits: 300 .. none  margin: 0x0  spacing: img-sep by 20  align: [↑]]
+	tube with [limits: 300 .. none  margin: 0x0  spacing: img-sep . 20  align: [↑]]
 	(append/dup [] [icon with [limits: 100 .. 100 text: take icons  image: take icons]] 3)
 ]
 
@@ -173,7 +173,7 @@ view/no-wait/flags compose/deep [
 					text "Mockup of" link https://easings.net 50 .. none
 					text "layout" text "on" pair: text text "canvas"
 				]	;@@ should be a rich-text style? although, how to specify the limits in rich-text
-				triplets-row: row tight spacing= triplet-sep by 30 top center [
+				triplets-row: row tight spacing= triplet-sep . 30 top center [
 					(triplets)
 				]
 			]

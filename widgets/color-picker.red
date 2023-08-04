@@ -40,43 +40,43 @@ context expand-directives with spaces/ctx [
 			lightness: make-space 'rectangle [
 				type:  'lightness
 				weight: 0
-				drop: function [offset [pair!]] [
+				drop: function [offset [planar!]] [
 					parent/lightness: 100% * clip 0 1 offset/x / size/x
 				]
 				draw: function [/on canvas fill-x fill-y] [		;@@ use the fill flags?
 					width: first finite-canvas canvas
-					self/size: width by 20
+					self/size: width . 20
 					pos: clip 3 width - 3 width * parent/lightness
 					compose [
 						line-width 1
 						fill-pen linear #000 #FFF box 0x0 (size)	;-- lightness scale
-						fill-pen off box (pos - 3 by 0) (pos + 3 by 20)		;-- selected value outline ;@@ or draw arrows below/above?
+						fill-pen off box (pos - 3 . 0) (pos + 3 . 20)	;-- selected value outline ;@@ or draw arrows below/above?
 					]
 				]
 			]
 			palette: make-space 'rectangle [
 				type:  'palette
 				weight: 1
-				drop: function [offset [pair!]] [
+				drop: function [offset [planar!]] [
 					parent/saturation: 100% - clip 0 1 offset/y / size/y
 					parent/hue:         360 * clip 0 1 offset/x / size/x
 				]
 				draw: function [/on canvas fill-x fill-y /local x] [	;@@ use the fill flags?
 					width: first canvas: finite-canvas canvas
 					height: either fill-y [canvas/y][0]
-					self/size: width by height
+					self/size: width . height
 					hue: clip 0 1 parent/hue / 360 // 1
 					sat: clip 0 1 (1 - parent/saturation)
 					lgt: clip 0 1 parent/lightness
 					shade: either 0.5 >= lgt
 						[    lgt * 2 * #000000FF]
 						[1 - lgt * 2 * #000000FF + #FFF]
-					pos: as-pair width * hue height * sat
+					pos: as-point2D width * hue height * sat
 					drawn: compose [
 						line-width 1
 						fill-pen linear #F00 #FF0 #0F0 #0FF #00F #F0F #F00	;-- tuples hardcoded to withstand possible override
 						box 0x0 (size)					;-- palette itself
-						fill-pen linear #808080FF #80808000 0x0 (0 by size/y)
+						fill-pen linear #808080FF #80808000 0x0 (0 . size/y)
 						box 0x0 (size)					;-- fade into gray
 						fill-pen (shade) box 0x0 (size)	;-- darkening/whitening by lightness
 						fill-pen off clip 0x0 (size) circle (pos) 4	;-- selected color outline

@@ -103,12 +103,12 @@ do with styling: context [
 	; |n: make op! func [a b] [either :a [:a][:b]]
 	
 	make-box: function [
-		size [pair!]
-		line [integer!]
+		size [planar!]
+		line [linear!]
 		pen [word! tuple! block! none!]
 		fill-pen [word! tuple! none!]
-		/round radius [integer!]
-		/margin mrg: ((system/words/round/ceiling/to 1x1 * line 2) / 2) [pair!]
+		/round radius [linear!]
+		/margin mrg: (line . line / 2) [planar!]
 	][
 		reshape-light [
 			push [
@@ -204,7 +204,7 @@ do with styling: context [
 		]
 		list-view/window/list/item: [
 			lview:  parent/parent/parent				;@@ how to simplify this?
-			margin: either lview/selectable [4x2][0x0]	;-- add little margin to draw frame on
+			margin: either lview/selectable [(4,2)][(0,0)]	;-- add little margin to draw frame on
 		]
 		
 		;; "☒☐" make lines too big! needs custom draw code, not symbols
@@ -212,7 +212,7 @@ do with styling: context [
 		;; it also cannot be written in block style, since draw will nullify the size (given text is empty)
 		switch: function [self] [						;-- clickable
 			cross?: when self/state [line 3x3 13x13 line 13x3 3x13]
-			frame:  make-box self/size: 16x16 1 none none
+			frame:  make-box self/size: (16,16) 1 none none
 			reduce [frame cross?]
 		]
 		logic: [										;-- readonly

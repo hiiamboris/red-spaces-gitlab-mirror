@@ -12,19 +12,19 @@ do/expand [
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
-set-style 'heading function [self /on canvas [pair! none!] fill-x fill-y] [
+set-style 'heading function [self /on canvas [point2D! none!] fill-x fill-y] [
 	self/font: bigfont
 	drawn: self/draw/on canvas fill-x fill-y
 	width: either canvas [canvas/x][self/size/x]
 	compose [
 		fill-pen (svmc/text + 0.0.0.200)
-		pen off box 0x0 (width by self/size/y)
+		pen off box 0x0 (width . self/size/y)
 		(drawn) 
 	]
 ]
 set-style 'field [[fill-pen (contrast-with svmc/text) pen off box 0x0 (size)]]
 ; set-style 'field/caret [fill-pen (svmc/text)]
-set-style 'tube function [tube /on canvas [pair! none!] fill-x fill-y] [
+set-style 'tube function [tube /on canvas [point2D! none!] fill-x fill-y] [
 	drawn: tube/draw/on canvas fill-x fill-y
 	#assert [drawn]
 	#assert [tube/size]
@@ -37,13 +37,13 @@ set-style 'tube function [tube /on canvas [pair! none!] fill-x fill-y] [
 declare-template 'heading/data-view []
 
 boxes: map-each spec [
-	[60x30 "A"]
-	[50x40 "B"]
-	[40x50 "C"]
-	[30x60 "D"]
-	[20x20 "E"]
-	[30x10 "F"]
-	[10x10 "G"]
+	[(60,30) "A"]
+	[(50,40) "B"]
+	[(40,50) "C"]
+	[(30,60) "D"]
+	[(20,20) "E"]
+	[(30,10) "F"]
+	[(10,10) "G"]
 ][
 	; make-space/name 'rectangle spec
 	; make-space/name 'field spec
@@ -56,7 +56,7 @@ tubes: collect [
 	for-each [/i axes] [ [→ ↓] [→ ↑]  [↓ ←] [↓ →]  [← ↑] [← ↓]  [↑ →] [↑ ←] ] [
 		do with spaces/ctx [
 			lim2: extend-canvas
-				lim1: width by width
+				lim1: width . width
 				anchor2axis axes/2
 		]
 		keep reshape [

@@ -141,7 +141,7 @@ define-handlers [
 					all [event/ctrl?  multi?] ['invert]
 					'default                  ['replace]
 				]
-				range: either all [event/shift? multi?] [i][i by i]
+				range: either all [event/shift? multi?] [i][i thru i]
 				batch space [
 					select-range/mode range mode
 					move-cursor i 
@@ -201,10 +201,10 @@ define-handlers [
 					switch select? [
 						range [
 							mode: either event/ctrl? ['include]['extend]
-							batch space [select-range/mode old by new mode]
+							batch space [select-range/mode old thru new mode]
 						]
 						single [
-							batch space [select-range/mode new by new 'replace]
+							batch space [select-range/mode new thru new 'replace]
 						]
 					]
 					batch space [

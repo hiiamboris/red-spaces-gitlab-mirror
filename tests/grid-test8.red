@@ -14,12 +14,12 @@ declare-template 'zoomer/box [
 	canvas: 0x0		#type =? :spaces/ctx/invalidates  
 	; draw: function [/on canvas [pair! none!]] [
 	draw: function [] [
-		canvas': as-pair
+		canvas': as-point2D
 			canvas/x / zoom/x
 			canvas/y / zoom/y
 		drawn: render/on content canvas' no no 
 		size:  content/size
-		maybe self/size: as-pair
+		maybe self/size: as-point2D
 			size/x * zoom/x
 			size/y * zoom/y
 		compose/deep/only [

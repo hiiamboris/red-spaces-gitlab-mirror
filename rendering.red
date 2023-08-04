@@ -147,8 +147,9 @@ context [
 		cache/with-generation face/generation + 1.0 [
 			without-GC [								;-- speeds up render by 60%
 				with-style face [
-					style: apply-current-style face		;-- host style can only be a block
-					drawn: render-space/on face/space face/size yes yes	;-- fill by default
+					style:  apply-current-style face	;-- host style can only be a block
+					canvas: all [face/size to point2D! face/size]
+					drawn:  render-space/on face/space canvas yes yes	;-- fill by default
 					#assert [block? :drawn]
 					unless face/size [					;-- initial render: define face/size
 						#assert [face/space/size]
@@ -181,7 +182,7 @@ context [
 		]
 	]
 
-	add-child: function [space [object!] canvas [pair!]] [		;-- list child in its parent's children list
+	add-child: function [space [object!] canvas [point2D!]] [	;-- list child in its parent's children list
 		either pos: find/same/skip/tail children-stack space 2 [
 			change pos canvas
 		][
@@ -193,9 +194,9 @@ context [
 	safe-draw: function [
 		draw   [function!]
 		space  [object! none!]
-		xy1    [pair! none!]
-		xy2    [pair! none!]
-		canvas [pair!]
+		xy1    [point2D! none!]
+		xy2    [point2D! none!]
+		canvas [point2D!]
 		fill-x [logic!]
 		fill-y [logic!]
 	][
@@ -220,8 +221,8 @@ context [
 					
 	render-space: function [
 		space [object!] (space? space)
-		/window xy1 [pair! none!] xy2 [pair! none!]
-		/on canvas: infxinf [pair! none!] fill-x: no [logic!] fill-y: no [logic!]
+		/window xy1 [point2D! none!] xy2 [point2D! none!]
+		/on canvas: infxinf [point2D! none!] fill-x: no [logic!] fill-y: no [logic!]
 		/crude
 	][
 		; if name = 'cell [?? canvas]
@@ -300,8 +301,8 @@ context [
 		"Return Draw code to draw a space or host face, after applying styles"
 		space [object!] "Space or host face as object"
 		/window "Limit rendering area to [XY1,XY2] if space supports it"
-			xy1 [pair! none!] xy2 [pair! none!]
-		/on canvas: infxinf [pair! none!] "Specify canvas size as sizing hint"
+			xy1 [point2D! none!] xy2 [point2D! none!]
+		/on canvas: infxinf [point2D! none!] "Specify canvas size as sizing hint"
 			fill-x: no [logic!] "Try to fill finite canvas width"
 			fill-y: no [logic!] "Try to fill finite canvas height"
 		/crude "For spaces only - speed up caching on intermediate canvases"	;-- children may be out of sync!

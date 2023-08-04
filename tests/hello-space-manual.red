@@ -28,7 +28,7 @@ window/pane: reduce [host]				;) add host to window
 host/space:  list						;) host must have exactly one space attached to it - here it's `list`
 host/draw:   render host				;) `render` returns a list of draw commands, but also sets the /size facet of spaces
 host/size:   list/size					;) now we know how big host face we need from previously set list/size
-host/offset: 10x10						;) apply default VID margin
+host/offset: (10,10)					;) apply default VID margin
 
 window/size: host/size + 20x20			;) add default VID margins to host/size to infer window/size
 window/offset: system/view/screens/1/size - window/size / 2		;) center the window

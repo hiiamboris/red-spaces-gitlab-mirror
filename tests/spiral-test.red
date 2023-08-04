@@ -13,11 +13,11 @@ Red [
 
 ;; this code is a bit messy and I'm lazy to clean it up
 declare-template 'spiral/space [
-	size: 100x100
-	field: make-space 'field [size: 999999999x9999]		;-- it's infinite
-	map: [field [offset 0x0 size 999x999]]
+	size: (100,100)
+	field: make-space 'field [size: (1.#inf,1e4)]		;-- it's infinite
+	map: [field [offset (0,0) size (1e3,1e3)]]
 
-	into: function [xy [pair!] /force child [object! none!]] [
+	into: function [xy [planar!] /force child [object! none!]] [
 		;@@ TODO: unify this with `draw` code somehow
 		; render/on field infxinf no no	;-- produce layout 
 		r: field/spaces/text/layout
@@ -106,7 +106,7 @@ view/no-wait/options [
 		rotor with [tight?: yes] [
 			spiral with [
 				field/text: lorem10
-				size: 400x400
+				size: (400,400)
 			]
 		]
 	]

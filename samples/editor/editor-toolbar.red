@@ -17,17 +17,17 @@ context [
 		step:      size/y - thickness / (n - 1)
 		if string? texts [
 			markers: map-each [/i t] texts [
-				compose [text (0 by (i - 1 * step - 6)) (form t)]
+				compose [text (0. (i - 1 * step - 6)) (form t)]
 			]
 		]
 		if block? texts [
 			markers: map-each i n [
-				compose/deep/only [push [translate (0 by (i - 1 * step)) (texts)]]
+				compose/deep/only [push [translate (0 . (i - 1 * step)) (texts)]]
 			]
 		]
 		lines: map-each [/i x1 x2] widths [
 			compose [
-				move (size/x * x1 by (i - 1 * step))
+				move (size/x * x1 . (i - 1 * step))
 				'hline (to float! x2 - x1 * size/x)
 			]
 		]
@@ -35,7 +35,7 @@ context [
 			push [
 				line-width (thickness)
 				font (tiny-font)
-				translate (0 by (thickness / 2))
+				translate (0 . (thickness / 2))
 				(only markers)
 				shape (wrap lines)
 			]

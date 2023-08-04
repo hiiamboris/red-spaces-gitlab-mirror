@@ -30,7 +30,7 @@ declare-template 'wheel/space [
 		offset: as-pair
 			(offset/x * cosine angle) + (offset/y * sine angle)
 			(offset/x * sine negate angle) + (offset/y * cosine angle)
-		offset: offset + (content/size / 2) - (radius by 0)
+		offset: offset + (content/size / 2) - (radius . 0)
 		self/point: offset
 		if any [force  0x0 +<= offset +< content/size] [reduce [content offset]]
 	]
@@ -43,7 +43,7 @@ declare-template 'wheel/space [
 		radius: (min size/x size/y) - (distance? 0x0 content/size) / 2
 		compose/deep [
 			rotate (angle) (size / 2)
-			translate (left / 2 + (radius by 0))
+			translate (left / 2 + (radius . 0))
 			(drawn)
 			(when point (compose [pen blue line-width 1 fill-pen cyan box (point - 2) (point + 2)]))
 		]

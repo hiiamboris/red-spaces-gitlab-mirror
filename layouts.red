@@ -14,7 +14,7 @@ make-layout: function [
 	type     [word!]            "Layout name (list, tube, ring)"
 	spaces   [block! function!] "List of space names or a picker function"
 	settings [block!]           "Block of words referring to setting values"
-	; return: [block!] "[size [pair!] map [block!]]
+	; return: [block!] "[size [planar!] map [block!]]
 ][
 	layouts/:type/create :spaces settings
 ]
@@ -28,22 +28,22 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 
 	list: context [
 		;; shared by list/create and list-view/draw
-		get-item-canvas: function [list-canvas [pair!] limits [object! none!] axis [word!] margin [pair!]] [
+		get-item-canvas: function [list-canvas [point2D!] limits [object! none!] axis [word!] margin [planar!]] [
 			extend-canvas (subtract-canvas (constrain list-canvas limits) margin * 2) axis	;-- list is infinite along its axis
 		]
 		
 		;; used to preallocate map buffer when count is unknown/infinite, but length (in px) is provided
-		item-size-estimate: 100x20
+		item-size-estimate: (100,20)
 		
 		;; settings for list layout:
 		;;   axis             [word!]      x or y
-		;;   margin           [pair!]      >= 0x0, always added around edge items, even if 'range' limits displayed items
-		;;   spacing      [pair! integer!] >= 0x0 (integer used by the document!)
-		;;   canvas        [pair! none!]   >= 0x0
+		;;   margin          [planar!]        >= 0x0, always added around edge items, even if 'range' limits displayed items
+		;;   spacing      [planar! integer!]  >= 0x0 (integer used by the document!)
+		;;   canvas        [point2D! none!]   >= 0x0
 		;;   fill-x fill-y [logic! none!]  fill along canvas axes flags: flag along 'axis' is ignored completely,
 		;;      while the opposite flag controls whether whole list width extends to canvas or not (but items always fill the width)
 		;;   limits        [object! none!]
-		;;   origin         [pair! none!]  unrestricted, offsets whole map, default=0x0
+		;;   origin         [point2D! none!]  unrestricted, offsets whole map, default=0x0
 		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
 		;;   length       [integer! none!] in pixels, when to stop adding items (used by list-view), default=unlimited
 		;;                                 does not include anchor size and both margins
@@ -69,19 +69,19 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
-				margin   [pair! (0x0 +<= margin)]
-				spacing  [pair! (0x0 +<= spacing) integer! (0 <= spacing)]
-				canvas   [pair! (0x0 +<= canvas) none!]
+				margin   [planar! (0x0 +<= margin)]
+				spacing  [planar! (0x0 +<= spacing) integer! (0 <= spacing)]
+				canvas   [point2D! (0x0 +<= canvas) none!]
 				fill-x   [logic! none!]
 				fill-y   [logic! none!]
 				limits   [object! (range? limits) none!]
-				origin   [pair! none!]
+				origin   [point2D! none!]
 				anchor   [integer! (anchor > 0) none!]
 				length   [integer! (length >= 0) none!]
 				reverse? [logic! none!]
 				do-not-extend? [logic! none!]
 			]]
-			default origin:   0x0
+			default origin:   (0,0)
 			default canvas:   infxinf
 			default fill-x:   no
 			default fill-y:   no
@@ -121,7 +121,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;;   but final list length is clipped/extended by limits/:y (hiding items or adding empty space)
 			
 			loop 2 [									;-- two render cycles
-				size: 0x0
+				size: (0,0)
 				map:  fill abs length direction			;@@ avg+2dev, estimator/corrector
 				
 				;; total width (size/:x) is used for new canvas when:
@@ -184,17 +184,17 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; because when tabbing around list-view, we need to have this item to switch to it and then pan the view
 		;; for the same reason it should draw at least one item even if length=0 or less than margin
 		fill: function [
-			length [integer!] (length >= 0) sign [integer!] (1 = abs sign)
+			length [linear!] (length >= 0) sign [integer!] (1 = abs sign)
 			/extern y spaces count func? origin margin spacing anchor range item-canvas size
 		] with :create [
 			ith-item: pick [[spaces/pick i][spaces/:i]] func?
 			;; requested length does not include margin, otherwise if margin is big it may happen that window intersects the margin
 			; length:   max 0 length - (margin/:y * 2)	;-- w/o margin = length of items themselves (and their spacing)
-			count~:   either length < 1e9 [length / item-size-estimate/:y][count]
+			count~:   either length < 1.#inf [length / item-size-estimate/:y][count]
 			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
 			range:    anchor * 1x1
-			pos:      origin + (1 by sign * margin)
+			pos:      origin + (1 . sign * margin)
 			add-item: [
 				; ?? [i pos item/size] 
 				compose/only/deep/into [
@@ -237,9 +237,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;                                  default = [e s] - left-to-right items, top-down rows
 		;;   align       [block! pair! none!]   pair of -1x-1 to 1x1: x = list within row, y = item within list
 		;;                                      default = -1x-1 - both x/y stick to the negative size of axes
-		;;   margin            [pair!]      >= 0x0
-		;;   spacing           [pair!]      >= 0x0
-		;;   canvas         [none! pair!]   >= 0x0; if none=inf, width determined by widest item
+		;;   margin           [planar!]     >= 0x0
+		;;   spacing          [planar!]     >= 0x0
+		;;   canvas       [none! point2D!]  >= 0x0; if none=inf, width determined by widest item
 		;;   fill-x fill-y [logic! none!]    fill along canvas axes flags
 		;;   limits        [none! object!]
 		create: function [
@@ -274,9 +274,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					)]
 					none!
 				]
-				margin   [pair!] (0x0 +<= margin)
-				spacing  [pair!] (0x0 +<= spacing)
-				canvas   [pair! (0x0 +<= canvas) none!]
+				margin   [planar!] (0x0 +<= margin)
+				spacing  [planar!] (0x0 +<= spacing)
+				canvas   [point2D! (0x0 +<= canvas) none!]
 				fill-x   [none! logic!]
 				fill-y   [none! logic!]
 				limits   [object! (range? limits) none!]
@@ -318,11 +318,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
-			min-size: max 0x0 (constrain 0x0 limits) - (2 * margin)
+			min-size: max (0,0) (constrain 0x0 limits) - (2 * margin)
 			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes of canvas size
-			stripe/:x: pick ccanvas / infxinf * infxinf x
+			stripe/:x: either ccanvas/:x < 1.#inf [0][1.#inf]
 			; stripe/:y: 0
 			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
 			
@@ -335,8 +335,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				#assert [number? weight]
 				available: 1.0 * case [					;-- max possible width extension length, normalized to weight
 					weight <= 0 [0]						;-- fixed size
-					not max-size: all [space/limits space/limits/max] [infxinf/x]	;-- unlimited extension possible ;@@ REP #113
-					pair? max-size [max-size/:x - space/size/:x / weight]
+					not max-size: all [space/limits space/limits/max] [1.#inf]	;-- unlimited extension possible ;@@ REP #113
+					planar? max-size [max-size/:x - space/size/:x / weight]
 					number? max-size [
 						either x = 'x [				 	;-- numeric max-size only used on vertical tubes
 							max-size - space/size/:x / weight
@@ -360,7 +360,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			total-length:   0							;-- used to extend row heights to fill finite canvas
 			row-weight:     0							;-- later used to expand rows with >0 peak weight
 			foreach [space drawn available weight] info [
-				new-row-size: as-pair					;-- add item-size and check if it hangs over
+				new-row-size: as-point2D				;-- add item-size and check if it hangs over
 					row-size/x + space/size/:x + spacing/:x
 					max row-size/y space/size/:y		;-- height will only be needed in infinite width case (no 2nd render)
 				either any [							;-- row either fits allowed-row-width, or has no items yet?
@@ -413,12 +413,12 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						repeat i length? extensions [	;@@ use for-each
 							set [space:] item: skip row i - 1 * 4
 							if extensions/:i > 0 [		;-- only re-render items that are being extended
-								desired-size: reverse? space/size/:x + extensions/:i by ccanvas/:y
+								desired-size: reverse? space/size/:x + extensions/:i . ccanvas/:y
 								;; fill is enabled for width only! otherwise it will affect row/y and later stage of row extension!
 								; ?? [desired-size space/content/size]
 								item/2: render/crude/on space desired-size x = 'x x = 'y
 							]
-							row-size: as-pair			;-- update row size with the new render results
+							row-size: as-point2D		;-- update row size with the new render results
 								row-size/x + space/size/:x + spacing/:x
 								max row-size/y space/size/:y
 						]
@@ -460,7 +460,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					set [space:] item: skip row i - 1 * 4
 					;; always re-renders items, because they were painted on an infinite canvas
 					;; finite canvas will most likely bring about different outcome
-					desired-size: reverse? space/size/:x by row-size/y
+					desired-size: reverse? space/size/:x . row-size/y
 					item/2: render/on space desired-size yes yes
 				]
 			]
@@ -473,9 +473,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			in-row-shift: align/2 + 1 / 2
 			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
 			foreach [row-size _ row] rows [
-				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) by row-y
+				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) . row-y
 				foreach [space drawn _ _] row [
-					ofs/:y: to integer! row-size/y - space/size/:y * in-row-shift + row-y
+					ofs/:y: row-size/y - space/size/:y * in-row-shift + row-y
 					geom: reduce ['offset ofs * oxy + (space/size * shift) 'size space/size 'drawn drawn]
 					repend map [space geom]
 					ofs/:x: ofs/:x + spacing/:x + space/size/:x
@@ -483,7 +483,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				row-y: row-y + spacing/:y + row-size/y
 			]
 			;; fill the desired canvas width if canvas is given:
-			size: 2 * margin + reverse? total-width by total-length
+			size: (2,2) * margin + reverse? total-width . total-length
 			if shift <> 0x0 [							;-- have to add total size to all offsets to make them positive
 				shift: size * abs shift
 				foreach [_ geom] map [geom/offset: geom/offset + shift]
@@ -524,7 +524,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    	map:   make [] count * 2
 	    	if count <= 0 [return reduce [map 0x0]]
 	    	
-	    	offset: total: 0x0							;-- margin is not accounted for in the map, so it's easier to change
+	    	offset: total: (0,0)						;-- margin is not accounted for in the map, so it's easier to change
 	    	ith-item: either func? [[spaces/pick i]][[spaces/:i]]
 			repeat i count [
 				space: do ith-item
@@ -539,7 +539,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			total/x: offset/x
 			
 			foreach [space geom] map [					;-- align vertically along a common baseline
-				geom/offset/y: round/to total/y - space/size/y * baseline 1	
+				geom/offset/y: total/y - space/size/y * baseline	
 			]
 	    	reduce [map total]
 	    ]
@@ -553,11 +553,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			#assert [x < infxinf/x]
 			if points = [0 0 0 1] [points/3: 1]			;-- hack to make it all work with a zero-wide map
-			build-index copy points n: x >> 5 + 1		;-- 1 point per 32 px
+			build-index copy points n: 1 + round-down x / 32	;-- 1 point per 32 px
 		]
 		
 		;; lists all sections of all child spaces in 1D space! - so not the same as space/sections
-		list-sections: function [map [block!] total [integer!]] [
+		list-sections: function [map [block!] total [linear!]] [
 	    	generate-sections map total sections: clear []
 	    	;@@ make leading spaces significant?
 	    	if empty? sections [append sections 1]
@@ -567,7 +567,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		words-period: 4								;-- helpful constant
 			
 	    ;; groups sections by their sign into 'words', and returns them in this format:
-	    ;; [word-x1-1D by word-x2-1D   word-width(int)   white?(logic)   sections-slice(pair)]
+	    ;; [word-x1-1D thru word-x2-1D   word-width(int)   white?(logic)   sections-slice(pair)]
 	    list-words: function [sections [block!]] [
 	    	words: clear []
 	    	unless empty? sections [
@@ -580,10 +580,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					width: width + abs w
 		    		if white? <> next-white? [
 			    		repend words [
-			    			0 by width + offset			;-- word's x1..x2 in 1D
+			    			0 . width + offset			;-- word's x1..x2 in 1D
 			    			width						;-- word's 1D' width (= 1D width now, may be scaled later)
 			    			white?						;-- whether word's empty or not
-			    			sec-bgn by sec-end			;-- sections slice used by the word
+			    			sec-bgn thru sec-end		;-- sections slice used by the word
 			    		]
 			    		white?: next-white?
 			    		sec-bgn: sec-end
@@ -597,13 +597,13 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    #assert [
 	    	[] = list-words []
 	    	; [0x1 1 #[true]  0x0] = list-words []
-	    	[0x6 6 #[false] 0x3] = list-words [1 2 3]
-	    	[0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] = list-words [-1 -2 1 2 3 -4]
+	    	[(0,6) 6 #[false] 0x3] = list-words [1 2 3]
+	    	[(0,3) 3 #[true] 0x2  (3,9) 6 #[false] 2x5  (9,13) 4 #[true] 5x6] = list-words [-1 -2 1 2 3 -4]
 	    ]
 	    
 	    ;@@ ensure this is not called with /force-wrap 
 	    ;; estimates minimum total width of the paragraph (without margin) given indents and words
-	    get-min-total-width-2D: function [words [block!] indent1 [integer!] indent2 [integer!]] [
+	    get-min-total-width-2D: function [words [block!] indent1 [linear!] indent2 [linear!]] [
 			;; tricky algorithm to account for the case where indent1 < indent2:
 			;; indent1-> w1 w2 long-word
 			;; indent2          -> long-word
@@ -635,7 +635,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    ]
 	    
 		;; copy words into buffer, until it fits row-width (or until scaling factor worsens in 'scale mode)
-		fill-row: function [buffer [block!] words [block!] sections [block!] row-avail-width [integer!] align [word!] wrap? [logic!]] [
+		fill-row: function [buffer [block!] words [block!] sections [block!] row-avail-width [linear!] align [word!] wrap? [logic!]] [
 			accept-word?: pick [
 				[new-used-width <= row-avail-width]
 				[										;-- 'scale mode may exceed row-avail-width
@@ -684,10 +684,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					sec-slice/1: (abs w) - sec-width * (sign? w)
 					word-sections: sec-slice
 				][
-					word-sections: sec-added by 0 + word-sections
+					word-sections: sec-added thru 0 + word-sections
 				]
-				word1: 0 by sec-width + word-x-1D/1		;-- commit only part the the word
-				word2: sec-width by 0 + word-x-1D
+				word1: (0 . sec-width) + word-x-1D/1	;-- commit only part the the word
+				word2: (sec-width . 0) + word-x-1D
 				rechange row-words [word1 sec-width white? none]	;-- sections are unused in row-words (can be none)
 				rechange words [									;-- subtract the committed part from the next word
 					word2 (word-width - sec-width) white? word-sections
@@ -701,7 +701,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		
 		float-vector: make vector! [float! 64 10]
 		;; evenly distributes remaining whitespace in fill mode
-		distribute-whitespace: function [words [block!] size [integer!]] [
+		distribute-whitespace: function [words [block!] size [linear!]] [
 			;; last (trailing) whitespace should not be changed, so need to get rid of it first
 			whites: clear {}
 			foreach [_ _ white? _] words [append whites pick " +" white?]	;@@ use map-each or sift
@@ -710,12 +710,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			n-white: length? whites
 			if n-white = 0 [exit]						;-- no empty words in the row, have to leave it left-aligned
 			
-			append/dup clear float-vector 1.0 * size / n-white n-white
-			white: quantize float-vector
+			white: 1.0 * size / n-white
 			while [not tail? words] [					;-- skip 1st word ;@@ use for-each
 				if white?: words/3 [
-					words/2: words/2 + white/1			;-- modifies word-width-1D
-					if tail? white: next white [break]
+					words/2: words/2 + white			;-- modifies word-width-1D
+					if zero? n-white: n-white - 1 [break]
 				]
 				words: skip words words-period
 			]
@@ -731,11 +730,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			; if words-period < length? group-end [  		;-- group whitespace
 				; words-end: tail group-end
-				; range-1D: group-end/1/1 by words-end/-4/2 
+				; range-1D: group-end/1/1 . words-end/-4/2 
 				; clear rechange group-end [range-1D span? range-1D yes none]
 			; ]
 			if words-period < offset? words group-end [	;-- group words
-				range-1D: words/1/1 by group-end/-4/2 
+				range-1D: words/1/1 . group-end/-4/2 
 				remove/part
 					rechange words [range-1D span? range-1D no none]
 					group-end
@@ -759,10 +758,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				
 		;; return format skeleton for paragraph layout
 		frame!: object [
-			size-1D:     0x0
-			size-1D':    0x0
-			size-2D:     0x0
-			margin:      0x0
+			size-1D:     (0,0)
+			size-1D':    (0,0)
+			size-2D:     (0,0)
+			margin:      (0,0)
 			spacing:     0
 			map:         []
 			sections:    []
@@ -780,9 +779,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; settings for paragraph layout:
 		;;   align          [none! word!]     one of: [left center right fill scale upscale], default: left
 		;;   baseline         [number!]       0=top to 1=bottom(default) normally, otherwise sticks out - vertical alignment in a row
-		;;   margin            [pair!]   >= 0x0
+		;;   margin           [planar!]       >= 0x0
 		;;   spacing         [integer!]       >= 0 - vertical distance between rows
-		;;   canvas         [none! pair!]     >= 0; if infinite, produces a single row
+		;;   canvas       [none! point2D!]    >= 0; if infinite, produces a single row
 		;;   fill-x fill-y [logic! none!]     fill along canvas axes flags
 		;;   limits        [none! object!]
 		;;   indent        [none! block!]     [first: integer! rest: integer!], first and rest are independent of each other
@@ -800,9 +799,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			#debug [typecheck [
 				align    [word! (find [left center right fill scale upscale] align) none!]
 				baseline [number!]
-				margin   [pair! (0x0 +<= margin)]
+				margin   [planar! (0x0 +<= margin)]
 				spacing  [integer! (0 <= spacing)]		;-- vertical only!
-				canvas   [pair! (0x0 +<= canvas) none!]
+				canvas   [point2D! (0x0 +<= canvas) none!]
 				fill-x   [none! logic!]
 				fill-y   [none! logic!]
 				limits   [object! (range? limits) none!]
@@ -838,7 +837,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			#assert [not empty? sections]				;-- too hard to adapt the algorithm for that case
 			total-1D/x: max 1 total-1D/x				;-- ditto
 			words: list-words sections
-			total-2D: 1x0 * ccanvas						;-- without margins
+			total-2D: (ccanvas/x . 0)					;-- without margins
 			if any [
 				ccanvas/x >= infxinf/x					;-- convert infinite canvas into single-row canvas
 				not fill-x								;-- contract width if not asked to fill it
@@ -860,8 +859,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			y-levels:          clear []
 			layout-drawn:      clear []
 			get-in-row-indent: switch/default align [
-				right [[row-left-width]]
-				center [[round/ceiling/to half row-left-width 1]]
+				right  [[row-left-width]]
+				center [[half row-left-width]]
 			] [0]
 			while [not tail? words] [
 				;; consume some words (or part of a single word)
@@ -933,7 +932,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					row-origin-1D: geom1/offset * 1x0
 					spaces-drawn: clear []
 					for i: map-ofs1 + 1 map-ofs2 + 1 [
-						geom: pick map i * 2 
+						geom: pick map i * 2
 						compose/only/into [
 							translate (geom/offset - row-origin-1D) (geom/drawn)
 						] tail spaces-drawn
@@ -943,15 +942,15 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					#assert [offset1 <= 0]
 					word-span: span? word-x-1D
 					word-drawn: compose/deep/only [
-				  		translate (word-offset by 0)			;-- move to the 2D point
+				  		translate (word-offset . 0)				;-- move to the 2D point
 						#debug paragraph [push [
-							translate (0 by row-y1-1D)
+							translate (0 . row-y1-1D)
 							fill-pen off pen magenta line-width 1
-							box 0x0 (word-width-1D' by row-height)
+							box 0x0 (word-width-1D' . row-height)
 						]]
 				  		scale (word-scale) 1.0
-				  		clip 0x0 (word-span by total-1D/y)
-				  		translate (offset1 by 0)				;-- account for word's offset within geom/size/x
+				  		clip 0x0 (word-span . total-1D/y)
+				  		translate (offset1 . 0)					;-- account for word's offset within geom/size/x
 				  		(copy spaces-drawn)
 					]
 					repend row-drawn ['push word-drawn]
@@ -959,7 +958,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				word-x1-2D: indent + in-row-indent
 				compose/only/into [
-					translate (indent + in-row-indent by row-y0-2D)
+					translate (indent + in-row-indent . row-y0-2D)
 					(copy row-drawn)
 				] tail layout-drawn
 			
@@ -969,7 +968,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			]
 			total-2D/y: row-y2-2D
 			drawn: compose/only [translate (margin) (copy layout-drawn)]
-			total-1D': (last x-1D-1D'-points) by total-1D/y
+			total-1D': (last x-1D-1D'-points) . total-1D/y
 			
 			frame: make frame! compose/only [
 				size-1D:   (total-1D)
@@ -982,9 +981,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				drawn:     (drawn)
 				nrows:     (nrows)
 				y-levels:  (copy y-levels)
-				x1D->x1D': (build-index copy x-1D-1D'-points total-1D/x >> 5 + 1)
+				x1D->x1D': (build-index copy x-1D-1D'-points 1 + round-down total-1D/x / 32)
 				x1D->map:  (x-1D-to-map-offset)
-				y2D->row:  (build-index copy y-irow-points   total-2D/y >> 2 + 1)
+				y2D->row:  (build-index copy y-irow-points   1 + round-down total-2D/y / 4)
 			]
 			
 			frame
@@ -993,9 +992,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	
 	ring: context [
 		;; settings for ring layout:
-		;;   angle    [integer! float! none!]   unrestricted, defaults to 0
+		;;   angle    [linear! none!]   unrestricted, defaults to 0
 		;;     in degrees - clockwise direction to the 1st item (0 = right, aligns with math convention on XY space)
-		;;   radius      [integer! float!]   >= 0
+		;;   radius      [linear!]   >= 0
 		;;     minimum distance (pixels) from the center to the nearest point of arranged items
 		;;   round?      [logic!]   default: false
 		;;     whether items should be considered round, not rectangular
@@ -1007,22 +1006,22 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [0x0 []]]	;-- empty layout optimization
+			if count <= 0 [return copy/deep [(0,0) []]]	;-- empty layout optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
 				#assert [:self/create =? context? bind word 'local]
 				set bind word 'local get word
 			]
 			#debug [typecheck [
-				angle  [integer! float! none!]
-				radius [integer! float!] (0 <= radius)
+				angle  [linear! none!]
+				radius [linear!] (0 <= radius)
 				round? [logic! none!]
 			]]
 			default angle: 0
 			default round?: no
 			
 			map: make [] 2 * count
-			origin: 0x0
-			total:  0x0
+			origin: (0,0)
+			total:  (0,0)
 			step:   360 / count
 			
 			either round? [

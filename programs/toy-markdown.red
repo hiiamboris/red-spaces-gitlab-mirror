@@ -209,8 +209,8 @@ context [
 					parse buffer/1 [any [remove 1 3 space! (indent: indent + 15)]]
 					compose/deep/only [
 						row tight [
-							; <-> (indent by 0)			;@@ stupid compiler compiles <-> as something other than word
-							stretch (indent by 0)
+							; <-> (indent . 0)			;@@ stupid compiler compiles <-> as something other than word
+							stretch (indent . 0)
 							rich-content (decode-text flat join buffer)
 						]
 					]

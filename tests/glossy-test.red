@@ -38,7 +38,7 @@ view/flags [
 							grid/widths: #(default 70)
 							grid/pinned: 0x1
 						]
-						source= map-each/only y 10 [map-each x 2 [rejoin ["Data " x by y]]]
+						source= map-each/only y 10 [map-each x 2 [rejoin ["Data " x thru y]]]
 					]
 				]
 			]

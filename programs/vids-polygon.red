@@ -31,7 +31,7 @@ view/flags/options reshape [
 	offset: config/offset
 	actors: object [
 		on-resize: on-resizing: function [window event] [
-			status/size: window/size/x - 20 by 40 
+			status/size: window/size/x - 20 . 40 
 			status/offset/y: window/size/y - 50
 			host/size: window/size - 20x155
 			if host/space [invalidate host/space]

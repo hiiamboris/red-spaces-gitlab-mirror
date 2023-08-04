@@ -163,18 +163,6 @@ if action? :mold [
 			
 			if decor [append/only mold-stack :value]
 			switch/default type [
-				pair! [
-					either all [
-						emit [(native-mold value)]
-					][
-						x: value/x  y: value/y
-						if x =  2e9 [x: 'INF]
-						if x = -2e9 [x: '-INF]
-						if y =  2e9 [y: 'INF]
-						if y = -2e9 [y: '-INF]
-						emit [(native-mold x) "x" (native-mold y)]
-					]
-				]
 				object! map! hash! block! paren! path! get-path! set-path! lit-path! event! [
 					if any-path? value [sp: "/" flat': flat flat: yes]
 					step 'depth
@@ -303,7 +291,7 @@ if action? :mold [
 				if paren? string [string: do string]
 				unless string [continue]
 				append/part output string limit
-				limit: max 0 limit - length? string
+				limit: system/words/max 0 limit - length? string
 			]
 			output
 		]

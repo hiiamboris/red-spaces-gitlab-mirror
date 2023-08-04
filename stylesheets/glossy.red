@@ -40,7 +40,7 @@ context with spaces/ctx [
 	
 	draw-frame: function [
 		"Draw a glossy frame"
-		size     [pair!]
+		size     [planar!]
 		rounding [integer!] "Corner rounding radius"
 		bgnd     [tuple!]   "Background color"
 	][
@@ -73,7 +73,7 @@ context with spaces/ctx [
 	
 	draw-sheen: function [
 		"Draw a bumpy sheen"
-		size     [pair!]
+		size     [planar!]
 		rounding [integer!]        "Corner rounding radius"
 		sheen    [percent! float!] "How pronounced is the sheen, 0-100%"
 	][
@@ -85,7 +85,7 @@ context with spaces/ctx [
 		]]
 		compose/deep [
 			pen off
-			fill-pen radial (tints) (1x1 * edge / 2) (to integer! 1.3 * edge / 2) (size / 4 - (1x1 * edge / 2))
+			fill-pen radial (tints) ((0.5,0.5) * edge) (1.3 * edge / 2) (size / 4 - ((0.5,0.5) * edge))
 			box 0x0 (size - 1) (rounding)
 		]
 	]
@@ -93,7 +93,7 @@ context with spaces/ctx [
 	draw-text: function [
 		"Draw shiny text"
 		space  [object!]
-		canvas [pair! none!]
+		canvas [point2D! none!]
 		text   [string! url!]
 		font   [object! none!]
 		bgnd   [tuple!]
@@ -125,7 +125,7 @@ context with spaces/ctx [
 
 	draw-text-box: function [
 		"Draw shiny centered text"
-		canvas [pair! none!]
+		canvas [point2D! none!]
 		text   [string!]
 		font   [object! none!]
 		bgnd   [tuple!]
@@ -150,7 +150,7 @@ context with spaces/ctx [
 	
 	draw-glossy-box: function [
 		"Draw an empty glossy rounded box"
-		size     [pair!]
+		size     [planar!]
 		bgnd     [tuple!]
 		rounding [integer!]
 		sheen    [percent!]
@@ -163,7 +163,7 @@ context with spaces/ctx [
 	
 	draw-glossy-text-box: function [
 		"Draw a glossy rounded box with text"
-		size     [pair!]
+		size     [planar!]
 		text     [string!]
 		font     [object! none!]
 		bgnd     [tuple!]
@@ -261,7 +261,7 @@ context with spaces/ctx [
 			]
 		]
 		switch: function [self] [
-			maybe self/size: 20x20
+			maybe self/size: (20,20)
 			color: either self/state [yello][glass]
 			draw-glossy-box 20x20 color 10 100%
 		]

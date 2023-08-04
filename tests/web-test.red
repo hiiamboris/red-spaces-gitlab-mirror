@@ -13,15 +13,16 @@ declare-template 'web/inf-scrollable [
 	web: self
 	canvas: make-space 'space [
 		type: 'canvas
+		size: infxinf
 		available?: function [axis dir from requested] [requested]
 	
 		draw: function [/window xy1 xy2 /on canvas fill-x fill-y] [
 			#assert [window]
-			center: 100x100
+			center: (100,100)
 			sectors: 12
 			t: tangent (sec: 360 / sectors) / 2
 			size: xy2 - xy1
-			corners: map-each corner 2x2 [corner - 1x1 * size + xy1 - center]
+			corners: map-each corner 2x2 [(to point2D! corner) - 1x1 * size + xy1 - center]
 			radii: minmax-of map-each/eval c corners [1.0 * spaces/ctx/vec-length? c]
 			either within? 0x0 corners/1 size + 1 [
 				angles: [0 360]
@@ -46,11 +47,10 @@ declare-template 'web/inf-scrollable [
 					['line p p * 1x-1]
 				]
 				compose/deep/only [
-					rotate (a) [line (radii/1 * 1x0) (radii/2 * 1x0)]
+					rotate (a) [line (radii/1 * (1,0)) (radii/2 * (1,0))]
 					rotate (a + (sec / 2)) (levels)
 				]
 			]
-			set-quiet in self 'size none				;-- circumvent pair type check without declaring a new class
 			compose/only [translate (center) (sec-draw)]
 		]
 	]

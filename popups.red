@@ -11,7 +11,7 @@ Red [
 
 declare-template 'hint/box [
 	margin: 20x10
-	origin: 0x0		#type =? [pair! none!]				;-- `none` disables the arrow display (when it's not precise)
+	origin: (0,0)	#type =? [point2D! none!]			;-- `none` disables the arrow display (when it's not precise)
 ]
 
 ;@@ should it be here or in vid.red?
@@ -92,7 +92,7 @@ popups: context [
 	show: function [
 		"Show a popup at given offset, hiding the previous one(s)"
 		space  [object!] "Space or face object to show" (any [space? space is-face? space])
-		offset [pair!]   "Offset on the window"
+		offset [planar!] "Offset on the window"
 		/in window: focus/window [object! none!] "Specify parent window (defaults to focus/window)"
 		/owner parent [object! none!] "Space or face object; owner is not hidden"
 	][
@@ -103,7 +103,7 @@ popups: context [
 		]
 		face/offset: offset
 		if host? face [
-			if face/size = 0x0 [face/size: none]		;-- hint for render to set its size
+			if zero? face/size [face/size: none]		;-- hint for render to set its size
 			face/draw: render face
 		]
 		
@@ -147,7 +147,7 @@ popups: context [
 	show-hint: function [
 		"Show a hint around pointer in window"
 		text    [string!] "Text for the hint"
-		pointer [pair!]
+		pointer [planar!]
 		/in window [object!] "Specify parent window (defaults to focus/window)"
 	][
 		if text == get-hint-text [exit]					;-- don't redisplay an already shown hint
@@ -161,10 +161,10 @@ popups: context [
 		;; hint is transparent so it can have an arrow
 		host/color: svmc/panel + 0.0.0.254
 		render host/space: hint: first lay-out-vids [	;-- render sets hint/size
-			hint [text text= text] origin= either above? [0x1][0x0]	;-- corner where will the arrow be (cannot be absolute - no size yet)
+			hint [text text= text] origin= either above? [(0,1)][(0,0)]	;-- corner where will the arrow be (cannot be absolute - no size yet)
 		]
 		
-		offset: pointer + either above? [2 by (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
+		offset: pointer + either above? [2 . (-2 - hint/size/y)][2x2]	;@@ should these offsets be configurable or can I infer them somehow?
 		limit: window/size - hint/size
 		fixed: clip offset 0x0 limit					;-- adjust offset so it's not clipped
 		if fixed <> offset [
@@ -182,7 +182,7 @@ popups: context [
 	show-menu: function [
 		"Show a popup menu at given offset"
 		menu    [block!] "Written using Menu DSL"
-		offset  [pair!]
+		offset  [planar!]
 		/owner parent [object!] "Space or face object; owner is not hidden"
 		/in    window [object!] "Specify parent window (defaults to focus/window)"
 		;@@ maybe also a flag to make it appear above the offset?
@@ -202,7 +202,7 @@ popups: context [
 	primed: context [									;-- pending hint data
 		text:      none
 		show-time: now/utc/precise						;-- when to show next hint
-		anchor:    0x0									;-- pointer offset of the over event (timer doesn't have this info)
+		anchor:    (0,0)								;-- pointer offset of the over event (timer doesn't have this info)
 	]
 
 	;; event funcs internal data
@@ -287,7 +287,7 @@ popups: context [
 				menu: find-facet path 'menu block!
 			][
 				;; has to be under the pointer, so it won't miss /away? event closing the menu
-				offset: -1x-1 + face-to-window event/offset event/face
+				offset: (-1,-1) + face-to-window event/offset event/face
 				hide-hint
 				show-menu/in menu offset event/window
 			]

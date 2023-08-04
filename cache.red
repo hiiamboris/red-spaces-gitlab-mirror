@@ -40,7 +40,7 @@ cache: context [
 		"Update generation data of SPACE if it's an in-tree render"
 		space  [object!] (space? space)
 		state  [word!] "One of [cached drawn]" (find [cached drawn] state)
-		canvas [pair!] "Encoded canvas of the current state"
+		canvas [point2D!] "Encoded canvas of the current state"
 	][
 		if current-generation [							;-- only update for in-tree renders
 			change change change head space/cached canvas current-generation state
@@ -73,7 +73,7 @@ cache: context [
 	fetch: function [
 		"If SPACE's draw caching is enabled and valid, return its cached slot for given canvas"
 		space  [object!] (space? space)
-		canvas [pair!]
+		canvas [point2D!]
 	][
 		#debug profile [prof/manual/start 'cache]
 		result: all [
@@ -106,13 +106,13 @@ cache: context [
 	commit: function [
 		"Save SPACE's Draw block and cached facets on given CANVAS in the cache"
 		space    [object!] (space? space)
-		canvas   [pair!]
+		canvas   [point2D!]
 		children [block!]
 		drawn    [block!]
 	][
 		unless space/cache [exit]						;-- do nothing if caching is disabled
 		#debug profile [prof/manual/start 'cache]
-		#assert [pair? space/size]						;@@ should I enable caching of infinite spaces? see no point so far
+		#assert [point2D? space/size]					;@@ should I enable caching of infinite spaces? see no point so far
 		cur-gen: any [current-generation space/cached/-2]
 		old-gen: cur-gen - 1.0
 		period: 4 + length? space/cache					;-- custom words + (canvas + drawn + gen + children)
@@ -124,7 +124,8 @@ cache: context [
 			forall slots [								;@@ use for-each
 				if all [
 					slots/2 < old-gen					;-- slot is old
-					slots/1 % infxinf = 0x0				;-- keep [infxinf infx0 0xinf 0x0] canvases (always relevant, unlike 0x319 or smth)
+					nan? slots/1/x / slots/1/x			;-- keep [infxinf infx0 0xinf 0x0] canvases (always relevant, unlike 0x319 or smth)
+					nan? slots/1/y / slots/1/y
 					;@@ maybe fetch should also ignore old finite slots?
 				][
 					slot: slots

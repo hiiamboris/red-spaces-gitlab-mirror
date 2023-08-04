@@ -328,11 +328,11 @@ events: context [
 		hnd-name: select system/view/evt-names event/type		;-- prepend "on-"
 		#assert [hnd-name  "Unsupported event type detected"]
 		
-		spec:  pick [ [word _] word ] pair? second path			;-- remove pairs
-		unit:  pick [2 1] pair? second path
+		spec:  pick [ word [word _] ] object? second path		;-- remove coordinates
+		unit:  pick [1 2] object? second path
 		wpath: clear copy path									;-- word-only path needed to locate handler
 		foreach (spec) path [append wpath word/type]			;@@ use `map-each` - manual fill is slow
-		#assert [not find wpath pair!]
+		#assert [not find wpath planar!]
 		
 		len: length? wpath
 		template: change make path! len + 3 [_ _]				;-- at index=3 (tiny optimization)
@@ -438,8 +438,8 @@ events: context [
 		#assert [
 			spc =? spc'									;-- only makes sense to track it within the same space
 			space? spc
-			pair? ofs
-			pair? ofs'
+			planar? ofs
+			planar? ofs'
 		]
 		ofs - ofs'
 	]

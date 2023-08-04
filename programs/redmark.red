@@ -50,7 +50,7 @@ do/expand with spaces/ctx [
 	;; pre and code templates for styling
 	declare-template 'pre/paragraph []
 	declare-template 'code/text []
-	declare-template 'thematic-break/stretch [limits: 0x20 .. (infxinf/x by 20)]
+	declare-template 'thematic-break/stretch [limits: 0x20 .. (1.#inf . 20)]
 	declare-template 'rich-content/rich-content [
 		;; code inside links should be painted blue
 		apply-attributes: function [space attrs] [
@@ -77,9 +77,9 @@ do/expand with spaces/ctx [
 	
 	underbox: function [
 		"Draw a box to highlight code parts"
-		size       [pair!]
-		line-width [integer!]
-		rounding   [integer!]
+		size       [planar!]
+		line-width [linear!]
+		rounding   [linear!]
 	][
 		compose/deep [
 			push [										;-- solid box under code areas
@@ -99,7 +99,7 @@ do/expand with spaces/ctx [
 		]
 		rich-content: [
 			default font: ~styling/fonts/text/1
-			margin: font/size - svf/size * 0x1
+			margin: font/size - svf/size * (0,1)
 		]
 		cell/rich-content: [
 			default font: ~styling/fonts/text/1
@@ -122,7 +122,7 @@ do/expand with spaces/ctx [
 			below: [
 				line-width 3
 				pen (opaque 'text 10%)
-				line (size * 0x1 / 2 + 5x0) (size / 1x2 - 5x0)
+				line (size * (0,1) / 2 + 5x0) (size / (1,2) - 5x0)
 			]
 		]
 		grid: [

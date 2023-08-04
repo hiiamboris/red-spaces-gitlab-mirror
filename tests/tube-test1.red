@@ -14,7 +14,7 @@ do/expand [
 
 svmc: system/view/metrics/colors
 bigfont: make font! [size: 20]
-set-style 'heading function [self /on canvas [pair! none!] fill-x fill-y] [
+set-style 'heading function [self /on canvas [point2D! none!] fill-x fill-y] [
 	maybe/same self/font: bigfont
 	drawn: self/draw/on canvas fill-x fill-y
 	compose [
@@ -33,7 +33,7 @@ set-style 'field function [field /on canvas fill-x fill-y] [
 	] (drawn)]
 ]
 ; set-style 'field/caret [[fill-pen (svmc/text)]]
-set-style 'tube function [tube /on canvas [pair! none!] fill-x fill-y] [
+set-style 'tube function [tube /on canvas [point2D! none!] fill-x fill-y] [
 	drawn: tube/draw/on canvas fill-x fill-y
 	#assert [drawn]
 	#assert [tube/size]
@@ -69,7 +69,7 @@ tubes: collect [
 	; for-each [/i axes] [ [↓ →] ][
 		do with spaces/ctx [
 			lim2: extend-canvas
-				lim1: width by width
+				lim1: width . width
 				anchor2axis axes/2
 		]
 		if i > 1 [keep [<-> 1x30]]		;-- delimiter
@@ -107,7 +107,7 @@ view/no-wait compose/only/deep [
 
 ; dump-tree
 out: none
-save %tube-test-output.png out: draw list/size render/on list list/size yes no
+save %tube-test-output.png out: draw to pair! list/size render/on list list/size yes no
 if exists? ref: %tube-test-reference.png [
 	ref: load ref
 	unless ref = out [print "!! LAYOUT HAS CHANGED !!"]

@@ -147,7 +147,7 @@ editor-tools: context [
 		mapped: batch doc [map-range/extend/no-empty any [range here * 1x1]]
 		range1: mapped/2
 		range2: last mapped
-		range1/1 by range2/2
+		range1/1 thru range2/2
 	]
 	
 	range->paragraphs: function [
@@ -359,7 +359,7 @@ editor-tools: context [
 	][
 		if size = 'pick [size: request-grid-size]
 		unless size [exit]
-		col-width: to integer! (max 100 doc/parent/size/x - 100) / size/x
+		col-width: (max 100 doc/parent/size/x - 100) / size/x
 		grid: remake-space 'grid [bounds: (size) widths/default: (col-width)]
 		for-each xy size [
 			grid/content/:xy: cell: first lay-out-vids [editor]

@@ -9,7 +9,7 @@ Red [
 exports: [hittest]
 
 into-map: function [
-	map [block!] xy [pair!] child [object! (space? child) none!]
+	map [block!] xy [planar!] child [object! (space? child) none!]
 	/only list [block!] "Only try to enter selected spaces"
 ][
 	either child [
@@ -17,7 +17,7 @@ into-map: function [
 		;; geom=none possible if e.g. hittest on 'up' event uses drag-path of 'down' event
 		;; and some code of 'down' event replaces part of the tree;
 		;; also %hovering.red on tree modification uses a no longer valid path
-		xy: either geom: select/same/only map child [xy - geom/offset][0x0] 
+		xy: either geom: select/same/only map child [xy - geom/offset][(0,0)] 
 		reduce [child xy]
 	][
 		either list [
@@ -46,7 +46,7 @@ hittest: function [
 	space [object! (space? space) block! path!]
 		"Top space in the tree (host/space usually), or path of spaces to follow"
 		;; path/block is required for dragging, as we need to follow the same path as at the time of click
-	xy [pair!] "Point in that top space"
+	xy [planar!] "Point in that top space"
 	/into "Append into a given buffer"
 		path: (make [] 16) [block! path!]
 ][
