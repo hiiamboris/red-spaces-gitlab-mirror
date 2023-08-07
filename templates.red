@@ -1192,7 +1192,7 @@ list-ctx: context [
 		set [item: geom:] skip list/map i - 1 * 2
 		; ?? [i geom/offset geom/size xy]
 		xy: xy - geom/offset
-		if xy inside? geom [reduce [item xy]]
+		if xy +< geom/size [reduce [item xy]]
 	]
 	
 	get-sections: function [list [object!]] [
@@ -1484,7 +1484,7 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 				set [child: geom:] map
 				if child [								;-- x-1D = size-1D/x leads to the tail
 					child-xy: xy-1D - geom/offset
-					if child-xy inside? geom [reduce [child child-xy]]
+					if child-xy +< geom/size [reduce [child child-xy]]
 				] 
 			] 
 		]

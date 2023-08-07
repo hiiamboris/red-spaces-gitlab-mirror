@@ -167,7 +167,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 
 inside?: make op! function [
 	"Test if POINT is inside the SPACE"
-	point [planar!] space [object! block!]				;-- block used to test against map geometry, ignores /offset
+	point [planar!] space [object!]
 ][
 	within? point 0x0 space/size
 ]
