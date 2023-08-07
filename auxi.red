@@ -151,16 +151,16 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
 +<=: make op! func [
 	"Chainable pair comparison (non-strict)"
-	a [planar! none!] b [planar! none!]
+	a [planar! none!] b [planar!]
 ][
-	; all [a b a = min a b  b]							;@@ bugged with inf/nan
-	all [a b a/x <= b/x a/y <= b/y  b]
+	all [a a = min a b  b]
+	; all [a a/x <= b/x a/y <= b/y  b]
 ]
 +<:  make op! func [
 	"Chainable pair comparison (strict)"    
-	a [planar! none!] b [planar! none!]
+	a [planar! none!] b [planar!]
 ][
-	all [a b a/x < b/x a/y < b/y  b]
+	all [a a/x < b/x a/y < b/y  b]
 ]
 ;+>:  make op! func [a b] [a = max a b + 1]
 ;+>=: make op! func [a b] [a = max a b]
