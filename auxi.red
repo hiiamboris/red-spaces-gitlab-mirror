@@ -530,26 +530,13 @@ order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a b
 
 skip?: func [series [series!]] [-1 + index? series]
 
-native-min: :system/words/min
-native-max: :system/words/max
-max: func [												;@@ point/pair bugs workaround
-	"Returns the greater of the two values"
-	a [scalar! series!] b [scalar! series!]				;@@ wonder if anyone ever used it on series
-][
-	either point2D? b [native-max b a][native-max a b]
-]
-min: func [												;@@ point/pair bugs workaround
-	"Returns the lesser of the two values"
-	a [scalar! series!] b [scalar! series!]				;@@ wonder if anyone ever used it on series
-][
-	either point2D? b [native-min b a][native-min a b]
-]
-
-#assert [
+#assert [												;-- check for arithmetic sanity
 	(2,3)      = max (1,3) 2x2 
 	(2,3)      = max 2x2 (1,3) 
 	(2,1.#inf) = max 2x2 (1,1.#inf) 
 	(2,1.#inf) = max (1,1.#inf) 2x2 
+	(1,2)      = min 2x2 (1,1.#inf) 
+	(1,2.5)    = min 2.5 (1,1.#inf) 
 ]
 
 ;@@ remove it if PR #5194 gets merged
