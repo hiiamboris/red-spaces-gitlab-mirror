@@ -187,7 +187,7 @@ scheduler: context [
 
 	#assert [1291100108 = checksum mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
-	set 'do-events func spec-of native-do-events: :do-events [
+	set 'do-events func keep-type spec-of native-do-events: :do-events complement any-string! [	;@@ workaround for #5363
 		either no-wait [
 			native-do-events/no-wait
 		][
