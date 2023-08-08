@@ -1,4 +1,4 @@
-Red [
+Red [                           ,,
 	title:   "Draw-based widgets (Spaces) definitions"
 	author:  @hiiamboris
 	license: BSD-3
@@ -392,7 +392,7 @@ cell-ctx: context [
 		margin:  0
 		weight:  1										;@@ what default weight to use? what default alignment?
 		;@@ consider more high level VID-like specification of alignment
-		align:   0x0	#type =? :invalidates-look (-1x-1 +<= align +<= 1x1)
+		align:   0x0	#type =? :invalidates-look [pair!] (-1x-1 +<= align +<= 1x1)
 		content: none	#type =? :invalidates [object! none!]
 		;@@ should /color be always present?
 		
@@ -1311,7 +1311,7 @@ tube-ctx: context [
 		kit:     ~/kit
 		margin:  0
 		spacing: 0
-		align:   -1x-1	#type =? :invalidates-look
+		align:   -1x-1	#type :invalidates-look =? [pair!] (-1x-1 +<= align +<= 1x1)
 		axes:    [e s]	#type :invalidates [block!]
 						(find/only [					;-- literal listing allows it to appear in the error output
 							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
@@ -3567,6 +3567,7 @@ grid-ctx: context [
 			#type =? :invalidates-look [pair!] (0x0 +<= pinned)
 		bounds:  [x: auto y: auto]								;-- max number of rows & cols
 			#type :invalidates [block! function! pair!]
+			;@@ none should be forbidden in favor of infinity
 			(all [										;-- 'auto=bound /cells, integer=fixed, none=infinite (only within a window!)
 				bounds: bounds							;-- call it if it's a function
 				any [none =? bounds/x  'auto = bounds/x  all [linear? bounds/x  bounds/x >= 0]]

@@ -383,9 +383,10 @@ define-handlers [
 	fps-meter: [
 		on-time [space path event] [
 			time: now/precise/utc
+			limit: time - space/aggregate
 			frames: space/frames
 			forall frames [
-				if frames/1 + space/aggregate > time [
+				if frames/1 > limit [
 					remove/part frames frames: head frames
 					break
 				]
