@@ -94,7 +94,7 @@ context [
 				path .. obj: last path
 				obj/cache								;-- cache enabled?
 				empty? obj/cached						;-- no cached slots?
-				obj/size								;-- has a finite size? (else can't be cached)
+				obj/size +< infxinf						;-- has a finite size? (else can't be cached)
 				not zero? area? obj/size				;-- not empty size? (may have no cached slots otherwise)
 				not :obj/on-invalidate					;-- not using custom cache? (otherwise this heuristic doesn't apply)
 			]
