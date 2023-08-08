@@ -2683,7 +2683,7 @@ list-view-ctx: context [
 				default mrg: mrg': list/margin along y: list/axis	;-- list/margin is already included, will subtract it
 				direction: case [after ['after] before ['before]]
 				
-				unless pair? point: target [
+				unless planar? point: target [
 					unless target-within-range?: target = clip target range/1 range/2 [
 						; if window/origin <> list/frame/window-origin [exit]
 						;; have to move the window (and the anchor)
@@ -2725,7 +2725,7 @@ list-view-ctx: context [
 					if direction = 'before [point/:y: point/:y + target-geom/size/:y]
 					; ?? target-geom
 					; ?? [direction target point mrg space/origin window/origin list/frame/window-origin target-xy1 target-xy2]
-				];unless pair? point: target [
+				];unless planar? point: target [
 				
 				if pre-move: case [								;-- trick to enforce /before and /after locations
 					after  [make-pair [(0,0) y point/:y + viewport/:y]]
