@@ -521,7 +521,14 @@ remake: function [proto [object! datatype!] spec [block!]] [
 	construct/only/with compose/only spec proto
 ]
 
-area?: func [xy [planar!]] [xy/x * 1.0 * xy/y]			;-- 1.0 to support infxinf here (overflows otherwise)
+area?: function [xy [planar!]] [
+	either nan? area: xy/x * 1.0 * xy/y [0.0][area]		;-- 1.0 to support infxinf here (overflows otherwise)
+]
+#assert [
+	zero? area? (0,0)
+	zero? area? (0,1.#inf)								;-- for the purposes of having a tangible area to draw on, INFx0 is empty
+	1.#inf = area? (1.#inf,1.#inf)
+]
 span?: func [xy [planar!]] [abs xy/y - xy/x]			;@@ or range? but range? tests for range! class
 order-pair: function [xy [planar!]] [either xy/1 <= xy/2 [xy][reverse xy]]
 order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a block of any number of paths?
