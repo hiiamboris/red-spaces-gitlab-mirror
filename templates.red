@@ -1,4 +1,4 @@
-Red [                           ,,
+Red [
 	title:   "Draw-based widgets (Spaces) definitions"
 	author:  @hiiamboris
 	license: BSD-3
