@@ -153,11 +153,7 @@ VID: context [
 		grid [
 			template: grid
 			layout:   lay-out-grid						;-- uses custom layout function
-			facets:   [
-				pair!    bounds
-				point2D! bounds
-				@(props/tight)
-			]
+			facets:   [pair! bounds @(props/tight)]
 		]
 	];; styles
 	
