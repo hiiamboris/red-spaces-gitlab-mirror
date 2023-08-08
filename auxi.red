@@ -153,7 +153,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 	"Chainable pair comparison (non-strict)"
 	a [planar! none!] b [planar!]
 ][
-	all [a a = min a b  b]
+	all [a a == min a b  b]								;-- strict equality, otherwise 0 <= -1e30 will pass
 	; all [a a/x <= b/x a/y <= b/y  b]
 ]
 +<:  make op! func [
@@ -809,13 +809,13 @@ constrain: function [
 	limits  [object! (range? limits) none!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
-	min: switch/default type?/word limits/min [
-		pair! point2D!  [limits/min]
-		integer! float! [limits/min . 0]				;-- numeric limits only affect /x
-	] [(0,0)]											;-- none and invalid treated as 0x0
-	max: switch/default type?/word limits/max [
-		pair! point2D!  [limits/max]
-		integer! float! [limits/max . infxinf/y]		;-- numeric limits only affect /x
+	min: switch/default type? limits/min [
+		#[pair!] #[point2D!]  [limits/min]
+		#[integer!] #[float!] [limits/min . 0]			;-- numeric limits only affect /x
+	] [0x0]												;-- none and invalid treated as 0x0
+	max: switch/default type? limits/max [
+		#[pair!] #[point2D!]  [limits/max]
+		#[integer!] #[float!] [limits/max . 1.#inf]		;-- numeric limits only affect /x
 	] [infxinf]											;-- none and invalid treated as infinity
 	clip size min max
 ]
