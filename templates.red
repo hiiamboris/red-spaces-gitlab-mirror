@@ -2386,7 +2386,7 @@ list-view-ctx: context [
 			#assert [anchor/offset <= 0]
 			anchor/offset
 		]
-		window/origin: make-pair [(0,0) axis shift]				;@@ or move the list instead? a bit slower
+		window/origin: set-axis (0,0) axis shift				;@@ or move the list instead? a bit slower
 		
 		; ?? [xy1 xy2 length frame/filled shift anchor/index anchor/offset window/origin lview/origin]
 		compose/into [
@@ -2697,7 +2697,7 @@ list-view-ctx: context [
 						originy: either back?
 							[negate space/window/size/:y - viewport/:y + mrg - mrg']
 							[mrg - mrg']
-						scrollable-ctx/set-origin space make-pair [(0,0) y originy] yes
+						scrollable-ctx/set-origin space (set-axis (0,0) y originy) yes
 						; ?? [direction target space/origin window/origin list/frame/window-origin]
 						exit									;-- done here
 					]
@@ -2707,7 +2707,7 @@ list-view-ctx: context [
 					target-xy1:  target-geom/offset + window/origin + space/origin	;-- target from viewport
 					; target-xy1:  target-geom/offset + list/frame/window-origin + space/origin	;-- target from viewport
 					target-xy2:  target-xy1 + target-geom/size
-					xy1: make-pair [(0,0) y mrg - mrg']			;-- viewport with margins considered
+					xy1: set-axis (0,0) y mrg - mrg'			;-- viewport with margins considered
 					xy1: min xy1 viewport / 2					;-- cap at half viewport to avoid margin inversion
 					xy2: viewport - xy1
 					if all [
@@ -2728,12 +2728,12 @@ list-view-ctx: context [
 				];unless planar? point: target [
 				
 				if pre-move: case [								;-- trick to enforce /before and /after locations
-					after  [make-pair [(0,0) y point/:y + viewport/:y]]
-					before [make-pair [(0,0) y point/:y - viewport/:y]]
+					after  [set-axis (0,0) y point/:y + viewport/:y]
+					before [set-axis (0,0) y point/:y - viewport/:y]
 				][
 					scrollable-ctx/move-to space pre-move 0x0 yes
 				]
-				mrg: make-pair [(0,0) y mrg]					;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
+				mrg: set-axis (0,0) y mrg						;-- /margin has meaning along main axis only in list-view, since it's a 1D widget
 				scrollable-ctx/move-to space point mrg no-clip
 				; scrollable-ctx/set-origin space (viewport * 0x1) - point yes
 				; ?? space/origin
@@ -2847,7 +2847,7 @@ list-view-ctx: context [
 					; anchor/offset
 				; ]
 				; ?? [shift overhang anchor/offset]
-				; quietly window/origin: window/map/2/offset: drawn/2: make-pair [(0,0) list/axis shift]
+				; quietly window/origin: window/map/2/offset: drawn/2: set-axis (0,0) list/axis shift
 			; ]
 			; drawn
 		; ]

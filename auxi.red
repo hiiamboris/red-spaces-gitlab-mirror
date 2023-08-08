@@ -890,13 +890,17 @@ set-pair: function [
 	b = 5
 ]]
 
-make-pair: function [									;@@ rename to make-point
-	"Construct a pair out of default value and possible axis replacements"
-	spec [block!] "Reduced, /x /y and /1 are used"
+set-axis: function [
+	"Change VALUE of a given AXIS of an anonymous POINT"
+	point [planar!]
+	axis  [word!] (find [x y] axis)
+	value [linear!]
 ][
-	reduce/into spec spec: clear []
-	as-point2D any [spec/x spec/1/1] any [spec/y spec/1/2]
+	point/:axis: value
+	point
 ]
+
+#assert [2x3 = set-axis set-axis 0x0 'y 3 'x 2]
 
 axis2pair: func [xy [word!]] [
 	switch xy [x [1x0] y [0x1]]
