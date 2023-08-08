@@ -450,7 +450,7 @@ scrollbar: context [
 		quietly space/back-arrow/size:  w-arrow . h
 		quietly space/back-page/size:   w-pgup  . h
 		quietly space/thumb/size:       w-thumb . h
-		quietly space/forth-page/size:  w-inner - w-thumb - w-pgup . h	;-- compensates for previous rounding errors
+		quietly space/forth-page/size:  w-pgdn  . h
 		quietly space/forth-arrow/size: w-arrow . h
 		space/map: arrange with space list: [back-arrow back-page thumb forth-page forth-arrow]
 		
