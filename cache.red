@@ -112,7 +112,7 @@ cache: context [
 	][
 		unless space/cache [exit]						;-- do nothing if caching is disabled
 		#debug profile [prof/manual/start 'cache]
-		#assert [point2D? space/size]					;@@ should I enable caching of infinite spaces? see no point so far
+		#assert [space/size +< infxinf]					;@@ should I enable caching of infinite spaces? see no point so far
 		cur-gen: any [current-generation space/cached/-2]
 		old-gen: cur-gen - 1.0
 		period: 4 + length? space/cache					;-- custom words + (canvas + drawn + gen + children)
