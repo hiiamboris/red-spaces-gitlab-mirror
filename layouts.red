@@ -318,12 +318,11 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
-			min-size: max (0,0) (constrain 0x0 limits) - (2 * margin)
+			min-size: subtract-canvas (constrain 0x0 limits) 2 * margin
 			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes of canvas size
 			stripe/:x: either ccanvas/:x < 1.#inf [0][1.#inf]
-			; stripe/:y: 0
 			#debug sizing [#print "tube canvas=(canvas) ccanvas=(ccanvas) stripe=(stripe)"]
 			
 			repeat i count [
@@ -567,7 +566,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		words-period: 4								;-- helpful constant
 			
 	    ;; groups sections by their sign into 'words', and returns them in this format:
-	    ;; [word-x1-1D thru word-x2-1D   word-width(int)   white?(logic)   sections-slice(pair)]
+	    ;; [word-x1-1D thru word-x2-1D(point as range)   word-width(linear)   white?(logic)   sections-slice(pair)]
 	    list-words: function [sections [block!]] [
 	    	words: clear []
 	    	unless empty? sections [
