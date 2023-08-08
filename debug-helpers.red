@@ -291,7 +291,7 @@ if action? :mold [
 				if paren? string [string: do string]
 				unless string [continue]
 				append/part output string limit
-				limit: system/words/max 0 limit - length? string
+				limit: max 0 limit - length? string
 			]
 			output
 		]
