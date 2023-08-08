@@ -194,7 +194,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			map':     make [] count~ * 110% + 5			;-- add extra space to lower the need for reallocations
 			i:        anchor
 			range:    anchor * 1x1
-			pos:      origin + (1 . sign * margin)
+			pos:      origin + (margin * set-axis 1x1 y sign)
 			add-item: [
 				; ?? [i pos item/size] 
 				compose/only/deep/into [
