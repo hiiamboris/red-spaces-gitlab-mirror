@@ -71,7 +71,7 @@ code-font: make font! with system/view [name: fonts/fixed size: fonts/size]
 ;; helper function that draws background in styles
 underbox: function [
 	"Draw a box to highlight code parts"
-	size       [pair!]
+	size       [planar!]
 	line-width [integer!]
 	rounding   [integer!]
 ][

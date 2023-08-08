@@ -65,7 +65,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			count: either func? [spaces/size][length? spaces]
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#assert [any [count length]]				;-- this layout only supports finite number of items or limited length
-			default count: infxinf/x
+			default count: 1.#inf
 			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
@@ -86,7 +86,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			default fill-x:   no
 			default fill-y:   no
 			default anchor:   1
-			default length:   infxinf/x
+			default length:   1.#inf
 			default reverse?: no
 			spacing: spacing * 1x1						;-- pair normalization needed by document
 			direction: either reverse? [-1][1]
@@ -318,7 +318,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			info: make [] count * 4
 			
 			;; clipped canvas - used for allowed width / height fitting
-			min-size: subtract-canvas (constrain 0x0 limits) 2 * margin
+			min-size: subtract-canvas (constrain (0,0) limits) 2 * margin
 			stripe: ccanvas: subtract-canvas constrain canvas limits 2 * margin
 			;; along X finite canvas becomes 0 (to compress items initially), infinite stays as is
 			;; along Y canvas becomes of canvas size
@@ -340,7 +340,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 						either x = 'x [				 	;-- numeric max-size only used on vertical tubes
 							max-size - space/size/:x / weight
 						][								;-- vertical is considered unbound
-							infxinf/x
+							1.#inf
 						]
 					]
 				]
@@ -384,7 +384,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 
 			;; expand row items - facilitates a second render cycle of the row
 			;; this collects row heights (canvas/:y is still infinite)
-			if allowed-row-width < infxinf/x [			;-- only if width is constrained
+			if allowed-row-width < 1.#inf [				;-- only if width is constrained
 				allowed-row-width: max allowed-row-width peak-row-width		;-- expand canvas to the biggest row
 				peak-row-width: 0						;-- will have to recalculate it during expansion
 				total-length:   0
@@ -437,7 +437,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;; - when canvas has height bigger than all rows height and filling is requested along height 
 			;;   this makes it possible to align tube with the canvas without resorting to manual geometry management
 			;; - when min height limit is bigger than all rows height (regardless of the fill flag) 
-			fill-length: all [ccanvas/:y < infxinf/y  either x = 'x [fill-y][fill-x]]	;-- only fill if finite and requested to fill
+			fill-length: all [ccanvas/:y < 1.#inf  either x = 'x [fill-y][fill-x]]	;-- only fill if finite and requested to fill
 			min-length: max-safe min-size/:y if fill-length [ccanvas/:y]				;-- but also if cannot be smaller
 			free: min-length - total-length
 			if 0 < free: min-length - total-length [
@@ -470,7 +470,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			shift: min 0x0 oxy: ox + oy					;-- offset correction for negative axes
 			row-shift:    align/1 + 1 / 2
 			in-row-shift: align/2 + 1 / 2
-			total-width:  max-safe peak-row-width if allowed-row-width < infxinf/x [allowed-row-width] 
+			total-width:  max-safe peak-row-width if allowed-row-width < 1.#inf [allowed-row-width] 
 			foreach [row-size _ row] rows [
 				ofs: reverse? margin/:x + (total-width - row-size/x * row-shift) . row-y
 				foreach [space drawn _ _] row [
@@ -550,7 +550,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			foreach [space geom] map [					;@@ use map-each
 				repend points [x: x + geom/size/x  o: o + 1]
 			]
-			#assert [x < infxinf/x]
+			#assert [x < 1.#inf]
 			if points = [0 0 0 1] [points/3: 1]			;-- hack to make it all work with a zero-wide map
 			build-index copy points n: 1 + round-down x / 32	;-- 1 point per 32 px
 		]
@@ -838,7 +838,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			words: list-words sections
 			total-2D: (ccanvas/x . 0)					;-- without margins
 			if any [
-				ccanvas/x >= infxinf/x					;-- convert infinite canvas into single-row canvas
+				ccanvas/x = 1.#inf						;-- convert infinite canvas into single-row canvas
 				not fill-x								;-- contract width if not asked to fill it
 			][
 				total-2D/x: min total-2D/x total-1D/x
@@ -846,7 +846,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			unless force-wrap? [						;-- extend width to the longest predicted row
 				total-2D/x: max total-2D/x get-min-total-width-2D words indent1 indent2
 			]
-			#assert [total-2D/x < infxinf/x]
+			#assert [total-2D/x < 1.#inf]
 			
 			;; lay out rows...
 			

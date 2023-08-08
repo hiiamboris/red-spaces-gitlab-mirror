@@ -105,7 +105,7 @@ doc-ctx: context [
 			'move   set val integer! (doc/caret/offset: val)
 		|	'side   set val word! (doc/caret/side: val)
 		|	'select set val [none! | pair!] (doc/selected: val)
-		|	'indent set par integer! set val [none! | block!] (doc/content/:par/indent: val)
+		|	'indent set par linear! set val [none! | block!] (doc/content/:par/indent: val)
 		|	'align  set par integer! set val word! (doc/content/:par/align: val)
 		|	'insert set rng pair! set val object! (
 				#assert [val/length = span? rng]
@@ -445,7 +445,7 @@ doc-ctx: context [
 			limit [word! pair! none! (not by) integer!]
 			/by "Move selection edge by an integer number of items"
 		][
-			set [ofs: sel:] field-ctx/compute-selection space limit thru here length selected
+			set [ofs: sel:] field-ctx/compute-selection space limit by here length selected
 			record
 				[move (here) select (selected)]
 				[move (ofs)  select (sel)]
@@ -588,8 +588,8 @@ doc-ctx: context [
 		indent-range: function [
 			"Reindent paragraph(s) spanned by given range"
 			range: here [pair! integer! none!] "Range or offset, or none for caret location"
-			indent [block! (parse indent [2 [set-word! integer!]]) integer!]
-				"Relative integer offset or absolute [first: int! rest: integer!] block"
+			indent [block! (parse indent [2 [set-word! linear!]]) linear!]
+				"Relative integer offset or absolute [first: linear! rest: linear!] block"
 		][
 			if integer? range [range: range * 1x1]
 			mapped: map-range range
@@ -653,7 +653,7 @@ doc-ctx: context [
 				insert (find/same/tail doc/content dst-para) next list
 				;; append stashed part to the last inserted paragraph
 				paraN: last list
-				batch paraN [insert-items infxinf/x stashed]
+				batch paraN [insert-items 'tail stashed]
 			]
 		]
 		adjust-offsets doc offset len
@@ -720,7 +720,7 @@ doc-ctx: context [
 		caret [integer!]
 		side  [word!]
 		dir   [word!] (find [up down] dir)
-		shift [integer!] (shift >= 0) "0 for one line, else number of extra pixels (for paging)"
+		shift [linear!] (shift >= 0) "0 for one line, else number of extra pixels (for paging)"
 	][
 		set [para: pofs: plen:] caret->paragraph doc caret
 		pcar: caret - pofs
@@ -843,7 +843,7 @@ doc-ctx: context [
 		kit:       ~/kit
 		content:   []		#type :on-content-change
 		axis:      'y		#type (axis = 'y)			;-- protected
-		spacing:   5		#type [integer!] :invalidates	;-- interval between paragraphs
+		spacing:   5		#type [linear!] :invalidates	;-- interval between paragraphs
 		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
 		page-size: function [] [						;-- needs access to the parent viewport for paging
 			vp: any [get-safe 'parent/viewport 0x0]

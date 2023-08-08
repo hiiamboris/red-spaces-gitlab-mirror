@@ -202,8 +202,8 @@ context [
 	][
 		window: in :draw /window
 		if on:  in :draw /on [
-			if canvas/x = infxinf/x [fill-x: no]		;-- inf canvas cannot be filled (result of canvas extension)
-			if canvas/y = infxinf/y [fill-y: no]
+			if canvas/x = 1.#inf [fill-x: no]			;-- inf canvas cannot be filled (result of canvas extension)
+			if canvas/y = 1.#inf [fill-y: no]
 		]
 		index:  (either on [1][0]) + (either window [2][0]) + (either space [4][0])
 		do pick [

@@ -300,8 +300,6 @@ image-ctx: context [
 				]
 				if all [image/weight > 0  canvas <> infxinf] [		;-- if inf canvas, will be unscaled, otherwise uses finite dimension
 					set-pair [cx: cy:] subtract-canvas canvas mrg2
-					if cx = infxinf/x [cx: 1.#inf]
-					if cy = infxinf/x [cy: 1.#inf]
 					canvas-max-scale: min  cx / isize/x  cy / isize/y	;-- won't be bigger than the canvas
 					if fill-x [cx: 1.#inf]							;-- don't stick to dimensions it's not supposed to fill
 					if fill-y [cy: 1.#inf]  
@@ -809,7 +807,7 @@ paragraph-ctx: context [
 		][
 			;; normal mode prioritizes words, so have to estimate min. width from the longest word
 			quietly layout/size: infxinf
-			if all [wrap? canvas/x < infxinf/x] [		;@@ perhaps this too should be a flag?
+			if all [wrap? canvas/x < 1.#inf] [			;@@ perhaps this too should be a flag?
 				words: append clear "" as string! space/text
 				trail: any [find/last/tail words non-space!  words]
 				parse/case/part words [any [to whitespace! p: skip (change p #"^/")]] trail
@@ -840,7 +838,7 @@ paragraph-ctx: context [
 	
 	draw: function [space [object!] canvas: infxinf [point2D! none!]] [	;-- text ignores fill flags
 		space/sec-cache: copy []						;-- reset computed sections
-		if canvas/x < infxinf/x [						;-- no point in wrapping/ellipsization on inf canvas
+		if canvas/x < 1.#inf [							;-- no point in wrapping/ellipsization on inf canvas
 			ellipsize?: find space/flags 'ellipsize
 			wrap?:      find space/flags 'wrap
 		]
@@ -1769,6 +1767,16 @@ rich-content-ctx: context [								;-- rich content
 			][
 				~/row->box space row
 			]
+		]
+		
+		locate: function [
+			"Get offset of a named location"
+			name [word!]
+		][
+			switch/default name [
+				head [0]
+				tail [length]
+			][here]
 		]	
 		
 		format: does [rich/source/format space/data]	;@@ should this format be so different from rich-paragraph's one?
@@ -1839,13 +1847,14 @@ rich-content-ctx: context [								;-- rich content
 	
 		insert-items: function [
 			"Insert items at given offset"
-			offset [integer!]
+			offset [word! integer!]
 			items  [
 				object! (space? items)					;-- rich-content not inlined! for inlining use `insert! ofs para/data`
 				block!  (even? length? items)
 				string!
 			]
 		][
+			if word? offset [offset: locate offset]
 			case [
 				object? items [items: reduce [items 0]]	;-- items are not auto-cloned! so undo/redo may work on *same* items
 				string? items [items: zip explode items 0]
@@ -2559,7 +2568,7 @@ list-view-ctx: context [
 			; /text
 		][
 			items: either pair? items [
-				limit: any [space/list/items/size infxinf/x]
+				limit: any [space/list/items/size 1.#inf]
 				list-range clip 1 limit order-pair items
 			][
 				sort copy items							;-- copy should always be ordered
@@ -2813,7 +2822,7 @@ list-view-ctx: context [
 		list/items: func [/pick i [integer!] /size /local item] with list [
 			either pick [
 				all [
-					0 < i i <= any [data/size infxinf/x]		;-- since data/pick can return any value, this is the only way to limit it
+					0 < i i <= any [data/size 1.#inf]			;-- since data/pick can return any value, this is the only way to limit it
 					any [
 						select item-cache i						;-- no /skip needed because datatypes enforce it
 						also item: wrap-data data/pick i
@@ -3384,7 +3393,7 @@ grid-ctx: context [
 			H2: any [H2  do new-vector]
 			repeat i nx [
 				if all [W2/:i >= 0 H2/:i >= 0] [continue]		;-- cached, still valid
-				size: measure-column grid i infxinf/x 1 ny
+				size: measure-column grid i 1.#inf 1 ny
 				W2/:i: max W1/:i 1.0 * size/x		;-- ensure monotony:
 				H2/:i: min H1/:i 1.0 * size/y		;-- W2 >= W1, H2 <= H1
 			]
@@ -4113,10 +4122,11 @@ field-ctx: context [
 	
 		insert-items: function [
 			"Insert text at given offset"
-			offset [integer!]
+			offset [word! integer!]
 			text   [any-string!]
 		][
 			unless empty? text [
+				if word? offset [offset: locate offset]
 				offset: clip offset 0 length
 				record [
 					insert (skip space/text offset) text
