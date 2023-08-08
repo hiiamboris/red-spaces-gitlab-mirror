@@ -141,8 +141,8 @@ scheduler: context [
 
 		set 'group-next-event function [host [object!]] [
 			unless attempt [window-of host] [					;-- ignore out-of-tree events (host or window has been destroyed?)
+				#debug events [#print "ignoring outdated (host/queue/:ievent/type) event for (host/type):(host/size)"]
 				remove-next-event host
-				#debug events [#print "ignored outdated (host/queue/:ievent/type) event for (host/type):(host/size)"]
 				return true
 			]
 			;; find grouping candidate
