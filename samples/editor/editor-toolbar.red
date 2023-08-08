@@ -17,7 +17,7 @@ context [
 		step:      size/y - thickness / (n - 1)
 		if string? texts [
 			markers: map-each [/i t] texts [
-				compose [text (0. (i - 1 * step - 6)) (form t)]
+				compose [text (0 . (i - 1 * step - 6)) (form t)]
 			]
 		]
 		if block? texts [
