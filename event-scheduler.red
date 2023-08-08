@@ -115,9 +115,11 @@ scheduler: context [
 	
 		set 'process-next-event function [host [object!]] [
 			unless group-next-event host [
-				events/dispatch host host/queue/:ievent
-				finish-times/(host/queue/:ievent/type): now/utc/precise	;-- mark the end of processing of this event type
+				event: host/queue/:ievent
+				#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
 				remove-next-event host
+				events/dispatch host event
+				finish-times/(event/type): now/utc/precise		;-- mark the end of processing of this event type
 			]
 		]
 		
@@ -127,19 +129,20 @@ scheduler: context [
 				not empty? host/queue		"shared and host queues are out of sync"
 				1000 > length? host/queue	"event queue buildup detected"
 			]
-			process-next-event host
 			shared-queue: next shared-queue
 			if 100 < index? shared-queue [
 				; remove/part shared-queue shared-queue: head shared-queue
 				remove/part head shared-queue shared-queue
 				shared-queue: head shared-queue
 			]
+			process-next-event host
 			true
 		]
 
 		set 'group-next-event function [host [object!]] [
 			unless attempt [window-of host] [					;-- ignore out-of-tree events (host or window has been destroyed?)
 				remove-next-event host
+				#debug events [#print "ignored outdated (host/queue/:ievent/type) event for (host/type):(host/size)"]
 				return true
 			]
 			;; find grouping candidate
@@ -166,6 +169,7 @@ scheduler: context [
 				ahead/:ievent/picked: ahead/:ievent/picked + this/:ievent/picked
 			]
 			remove-next-event host
+			#debug events [if type <> 'time [#print "grouped (type) event for (host/type):(host/size)"]]
 			true												;-- report success
 		]
 	
