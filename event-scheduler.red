@@ -191,17 +191,23 @@ scheduler: context [
 
 	#assert [1291100108 = checksum mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
-	set 'do-events func keep-type spec-of native-do-events: :do-events complement any-string! [	;@@ workaround for #5363
+	set 'do-events function keep-type spec-of native-do-events: :do-events complement any-string! [	;@@ workaround for #5363
 		either no-wait [
 			native-do-events/no-wait
 		][
+			window: last head system/view/screens/1/pane		;@@ what if windows were reordered?
+			unless window [exit]
+			#assert [window/state]
 			forever [
 				switch native-do-events/no-wait [		;-- fetch all pending events ;@@ may deadlock?
 					#[true]  [continue]
 					#[false] []
 					#[none]  [break]
 				]
-				unless process-any-event [wait 1e-3]	;-- wait is also tainted by single do-events/no-wait
+				unless window/state [break]				;-- there's one event loop per window, so leave once it's closed
+				trap/all/catch
+					[unless process-any-event [wait 1e-3]]		;-- wait is also tainted by single do-events/no-wait
+					[print thrown]
 			]
 		]
 	]
