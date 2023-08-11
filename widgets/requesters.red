@@ -59,7 +59,7 @@ request: function [
 	title   [string!]
 	layout  [block!] "VID/S code for dialog body"
 	buttons [block!] {List of buttons, e.g. ["OK" [action] @"Cancel" [action]] - use @ for default button}
-	/local focus text action result default
+	/local text action result default
 ][
 	buttons: mapparse [set default opt @ set text string! set action opt block!] copy buttons [
 		action: compose/only [set/any 'result do (only action) unview]	;-- action can use `exit` to prevent unview
@@ -72,7 +72,14 @@ request: function [
 		] on-key-up [									;-- 'key-up' so Enter first goes into buttons, then here
 			switch event/key [
 				#"^[" [unview]							;@@ suffers from #5124 unfortunately
-				#"^M" [if default-button [do default-button/command]]
+				#"^M" [
+					focused: spaces/focus/current
+					all [
+						default-button
+						any [not focused  focused/type <> 'button]
+						do default-button/command
+					]
+				]
 			]
 		]
 	] [modal no-min no-max]
@@ -89,7 +96,7 @@ request-color: function [
 			cp: color-picker 200x200 color= color
 			box 200x20 white react [color: cp/color]
 		]
-	] [@"OK" [cp/color] "Cancel"]
+	] [@"OK" [cp/color] focus "Cancel"]					;@@ should make color-picker focusable, with keys support?
 ]
 
 ; probe request-color/from blue
