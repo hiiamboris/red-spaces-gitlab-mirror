@@ -98,26 +98,28 @@ scheduler: context [
 		
 		set 'insert-event function [host [object!] event [map!]] [
 			#assert [host =? event/face]
-			insert next shared-queue host
-			insert skip host/queue period reduce [		;-- inserted after the current event
+			insert shared-queue host
+			insert host/queue reduce [
 				groups/(event/type) event
 			] 
 		] 
 		
-		set 'remove-next-event function [host [object!]] [
+		set 'take-next-event function [host [object!]] [
+			event: host/queue/:ievent
 			quietly host/queue: skip host/queue period
 			if 100 < index? host/queue [
 				; remove/part host/queue quietly host/queue: head host/queue
 				remove/part head host/queue host/queue
 				quietly host/queue: head host/queue
 			]
+			event
 		]
 	
 		set 'process-next-event function [host [object!]] [
 			unless group-next-event host [
-				event: host/queue/:ievent
 				#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
-				remove-next-event host
+				#debug focus  [if event/type = 'focus [#print "about to process (event/type) event for (host/type):(host/size)"]]
+				event: take-next-event host
 				events/dispatch host event
 				finish-times/(event/type): now/utc/precise		;-- mark the end of processing of this event type
 			]
@@ -131,7 +133,7 @@ scheduler: context [
 			]
 			shared-queue: next shared-queue
 			if 100 < index? shared-queue [
-				; remove/part shared-queue shared-queue: head shared-queue
+				; remove/part shared-queue shared-queue: head shared-queue	;@@ negative part is bugged
 				remove/part head shared-queue shared-queue
 				shared-queue: head shared-queue
 			]
@@ -142,7 +144,7 @@ scheduler: context [
 		set 'group-next-event function [host [object!]] [
 			unless attempt [window-of host] [					;-- ignore out-of-tree events (host or window has been destroyed?)
 				#debug events [#print "ignoring outdated (host/queue/:ievent/type) event for (host/type):(host/size)"]
-				remove-next-event host
+				take-next-event host
 				return true
 			]
 			;; find grouping candidate
@@ -168,7 +170,7 @@ scheduler: context [
 			if type = 'wheel [									;-- the only event that requires summation
 				ahead/:ievent/picked: ahead/:ievent/picked + this/:ievent/picked
 			]
-			remove-next-event host
+			take-next-event host
 			#debug events [if type <> 'time [#print "grouped (type) event for (host/type):(host/size)"]]
 			true												;-- report success
 		]
@@ -191,24 +193,24 @@ scheduler: context [
 
 	#assert [1291100108 = checksum mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
-	set 'do-events function keep-type spec-of native-do-events: :do-events complement any-string! [	;@@ workaround for #5363
+	set 'do-events function spec-of native-do-events: :do-events [
 		either no-wait [
 			native-do-events/no-wait
 		][
-			window: last head system/view/screens/1/pane		;@@ what if windows were reordered?
-			unless window [exit]
-			#assert [window/state]
-			forever [
-				switch native-do-events/no-wait [		;-- fetch all pending events ;@@ may deadlock?
-					#[true]  [continue]
-					#[false] []
-					#[none]  [break]
+			if window: last system/view/screens/1/pane [		;@@ what if windows were reordered?
+				#assert [window/state]
+				while [window/state] [							;-- there's one event loop per window, so leave once it's closed
+					switch native-do-events/no-wait [			;-- fetch all pending events ;@@ may deadlock?
+						#[true]  [continue]
+						#[false] []
+						#[none]  [break]
+					]
+					trap/all/catch
+						[unless process-any-event [wait 1e-3]]	;-- wait is also tainted by single do-events/no-wait
+						[print thrown]
 				]
-				unless window/state [break]				;-- there's one event loop per window, so leave once it's closed
-				trap/all/catch
-					[unless process-any-event [wait 1e-3]]		;-- wait is also tainted by single do-events/no-wait
-					[print thrown]
-			]
+				none											;-- return value must be useful for smth..
+			]	
 		]
 	]
 	
