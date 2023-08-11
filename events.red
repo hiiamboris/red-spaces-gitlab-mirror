@@ -266,7 +266,7 @@ events: context [
 				key key-down key-up enter [
 					focused?: yes								;-- event should not be detected by parent spaces
 					if face/space [
-						unless focus/window [focus/window: event/window]	;-- init /window on 1st event
+						focus/window: event/window				;-- init /window on 1st event, or if another window got activated
 						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
 						unless focus/current [focus-space focus/find-next-focal-*ace 'forth]
 						;; but it still may fail if nothing is focusable
