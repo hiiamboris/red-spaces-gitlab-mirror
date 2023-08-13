@@ -20,18 +20,18 @@ focus: make classy-object! declare-class 'focus-context [
 	focusable-faces: tabbing/focusables
 	
 	;; each window has own focus history, format: [window [space ...] ...]
-	histories: make hash! 8			#type [hash!]
-	window:    none					#type [none! object!]		;-- set by first history access and by global event hook
+	histories: make hash! 8			#type    [hash!]
+	window:    none					#type =? [none! object!]	;-- set by first history access and by global event hook
 
 	;; currently focused space in currently focused window!
 	;@@ it's currently not possible to tell what is focused becase Red doesn't tell us which window is active - #3808
 	;@@ so this is not very reliable right now and requires a lot of kludges...
 	;@@ TODO: /current should be able to return window object (after unfocus - to avoid duplicate unfocus), while /history should not contain it
-	current: does [last history]	#type [function!]	;-- returns space, face, or none
+	current: does [last history]	#type    [function!]		;-- returns space, face, or none
 	
 	;; the point of /history is to recover focus when last focused space gets hidden/removed from frame/whole window disappears, and Tab is hit
 	;@@ TODO: to support per-tab, per-page focus history they may have their own histories, or maybe /focus should handle scope too?
-	history: has [w h hist] [							;-- previously focused spaces, including current one
+	history: has [w h hist] [									;-- previously focused spaces, including current one
 		unless window [self/window: last head system/view/screens/1/pane]
 		unless hist: select/same histories window [
 			unless window [ERROR "focus/window must be set before using focus/history"]
@@ -98,13 +98,14 @@ focus: make classy-object! declare-class 'focus-context [
 			deep-check path [visible? enabled?]			;-- tests reachability, /state may be none if window is not yet shown
 		][
 			#assert [is-face? path/1]					;-- or set-focus will deadlock by calling this again
+			#debug focus [#print "sending generated 'focus' event to (path/1/type):(path/1/size) on (mold select window-of path/1 'text)"]
 			invalidate space							;-- let space paint its focus decoration
-			native-set-focus face: path/1
+			native-set-focus host: path/1
 			events/with-stop [							;-- init a separate stop flag for a separate event
-				focus-event!/face: face
+				focus-event!/face: host
 				events/process-event as [] path focus-event! [] yes
 			]
-			unless system/view/auto-sync? [show window-of face]	;-- otherwise keys won't be detected
+			unless system/view/auto-sync? [show window-of host]	;-- otherwise keys won't be detected
 		]
 	]
 	
@@ -113,7 +114,7 @@ focus: make classy-object! declare-class 'focus-context [
 		focused: any [last-valid-focus compose [(system/view/screens/1) (only window)]]		;-- screen-relative path
 		#debug focus [#print "last valid focus path: (mold as path! focused)"]
 		reverse: dir <> 'forth 
-		foreach-*ace/next/:reverse path found: focused [				;-- default to already focused item (e.g. it's the only focusable)
+		foreach-*ace/next/:reverse path found: focused [		;-- default to already focused item (e.g. it's the only focusable)
 			#debug focus [
 				space: last path 
 				text: mold/flat/part any [select space 'text  select space 'data] 40 
@@ -178,6 +179,7 @@ focus-space: function [
 ;; overrides (extends) the native function
 native-set-focus: :system/words/set-focus
 set-focus: function ["Focus face or space object" face [object!]] reshape [
+	#debug focus [#print "set-focus call on (face/type):(face/size)"]
 	either space? face [
 		focus-space face
 	][
@@ -195,8 +197,7 @@ context [
 	;@@ but it's not working when controls are in a panel - see #3808
 	;@@ native buttons also silently steal focus on clicks, without affecting window/selected, so they break this
 	
-	insert-event-func focus-checker: filtered-event-func [face event] [
-		[down alt-down mid-down aux-down dbl-click focus unfocus] 
+	focus-checker: function [face event] [
 		new-focal-face: event/window/selected
 		old-focal-face: all [
 			focus/current
@@ -210,9 +211,20 @@ context [
 				focus/add-to-history new-focal-face
 			]
 		]
+	]
+	
+	insert-event-func filtered-event-func [face event] [
+		[down alt-down mid-down aux-down dbl-click focus unfocus]
+		focus-checker face event
 		none
 	]
+	
+	;@@ this fixes the situation when a host in a new window has got focus but `focus-checker` didn't receive 'focus' event
+	register-previewer [key-down] function [space [object!] path [block!] event [event! map! object!]] [
+		focus-checker event/face event
+	]
 ]
+
 
 register-previewer
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks on host may change focus
