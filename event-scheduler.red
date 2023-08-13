@@ -117,9 +117,9 @@ scheduler: context [
 	
 		set 'process-next-event function [host [object!]] [
 			unless group-next-event host [
+				event: take-next-event host
 				#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
 				#debug focus  [if event/type = 'focus [#print "about to process (event/type) event for (host/type):(host/size)"]]
-				event: take-next-event host
 				events/dispatch host event
 				finish-times/(event/type): now/utc/precise		;-- mark the end of processing of this event type
 			]
