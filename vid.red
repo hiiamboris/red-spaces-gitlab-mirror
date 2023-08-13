@@ -254,7 +254,7 @@ VID: context [
 			string! [make-space pick [paragraph text] wrap [text: value]]
 			logic!  [make-space 'logic [state: value]]
 			image!  [make-space 'image [data:  value]]
-			url!    [make-space 'link  [data:  value]]
+			url!    [make-space 'link  [text:  value]]
 			block!  [lay-out-data/:wrap value]
 		] [make-space 'text [text: mold :value]]
 	]
