@@ -271,7 +271,10 @@ events: context [
 						unless focus/current [focus-space focus/find-next-focal-*ace 'forth]
 						;; but it still may fail if nothing is focusable
 						unless focused: focus/current [exit]
-						if path: get-host-path focused [as [] path] 
+						if path: get-host-path focused [
+							#assert [path/1 =? event/face  "event is dispatched into the wrong host!"]
+							as [] path
+						] 
 					]
 				]
 				; focus unfocus ;-- generated internally by focus.red
