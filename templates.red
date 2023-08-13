@@ -25,10 +25,10 @@ invalidates-look: function [space [object!] word [word!] value [any-type!]] [
 ]
 
 ;; normalizes /margin & /spacing to a pair, for easier handling
-on-margin-spacing-change: function [space [object!] word [word!] value [linear! planar!]] [
-	;@@ need to add 'old' value to on-change, to avoid invalidation on assigning '0' to (0,0)
-	;@@ tricky because of error throw and because assignment must be either explicit here, or modified value returned
-	invalidates space word quietly space/:word: (1,1) * value 
+on-margin-spacing-change: function [space [object!] word [word!] value [linear! planar!] old [any-type!]] [
+	if :old <> new: (1,1) * value [
+		invalidates space word quietly space/:word: new
+	] 
 ]
 
 templates/space: declare-class 'space [					;-- minimum basis to build upon
@@ -716,6 +716,7 @@ scrollable-ctx: context [
 paragraph-ctx: context [
 	~: self
 	
+	;@@ rich-text also splits after hyphen - should I do this too?
 	whitespace!: charset " ^-"							;-- wrap on tabs as well, although it's glitch-prone (sizing is hard)
 	non-space!: negate whitespace!
 	
