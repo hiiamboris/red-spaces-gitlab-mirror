@@ -45,7 +45,7 @@ The following VID/S styles are currently supported for truly high level experien
 | `vlist` | vertical list of spaces | [list](reference.md#list) | block! as content | tight |
 | `row` | horizontal tube of spaces | [tube](reference.md#tube) | block! as content | tight left center right top middle bottom |
 | `column` | vertical tube of spaces | [tube](reference.md#tube) | block! as content | tight left center right top middle bottom |
-| `list-view` | scrollable vertical list of data | [list-view](reference.md#list-view) | block! as content | tight left center right top middle bottom |
+| `list-view` | scrollable vertical list of data | [list-view](reference.md#list-view) | block! as source | tight left center right top middle bottom |
 | `box` | borderless aligning box | [box](reference.md#box) | block! as content | left center right top middle bottom |
 | `cell` | bordered aligning box | [cell](reference.md#cell) | block! as content | left center right top middle bottom |
 | `grid` | grid of spaces | [grid](reference.md#grid) | pair! as bounds,<br>block! as content | tight |
