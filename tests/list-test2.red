@@ -49,5 +49,7 @@ view/no-wait/options [
 ;foreach-*ace/next path system/view/screens/1 [probe path]
 ; dump-tree
 ; debug-draw
+prof/reset
 either system/build/config/gui-console? [print "---"][do-events]
+prof/show
 
