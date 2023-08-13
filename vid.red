@@ -516,7 +516,7 @@ VID: context [
 		]
 			
 		=auto-facet=: [
-			set x any-type!										;-- try to match by value type
+			set x any-type!								;-- try to match by value type
 			if (facet: get-safe 'def/style/facets/(type?/word :x))
 			(repend def/facets pick [[none facet :x] [facet :x]] function? :facet) 
 		]
@@ -548,6 +548,7 @@ VID: context [
 				not VID/styles/:x						;-- protect from bugs if style name is set globally to a number
 				not templates/:x
 				find limit! type? set/any 'x get-safe x	;-- safe or may have lost context
+				none <> :x								;-- ignore single none or unset values!
 			])
 		]
 		=size-component-2=: [
@@ -587,4 +588,7 @@ VID: context [
 	2 = length? lt										;-- style names should not be broken by word values
 	lt/1/type = 'button
 	lt/2/type = 'text
+	
+	error? try [lay-out-vids [nonexistent-word]]
+	error? try [lay-out-vids [text nonexistent-word]]
 ]]
