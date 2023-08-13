@@ -35,7 +35,7 @@ focus: make classy-object! declare-class 'focus-context [
 		unless window [self/window: last head system/view/screens/1/pane]
 		unless hist: select/same histories window [
 			unless window [ERROR "focus/window must be set before using focus/history"]
-			#debug focus [#print "current window detected as: (mold/flat window)"]
+			#debug focus [#print "current window detected as: (select window 'type):(select window 'size) (mold select window 'text)"]
 			self/histories: sift histories [w h .. w/state]		;-- forget closed windows
 			repend histories [window hist: make [] 11]
 		]
@@ -45,7 +45,7 @@ focus: make classy-object! declare-class 'focus-context [
 	
 	add-to-history: function [space [object!]] [
 		#debug focus [#print "adding (space/type):(space/size) to focus history"]
-		self/window: window-of space
+		self/window: window-of host-of space
 		append hist: history space
 		remove/part hist hist << 10						;-- limit history length
 	]
