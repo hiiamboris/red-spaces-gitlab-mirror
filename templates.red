@@ -726,7 +726,7 @@ paragraph-ctx: context [
 	]
 	
 	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
-		size1: to point2D! (size-text layout) + 0.51			;@@ workaround for #5368
+		size1: to point2D! size-text layout
 		size2: to point2D! caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
 		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
 		max size1 size2
@@ -813,7 +813,7 @@ paragraph-ctx: context [
 				parse/case/part words [any [to whitespace! p: skip (change p #"^/")]] trail
 				quietly layout/text: words				;@@ memoize results?
 				min-width: (1,0) * size-text2 layout
-				quietly layout/size: max (1,1) max canvas min-width
+				quietly layout/size: max (1,1) 0.51 + max canvas min-width	;@@ workaround for #5368
 			]
 			quietly layout/text:  copy as string! space/text	;-- copy so it doesn't update its look until re-rendered!
 			; system/view/platform/update-view layout
