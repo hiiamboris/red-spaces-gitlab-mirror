@@ -732,7 +732,7 @@ context [
 		pos: at points pick index 1 + to integer! value / step
 		;; find *first* segment that contains the value
 		while [all [pos/5 value > pos/3]] [pos: skip pos 2]		;@@ use general locate when fast
-		#assert [all [pos/1 <= value  value <= pos/3]]
+		#assert [all [pos/1 <= value  value <= (pos/3 + 0.1)]]	;-- 0.1 to account for rounding error
 		pos
 	]
 	find-x: function [fun [object!] x [number!]] [
@@ -761,7 +761,11 @@ context [
 		;; find *last* segment that contains the value
 		if up [while [all [xs/5  xs/3 <= x]] [xs: skip xs 2]]	;@@ use for-each
 		ys: either inverse [back xs][next xs]
-		t: either xs/1 == xs/3 [either up [1][0]][x - xs/1 / (xs/3 - xs/1)]	;-- avoid zero-division
+		t: either xs/1 == xs/3 [						;-- avoid zero-division
+			either up [1][0]
+		][
+			clip 0 1 x - xs/1 / (xs/3 - xs/1)			;-- clip to work around rounding issues
+		]
 		y: interpolate ys/1 ys/3 t
 		if truncate [y: to integer! y]
 		y

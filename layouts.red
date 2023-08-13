@@ -657,7 +657,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			append/part row-words: tail buffer words words-end
 			if all [									;-- split the word itself if it's bigger than the canvas
 				align <> 'scale
-				row-used-width > row-avail-width
+				row-used-width > (row-avail-width + 0.5)	;-- 0.5px tolerance to account for rounding errors
 			][
 				; #assert [words-period = offset? words words-end]	;-- single word in the row -- doesn't check for white words before!
 				#assert [wrap?]							;-- no-wrap mode must have adjusted the row-avail-width
