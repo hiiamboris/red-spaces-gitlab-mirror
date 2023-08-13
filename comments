@@ -4398,12 +4398,47 @@ there's some really nasty bug in list-view/on-key-down, spent hours on it
 		but sometimes calculated before & after become negative, indicating that current viewport includes empty undrawn region
 		maybe this region was sometimes bigger than the 200 pixels requested, and this led to glitches (esp with big list items)
 		I just include empty region into the jump now and it's flawless 
-	  
+focus needs rewrite, it was a bad design
+	in multi window setup currently it's possible that keys that have one event/face go into another event/face
+	keys should always go into their proper host, but into different spaces
+	what if I call focus-space and all pending events go into the wrong space?
+	how to sync focus changes with actual key events?
+	e.g. I press Tab X Tab Y, both X and Y may be meant to different spaces, and Tab is relative to the state when it gets processed
+	so if focus changes in result of processing an event, it should apply before any other events get processed
+	however View is not going to wait for me, once I click a button it gets focused right away, ahead of my event processing
+	I only have to deal with my own buttons, so only hosts may get refocused out of turn
+	but hosts don't refocus on click, only manually with set-focus or view[] or with tabbing (also uses set-focus)
+	so I should make set-focus work immediately with non-hosts, and put a focus event into hosts queues
+	view[] is tricky since it can interrupt another event (if triggered by)
+	(also the reason why event should be removed first, reacted later)
+	problem: e.g. if tab key is held, and if host or spaces are focused asynchronously
+	then tabbing won't progress until focus event is handled by the host
+	maybe let focus state be sync, but focus event processing async?
+	relies on assumption that focus/unfocus events do not themselves change focus, just schedule redraws
+	also receiver of focus/unfocus events won't be able to rely on whether space is actually focused
+	but tabbing will work fine, just drawing will be delayed from real focus changes
+	except I have two tab handlers - for faces and for spaces (latter is sync), so need to remove the latter?
+	it relies on stop flag though, which allows some spaces to capture the tab key
+	crap.. maybe lesser of evils is to let tabbing stall until processed by the host
+	or I may add a delay into face tabbing handler that will wait until generated event is processed by the host?
+	  do-events/until time or event ?
+	I could streamline View events by calling actors manually and using my own insert-event-func
+	  but consequences are unknown and lots of code to waste on this
+	or maybe the problem is exaggerated?
+	  once host gets focus, let it just schedule all tab events including the initial one, and handle in its own time
+	  although it will still get stuck if receives more tab events than there are spaces on the host
+	  still not a huge issue
+	real problem is inability to track focus changes coming from /selected: facet
+	have to check in dispatch each key event if focus and event/face are aligned
+	if not, need to force focus into event/face, but what space in it?
+	if I have 2 hosts on a window then tabbing can switch to either first or last space in each host
+	if they're on different windows, there may be no event at all, nor /selected change! only event is the signal of refocus
 	
+	  
+;@@ on-change needs access to old value
+;@@ in scheduler: see if any other than timer events come during resize/menu, switch to immediate processing
+;@@ remove object events, make map events! e.g. in hovering.red
 ;@@ focus needs debugging across multiple windows - need 2 windows in focus-test
-;@@ ensure layouts settings in the doc are synced to the code
-
-;@@ clock hittest inside the window (on list-view with big window) - does it need an optimization? binary search?
 
 ;@@ draw an illustration of list-view/origin and window/origin, in docs
 ;@@ explain how scrollbar imposes a performance limitation on the list
@@ -4411,22 +4446,7 @@ there's some really nasty bug in list-view/on-key-down, spent hours on it
 
 ;@@ consider a vlist of plots: each plot is huge and can only be drawn on a viewport, but can list support it?
 	
-;@@ doc list & list-view changes
-	
-;@@ need to add single selection to lists or drop-down key support is nonsensical otherwise
-;@@ remove rendered-xy kludge
-
 ;@@ using apply simplify passing of arguments into layouts
-;@@ test drop-down interactivity
-
-;@@ manual profiling model needs simplification, removal of all foreachs etc: just use last start marker as a destination for dt/ds
-
-		;; whether list-view/origin is counted from anchor item's top or bottom (bottom is useful for message logs)
-		;@@ TBD; not sure about the name though, maybe /direction or just /reversed or smth;
-		;@@ also top/bottom is for vertical lists only, and I'd rather have universal names
-		;@@ example of horizontal list-view analogous to message log is a realtime chart updated and scrolled to the right
-		; anchor-side: 'top			#type =  [word!] (find [top bottom] anchor-side) :invalidates-list
-		
 
 
 Paragraph layout design...
@@ -4570,6 +4590,105 @@ Timer design:
   so it makes sense to call the timer before it expires, like up to 7ms before? half of the host resolution
   no that's bad.. rather we should accumulate bias and try to minimize it...
   OK it works up to 64 fps, where timer is slower than the desired fps...
+
+
+event scheduler thought dump...
+
+how to filter events?
+over events may be sampled down to 100ms, can be delayed
+	normally come at ~15ms (GTK) and down to 2ms but usually 7ms (windows)
+drag - exactly the same (though I'm not using it)
+timer event we need to happen at least once a second (per face!)
+	but if it clogs the pipeline, maybe tune it down to no more than e.g. 50% CPU usage or if queue is empty
+	that is timer must pop up if it meets other events but not after some delay threshold dependent on the speed of timer itself
+drawing events must take priority or we'll never see the changes
+clicks and keys we can not miss, but can delay
+	clicks cannot be reordered with over events, and wheel too
+	all pointer events cannot be reordered (delayed) one around the other, or movement will be seen as jumpy
+moving, resizing - can be slow?, involve both draw and timer but should be bigger priority
+wheel can be downsampled (grouped) esp if it mimicks touchpad dragging
+	it normally comes every 5-15 ms, but down to 100ms acceptable, or even less
+	delay seems to be tied to smooth scrolling speed profile, so we miss smoothness this way, will be sluggish
+slowest single events will be drawing (draw) and timer (render) - need to throttle down
+
+so to throttle down over and wheel events we can group them in the pipeline
+	over - just discard older ones
+	wheel - sum delta in the new event
+		however if movement occurs between wheels, they may land onto different areas
+		so these can only be grouped if offset is the same
+simulated events must be put immediately after their parent event in the pipeline
+need single pipeline per host, but shared CPU usage estimator (if used)
+a working goal could be to balance CPU usage per event type given some ideal profile
+	eg. 50% reserved for timer, 30% for drawing, 20% for all pointer events, 10% for the rest
+	then delay and filter events that exceed their quota
+or another way we could define normative acceptable delays per event and try to satisfy these, e.g.
+	clicks, keys - 50ms
+	over, wheel, drag - 100ms
+	drawing - 300ms
+	timer - 500ms
+	and resolve coming events proportionally to the ratio between delay and the norm
+	always group groupable events when pipeline is not empty in this mode?
+	yes this mode should be reliable and simple enough to express
+how to efficiently filter and group events?
+	we can't ignore events or postpone, only group with like events
+	when to attempt to group? always? when not the last event? or when delay is within acceptable?
+		ideally need to balance delays, but this means knowing how much time each event takes on avg, too complex
+		look ahead by one event and see if its delay is bigger already then try to group?
+			what if we have small-delay small-delay big-delay? then first small-delay won't detect pending big-delay
+		first I need delays relative to the norm
+		second I need some list always reverse-sorted by this delay/norm and so I just choose the first 
+	grouping is singular - find one event, clash with the previous one, done, increases its delay
+	what if e.g. timer takes 1sec, then whole lot of events gets pushed with single (wrong) timestamp
+		then another timer can get prioritized again and we deadlock
+		so ideally need timestamps of all last processed events by type,
+		measure delays from last timestamp, not from the time it was registered
+		when possible, always group the event instead of full processing
+		the only Q is how to quickly choose event by delay/norm, esp. since delay changes all the time??
+		more performant mechanism would be to just subtract the norm, even though maybe less flexible
+		even then, will have to subtract this planned timestamp from each event's of this type timestamp?
+	OK after groupings I have a max of single event per event type for groupables, the rest isn't that populous presumably
+		so that makes maybe 20-50 queue, worst case about 100 if delay was big and keys accumulated
+		can I really choose/prioritize the next processed event? what events are independent
+		e.g. can't reorder clicks with keys as that would divert focus into wrong place
+		some program may rely on the order of keys and over events too
+		all pointer events cannot be reordered
+		resizing is usually independent but can be caused by timer or key events, in which case probably bad to reorder it
+		resizing and moving shouldn't reorder either
+		drawing and time are likely the only independent events??
+		does it mean I can't group other events like moving/resizing? conservatively yes
+	so conservative plan:
+		timer and drawing can be grouped with other event of the kind anywhere forth
+		moving, resizing, wheel, over, drag - only with the next event of the kind (but ignoring intermittent timer and drawing events)
+		rest is not grouped
+		grouping only should happen if current event's delay/norm is less than next event's delay/norm
+		this also should be efficient
+	timer - unconditionally groupable with other timer
+	drawing - same, with other drawing
+	moving - same
+	resizing - same
+	wheel - groupable with other wheel if offset is the same and no other pointer events between (needs /picked summation)
+	over - with other over if no other pointer evts between
+	drag - same
+		what if drag and over come in pairs (intermittent)? quite likely
+		ideally need a way to somehow group drag+over mixed events, but for now shouldn't worry since drag is unused
+		besides, I'll generate drag event from over and the problem will go away
+	when to process events?
+		if I do that on each event I never get a queue so grouping never happens
+		if I do that on timer I get delays between actual clicks and keys and processing
+		what if I do `do-events/no-wait` a couple times to fill the queue, then process single event, and do that on each event?
+		no, won't work, because do-events/no-wait itself calls event function, will deadlock or do nothing
+		ok idea: enter on every event, build up event queue until do-events/no-wait returns false or when 100 events threshold reached
+		hold on processing while this event function is in effect (i.e. it should just exit when its inner iterations)
+		then after the queue is finished start processing: after every single event refill the queue
+		however this may lock the original event for long time
+		so perhaps 15ms timer delay is lesser evil
+		but GTK prioritizes timer so once I finish one timer I got no queue and next event is timer again
+		so I have to fill the queue from timer, then process it event by event and it's not so bad that I hold leave from timer?
+		custom event processor? do-events replacement? I could then separate events fetching from events processing
+		in fact, I'll fetch all I can before processing single one, and no timer delay to deal with
+	one great thing of this queue is I'll be able to fully test any spaces program with virtual events!
+	another is independence from the OS quirks
+
 
 MUSEUM
 this is bad because it mirrors the code from draw
