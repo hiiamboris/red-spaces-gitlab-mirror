@@ -1027,7 +1027,7 @@ paragraph-ctx: context [
 						]
 						if mrg > 0 [append sections mrg]
 						width: mrg * 2 + first size-text2 layout
-						if 0 <> left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
+						if 0.02 < left: space/size/x - width [append sections left]	;-- additional margin introduced by limits/min
 					]
 				]
 				sections

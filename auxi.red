@@ -764,7 +764,7 @@ context [
 		t: either xs/1 == xs/3 [						;-- avoid zero-division
 			either up [1][0]
 		][
-			clip 0 1 x - xs/1 / (xs/3 - xs/1)			;-- clip to work around rounding issues
+ 			clip 0 1 x - xs/1 / (xs/3 - xs/1)			;-- clip to work around rounding issues
 		]
 		y: interpolate ys/1 ys/3 t
 		if truncate [y: to integer! y]
@@ -1215,14 +1215,14 @@ generate-sections: function [
 	case [
 		not tail? buffer [return buffer]				;-- already computed
 		tail? map [										;-- optimization
-			if width > 0 [append buffer width]			;-- treat margins as significant
+			if width > 0.02 [append buffer width]		;-- treat margins as significant
 			return buffer
 		]
 	]
 	offset: 0
 	frame: []											;-- when no sections in space, uses local value
 	foreach [space geom] map [
-		if negative? skipped: offset - geom/offset/x [
+		if (skipped: offset - geom/offset/x) < -0.02 [	;-- avoid adding too tiny (rounding error) values
 			append buffer skipped
 		]
 		case [
@@ -1232,12 +1232,12 @@ generate-sections: function [
 			][
 				append buffer sec
 			]
-			geom/size/x > 0  [append buffer geom/size/x]		;-- don't add empty (0) spaces
+			geom/size/x > 0 [append buffer geom/size/x]			;-- don't add empty (0) spaces
 		]
 		offset: offset - skipped + geom/size/x
 	]
 	if all [buffer/1 buffer/1 < 0] [buffer/1: abs buffer/1]		;-- treat margins as significant
-	if offset < width [append buffer width - offset]
+	if width - offset > 0.02 [append buffer width - offset]
 	#assert [not find/same buffer 0]
 	buffer
 ]
