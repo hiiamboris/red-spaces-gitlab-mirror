@@ -13,11 +13,11 @@ svf: system/view/fonts
 r: rtd-layout compose/deep [font [50 (svf/serif)] "L" /font]
 fgcolor: any [system/view/metrics/colors/text]
 bgcolor: any [system/view/metrics/colors/panel]
-bgnd: make image! compose [(16x4 + size-text r) (bgcolor)]
+bgnd: make image! compose [(16x4 + to pair! spaces/ctx/round-up size-text r) (bgcolor)]
 capital: draw bgnd compose [
 	pen (fgcolor) text 8x2 (r)
 	line-width 4 pen (bgcolor) line 10x0 50x100 line 50x20 0x70
-	line-width 1 pen (fgcolor) fill-pen off box 1x1 (bgnd/size - 1) 10
+	line-width 1 pen (fgcolor) fill-pen off box (0.5, 0.5) (bgnd/size - 0.5) 10
 ]; ? capital
 
 source: does [compose [
