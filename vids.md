@@ -54,7 +54,7 @@ The following VID/S styles are currently supported for truly high level experien
 | `label` | 1- to 3-line unwrapped text with sigil | [label](reference.md#label) | string! as text,<br>char! or image! as image | bold italic underline |
 | `field` | single-line editable text | [field](reference.md#field) | string! as text | bold italic underline |
 | `link` | multi-line clickable wrapped text | [link](reference.md#link) | string! or url! as text,<br>block! as command | |
-| `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data | block! as command |
+| `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data,<br> block! as command | |
 | `timer` | invisible zero-sized time events receiver | [timer](reference.md#timer) | integer!, float! or time! as rate,<br>block! as on-time actor body | |
 | `<->` aka `stretch` | invisible elastic filler space | [stretch](reference.md#stretch) | | |
 
