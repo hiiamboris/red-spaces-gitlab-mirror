@@ -49,12 +49,13 @@ The following VID/S styles are currently supported for truly high level experien
 | `box` | borderless aligning box | [box](reference.md#box) | block! as content | left center right top middle bottom |
 | `cell` | bordered aligning box | [cell](reference.md#cell) | block! as content | left center right top middle bottom |
 | `grid` | grid of spaces | [grid](reference.md#grid) | pair! as bounds,<br>block! as content | tight |
-| `text` | single-line text | [text](reference.md#text) | string! as text | bold italic underline |
-| `paragraph` | multi-line wrapped text | [paragraph](reference.md#paragraph) | string! as text | bold italic underline |
+| `text` | single-line text | [text](reference.md#text) | string! as text | bold italic underline strike ellipsize |
+| `paragraph` | multi-line wrapped text | [paragraph](reference.md#paragraph) | string! as text | bold italic underline strike ellipsize |
 | `label` | 1- to 3-line unwrapped text with sigil | [label](reference.md#label) | string! as text,<br>char! or image! as image | bold italic underline |
-| `field` | single-line editable text | [field](reference.md#field) | string! as text | bold italic underline |
+| `field` | single-line editable text | [field](reference.md#field) | string! as text | bold italic underline strike |
 | `link` | multi-line clickable wrapped text | [link](reference.md#link) | string! or url! as text,<br>block! as command | |
-| `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data,<br> block! as command | |
+| `data-clickable` | borderless clickable area | [button](reference.md#data-clickable) | string! or image! as data,<br> block! as command | bold italic underline strike ellipsize (for text data only) |
+| `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data,<br> block! as command | bold italic underline strike ellipsize (for text data only) |
 | `timer` | invisible zero-sized time events receiver | [timer](reference.md#timer) | integer!, float! or time! as rate,<br>block! as on-time actor body | |
 | `<->` aka `stretch` | invisible elastic filler space | [stretch](reference.md#stretch) | | |
 
