@@ -814,7 +814,7 @@ paragraph-ctx: context [
 				parse/case/part words [any [to whitespace! p: skip (change p #"^/")]] trail
 				quietly layout/text: words				;@@ memoize results?
 				min-width: (1,0) * size-text2 layout
-				quietly layout/size: max (1,1) 0.51 + max canvas min-width	;@@ workaround for #5368
+				quietly layout/size: max (1,1) max canvas min-width
 			]
 			quietly layout/text:  copy as string! space/text	;-- copy so it doesn't update its look until re-rendered!
 			; system/view/platform/update-view layout
