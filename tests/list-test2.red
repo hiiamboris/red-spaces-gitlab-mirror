@@ -50,6 +50,6 @@ view/no-wait/options [
 ; dump-tree
 ; debug-draw
 prof/reset
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]
 prof/show
 

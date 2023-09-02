@@ -72,4 +72,4 @@ view/no-wait/options [
 prof/show
 prof/reset
 ; foreach-*ace/next path system/view/screens/1 [probe path]
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]

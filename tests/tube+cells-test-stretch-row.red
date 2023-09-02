@@ -91,6 +91,6 @@ view/no-wait compose/only/deep [
 prof/show
 prof/reset
 ; debug-draw
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]
 prof/show
 ]

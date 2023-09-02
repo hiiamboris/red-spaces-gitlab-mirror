@@ -186,4 +186,4 @@ view/no-wait/flags compose/deep [
 	]
 ] 'resize
 
-unless system/build/config/gui-console? [do-events]
+either system/build/config/gui-console? [run-console][do-events]

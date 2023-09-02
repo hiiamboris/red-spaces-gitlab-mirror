@@ -193,13 +193,16 @@ scheduler: context [
 
 	#assert [1291100108 = checksum mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
+	event-loop-depth: 0									;@@ used to work around #5377
 	set 'do-events function spec-of native-do-events: :do-events [
 		either no-wait [
 			native-do-events/no-wait
 		][
-			if window: last system/view/screens/1/pane [		;@@ what if windows were reordered?
+			;; 'head' to account for GUI console which enters event loop too:
+			if window: last head system/view/screens/1/pane [	;@@ what if windows were reordered?
 				#assert [window/state]
-				while [window/state] [							;-- there's one event loop per window, so leave once it's closed
+				depth: step 'event-loop-depth
+				while [all [window/state depth = event-loop-depth]] [	;-- there's one event loop per window, so leave once it's closed
 					switch native-do-events/no-wait [			;-- fetch all pending events ;@@ may deadlock?
 						#[true]  [continue]
 						#[false] []
@@ -209,10 +212,28 @@ scheduler: context [
 						[unless process-any-event [wait 1e-3]]	;-- wait is also tainted by single do-events/no-wait
 						[print thrown]
 				]
+				self/event-loop-depth: depth - 1
 				none											;-- return value must be useful for smth..
 			]	
 		]
 	]
 	
-	set 'view func spec-of :view body-of :view			;-- uses compiled `do-events` so need to recreate it
+	;; View and GUI console are using some functions with compiled version of 'do-events'
+	;; I have to recreate these to switch them to the new scheduler
+	set 'view func spec-of :view body-of :view
+	if attempt [system/console/gui?] [
+		; do with gui-console-ctx/terminal [do-ask-loop: :do-events]
+		do with gui-console-ctx/terminal [ask: func spec-of :ask body-of :ask]
+		do with system/words             [ask: func spec-of :ask body-of :ask]
+		do with system/console           [run: func spec-of :run body-of :run]
+		insert-event-func function [face event] [		;@@ workaround for #5377
+			all [
+				face =? gui-console-ctx/console
+				event/type = 'key-down
+				event/key = #"^M"
+				step/down 'event-loop-depth
+				none
+			]
+		]
+	]
 ]

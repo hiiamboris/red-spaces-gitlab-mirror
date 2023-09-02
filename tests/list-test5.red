@@ -36,6 +36,6 @@ view/no-wait/options expand-directives [
 ] [offset: 10x10]
 
 prof/show prof/reset
-unless system/build/config/gui-console? [do-events]
+either system/build/config/gui-console? [run-console][do-events]
 prof/show
 

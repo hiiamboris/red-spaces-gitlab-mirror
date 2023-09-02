@@ -58,4 +58,4 @@ view/no-wait/options/flags reshape [
 	status: text 400x60
 ] [offset: 400x10] 'resize
 
-either system/build/config/gui-console? [halt][do-events]
+either system/build/config/gui-console? [run-console][do-events]

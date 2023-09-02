@@ -77,6 +77,6 @@ view/no-wait/options [
 	status: text 300x40
 ] [offset: 10x10]
 
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]
 prof/show
 ];; do with spaces/ctx [

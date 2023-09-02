@@ -32,5 +32,5 @@ view/no-wait/options [
 ] [offset: 10x10]
 
 ; foreach-*ace/next path system/view/screens/1 [probe path]
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]
 

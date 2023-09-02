@@ -127,4 +127,4 @@ prof/reset
 ; ??~ z
 ; dump-tree
 ; debug-draw
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]

@@ -110,6 +110,6 @@ view/no-wait/options/flags reshape [
 ; b/dirty?: yes
 			
 ; dump-tree
-either system/build/config/gui-console? [print "---"][do-events]
+either system/build/config/gui-console? [run-console][do-events]
 prof/show
 
