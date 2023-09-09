@@ -86,10 +86,14 @@ define-handlers [
 			if 100 < absolute amount: event/picked [	;@@ workaround for #5110
 				amount: -256 * sign? amount + amount
 			]
+			horz?: to logic! any [						;-- shift+wheel changes direction - wish #9
+				path/3 =? space/hscroll
+				all [path/3 =? space/content event/shift?]
+			] 
 			space/move-by/scale
 				'line
 				pick [forth back] amount <= 0
-				pick [x y] 'hscroll = path/3
+				pick [x y] horz?
 				abs amount * 4
 		]
 		on-focus [space path event] [
