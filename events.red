@@ -38,7 +38,7 @@ events: context [
 		foreach word system/catalog/accessors/event! [result/:word: :event/:word]
 	]
 	
-	register-as: function [map [map!] types [block!] handler [function!] /local blk] [
+	register-as: function [map [map!] types [block!] handler [function!] /priority /local blk] [
 		delist-from map :handler						;-- duplicate protection, in case of multiple includes etc.
 		#assert [										;-- validate the spec to help detect bugs
 			any [
@@ -52,10 +52,11 @@ events: context [
 				(source handler  none)
 			] "invalid handler spec"
 		]
+		inject: either priority [:insert][:append]
 		foreach type types [
 			#assert [word? type]
 			list: any [map/:type  map/:type: copy []]
-			append list :handler						;@@ append or insert? affects evaluation order
+			inject list :handler
 			bind body-of :handler commands
 		]
 		:handler
@@ -71,16 +72,18 @@ events: context [
 		"Register a previewer in the event chain; remove previous instances"
 		types [block!] "List of event/type words that this HANDLER supports"
 		handler [function!] "func [space path event]"
+		/priority "Insert at the start of the event previewers chain"
 	][
-		register-as previewers types :handler
+		register-as/:priority previewers types :handler
 	]
 
 	register-finalizer: func [
 		"Register a finalizer in the event chain; remove previous instances"
 		types [block!] "List of event/type words that this HANDLER supports"
 		handler [function!] "func [space path event]"
+		/priority "Insert at the start of the event finalizers chain"
 	][
-		register-as finalizers types :handler
+		register-as/:priority finalizers types :handler
 	]
 
 	delist-previewer: func [
