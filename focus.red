@@ -199,7 +199,11 @@ context [
 	;@@ native buttons also silently steal focus on clicks, without affecting window/selected, so they break this
 	
 	focus-checker: function [face event] [
-		new-focal-face: event/window/selected
+		; #print "checking focus for (face/type):(face/size)"
+		;; focus host on clicks before all other events
+		new-focal-face: either host? face
+			[event/window/selected: face]
+			[event/window/selected]
 		old-focal-face: all [
 			focus/current
 			path: get-screen-path focus/current
@@ -211,6 +215,7 @@ context [
 			if all [object? new-focal-face  not host? new-focal-face] [
 				focus/add-to-history new-focal-face
 			]
+			focus/window: event/window
 		]
 	]
 	
@@ -227,7 +232,7 @@ context [
 ]
 
 
-register-previewer
+register-previewer/priority
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks on host may change focus
 	function [space [object!] path [block!] event [event! map! object!]] [
 		;@@ should it avoid focusing if stop flag is set?
