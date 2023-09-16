@@ -279,7 +279,7 @@ image-ctx: context [
 		mrg2: 2 * mrg: image/margin
 		switch type?/word image/data [
 			none! [
-				image/size: mrg2						;@@ can't be constrained further; or call constrain again?
+				image/size: constrain mrg2 image/limits			;-- empty image should obey constraints too
 				[]
 			]
 			;@@ this feature needs to be doc'd but I'm not sure about it,
