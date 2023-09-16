@@ -2275,7 +2275,7 @@ list-view-ctx: context [
 		#assert [list/frame/anchor]
 		anchor-item: list/items/pick anchor: list/frame/anchor
 		anchor-pos: find/same/skip list/map anchor-item 2
-		#assert [anchor-pos]
+		unless anchor-pos [return none]					;-- list may have been cleared, map not updated
 		anchor-map-index: half 1 + index? anchor-pos
 		anchor - anchor-map-index + map-index
 	]
@@ -2302,6 +2302,7 @@ list-view-ctx: context [
         #assert [anchor-item]
         y:        req-axis
         anchor:   map-index->list-index list map-index
+        unless anchor [return 0]						;-- don't try sliding if list was cleared or updated in this frame
         margin:   list/frame/margin
         window:   list/parent
         frame:    construct list/frame					;-- for bind(with) to work
@@ -2781,7 +2782,10 @@ list-view-ctx: context [
 	declare-template 'list-view/inf-scrollable [
 		kit:    ~/kit
 		pages:  10
-		source: []	#on-change :invalidates-list		;-- no type check for it can be freely overridden
+		source: []	#on-change [space word value [any-type!]] [	;-- no type check for it can be freely overridden
+			invalidates-list space word :value
+			if any-list? :space/item-cache [clear space/item-cache]
+		]
 		data: func [/pick i [integer!] /size] [			;-- can be overridden
 			either pick [source/:i][length? source]		;-- /size may return `none` for infinite data
 		] #type [function!]
