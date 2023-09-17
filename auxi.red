@@ -820,13 +820,15 @@ constrain: function [
 	limits  [object! (range? limits) none!] "none if no limits"
 ][
 	unless limits [return size]							;-- most common case optimization
-	min: switch/default type? limits/min [
-		#[pair!] #[point2D!]  [limits/min]
-		#[integer!] #[float!] [limits/min . 0]			;-- numeric limits only affect /x
+	;@@ NOTE: always use type?/word, not type? here, otherwise construction syntax is lost during 'inline' call
+	;@@ see #5387
+	min: switch/default type?/word limits/min [
+		pair! point2D!  [limits/min]
+		integer! float! [limits/min . 0]				;-- numeric limits only affect /x
 	] [0x0]												;-- none and invalid treated as 0x0
-	max: switch/default type? limits/max [
-		#[pair!] #[point2D!]  [limits/max]
-		#[integer!] #[float!] [limits/max . 1.#inf]		;-- numeric limits only affect /x
+	max: switch/default type?/word limits/max [
+		pair! point2D!  [limits/max]
+		integer! float! [limits/max . 1.#inf]			;-- numeric limits only affect /x
 	] [infxinf]											;-- none and invalid treated as infinity
 	clip size min max
 ]
