@@ -200,7 +200,7 @@ do with styling: context [
 			; below: [(make-box size 0 'off glass)]
 		]
 		list-view/window/list/cursor: [
-			below: [(make-box size 1 checkered-pen 'off)]
+			below: when focused?/above 3 [(make-box size 1 checkered-pen 'off)]
 		]
 		list-view/window/list/item: [
 			lview:  parent/parent/parent				;@@ how to simplify this?

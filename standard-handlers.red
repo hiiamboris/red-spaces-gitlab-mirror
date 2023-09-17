@@ -134,6 +134,9 @@ define-handlers [
 
 	;-- *************************************************************************************
 	list-view: extends 'inf-scrollable [
+		on-focus   [space path event] [if space/selectable [invalidate space/list]]
+		on-unfocus [space path event] [if space/selectable [invalidate space/list]]
+		
 		on-down [space path event] [
 			; ?? [space/origin space/window/origin space/anchor/offset]		
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
