@@ -97,3 +97,13 @@ I have no plan on extending RedMark right now. But my plan *for the future*:
 
    Red has no animated GIF support as of now. Animations can be distracting and hypnotic, and it's likely not a good idea to animate GIFs by default, but I'd like it to be a controllable option.
 
+
+## [SVG Browser](svg-browser.red)
+
+Mainly a testing GUI for the SVG decoder.
+
+Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/svg-browser.exe)
+
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif)
+
+Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a lot of compiler workarounds to make a binary ☺
