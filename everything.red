@@ -78,7 +78,6 @@ do/expand [
 	#include %../common/classy-object.red
 	; #include %../common/advanced-function.red			;-- included by search.red
 	#include %../common/search.red
-	#include %../common/quantize.red
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
