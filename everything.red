@@ -10,20 +10,20 @@ Red [
 ;@@ for some reason, it won't affect #includes of this very file,
 ;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
 
+; #do [verbose-inclusion?: yes]							;-- enable to dump filenames
 #include %../common/include-once.red					;-- the rest can use the improved include
 #do [
 	;; when compiling, this needs `inline` to get the `-t os` argument!
-	linux?: any [										;-- to unify compiled & interpreted workaround logic
-		system/platform = 'Linux
-		all [Rebol system/version/4 = 4]
-	]
+	linux?: either Rebol								;-- to unify compiled & interpreted workaround logic
+		[system/version/4 = 4]
+		[system/platform = 'Linux]
 ]
 
 #process off											;-- do not expand the rest using the default #include
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	#debug off										;-- turn off type checking and general (unspecialized) debug logs
+	; #debug off										;-- turn off type checking and general (unspecialized) debug logs
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times
 	; #debug set changes								;-- turn on to see value changes and invalidation
@@ -39,7 +39,7 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	#assert off
+	; #assert off
 	#include %../common/expect.red
 	#include %../common/setters.red
 	; #include %../common/composite.red
@@ -78,6 +78,7 @@ do/expand [
 	#include %../common/classy-object.red
 	; #include %../common/advanced-function.red			;-- included by search.red
 	#include %../common/search.red
+	#include %../common/quantize.red
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code

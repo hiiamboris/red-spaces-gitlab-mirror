@@ -589,20 +589,6 @@ mix: function [
 ]
 
 
-quantize: function [
-	"Quantize a float sequence into integers, minimizing the overall bias"
-	vector [vector! block!]
-][
-	r: make vector! n: length? vector
-	error: 0											;-- accumulated rounding error is added to next value
-	repeat i n [
-		r/:i: hit: round/to aim: vector/:i + error 1
-		error: aim - hit
-	]
-	r
-]
-
-
 enhance: function [
 	"Push COLOR further from BGND (alpha channels ignored)"
 	bgnd  [tuple! word!]
