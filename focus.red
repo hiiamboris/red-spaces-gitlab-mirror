@@ -219,7 +219,7 @@ context [
 		]
 	]
 	
-	insert-event-func filtered-event-func [face event] [
+	insert-event-func 'spaces-focus-tracker filtered-event-func [face event] [
 		[down alt-down mid-down aux-down dbl-click focus unfocus]
 		focus-checker face event
 		none

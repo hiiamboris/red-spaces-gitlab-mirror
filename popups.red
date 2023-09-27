@@ -208,7 +208,7 @@ popups: context [
 	;; event funcs internal data
 	context [
 		;; global space timers are not called unless event is processed, so timer needs a dedicated event function
-		insert-event-func auto-show-hint: function [host event] [	;-- displays hints across all host faces when time hits
+		insert-event-func 'spaces-hint-popup auto-show-hint: function [host event] [	;-- displays hints across all host faces when time hits
 			all [
 				event/type = 'time
 				host? host								;-- a host face?

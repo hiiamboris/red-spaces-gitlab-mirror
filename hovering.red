@@ -11,7 +11,7 @@ Red [
 
 context [
 	last-offsets: make hash! 2							;@@ suffers from REP #129
-	insert-event-func filtered-event-func [face event] [
+	insert-event-func 'spaces-away-event filtered-event-func [face event] [
 		[over time]
 		unless host? face [return none]
 		switch event/type [

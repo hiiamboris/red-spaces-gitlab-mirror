@@ -178,7 +178,7 @@ scheduler: context [
 	]
 
 	;; sometimes this gets window as 'host', likely when no face is in focus
-	insert-event-func func [host event] [
+	insert-event-func 'spaces-event-dispatcher func [host event] [
 		all [
 			host? host									;@@ maybe /content field not /space?
 			host/space									;-- /space is assigned?
@@ -226,7 +226,7 @@ scheduler: context [
 		do with gui-console-ctx/terminal [ask: func spec-of :ask body-of :ask]
 		do with system/words             [ask: func spec-of :ask body-of :ask]
 		do with system/console           [run: func spec-of :run body-of :run]
-		insert-event-func function [face event] [		;@@ workaround for #5377
+		insert-event-func 'spaces-workaround-for-5377 function [face event] [		;@@ workaround for #5377
 			all [
 				face =? gui-console-ctx/console
 				event/type = 'key-down
