@@ -286,7 +286,7 @@ image-ctx: context [
 			;@@ since it fills all canvas up to /limits but draw code knows nothing about canvas size
 			block! [
 				image/size: constrain finite-canvas canvas image/limits
-				free: subtract-canvas image/size 2 * mrg
+				free: subtract-canvas image/size mrg2
 				compose/only [translate (mrg) clip 0x0 (free) (image/data)]
 			]
 			image! [
