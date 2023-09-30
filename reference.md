@@ -734,6 +734,21 @@ Supported facets:
 | `flags` | block! | a list of rich-text flags (`underline`, `bold`, `italic`, `wrap`); should be set in styles |
 
 
+## Slider
+
+Adjustable parameter in 0% to 100% range.
+
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-slider.png) | <pre>slider 150 20%</pre> |
+|-|-|
+
+| facet  | type  | description |
+|-|-|-|
+| `offset` | float! percent! | knob location: 0% to 100% ; defaults to 0% |
+| `step` | number! | amount of `offset` displacement on left/right keys: integer = number of pixels, percent/float = relative to the whole |
+| `knob` | space object! | knob to draw on the slider; can be styled as `slider/knob` |
+| `knob/size` | point2D! | size is fixed and should be defined; defaults to (12,12) |
+
+
 ## Scrollbar
 
 Obvious. To be used in other spaces, as by itself it's not interactive. Used in `scrollable` template. Uses `rectangle` and `triangle`.
