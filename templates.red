@@ -4291,16 +4291,16 @@ context [
 	
 	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		kdrawn: render knob: space/knob
-		size: max space/knob/size fill-canvas canvas fill-x fill-y 
+		size: max space/knob/size fill-canvas canvas fill-x no	;-- never extend along Y axis 
 		space/size: constrain size space/limits
 		free: space/size - knob/size
-		compose/only [translate (1.0 * space/offset . 1 * free) (kdrawn)] 
+		compose/only [translate (1.0 * space/offset . 0.5 * free) (kdrawn)] 
 	]
 	
 	declare-template 'knob/space [
 		size:  (12,12)
-		cache: none									;-- it should be enough to just invalidate the slider
-		draw:  :no-draw								;-- drawn by style
+		cache: none										;-- it should be enough to just invalidate the slider
+		draw:  :no-draw									;-- drawn by style
 	]
 	
 	kit: make-kit 'slider [
@@ -4319,7 +4319,6 @@ context [
 		;; keyboard-driven knob displacement: integer = pixels, otherwise = percent of the whole
 		step:   0.5%					#type =  [number!] (step > 0)
 		
-		weight: 1
 		knob:   make-space 'knob []		#type =? [object!] (space? knob) :invalidates 
 		draw:   func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]

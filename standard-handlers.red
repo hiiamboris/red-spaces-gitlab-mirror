@@ -390,7 +390,7 @@ define-handlers [
 	slider: [
 		on-down [space path event] [
 			space/offset: batch space [frame/x->offset path/2/x]
-			start-drag path						;-- keep tracking knob when pointer leaves the slider
+			start-drag path								;-- keep tracking knob when pointer leaves the slider
 		]
 		on-up   [space path event] [stop-drag]
 		on-over [space path event] [
@@ -410,7 +410,7 @@ define-handlers [
 			][
 				space/offset: 100% * clip 0 1 offset
 			][
-				pass							;-- ignore other keys, esp. tab
+				pass									;-- ignore other keys, esp. tab
 			]
 		]
 		on-focus   [space path event] [invalidate space]
