@@ -49,6 +49,7 @@ context with spaces/ctx expand-directives [
 	append focus/focusable [drop-box drop-field]
 	
 	;@@ not a showstopper, but should /selected be an index instead? or maybe add an index facet separately?
+	;@@ it probably should not fill the canvas vertically - will need to make 2D /weight for that?
 	declare-template 'drop-box/tube reshape [
 		@(box-skeleton)
 		spaces/box: make-space 'data-view []

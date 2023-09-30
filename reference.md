@@ -213,6 +213,12 @@ Some facets are not reserved or prescribed but have a **recommended** meaning as
 
 Spaces do not impose any structural limitations. If a space can hold a box or a piece of text, then it can hold *any* other space, no matter how complex it is. The only requirement is that same space should not normally appear in multiple places on the tree.
 
+### Typesets
+
+These typesets are extensively used throughout Spaces and in this document:
+- `linear!` is equivalent to `integer! float!` and represents a 1D quantity
+- `planar!` is equivalent to `pair! point2D!` and represents a 2D quantity
+
 ### Kit
 
 `kit` facet is present in templates spaces that want provide functions to read, interpret and modify their state. Having a set of functions inside every space object is quite RAM-expensive, so instead spaces of the same template contain a link to a shared kit object that contains all the functions.
@@ -1479,6 +1485,52 @@ Inherits all of `scrollable` facets:
 
 Editor affects its document (`content`) according to received events: modifies data, selection, moves caret. 
 
+## Drop-box
+
+Commonly known as [drop-down list](https://en.wikipedia.org/wiki/Drop-down_list) - entry with an item selectable from a predefined list. Based on horizontal `tube`.
+
+Has to be imported separately: [`#include %widgets/drop-down-lists.red`](widgets/drop-down-lists.red). `drop-down-lists.red` file contains both `drop-box` and `drop-field` templates.
+
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-drop-box.png) | `vlist [drop-box ["a" "b" "c" "d"]]` |
+|-|-|
+
+| **NOTE** | Before using `drop-box` please read [this article on better alternatives](https://medium.com/re-write/fuck-dropdowns-6-ways-to-eliminate-dropdowns-from-your-design-83efb8773675) (or see [this long video](https://youtu.be/hcYAHix-riY)). IMO drop-down lists have a place in some cases, e.g. in a toolbar above the text area, where space is precious, but they are abused way too much. |
+|-|-|
+
+Supported facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `data` | block! hash! | list of *unique* values (of any type) to select from |
+| `selected` | any-type! | item currently in the box: empty string or one of the values from `data` |
+| `margin` | linear! planar! | horizontal and vertical space between content and the bounding box |
+| `spacing` | linear! planar! | horizontal space between text and the arrow |
+| `align` | pair! | text alignment: -1x-1 to 1x1 (9 variants); defaults to -1x0 (left) |
+| `list-pages` | linear! | max drop-down menu vertical size in drop-box's heights; default: 5 |
+
+
+## Drop-field
+
+Commonly known as [combo box](https://en.wikipedia.org/wiki/Combo_box) - editable entry with a ready list of options. Based on horizontal `tube`.
+
+Has to be imported separately: [`#include %widgets/drop-down-lists.red`](widgets/drop-down-lists.red). `drop-down-lists.red` file contains both `drop-box` and `drop-field` templates.
+
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-drop-field.png) | `vlist [drop-field ["a" "b" "c" "d"] selected="abc"]` |
+|-|-|
+
+| **NOTE** | Before using `drop-field` please read [this article on better alternatives](https://medium.com/re-write/fuck-dropdowns-6-ways-to-eliminate-dropdowns-from-your-design-83efb8773675) (or see [this long video](https://youtu.be/hcYAHix-riY)). IMO drop-down lists have a place in some cases, e.g. in a toolbar above the text area, where space is precious, but they are abused way too much. |
+|-|-|
+
+Supported facets:
+
+| facet  | type  | description |
+|-|-|-|
+| `data` | block! hash! | list of values (of any type) to select from, *uniquely* representable as strings |
+| `selected` | string! | item currently in the box: empty string or one of the values from `data` converted into a string (required for editability) |
+| `margin` | linear! planar! | horizontal and vertical space between content and the bounding box |
+| `spacing` | linear! planar! | horizontal space between text and the arrow |
+| `align` | pair! | text alignment: -1x-1 to 1x1 (9 variants); defaults to -1x0 (left) |
+| `list-pages` | linear! | max drop-down menu vertical size in drop-field's heights; default: 5 |
 
 
 

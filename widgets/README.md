@@ -28,3 +28,4 @@ See the [guide](guide.md) if you'd like to create your own widget.
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-drop-down-test.gif)
 
+More documentation in [the reference](../reference.md#drop-box).
