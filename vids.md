@@ -56,6 +56,7 @@ The following VID/S styles are currently supported for truly high level experien
 | `link` | multi-line clickable wrapped text | [link](reference.md#link) | string! or url! as text,<br>block! as command | |
 | `data-clickable` | borderless clickable area | [button](reference.md#data-clickable) | string! or image! as data,<br> block! as command | bold italic underline strike ellipsize (for text data only) |
 | `button` | bordered clickable area | [button](reference.md#button) | string! or image! as data,<br> block! as command | bold italic underline strike ellipsize (for text data only) |
+| `slider` | adjustable parameter | [slider](reference.md#slider) | float! or percent! as offset | |
 | `timer` | invisible zero-sized time events receiver | [timer](reference.md#timer) | integer!, float! or time! as rate,<br>block! as on-time actor body | |
 | `<->` aka `stretch` | invisible elastic filler space | [stretch](reference.md#stretch) | | |
 
