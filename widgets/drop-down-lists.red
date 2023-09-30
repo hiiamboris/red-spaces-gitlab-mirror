@@ -186,7 +186,7 @@ context with spaces/ctx expand-directives [
 	
 	define-styles [
 		drop-box: [
-			below: compose [line-width 1 box 1x1 (size - 1)]
+			below: [line-width 1 box 1x1 (size - 1)]
 			above: when focused? [						;-- unlike drop-field, requires focus indicator
 				fill-pen off line-width 1 pen (styling/checkered-pen) box 3x3 (size - 3)
 			]
