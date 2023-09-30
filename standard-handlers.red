@@ -387,6 +387,36 @@ define-handlers [
 		on-unfocus [space path event] [space/caret/visible?: no]
 	]
 
+	slider: [
+		on-down [space path event] [
+			space/offset: batch space [frame/x->offset path/2/x]
+			start-drag path						;-- keep tracking knob when pointer leaves the slider
+		]
+		on-up   [space path event] [stop-drag]
+		on-over [space path event] [
+			if event/down? [space/offset: batch space [frame/x->offset path/2/x]]
+		]
+		on-key  [space path event] [
+			if integer? step: space/step [
+				step: step / (space/size/x - space/knob/size/x)
+			]
+			either offset: switch event/key [
+				left  up   [space/offset - step]
+				right down [space/offset + step]
+				page-up    [space/offset - (step * 20)]
+				page-down  [space/offset + (step * 20)]
+				home       [0%]
+				end        [100%]
+			][
+				space/offset: 100% * clip 0 1 offset
+			][
+				pass							;-- ignore other keys, esp. tab
+			]
+		]
+		on-focus   [space path event] [invalidate space]
+		on-unfocus [space path event] [invalidate space]
+	]
+	
 	fps-meter: [
 		on-time [space path event] [
 			time: now/precise/utc

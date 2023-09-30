@@ -16,7 +16,7 @@ focus: make classy-object! declare-class 'focus-context [
 	;; template names that can receive focus (affects tabbing & clicking)
 	;; class should not matter, name should - then we'll be able to override/extend classes
 	;@@ TODO: should paths be allowed here? e.g. if some spaces are only focusable in some bigger context?
-	focusable: make hash! [scrollable button field area list-view grid-view]	#type [hash!]
+	focusable: make hash! [scrollable button field area list-view grid-view slider]	#type [hash!]
 	focusable-faces: tabbing/focusables
 	
 	;; each window has own focus history, format: [window [space ...] ...]

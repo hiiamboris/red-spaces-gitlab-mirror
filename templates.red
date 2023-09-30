@@ -4286,6 +4286,46 @@ field-ctx: context [
 ]
 
 
+context [
+	~: self
+	
+	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+		kdrawn: render knob: space/knob
+		size: max space/knob/size fill-canvas canvas fill-x fill-y 
+		space/size: constrain size space/limits
+		free: space/size - knob/size
+		compose/only [translate (1.0 * space/offset . 1 * free) (kdrawn)] 
+	]
+	
+	declare-template 'knob/space [
+		size:  (12,12)
+		cache: none									;-- it should be enough to just invalidate the slider
+		draw:  :no-draw								;-- drawn by style
+	]
+	
+	kit: make-kit 'slider [
+		frame: object [
+			x->offset: func [x [linear!] "Convert X coordinate into slider offset"] [
+				100% * clip 0 1 x - (space/knob/size/x / 2) / (space/size/x - space/knob/size/x)
+			]
+		]
+	]
+	
+	declare-template 'slider/space [
+		kit:    ~/kit
+		
+		;; knob location: 0-100%
+		offset: 0%						#type =  [percent! float!] (all [0 <= offset offset <= 1]) :invalidates-look
+		;; keyboard-driven knob displacement: integer = pixels, otherwise = percent of the whole
+		step:   0.5%					#type =  [number!] (step > 0)
+		
+		weight: 1
+		knob:   make-space 'knob []		#type =? [object!] (space? knob) :invalidates 
+		draw:   func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
+	]
+]
+
+	
 declare-template 'fps-meter/text [
 	; cache:     off
 	rate:      100

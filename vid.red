@@ -155,6 +155,13 @@ VID: context [
 			layout:   lay-out-grid						;-- uses custom layout function
 			facets:   [pair! bounds @(props/tight)]
 		]
+		slider [
+			template: slider
+			facets: [
+				percent! offset
+				float!   offset
+			]
+		]
 	];; styles
 	
 	for-each [name spec] styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111

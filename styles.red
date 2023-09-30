@@ -289,6 +289,24 @@ do with styling: context [
 			below: when select self 'color [pen (color)]
 		]
 		;@@ scrollbars should prefer host color
+		
+		slider: function [slider /on canvas fill-x fill-y] [
+			drawn: slider/draw/:on canvas fill-x fill-y
+			knob:  slider/knob
+			right: slider/size - left: half knob/size/x . slider/size/y
+			stop:  right - left * slider/offset * 1x0 + left
+			compose [
+				line-width 4
+				pen (opaque svmc/text 70%) line (left) (stop)
+				pen (opaque svmc/text 30%) line (stop) (right)
+				(drawn)
+			]
+		]
+		
+		slider/knob: /skip [
+			fill:  opaque svmc/text either focused?/parent [100%][40%]
+			above: reshape-light [line-width 1 fill-pen @(fill) circle (size / 2) (size/x / 2) (size/y / 2)]
+		]
 	]
 ]
 
