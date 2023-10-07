@@ -65,6 +65,7 @@ do/expand [
 	#include %../common/color-models.red
 	#include %../common/contrast-with.red
 	#include %../common/keep-type.red
+	#include %../common/clip.red
 	#include %../common/step.red
 	; #include %../common/typecheck.red
 	; #include %../common/selective-catch.red
