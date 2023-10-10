@@ -403,8 +403,8 @@ define-handlers [
 			either offset: switch event/key [
 				left  up   [space/offset - step]
 				right down [space/offset + step]
-				page-up    [space/offset - (step * 20)]
-				page-down  [space/offset + (step * 20)]
+				page-up    [space/offset - max 10% step * 20]
+				page-down  [space/offset + max 10% step * 20]
 				home       [0%]
 				end        [100%]
 			][
