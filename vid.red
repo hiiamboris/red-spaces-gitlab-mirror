@@ -263,7 +263,13 @@ VID: context [
 			image!  [make-space 'image [data:  value]]
 			url!    [make-space 'link  [text:  value]]
 			block!  [lay-out-data/:wrap value]
-		] [make-space 'text [text: mold :value]]
+		][
+			either space? :value [						;-- pass spaces as is - common case for list-view/grid-view
+				:value
+			][
+				make-space 'text [text: mold :value]
+			]
+		]
 	]
 	
 	
