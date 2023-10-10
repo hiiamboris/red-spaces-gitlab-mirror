@@ -220,6 +220,8 @@ scheduler: context [
 	
 	;; View and GUI console are using some functions with compiled version of 'do-events'
 	;; I have to recreate these to switch them to the new scheduler
+	;@@ unfortunately commands are not added to history, and terminal/line contains junk :/
+	;@@ I really should dump this console and make my own
 	set 'view func spec-of :view body-of :view
 	if attempt [system/console/gui?] [
 		; do with gui-console-ctx/terminal [do-ask-loop: :do-events]
