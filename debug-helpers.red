@@ -113,19 +113,22 @@ if action? :mold [
 		~: system/words
 			
 		mold-stack: make hash! 100						;-- used to avoid cycles
-		mold*: function [value [any-type!] limit /extern deep flat] with :mold [
+		mold*: function [value [any-type!] limit /extern deep flat] with :mold reshape [
 			; print native-mold reduce [only all :value]
 			sp: " "
 			output: make string! 16
 			decor: select pick decor* all type: type?/word :value
-			if ~/all [decor only depth = 0] [decor: ["" ""] noindent?: yes]
-			~/all [decor  find/same/only mold-stack :value  return emit ["..."]]
+			if decor [
+				if ~/all [only depth = 0] [decor: ["" ""] noindent?: yes]
+				vhead: either series? :value [head value][:value]
+				if find/same/only mold-stack :vhead [return emit ["..."]]
+			]
 			unless deep [
 				if 0 < depth [
-					if 'block! = type [
+					if all ['block! = type not all] [
 						try [							;-- fails on system/words
 							parse value: copy value [any [	;-- simple grouping ;@@ TODO: also find periodic patterns
-								s: ahead [set x skip (xtype: type? :x) 9 xtype] [	;@@ how many items minimum to group?
+								s: ahead [set x skip (xtype: type? :x) 19 xtype] [	;@@ how many items minimum to group?
 									skip change [some x e:] (to word! rejoin ['x offset? s e])
 								|	change xtype (to word! xtype)
 									change [some xtype e:]  (to word! rejoin ['x offset? s e])
@@ -161,9 +164,9 @@ if action? :mold [
 				]
 			]
 			
-			if decor [append/only mold-stack :value]
+			if decor [append/only mold-stack :vhead]
 			switch/default type [
-				object! map! hash! block! paren! path! get-path! set-path! lit-path! event! [
+				object! map! @(to [] any-block!) event! [
 					if any-path? value [sp: "/" flat': flat flat: yes]
 					step 'depth
 					;; output events too ;@@ won't be loadable since can't make events
@@ -172,10 +175,10 @@ if action? :mold [
 							[to set-word! word  :value/:word]
 						]
 					]
-					;; emit skip for blocks in /all mode
+					;; emit skip for series in /all mode (strings are below)
 					if ~/all [
 						all
-						find [block! hash! paren!] type
+						series? :value
 						skip?: unless head? value [-1 + index? value]
 					][
 						skip-decor: reduce ["##[skip " rejoin [" " skip? "]"]]
@@ -257,6 +260,19 @@ if action? :mold [
 						emit [(mold* alpha limit) decor/2]
 					]
 				]
+				@(to [] any-string!) [
+					either ~/all [
+						all
+						skip?: unless head? value [-1 + index? value]
+					][
+						string: native-mold/:all/:flat head value
+						skip-decor: reduce ["##[skip " rejoin [" " skip? "]"]]
+						emit [skip-decor/1 string skip-decor/2]
+					][
+						string: native-mold/:all/:flat value
+						emit [string]
+					]
+				]
 				function! action! native! routine! [
 					spec: spec-of :value
 					body: body-of :value
@@ -281,7 +297,7 @@ if action? :mold [
 				string: native-mold/:all/:flat :value
 				emit [string]
 			]
-			if decor [clear find/same/only mold-stack :value]
+			if decor [clear find/same/only mold-stack :vhead]
 			
 			output
 		]
