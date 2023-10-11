@@ -112,6 +112,8 @@ if action? :mold [
 		
 		~: system/words
 			
+		;@@ perhaps I should not override global mold, but only probe/??/save
+		;@@ otherwise high chance of breaking user code
 		mold-stack: make hash! 100						;-- used to avoid cycles
 		mold*: function [value [any-type!] limit /extern deep flat] with :mold reshape [
 			; print native-mold reduce [only all :value]

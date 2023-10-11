@@ -25,8 +25,8 @@ Red [
 import/only spaces/ctx [top]
 append spaces/focus/focusable 'tube
 
+mold: :native-mold
 context [
-	mold: :native-mold
 
 	code-font: make font! [name: system/view/fonts/fixed]
 	
