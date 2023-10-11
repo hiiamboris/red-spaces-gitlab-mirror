@@ -727,10 +727,17 @@ paragraph-ctx: context [
 		]
 	]
 	
-	size-text2: function [layout [object!]] [					;@@ see #4841 on all kludges included here
+	size-text2: function [layout [object!]] [			;@@ see #4841, #5245, #5402 on all kludges included here
+		#if linux? [
+			size': layout/size
+			layout/size: either layout/size
+				[min layout/size 16777215]
+				[16777215x0]
+		]
 		size1: to point2D! size-text layout
 		size2: to point2D! caret-to-offset/lower layout length? layout/text	;-- include trailing whitespaces
 		if layout/size [size2/x: min size2/x layout/size/x]		;-- but not beyond the allowed width
+		#if linux? [layout/size: size']
 		max size1 size2
 	]
 	
