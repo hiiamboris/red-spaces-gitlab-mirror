@@ -109,13 +109,20 @@ copy-deep-map: function [m [map!]] [
 
 ;; this version is reliable but allocates 60% more
 ;@@ should cloning be based on it?
-copy-deep-safe: function [
+clone: function [
 	"Obtain a complete deep copy of the data"
 	data [any-object! map! series!]
 ] with system/codecs/redbin [
 	decode encode data none
 ]
 	
+shallow-clone: function [
+	"Make TARGET series a (shallow) clone of SOURCE series"
+	source [series!] /into target: (clear copy source) [series!]
+][
+	at append clear head target head source index? source
+]
+
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
 ;; since it's for layout usage only, I don't care about a few allocated objects, no need to optimize it
 ;; ranges are used by spaces to constrain their size, but those are read-only
@@ -304,13 +311,6 @@ make-free-list: function [
 			append/only stack (either find series! type [ [clear head x] ][ [:x] ])
 		]
 	]
-]
-
-clone: function [
-	"Make TARGET series a (shallow) clone of SOURCE series"
-	source [series!] target [series!]
-][
-	at append clear head target head source index? source
 ]
 
 

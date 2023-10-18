@@ -117,7 +117,7 @@ events: context [
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
 		code: compose/into [handler space pcopy event (args) none] clear []
 		foreach handler list [
-			pcopy: clone path cache/get					;-- copy in case user modifies/reduces it, preserve index
+			pcopy: shallow-clone/into path cache/get	;-- copy in case user modifies/reduces it, preserve index
 			trap/all/catch code [
 				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
 				kind: either map =? previewers ["previewer"]["finalizer"]
@@ -314,7 +314,7 @@ events: context [
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
 	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object! map!] args [block!]] [
-		space: first path: clone path cache/get			;-- copy in case user modifies/reduces it, preserve index
+		space: first path: shallow-clone/into path cache/get	;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
 			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
@@ -421,7 +421,7 @@ events: context [
 		#debug events [#print "Starting drag on [(mold copy/part path -99) | (mold path)] with (:param)"]
 		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]
-		drag-in/path: clone path drag-in/head			;-- drag-path will return it at the same index
+		drag-in/path: shallow-clone/into path drag-in/head		;-- drag-path will return it at the same index
 		set/any in drag-in 'payload :param
 	]
 
