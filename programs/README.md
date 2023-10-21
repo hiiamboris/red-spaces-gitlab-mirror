@@ -1,3 +1,9 @@
+---
+gitea: none
+include_toc: true
+---
+
+
 # Programs written with Spaces
 
 ## [Red Inspector](red-inspector.red)
