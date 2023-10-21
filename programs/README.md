@@ -140,9 +140,9 @@ So to set things up you'll need:
    - `inspect-dump` function that `call`s the frontend to inspect the dump
    - `parsee` function that does both steps at once
    
-2. Compiled frontend binary for your platform: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee.exe), [Linux], [MacOS 32-bit]
+2. Compiled frontend binary for your platform: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee), [MacOS 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee-mac)
 
-   This is the UI that reads the saved dump file. Make this binary available from `PATH` or let the frontend ask you where it is located.
+   This is the UI that reads the saved dump file. Make this binary available from `PATH` as `parsee` or let the frontend ask you where it is located.
 
 ### Usage
 
