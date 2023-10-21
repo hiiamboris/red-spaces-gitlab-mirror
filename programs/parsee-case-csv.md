@@ -10,7 +10,7 @@ Double processing incurs additional time cost and should be avoided in codecs. S
 
 Here's an example from CSV codec:
 
-<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-case-csv.gif />
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-case-csv.gif />
 
 As can be seen, `single-value` rule matches the last value in every line, then its parent rule fails as it doesn't see a delimiter (comma) ahead, and `line-rule` lets `single-value` match again, which is likely not by design.
    
