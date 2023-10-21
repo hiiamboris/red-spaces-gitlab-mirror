@@ -43,7 +43,7 @@ It normally takes about half an hour to figure out what happens in such complica
    
 3. Try to decode my data and count the number of `p: ...` printed, to figure out where it's stuck
 4. Go on with this boring routine deeply into subrules, printing the trace after every change, until I find the last rule that should have succeeded but instead failed
-5. In this case I find culprit to be [`PubidLiteral`](https://github.com/red/red/blob/f9efb7852f22c1745aeb770161ddffc056d25d03/environment/codecs/XML.red#L220-L223)
+5. In this case I find culprit to be [`PubidLiteral`](https://github.com/red/red/blob/f9efb7852f22c1745aeb770161ddffc056d25d03/environment/codecs/XML.red#L220-L223):
 
    ```
    	PubidLiteral: [
@@ -60,7 +60,7 @@ It normally takes about half an hour to figure out what happens in such complica
    	]
    ```
 
-So that must be the issue.
+   So that must be the issue.
 
 ### ParSEE solution
 
@@ -82,9 +82,9 @@ Only a matter of getting the progress log and then inspecting it:
    	]
    ```
 
-3. Try to decode my data, which brings up the progress inspection window where I can see what happened:
+3. Try to decode the data, which brings up the progress inspection window where I can see what happened:
 
-   ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-case-xml.gif)
+   <img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-case-xml.gif />
    
    In just a minute I know that:
    - it didn't succeed past the `<xml>` header
