@@ -107,3 +107,122 @@ Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif)
 
 Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a lot of compiler workarounds to make a binary ☺
+
+## [ParSEE - Parsing flow visual analysis tool](parsee-tool.red)
+
+Debug your `parse` code with ease!
+
+ParSEE allows you to get an almost immediate answer for the questions:
+- How far did the parsing reach?
+- What rule deadlocks?
+- Which rules succeeded, which failed and why?
+- Sometimes it also can show double (suboptimal) matching
+
+Case studies:
+- [Failed rule discovery on XML codec's example](parsee-case-xml.md)
+- [Double matching detection on CSV codec's example](parsee-case-csv.md)
+- TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
+
+| NOTE | Block parsing is not implemented yet |
+|-|-|
+
+### Setup
+
+ParSEE UI is Spaces-based, but it would be unwise to require Spaces to be included into every small rule we may wish to debug. For this reason the project is split into two parts:
+1. [`parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) backend that collects info during a Parse run
+2. [`parsee-tool.red`](parsee-tool.red) Spaces-based frontend that displays and helps analyze it
+
+So to set things up you'll need:
+1. Either [`parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) with all of its dependencies, or (**recommended**): [`parsee-standalone.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee-standalone.red) that has all dependencies included already. Latter option is a result of [*inlining*](https://codeberg.org/hiiamboris/red-cli/src/branch/master/mockups/inline) the former, and is provided because I know how annoying the #include bugs can be.
+
+   This script, which you'll want to include, contains:
+   - `parse-dump` function that gathers parsing progress and saves it into a temporary dump file
+   - `inspect-dump` function that `call`s the frontend to inspect the dump
+   - `parsee` function that does both steps at once
+   
+2. Compiled frontend binary for your platform: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee.exe), [Linux], [MacOS 32-bit]
+
+   This is the UI that reads the saved dump file. Make this binary available from `PATH` or let the frontend ask you where it is located.
+
+### Usage
+
+After everything's set up and including the backend, you should be able play with it in console e.g.:
+```
+>> char: charset [#"a" - #"z"]
+>> word: [some char]
+>> parsee "lorem ipsum dolor sit amet" [some [word opt space]]
+```
+You'll see the UI popping up:
+
+![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-simple.gif)
+
+UI lists all detected Parse rules, with their profiles (Y = input advancement, X = time in events), and rules text. Use `Left`/`Right` keys to change time by single event.
+
+<details><summary>Overview of the backend...</summary>
+
+**`parsee` is a high level replacement for `parse`**:
+```
+>> ? parsee
+USAGE:
+     PARSEE input rules
+
+DESCRIPTION: 
+     Process a series using dialected grammar rules, visualizing progress afterwards. 
+     PARSEE is a function! value.
+
+ARGUMENTS:
+     input        [any-string!] 
+     rules        [block!] 
+
+REFINEMENTS:
+     /case        => Uses case-sensitive comparison.
+     /part        => Limit to a length or position.
+        length       [number! series!] 
+     /timeout     => Force failure after certain parsing time is exceeded.
+        maxtime      [time! integer! float!] "Time or number of seconds (defaults to 1 second)."
+     /keep        => Do not remove the temporary dump file.
+     /auto        => Only visualize failed parse runs.
+```
+It parses input, collects data and calls the frontend for analysis. Optionally /auto flag can be used to skip successful parse runs, and only visualize failures.
+
+**`parse-dump` is a lower level `parse` wrapper**:
+```
+>> ? parse-dump
+USAGE:
+     PARSE-DUMP input rules
+
+DESCRIPTION: 
+     Process a series using dialected grammar rules, dumping the progress into a file. 
+     PARSE-DUMP is a function! value.
+
+ARGUMENTS:
+     input        [binary! any-block! any-string!] 
+     rules        [block!] 
+
+REFINEMENTS:
+     /case        => Uses case-sensitive comparison.
+     /part        => Limit to a length or position.
+        length       [number! series!] 
+     /timeout     => Specify deadlock detection timeout.
+        maxtime      [time! integer! float!] "Time or number of seconds (defaults to 1 second)."
+     /into        => 
+        filename     [file!] "Override automatic filename generation."
+```
+It only does the collection of data. By default it is saved with a unique filename in current working directory. When something goes wrong on either side, it becomes useful to dump the data for manual inspection.
+
+**`inspect-dump` is a frontend launcher:**
+```
+>> ? inspect-dump
+USAGE:
+     INSPECT-DUMP filename
+
+DESCRIPTION: 
+     Inspect a parse dump file with PARSEE tool. 
+     INSPECT-DUMP is a function! value.
+
+ARGUMENTS:
+     filename     [file!]
+```
+It can be used to analyze a set of previously saved dumps right from the console.
+
+</details>
