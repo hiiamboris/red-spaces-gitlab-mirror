@@ -123,7 +123,7 @@ Case studies:
 - [Double matching detection on CSV codec's example](parsee-case-csv.md)
 - TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
 
-| NOTE | Block parsing is not implemented yet |
+| NOTE | Block parsing and input modification tracking are not implemented yet |
 |-|-|
 
 ### Setup
