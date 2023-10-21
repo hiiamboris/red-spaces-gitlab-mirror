@@ -160,6 +160,8 @@ UI lists all detected Parse rules, with their profiles (Y = input advancement, X
 
 <details><summary>Overview of the backend...</summary>
 
+---
+
 **`parsee` is a high level replacement for `parse`**:
 ```
 >> ? parsee
@@ -185,6 +187,8 @@ REFINEMENTS:
 ```
 It parses input, collects data and calls the frontend for analysis. Optionally /auto flag can be used to skip successful parse runs, and only visualize failures.
 
+---
+
 **`parse-dump` is a lower level `parse` wrapper**:
 ```
 >> ? parse-dump
@@ -209,6 +213,8 @@ REFINEMENTS:
         filename     [file!] "Override automatic filename generation."
 ```
 It only does the collection of data. By default it is saved with a unique filename in current working directory. When something goes wrong on either side, it becomes useful to dump the data for manual inspection.
+
+---
 
 **`inspect-dump` is a frontend launcher:**
 ```
