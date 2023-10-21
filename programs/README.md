@@ -61,7 +61,7 @@ World's smallest markdown viewer.
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark-mac). 
 
-<img width=800 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-redmark.gif />
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-redmark.gif />
 
 This tool's main purpose *for now* is to showcase and test rich content, so:
 - it contains only a [*toy* 250-LOC markdown-to-VID/S converter](toy-markdown.red) (I may call it a toy, but some webchat implementations do away with worse for years...)
@@ -104,7 +104,7 @@ Mainly a testing GUI for the SVG decoder.
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/svg-browser.exe)
 
-<img width=1000 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif />
+<img width=900 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif />
 
 Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a lot of compiler workarounds to make a binary ☺
 
