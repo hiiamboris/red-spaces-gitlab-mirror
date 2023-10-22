@@ -162,7 +162,7 @@ You'll see the UI popping up:
 
 <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-simple.gif />
 
-UI lists all detected Parse rules, with their profiles (Y = input advancement, X = time in events), and rules text. Use `Left`/`Right` keys to change time by single event.
+UI lists all detected Parse rules in depth increasing order, with their profiles (Y = input advancement, X = time in events), and rules text. Use `Left`/`Right` keys to change time by single event.
 
 <details><summary>Overview of the backend...</summary>
 
