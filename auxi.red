@@ -1019,18 +1019,6 @@ top: func [
 	back tail series
 ]
 
-;; good addition to do-atomic which holds reactivity
-do-async: function [									;@@ used solely to work around #5132
-	"Evaluate CODE with view/auto-sync off"
-	code [block!]
-][
-	sync: 'system/view/auto-sync?
-	old: get sync
-	set sync off
-	do code
-	set sync old
-]
-
 rechange: function [
 	"Sequence multiple changes into SERIES"
 	series [series!]
