@@ -12,7 +12,7 @@ Red [
 
 VID: context [
 	; create VID styles for basic containers
-	; #localize [
+	; #hide [
 		; foreach name [hlist vlist row column] [
 			; system/view/VID/styles/:name: spec: copy/deep system/view/VID/styles/host
 			; spec/template/space: to lit-word! name
@@ -575,7 +575,7 @@ VID: context [
 	export [lay-out-vids host?]
 ]
 
-#localize [#assert [
+#hide [#assert [
 	lay-out-vids [										;-- new style names should be recognized
 		style text1: text 20
 		text1 "text"

@@ -861,7 +861,7 @@ set-pair: function [
 	set words/1 pair/1
 	set words/2 pair/2
 ]
-#localize [#assert [
+#hide [#assert [
 	set-pair [a b] 2x3
 	a = 2
 	b = 3
@@ -958,7 +958,7 @@ encode-canvas: function [
 	x-sign . y-sign * |canvas|
 ]
 
-#localize [#assert [
+#hide [#assert [
 	reencode: func [b] [encode-canvas b/1 b/2 b/3]
 	infxinf   = reencode decode-canvas  infxinf
 	( 10, 20) = reencode decode-canvas ( 10, 20)
@@ -1027,7 +1027,7 @@ rechange: function [
 	change series reduce values
 ]
 
-#localize [#assert [
+#hide [#assert [
 	s: [a b c]
 	e: rechange next s [1 + 1 2 * 3 3 + 4]
 	s == [a 2 6 7]
