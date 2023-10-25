@@ -351,6 +351,7 @@ VID: context [
 			facets:											;-- facets collected by manual and auto-facet
 			pane:											;-- unless snatched by auto-facet, assigns /content
 			focused?:										;-- to move focus into this space
+			children:										;-- collects set-words of a style
 		]
 		
 		commit-style: [
@@ -369,17 +370,18 @@ VID: context [
 					]
 				]
 			]
-			space-spec: compose [
-				(any [def/style/spec []])
-				(facets)
-				(def/with)
-			]
-			
 			either def/styling? [						;-- new style defined, def/style already copied and in the sheet
 				unless def/style/payload [append def/style [payload: []]] 
 				def/style/payload: copy/deep/part style-bgn style-end
 				; #print "saved payload (mold def/style/payload) in (def/link) style based on (def/style/template)"
 			][
+				space-spec: compose [
+					(only def/style/spec)
+					(when def/children (compose [children: (def/children)]))
+					(facets)
+					(def/with)
+				]
+			
 				space: make-space def/style/template space-spec
 				if def/link [set def/link space]		;-- set the word before calling reactions
 				
@@ -468,10 +470,11 @@ VID: context [
 					put sheet def/link def/style: copy/deep def/style	;-- from now on, linked word ends the definition and instantiates
 				]
 				if payload: def/style/payload [					;-- style has literal data to insert
+					def/children: make [] 4						;-- collect names of the children
 					;; literally insert anonymized copy of the payload
 					;; to avoid set-words collision when a style with set-words inside is instantiated multiple times:
-					ctx: construct collect-set-words payload
-					insert p with ctx copy/deep payload
+					def/children: construct collect-set-words payload
+					insert p with def/children copy/deep payload
 					; #print "inserted payload at: (mold/part p 80)"
 				]
 			)
@@ -498,7 +501,11 @@ VID: context [
 		)]
 		
 		=action=:     [=actor-name= =actor-body=]
-		=actor-name=: [set w word! if (find/match form w "on-")]
+		=actor-name=: [
+			set w word!
+			if (all [find/match x: form w "on-" #"=" <> last x])	;-- don't take facet for actor, e.g. on-move=
+			;@@ should look the name up in system/view/evt-names?
+		]
 		=actor-body=: [
 			set b block! (def/actors/:w: function [space path event] b)
 		|	set x [get-word! | get-path!] (
