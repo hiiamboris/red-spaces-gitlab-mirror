@@ -118,13 +118,13 @@ Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a
 
 Debug your `parse` code with ease!
 
-ParSEE allows you to get an almost immediate answer for the questions:
-- How far did the parsing reach?
-- What rule deadlocks?
-- Which rules succeeded, which failed and why?
-- Sometimes it also can show double (suboptimal) matching
+ParSEE allows you to get an almost immediate answer for the **questions**:
+- **How far** did the parsing reach?
+- What rule **deadlocks**?
+- Which rules succeeded, which failed and **why**?
+- Sometimes it also can show double (**suboptimal**) matching
 
-Case studies:
+**Case studies**:
 - [Failed rule discovery on XML codec's example](parsee-case-xml.md)
 - [Double matching detection on CSV codec's example](parsee-case-csv.md)
 - TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
@@ -134,25 +134,25 @@ Case studies:
 
 ### Setup
 
-ParSEE UI is Spaces-based, but it would be unwise to require Spaces to be included into every small rule we may wish to debug. For this reason the project is split into two parts:
-1. [`parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) backend that collects info during a Parse run
-2. [`parsee-tool.red`](parsee-tool.red) Spaces-based frontend that displays and helps analyze it
+ParSEE UI is Spaces-based, but it would be unwise to require Spaces to be included into every small rule we may wish to debug. For this reason the project is split into **two parts**:
+1. [`common/parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) **backend** that collects info during a Parse run
+2. [`spaces/parsee.red`](parsee.red) Spaces-based **frontend** that displays and helps analyze it
 
-So to set things up you'll need:
-1. Either [`parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) with all of its dependencies, or (**recommended**): [`parsee-standalone.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee-standalone.red) that has all dependencies included already. Latter option is a result of [*inlining*](https://codeberg.org/hiiamboris/red-cli/src/branch/master/mockups/inline) the former, and is provided because I know how annoying the #include bugs can be.
+So to set things up you'll **need**:
+1. As **backend** either [`parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) with all of its dependencies, or [`parsee-standalone.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee-standalone.red) (**recommended**) that has all dependencies included already. Latter option is a result of [*inlining*](https://codeberg.org/hiiamboris/red-cli/src/branch/master/mockups/inline) the former, and is provided because I know how annoying the #include bugs can be.
 
    This script, which you'll want to include, contains:
    - `parse-dump` function that gathers parsing progress and saves it into a temporary dump file
    - `inspect-dump` function that `call`s the frontend to inspect the dump
    - `parsee` function that does both steps at once
    
-2. Compiled frontend binary for your platform: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee), [MacOS 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee-mac)
+2. Compiled **frontend binary** for your platform: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee), [MacOS 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/parsee-mac)
 
    This is the UI that reads the saved dump file. Make this binary available from `PATH` as `parsee` or let the frontend ask you where it is located.
 
 ### Usage
 
-After everything's set up and including the backend, you should be able play with it in console e.g.:
+After everything's set up, **#include the backend** and you should be able play with it in console e.g.:
 ```
 >> char: charset [#"a" - #"z"]
 >> word: [some char]
@@ -162,9 +162,11 @@ You'll see the UI popping up:
 
 <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-simple.gif />
 
-UI lists all detected Parse rules in depth increasing order, with their profiles (Y = input advancement, X = time in events), and rules text. Use `Left`/`Right` keys to change time by single event.
+UI lists all detected Parse rules in depth-increasing order, with their profiles (Y = input advancement, X = time in events), and rules text.
 
-<details><summary>Overview of the backend...</summary>
+Use `Left`/`Right` keys to change time by single event.
+
+<details><summary>**Overview** of the backend...</summary>
 
 ---
 
