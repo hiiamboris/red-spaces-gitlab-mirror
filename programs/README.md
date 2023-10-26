@@ -124,7 +124,7 @@ ParSEE allows you to get an almost immediate **answer** for the questions:
 - Which rules succeeded, which **failed and why**?
 - Sometimes it also can show double (**suboptimal**) matching
 
-**Case studies**:
+**Real world case studies**:
 - [Failed rule discovery on XML codec's example](parsee-case-xml.md)
 - [Double matching detection on CSV codec's example](parsee-case-csv.md)
 - TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
