@@ -118,10 +118,10 @@ Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a
 
 Debug your `parse` code with ease!
 
-ParSEE allows you to get an almost immediate answer for the **questions**:
+ParSEE allows you to get an almost immediate **answer** for the questions:
 - **How far** did the parsing reach?
 - What rule **deadlocks**?
-- Which rules succeeded, which failed and **why**?
+- Which rules succeeded, which **failed and why**?
 - Sometimes it also can show double (**suboptimal**) matching
 
 **Case studies**:
