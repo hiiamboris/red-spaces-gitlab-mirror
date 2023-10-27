@@ -83,6 +83,7 @@ define-handlers [
 			]
 		]
 		on-wheel [space path event] [
+			if event/ctrl? [exit]						;-- ignore ctrl+wheel, which is used for zoom usually
 			if 100 < absolute amount: event/picked [	;@@ workaround for #5110
 				amount: -256 * sign? amount + amount
 			]
