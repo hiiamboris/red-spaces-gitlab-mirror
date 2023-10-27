@@ -167,7 +167,7 @@ UI lists all detected Parse rules in depth-increasing order, with their profiles
 
 Use `Left`/`Right` keys to change time by single event.
 
-<details><summary>**Overview** of the backend...</summary>
+<details><summary><b>Overview</b> of the backend...</summary>
 
 ---
 
