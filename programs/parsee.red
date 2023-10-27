@@ -12,7 +12,12 @@ Red [
 
 
 #include %../everything.red
+#process off
+do/expand [
+#include %../../common/format-number.red
 #include %../../cli/cli.red
+]
+#process on
 
 system/script/header: object [	 						;@@ workaround for #4992
 	title:   "ParSEE"
@@ -530,6 +535,13 @@ context with spaces/ctx expand-directives [
 			color-rule row/children/rule marks row/info age		;-- update rule text
 		]
 	]
+	
+	refresh-zoom: function [
+		"Update profiles zoom"
+		plot-list [block!] zoom [number!]
+	][
+		foreach row plot-list [row/children/plot/zoom: zoom]
+	]
 		
 	;; profile-plot custom template
 	context [
@@ -541,7 +553,7 @@ context with spaces/ctx expand-directives [
 				matrix [1 0 0 -1 0 (space/size/y)] 
 				line-width 0.5 fill-pen (colors/canvas) box 0x0 (space/size)
 				scale (space/zoom) (space/size/y * 1.0) (space/plot)
-				line-width 1 pen (colors/text) translate (space/age by 0) [line 0x0 (0 by space/size/y)]
+				line-width 1 pen (colors/text) translate (space/age * space/zoom by 0) [line 0x0 (0 by space/size/y)]
 			]
 		]
 		
@@ -626,12 +638,26 @@ context with spaces/ctx expand-directives [
 					timeline: slider 100% focus step= 100% / max 1 max-age
 						age= 0 react [age: to integer! 1 + max-age * timeline/offset]	;-- source of changes into other spaces
 					; <-> 0x10							;@@ doesn't work when compiled - #5137
-					stretch 0x10 text bold "Applied rules:"
+					stretch 0x10
+					row margin= 0 [
+						text bold "Applied rules:"
+						stretch
+						hlist margin= 0 [
+							text bold "Zoom:"
+							box [zoom: slider 100 100% step= 1% ratio= 0 react [ratio: 1% ** (1 - zoom/offset)]]
+							text 50
+								react [text: format-number zoom/ratio 1 2]
+								react [refresh-zoom plot-list zoom/ratio]
+						] 
+					]
 					profiles-view: list-view selectable tight source= !(plot-list) selected= [1] cursor= 1
 						on-key-down [
 							if sign: switch event/key [left [-1] right [1]] [
 								timeline/offset: clip 0% 100% timeline/offset + (sign / max-age) stop
 							]
+						]
+						on-wheel [
+							if event/ctrl? [zoom/offset: 100% * clip 0 1 zoom/offset + (10% * event/picked)]
 						]
 						react [refresh-progress input-view plot-list marks timeline/age profiles-view/cursor]
 				]
