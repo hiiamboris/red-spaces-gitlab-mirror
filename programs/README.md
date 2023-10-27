@@ -127,6 +127,7 @@ ParSEE allows you to get an almost immediate **answer** for the questions:
 **Real world case studies**:
 - [Failed rule discovery on XML codec's example](parsee-case-xml.md)
 - [Double matching detection on CSV codec's example](parsee-case-csv.md)
+- [Overall decoder evaluation on XML codec's example](parsee-case-eval.md)
 - TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
 
 | NOTE | Block parsing and input modification tracking are not implemented yet |
