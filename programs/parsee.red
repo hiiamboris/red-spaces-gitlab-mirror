@@ -67,6 +67,9 @@ context with spaces/ctx expand-directives [
 		[hex-to-rgb color]
 	;; translucent colors; multiple passes of the same rule should be clearly distinguishable
 	light: map-each [color [tuple!]] colors [opaque color either dark? [50%][25%]]
+	
+	;; spaces mold is not used here
+	mold: :native-mold
 		
 	;@@ remove keywords and scanning
 	keywords: make hash! [
@@ -104,43 +107,62 @@ context with spaces/ctx expand-directives [
 		result
 	]
 
+	;; measure the geometry of molded any-blocks
+	decor: make hash! #hide [map-each/eval type (to [] any-block!) [
+		molded: mold append make get type 0 [| |]
+		parse molded [to "|" item1: skip to "|" item2:]
+		prefix: skip? item1
+		suffix: length? next item2
+		sep: -1 + offset? item1 item2
+		[type prefix sep suffix]
+	]]
+	
+	nonws!: complement charset " ^-^/"
+	skip-ws: func [s [string!]] [any [find s nonws!  tail s]]
+	
+	;@@ since this is O(depth^2) it would be better if mold had a callback
 	;; returned format: [rule-block chart-block ...] (may be multiple pairs if there are nested unnamed rules)
-	chart-rule: function [
-		"Obtain molded text offsets for all block offsets of a rule (deeply)"
-		rule [block!]
-		/base "Override molded text and initial offset"
-			text:   (mold/flat rule)
-			offset: 0
+	chart-block: function [
+		"Obtain molded text offsets for all block offsets (deeply)"
+		rule [any-block!]
+		/flat "Remove newlines"
+		/only types: block! [datatype! typeset!] "Include only these datatypes"
+		/base text: (mold/:flat rule) "Override molded text or its current offset"
 	][
-		result: new-line reduce [rule base: make [] 2 + length? rule] on
+		result: new-line reduce [rule chart: make [] 2 + length? rule] on
+		set [prefix: sep: suffix:] next find decor type?/word rule 
+		to-item: [keep (skip? text: skip-ws skip text prefix)]
+		skip-item: [
+			set item types (
+				append result inner: chart-block/base item text
+				text: skip head text suffix + last inner/2
+			)
+		|	set item skip (text: skip text length? mold/flat item)
+		]
+		skip-to-next: [
+			end keep (skip? skip-ws text)
+		|	keep (skip? text: skip-ws skip text sep)
+		]
 		parse rule [
-			collect after base [
-				keep (text) keep (offset: offset + 1)			;-- skip "["
-				any [
-					set item block!
-					(append result inner: chart-rule/base item text offset)
-					keep (offset: 2 + last inner/2)				;-- 2 = "] "
-				|	set item skip
-					keep (offset: offset + 1 + length? mold/flat item)
-				]
-				(unless empty? rule [step/down top base])		;-- last item doesn't have a " " following it
+			collect after chart [
+				keep (head text) to-item any [skip-item skip-to-next]
 			]
 		]
 		result
 	]
 	
 	#assert [
-		[[] ["[]" 1]] = chart-rule []
+		[[] ["[]" 1]] = chart-block []
 		[
 		    [[]] ["[[]]" 1 3] 
 		    [] ["[[]]" 2]
-		] = chart-rule [[]]		
+		] = chart-block [[]]		
 		[
 			[1 2 ["30" ["40"] []] 5] [{[1 2 ["30" ["40"] []] 5]} 1 3 5 22 23] 
 			["30" ["40"] []] [{[1 2 ["30" ["40"] []] 5]} 6 11 18 20] 
 			["40"] [{[1 2 ["30" ["40"] []] 5]} 12 16] 
 			[] [{[1 2 ["30" ["40"] []] 5]} 19]
-		] = chart-rule [1 2 [{30} [{40}] []] 5]
+		] = chart-block [1 2 [{30} [{40}] []] 5]
 	]
 	
 	locate-age: function [
@@ -291,8 +313,8 @@ context with spaces/ctx expand-directives [
 			]
 		]
 		
-		;; chart-rule also lists unnamed nested rules, which are then spread across info objects 
-		charts: map-each [name rule] named [chart-rule rule]
+		;; chart-block also lists unnamed nested rules, which are then spread across info objects 
+		charts: map-each [name rule] named [chart-block/flat rule]
 		rules: to hash! map-each/eval [rule chart] charts [		;-- registry of all visited rule blocks: rule block -> info object
 			info: make rule-info! []
 			#assert [head? rule]								;@@ must be ensured by the dumper?
