@@ -4312,8 +4312,9 @@ context [
 	
 	kit: make-kit 'slider [
 		frame: object [
-			x->offset: func [x [linear!] "Convert X coordinate into slider offset"] [
-				100% * clip 0 1 x - (space/knob/size/x / 2) / (space/size/x - space/knob/size/x)
+			x->offset: function [x [linear!] "Convert X coordinate into slider offset"] [
+				ofs: x - (space/knob/size/x / 2) / (space/size/x - space/knob/size/x)
+				100% * clip 0 1 round/to ofs space/step
 			]
 		]
 	]
