@@ -193,6 +193,7 @@ if action? :mold [
 						repeat i length? values [
 							poke block i * 2 :values/:i
 						]
+						new-line/skip new-line/all block off on 2	;@@ workaround for #5417 - restore newlines
 					]
 					;; emit opening
 					unless noindent? [
