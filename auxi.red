@@ -313,6 +313,20 @@ make-free-list: function [
 	]
 ]
 
+;@@ move into common?
+make-stack: function [
+	"Create a stack of given row size"
+	size [pair!] (size/1 > 0) "row size X row count"
+][
+	context [
+		data:  make [] size/1 * size/2
+		push:  func [values [block!]] [data: tail reduce/into values data]
+		pop:   does compose [clear data: skip data (negate size/1)]
+		top:   does compose [skip data (negate size/1)]
+		empty: does [data: clear head data]
+	]
+]
+
 
 ; block-buffers: make hash! 100
 ; buffer-for: function [block [block!]] [
