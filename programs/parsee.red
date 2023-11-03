@@ -38,14 +38,11 @@ context with spaces/ctx expand-directives [
 			Age:  0_1_2_3_4_5... <- offsets between events
 			Tick: |1|2|3|4|5|... <- event number, transition between ages
 			
-		Rule profile consist of couples [locus value ...],
-		where 'value' can be:
-			integer 'start'   -> absolute input offset at rule entry (basis for following pairs)
-			pair    'oldXnew' -> input offset change from old to new, relative to 'start'
-			word    'result'  -> 'match or 'fail - end result of the rule (for coloring)
-		and 'locus' is a pair: ageXregion,
-			'region' being incremental number assigned to each separate run of the rule
-			it is required to support coloring of reentrant rules
+		Rule profile is a vector of quartets [age region input-offset text-offset] delimited by [event]s, where:
+		region = an incremental id of the region used for highlighting of reentrant rules
+		input-offset = offset in the original input, e.g. for block - in values
+		text-offset = offset in molded input, for both string block - in chars
+		event = enum defined below (region open, close, and stay)
 		
 		Rule 'marks' are a global sequence of Y=rule+offset(X=age) for each age.
 		Since parser works with only one rule at a time, it's a single hash.
@@ -56,6 +53,19 @@ context with spaces/ctx expand-directives [
 		A 'chart' is a mapping from block offsets into molded text marks, for each rule.
 		Chart format is: ["molded-text" mark0 mark1 ... markLEN]  
 	}
+	
+	;; events encoded in the profile (negative just for easier vector reading)
+	event-open:	   -1									;-- entry into new named rule
+	event-imove:   -2									;-- input movement
+	event-rmove:   -3									;-- rule movement
+	event-match:   -4									;-- left from a named rule
+	event-fail:    -5									;-- ditto
+	;; profile data field offsets
+	i-age:          1
+	i-region:       2
+	i-input-offset: 3
+	i-text-offset:  4
+	i-next-event:   5
 
 	;; colors for the parsing profiles plots need to be fixed, but I adapt them to night/day mode:
 	colors: #()													;-- saturated colors
@@ -167,91 +177,102 @@ context with spaces/ctx expand-directives [
 	
 	locate-age: function [
 		"Return profile at the given age"
-		profile [block!] age [integer!]
+		profile [vector!] age [integer!]
 	][
 		if empty? profile [return profile]
-		n: half length? profile
-		set [o1: f1: o2: f2:] search/for o: 0 n - 1 [profile/(o * 2 + 1)/1] age
-		skip profile 2 * case [
-			age <= f1 [o1]
-			age <= f2 [o2]
-			'else [o2 + 1]
-		]
+		n: (1 + length? profile) / 5
+		set [o1: f1: o2: f2:] search/for o: 0 n - 1 [profile/(o * 5 + i-age)] age
+		skip profile 5 * either age < f2 [o1][o2]
 	]
 	#assert [
-		0  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 0
-		2  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 1
-		4  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 2
-		6  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 3
-		8  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 4
-		8  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 5
-		8  = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 10
-		10 = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 11
-		12 = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 12
-		12 = skip? locate-age [0x1 a 1x1 b 2x1 c 3x1 d 10x1 e 11x1 f] 100
+		0  = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 0
+		5  = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 1
+		10 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 2
+		15 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 3
+		15 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 4
+		15 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 5
+		20 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 10
+		25 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 11
+		25 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 12
+		25 = skip? locate-age make vector! [0 0 0 0 0 1 0 0 0 0 2 0 0 0 0 3 0 0 0 0 10 0 0 0 0 11 0 0 0] 100
 	]
 	
 	replay: function [
 		"Apply a limited sequence of profile changes to the input RTD flags"
-		profile [block!] (head? profile) flags [block!] age1 [integer!] age2 [integer!]
-	][
-		step:    2 * sign: sign? age2 - age1
-		set [ilocus: ivalue:] pick [[-2 -1] [1 2]] back?: sign = -1
+		profile [vector!] flags [block!] age1 [integer!] age2 [integer!]
+	] reshape [
+		set [frange: fcolor:] [1 3]
+		step:    5 * sign: sign? age2 - age1
+		ievent:  pick [-1 5] back?: sign = -1
 		at-age1: locate-age profile age1
 		at-age2: locate-age profile age2
-		flag:    skip tail flags -3 
-		pos:     at-age1
+		; probe new-line/skip to [] profile on 5 ?? at-age1 ?? at-age2
 		options: either back? [[
-			pair!    [flag/1/2: value/1]						;-- progress update
-			; integer! [flag: skip clear flag -3]					;-- region entry
-			word!    [flag/3: light/yellow]						;-- region close = coloring
-		]] [[
-			pair!    [flag/1/2: either value/2 = 0 [flag/1/2][value/2]]	;-- do not rewind on exit, let color stay ;@@ better way?
-			integer! [if tail? flag [reduce/into [(value + 1 by 0) 'backdrop light/yellow] flag]]
-			word!    [flag/3: either value = 'match [light/green][light/red]]
+			!(event-imove) [dst-flag/:frange/2: dst-offset + 1 - dst-flag/:frange/1]
+			!(event-open)  [src-flag/:frange/2: 0]
+			!(event-match)
+			!(event-fail)  [dst-flag/:fcolor: light/yellow]
+		]] [[		
+			;; do not rewind length on exit, let color stay: ;@@ or any better way?
+			!(event-imove) [if 0 < len: dst-offset + 1 - dst-flag/:frange/1 [dst-flag/:frange/2: len]]
+			!(event-open)  [if tail? dst-flag [reduce/into [(dst-offset + 1 by 0) 'backdrop light/yellow] dst-flag]]
+			!(event-match) [src-flag/:fcolor: light/green]
+			!(event-fail)  [src-flag/:fcolor: light/red]
 		]]
-		while [not same? pos at-age2] [
-			flag: skip flags pos/:ilocus/2 - 1 * 3
-			switch type?/word value: pos/:ivalue options
-			pos: skip pos step
+		; ?? [age1 age2]
+		dst: at-age1 while [not same? src: dst at-age2] [
+			event:      src/:ievent
+			dst:        skip src step
+			src-flag:   skip flags src/:i-region * 3
+			dst-flag:   skip flags dst/:i-region * 3
+			dst-offset: dst/:i-text-offset
+			; print ""
+			; ?? [event src-flag dst-flag dst-offset]
+			switch event options
+			; ?? [event src-flag dst-flag]
 		]
 		flags
 	]
 	
 	render-profile: function [
 		"Create a draw block out of profile data"
-		profile [block!]
-	][
-		append failures:  clear [] [line 0x0]
-		append successes: clear [] [line 0x0]
-		runs: clear []
-		peak: 1
-		last-rise: 0
-		foreach [locus value] profile [
-			age: locus/1
-			switch type?/word value [
-				pair! [
-					peak: max peak value/2
-					repend run [(age by value/1) (age by last-rise: value/2)]
+		profile [vector!]
+	] reshape [
+		repend failures:  clear [] ['fill-pen colors/red]
+		repend successes: clear [] ['fill-pen colors/green]
+		peak:    1
+		old-xy:  0x0
+		runs:    make-stack 2x10
+		run:     none											;-- initial run is ignored
+		; repend runs [run start: 0]
+		; probe new-line/skip to [] profile on 5 
+		foreach [event x region iofs tofs] skip profile 4 [
+			if run [repend run ['box (old-xy) (x by 0)]]		;-- close the previous segment
+			switch event [
+				!(event-imove) [
+					if run [peak: max peak y: iofs - start]
 				]
-				integer! [
-					if run [repend run [(age by last-rise) (age by 0)]] ;-- close the outer region if recursing
-					repend runs [last-rise run: make [] 64]
-					last-rise: 0
+				!(event-open) [
+					runs/push [run: make [] 32 start: iofs]		;-- stash the run for later restoration
+					y: 0										;-- new run starts at zero height
 				]
-				word! [
-					target: either value = 'match [successes][failures]
-					repend append target run [(age by last-rise) (age by 0)]
-					clear set [last-rise: run:] skip tail runs -2
-					if run [repend run [(age by 0) (age by last-rise)]]	;-- reopen the outer region if out of recursion
+				!(event-match)
+				!(event-fail) [
+					target: either event = event-match [successes][failures]
+					#assert [run]
+					if run [append/only target run]
+					runs/pop
+					set [run: start:] runs/top
+					if run [peak: max peak y: iofs - start]
 				]
 			]
+			old-xy: x by y
 		]
-		compose/deep/only [
-			pen off scale 1.0 (1.0 / peak)
-			;; since shape can't change color on the fly, it's faster to have single shape per color
-			fill-pen (colors/red)   shape (copy append failures  'close)
-			fill-pen (colors/green) shape (copy append successes 'close)
+		prettify/draw compose/deep/only [
+			pen off scale 1.0 (1.0 / peak) [
+				(copy failures)
+				(copy successes)
+			]
 		]
 	]
 
@@ -296,22 +317,25 @@ context with spaces/ctx expand-directives [
 	;@@ need to use 'changes' block too (only reason why dump has 'age' is to sync changes to parsing)
 	;@@ if input is modified, this affects offsets after it, thus text highlighting may shift - need to care for
 	decode-dump: function [dump [block!] (parse dump [series! 2 block!])] [
-		set [input: events: changes:] dump
+		set [cloned: events: changes:] dump
+		#assert [not empty? events]								;-- parse can never generate zero events
+		input:     events/2
+		top-level: events/5
 		; ?? input ?? changes print ["events:" mold/all events]
 		
-		marks: make block! (length? events) / 5 + 1 * 2			;-- [rule offset] pairs at each age
+		marks: make block! (length? events) / 6 + 1 * 2			;-- [rule offset] pairs at each age
 		
-		named: make hash! []
-		if top-level: events/5 [
-			named: to hash! scan-rule-names top-level			;-- named rules dictionary: name -> info object
-			either found: find/only/same named top-level [		;-- top level rule may be named in case: parse input name
-				top-level-name: found/-1
-			][
-				top-level-name: 'top-level
-				#assert [not find named 'top-level]
-				repend named ['top-level top-level]
-			]
+		named: to hash! scan-rule-names top-level				;-- named rules dictionary: name -> info object
+		either found: find/only/same named top-level [			;-- top level rule may be named in case: parse input name
+			top-level-name: found/-1
+		][
+			top-level-name: 'top-level
+			#assert [not find named 'top-level]
+			repend named ['top-level top-level]
 		]
+		
+		if on-block: any-block? input [input-charts: make hash! chart-block input]
+		; ?? input-charts
 		
 		;; chart-block also lists unnamed nested rules, which are then spread across info objects 
 		charts: map-each [name rule] named [chart-block/flat rule]
@@ -320,9 +344,11 @@ context with spaces/ctx expand-directives [
 			#assert [head? rule]								;@@ must be ensured by the dumper?
 			info/rule:      rule
 			info/chart:     chart
-			info/profile:   make [] 1024
+			info/profile:   clear make vector! 4096
 			info/keyframes: make [] 32
 			;; info/depth = none initially: after decoding it indicates that this block is not a rule, or it was never reached
+			text-offset: either on-block [input-charts/2/2][0]
+			repend info/profile [0 0 0 text-offset]
 			[rule info]
 		]
 		map-each/self/eval [name rule] named [
@@ -332,150 +358,164 @@ context with spaces/ctx expand-directives [
 		]
 		
 		;; decoder's immediate data
-		starts:  make block! 64									;-- stack of input offsets at each rule's (re)entry
-		entered: clear []										;-- [scope depth offset...] triples; depth may change for the same scope
-		depth:   -1
-		age:     -1
+		scope-stack: clear []							;-- [scope info pos depth...] quartets; depth may change for the same scope
+		depth: 0
+		age:   -1
 		
-		unless empty? events [
-			;; all profile modification is kept here isolated, otherwise it's messy
-			tick: does [
-				mark: offset->mark info/chart skip? rule
-				;; collect named rule, not current rule as only named rules serve as search keys
-				repend marks [head named/:scope/rule  mark]
-				age: age + 1
-			]
-			get-input-offsets: does [
-				inp-offset1: either pair? pair: last profile [pair/2][last entered]
-				inp-offset2: (skip? inpos) - last starts
-			]
-			after-entering-rule: does [
-				repend profile [tick last starts]
-			]
-			before-leaving-rule: does [
-				repend profile [tick pick [match fail] match?]
-			]
-			after-rule-movement: does [
-				;; these events are used to display rule advancement, don't affect the input
-				repend profile [tick 1x1 * inp-offset: (skip? inpos) - last starts]
-			]
-			after-input-movement: does [
-				repend profile [tick inp-offset1 by inp-offset2]
-			]
+		new-age: func [scope info "current, possibly unnamed" pos] [
+			mark: offset->mark info/chart skip? pos/:irule
+			;; collect named rule, not current rule as only named rules serve as search keys
+			repend marks [head scope/rule  mark]
+			; ?? [age mark pos/:ievent]
+			age: age + 1
+		]
+		get-text-offset: func [orig-series [series!]] pick [[
+			chart: select/only/same/skip input-charts head orig-series 2
+			chart/(2 + skip? orig-series)
+		][
+			skip? orig-series
+		]] on-block
+		
+		scope: named/:top-level-name
+		prev-inpos: input
+		set [iinput: ievent: imatch?: irule: isubj:] [2 3 4 5 6]
+		
+		;; handle first push event manually
+		#assert [events/:ievent = 'push]
+		new:         events
+		inp-offset:  skip?           new/:iinput
+		text-offset: get-text-offset new/:iinput
+		next-age:    new-age scope scope new
+		repend scope/profile [event-open next-age 0 inp-offset text-offset]
+		repend scope-stack   [scope scope new scope/depth: 0]
 			
-			scope: top-level-name
-			while [not tail? events] [					;@@ use for-each when fast
-				set [_: inpos: event: match?: rule:] events
-				info:    select/only/same/skip rules head rule 2
-				profile: named/:scope/profile
-				switch event [
-					fetch match paren [							;-- all intermediate crap
-						get-input-offsets
-						if inp-offset1 <> inp-offset2 [after-input-movement]
-						rul-offset1: skip? any [prev-rule: events/-1 []]
-						rul-offset2: skip? rule
-						if rul-offset1 <> rul-offset2 [after-rule-movement]
-					]
-					push [										;-- just entered a rule maybe, or false alarm
-						prev-rule: events/-1
-						case [
-							not all [							;-- if not within the same rule
-								prev-rule
-								same? head rule head prev-rule
-							][
-								if info/name [
-									depth: depth + 1
-									info/depth: min-safe depth info/depth
-									append starts skip? inpos
-									scope: info/name
-									profile: named/:scope/profile 
-									after-entering-rule
-								]
-								inp-offset: (skip? inpos) - last starts
-								reduce/into [scope depth inp-offset] entered: tail entered
-							]
-							not same? rule prev-rule [			;-- within the same rule, at different offsets
-								rul-offset1: skip? prev-rule
-								rul-offset2: skip? rule
-								after-rule-movement
-							]
-						]
-					]
-					pop [										;-- about to leave a rule maybe, or false alarm
-						get-input-offsets						;-- may happen if popping through this rule
-						if inp-offset1 <> inp-offset2 [after-input-movement]
-						next-rule: events/10
-						case [
-							not all [							;-- popping into another rule
-								next-rule
-								same? head rule head next-rule
-							][
-								if info/name [
-									before-leaving-rule
-									take/last starts
-								]
-								set [scope: depth: _:] entered: skip clear entered -3
-							]
-							not same? rule next-rule [			;-- popping within the same rule, different offset
-								rul-offset1: skip? rule
-								rul-offset2: skip? next-rule
-								after-rule-movement
-							]
-						]
-					]
-				];switch event [
-				events: skip events 5
-			];while [not tail? events] [
+		;; kludge to handle last event as well
+		append events end: skip tail events -6
+		poke end 6 + ievent 'end
+		
+		while [not tail? new: skip old: new 6] [
+			;; infer high level features
+			old-info: select/only/same/skip rules head old/:irule 2
+			new-info: select/only/same/skip rules head new/:irule 2
+			into-named?: if
+				entered?: all [new/:ievent = 'push  block? new/:isubj]
+				[new-info/name]
+			from-named?: if
+				exited?:  all [old/:ievent = 'pop   block? old/:isubj]
+				[old-info/name]
+			scope-inout?: any [into-named? from-named?]			;-- possibly into/from the same scope (recursing)
 			
-			;; some profiles may have been left open, due to exception/return/etc - consider them failed (e.g.  that's how CSV normally works)
-			inp-offset2: 0										;-- closing offset of failed rules is zero
-			foreach [name info] named [
-				if empty? profile: info/profile [continue]
-				unless word? pair: last profile [
-					inp-offset1: either pair? pair: last profile [pair/2][0]
-					if inp-offset1 <> 0 [after-input-movement]
-					before-leaving-rule
+			;; update tracked state
+			if entered? [
+				if into-named? [
+					scope: new-info
+					depth: depth + 1
+					new-info/depth: min-safe depth new-info/depth
 				]
+				repend scope-stack [scope new-info new depth]
 			]
-		];unless empty? events [
+			
+			if scope-inout? [
+				#assert [not all [entered? exited?]]			;-- should never happen
+				either entered? [
+					p-event: event-open
+					pos:     new
+					info:    new-info
+				][
+					p-event: either old/:imatch? [event-match][event-fail]
+					pos:     old
+					info:    old-info
+				]
+				inp-offset:  skip?           pos/:iinput
+				text-offset: get-text-offset pos/:iinput
+				next-age:    new-age scope info pos 
+				repend scope/profile [p-event next-age 0 inp-offset text-offset]
+			]
+			
+			if exited? [
+				; clear set [scope: _: _: depth:] skip tail scope-stack -4
+				set [scope: _: old: depth:] skip tail scope-stack -8
+				clear skip tail scope-stack -4
+			]
+
+			any [
+				rule-switch?:  not same? head old/:irule  head new/:irule
+				rule-move?:    not same?      old/:irule       new/:irule
+			]
+			any [
+				input-switch?: not same? head old/:iinput head new/:iinput
+				input-move?:   not same?      old/:iinput      new/:iinput
+			]
+			
+			;; log event into the relevant rule profile
+			if any [all [input-move? not input-switch?] rule-switch? rule-move?] [
+				p-event:     either all [not input-switch? input-move?] [event-imove][event-rmove]
+				inp-offset:  skip?           new/:iinput
+				text-offset: get-text-offset new/:iinput
+				next-age:    new-age scope new-info new
+				repend scope/profile [p-event next-age 0 inp-offset text-offset]
+			]
+			
+		];while [not tail? new: skip old: new 6] [
 		
-		marks: make hash! marks
+		;; some profiles may have been left open, due to exception/return/etc - consider them failed
+		while [not tail? scope-stack] [
+			clear set [scope: info: pos: depth:] skip tail scope-stack -4
+			if info/name [								;-- pass thru entered unnamed rules, or profile is closed many times
+				inp-offset:  skip?           pos/:iinput
+				text-offset: get-text-offset pos/:iinput
+				next-age:    new-age info info pos 
+				repend scope/profile [event-fail next-age 0 inp-offset text-offset]
+			]
+		]
+		
+		marks: new-line/skip make hash! marks on 2
+		rules: new-line/skip rules on 2
 		
 		;; remove blocks that either aren't rules or were never reached
 		;@@ can dumper handle this instead?
 		remove-each [name info] named [not info/depth]
 		
-		;; profiles here are age-based, need to convert them into ageXrange based for fast replay
-		foreach [name info] named [
-			irange: nranges: 0
-			ranges: clear []
-			map-each/self/eval [age value] info/profile [
-				switch type?/word value [
-					pair! [[age by irange value]]
-					integer! [
-						append ranges irange: nranges: nranges + 1
-						[age by irange value]
+		;; enumerate regions of each profile
+		foreach [name info] named reshape [
+			profile:  info/profile
+			nregions: 0
+			regions: clear []
+			while [event: profile/:i-next-event] [
+				profile: skip profile 5
+				switch event [
+					!(event-open) [
+						append regions region: nregions			;-- region is 0-based for faster replay
+						nregions: 1 + nregions
 					]
-					word! [
-						old-irange: take/last ranges
-						irange: last ranges
-						[age by old-irange value]
+					!(event-match)
+					!(event-fail) [
+						take/last regions
+						region: any [last regions 0]
 					]
 				]
+				profile/:i-region: region
 			] 
 		]
 		
 		;; sort named rules by depth
 		compare: func [a b] [b/2/depth - a/2/depth]
 		named:   make map! sort/stable/skip/compare/all named 2 :compare
-		#assert [hash? rules]
-		#assert [hash? marks]
+		#assert [
+			hash? rules
+			hash? marks
+			any [not on-block  hash? input-charts]
+		]
+		
+		; ?? named/top-level
+		; ?? named/rule
 		
 		to map! compose/only [
-			max-age:  (max 0 age)						;-- >= 0
-			named:    (named)							;-- (map)  info of named rules: name -> info-object
-			rules:    (rules)							;-- (hash) info of all rules:   [rule-block info-object] pairs
-			marks:    (marks)							;-- (hash) rule marks per age:  [rule-block rule-mark] pairs
+			max-age:      (max 0 age)					;-- >= 0
+			named:        (named)						;-- (map)  info of named rules:    name -> info-object
+			rules:        (rules)						;-- (hash) info of all rules:      [rule-block info-object] pairs
+			marks:        (marks)						;-- (hash) rule marks per age:     [rule-block rule-mark] pairs
+			input-charts: (input-charts)				;-- (hash) any-block input charts: [input-block chart-block] pairs
 		]
 	];decode-dump: function [dump [block!] (parse dump [series! 2 block!])] [
 	
@@ -485,7 +525,7 @@ context with spaces/ctx expand-directives [
 	
 	get-keyframe: function [
 		"Ensure keyframe at given age exists and return it"
-		keyframes [block!] profile [block!] age [integer!] (age % key-step = 0)
+		keyframes [block!] profile [vector!] age [integer!] (age % key-step = 0)
 	][
 		unless flags: pick keyframes age / key-step + 1 [
 			if empty? keyframes [append/only keyframes []]
@@ -502,7 +542,7 @@ context with spaces/ctx expand-directives [
 	get-flags: function [
 		"Get input flags block for a given profile at given age"
 		keyframes [block!] "Keyframes data collected so far"
-		profile   [block!]
+		profile   [vector!]
 		age       [integer!]
 		/from "Last known age and flags block"
 			last-age:   0  [integer!]
@@ -604,11 +644,13 @@ context with spaces/ctx expand-directives [
 							
 	;@@ layout: grid-view with 2 vlists (1 pinned), so rule names are always visible
 	;@@ for that grid-view will have to support row selection, like in list-view
+	;@@ BUG: when profiles are too wide it won't allow to scroll to them, likely triggering slide during intermediate redraws
 	visualize-parse: function [file [file!] /config conf: #() [map!]] [
 		;; load the dump file
 		input: first data: load/as file 'redbin
 		decoded: decode-dump data
-		foreach key [max-age: named: rules: marks:] [set key decoded/:key]
+		foreach key [max-age: named: rules: marks: input-charts:] [set key decoded/:key]
+		input-text: any [if input-charts [input-charts/2/1] input]
 		
 		;; turn rule profiles into graphic shapes
 		foreach [name info] named [info/plot: render-profile info/profile]
@@ -651,7 +693,7 @@ context with spaces/ctx expand-directives [
 				column [
 					text bold "Parsed input:"
 					cell color= colors/canvas [scrollable [
-						input-view: text !(input) limits= 100x100 .. none
+						input-view: text !(input-text) limits= 100x100 .. none
 							color= colors/text font= monofont
 							age= 0 rule= none			;-- last state stored for fast replay
 					]]
