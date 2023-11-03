@@ -225,22 +225,35 @@ if action? :mold [
 							0
 						]
 					]
-					forall pos [						;-- emit items
-						if new-line? pos [emit [lf]]
-						string: mold* :pos/1 limit
+					either ~/all [						;-- abbreviate huge blocks
+						type = 'block!
+						not deep
+						not all
+						depth > 1
+						(length? pos) >= 16				;-- if this block is small, better to abbreviate a deeper one
+						(n: 256) = length? native-mold/part pos n
+					][
+						string: `"block of (length? block) values..."`
+						locally-flat: on
 						emit [string]
-						unless tail? next pos [
-							if align [
-								string: append/dup clear "" " " align - length? string
-								emit [string]
+					][
+						forall pos [					;-- emit items
+							if new-line? pos [emit [lf]]
+							string: mold* :pos/1 limit
+							emit [string]
+							unless tail? next pos [
+								if align [
+									string: append/dup clear "" " " align - length? string
+									emit [string]
+								]
+								emit [sp]
 							]
-							emit [sp]
+							if limit <= 0 [break]
 						]
-						if limit <= 0 [break]
 					]
 					if ~/all [not empty? block new-line? block] [	;@@ not empty = workaround for a heisenbug
 						unless noindent? [clear skip tail indent -4]
-						unless flat [
+						unless any [flat locally-flat] [
 							lf: rejoin ["^/" indent]
 							emit [lf]
 						]
