@@ -199,14 +199,29 @@ host-box-of: function [									;@@ temporary until REP #144
 	none
 ]
 
-;-- if one of the boxes is 0x0 in size, result is false: 1x1 (one pixel) is considered minimum overlap
-;@@ to be rewritten once we have floating point pairs
 boxes-overlap?: function [
-	"Get intersection size of boxes A1-A2 and B1-B2, or none if they do not intersect"
-	A1 [planar!] "inclusive" A2 [planar!] "non-inclusive"
-	B1 [planar!] "inclusive" B2 [planar!] "non-inclusive"
+	"Get nonzero intersection size of boxes A1-A2 and B1-B2, or none if they don't intersect"
+	A1 [planar!] A2 [planar!]
+	B1 [planar!] B2 [planar!]
 ][
 	(0,0) +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
+]
+
+#assert [
+	not   boxes-overlap? -2x-2 -1x-1 1x1 2x2
+	not   boxes-overlap? -2x1 -1x2 1x-2 2x-1
+	not   boxes-overlap? -2x-2 0x0 0x0 2x2
+	2x2 = boxes-overlap? -2x-2 1x1 -1x-1 2x2
+	2x2 = boxes-overlap? -2x-1 1x2 -1x-2 2x1
+]
+
+segments-overlap?: function [
+	"Get nonzero intersection size of segments A1-A2 and B1-B2, or none if they don't intersect"
+	A1 [linear!] A2 [linear!]
+	B1 [linear!] B2 [linear!]
+][
+	sec: (min A2 B2) - max A1 B1
+	all [sec > 0 sec]									;-- 0 < intersection size
 ]
 
 vec-length?: function [v [planar!]] [					;-- this is still 2x faster than compiled `distance? 0x0 v`
