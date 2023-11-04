@@ -149,8 +149,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			update-ema/batch 'item-size-estimate/:y item-len 1000 n 
 			size:     size + (2 * margin)
 			if direction < 0 [							;-- make all offsets positive
-				shift: size
-				shift/:x: 0
+				shift: set-axis size x 0
 				foreach [_ geom] map [geom/offset: geom/offset + shift]
 			]
 			range:    order-pair range 
