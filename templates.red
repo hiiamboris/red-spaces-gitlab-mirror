@@ -2225,7 +2225,7 @@ inf-scrollable-ctx: context [
 		;; transfer offset from scrollable into window, in a way detectable by on-change
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
-			#debug sizing [#print "sliding (space/size) with (space/content) by (wofs' - wofs)"]
+			#debug sizing [#print "sliding (space-id space) with (space/content) by (wofs' - wofs)"]
 			space/origin: space/origin + (wofs' - wofs)	;-- may be watched (e.g. by grid-view)
 			window/origin: negate wofs'					;-- invalidates both scrollable and window
 			wofs' - wofs								;-- let caller know that slide has happened
@@ -2405,7 +2405,8 @@ list-view-ctx: context [
 			#assert [anchor/offset <= 0]
 			anchor/offset
 		]
-		window/origin: set-axis (0,0) axis shift				;@@ or move the list instead? a bit slower
+		; window/origin: set-axis (0,0) axis shift				;@@ or move the list instead? a bit slower
+		window/origin: set-axis window/origin axis shift		;@@ or move the list instead? a bit slower
 		
 		; ?? [xy1 xy2 length frame/filled shift anchor/index anchor/offset window/origin lview/origin]
 		compose/into [
@@ -2455,7 +2456,7 @@ list-view-ctx: context [
 		y:      list/axis
 		if list/frame/anchor <> anchor/index [exit]		;-- forbid slide after anchor is changed (otherwise it resets anchor back)
 		; if window/origin <> list/frame/window-origin [exit]
-		
+
 		;; it's possible that multiple slides occur without a draw, resulting in no visible item suitable as a new anchor
 		;; to avoid this I just limit max consecutive slides to half the window
 		;@@ there must be a better solution for this, but I don't see a simple one
@@ -2472,7 +2473,7 @@ list-view-ctx: context [
 		set [new-anchor-item: new-anchor-geom:] pos:
 			apply 'locate [
 				list/map
-				[item geom .. boxes-overlap? xy1 xy2 geom/offset geom/offset + geom/size]
+				[item geom .. segments-overlap? xy1/:y xy2/:y geom/offset/:y geom/offset/:y + geom/size/:y]
 				;; if content in window shifted up/left, will draw more items below/right
 				;; if content in window shifted down/right, will draw more items above/left:
 				/back moved/:y < 0
