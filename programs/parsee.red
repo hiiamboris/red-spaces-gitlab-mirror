@@ -529,9 +529,10 @@ context with spaces/ctx expand-directives [
 		]
 	];decode-dump: function [dump [block!] (parse dump [series! 2 block!])] [
 	
-	;; 'replay' is surprisingly fast: about 150us/1k ticks,
-	;; so it makes sense to have keyframes at no less than 1k intervals, up to 10k
-	key-step: 4096
+	;; 'replay' is surprisingly fast: about 7ms per profile of 3000 events - that's 2.3us/event
+	;; in worst case - 1 event/tick - 5ms will be enough for 2k events, on slower CPU 1k
+	;; so it makes sense to have keyframes at 1k intervals give or take
+	key-step: 1024
 	
 	get-keyframe: function [
 		"Ensure keyframe at given age exists and return it"
