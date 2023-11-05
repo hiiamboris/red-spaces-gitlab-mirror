@@ -719,7 +719,7 @@ context with spaces/ctx expand-directives [
 						stretch
 						hlist margin= 0 [
 							text bold "Zoom:"
-							box [zoom: slider 200 100% step= 1% ratio= 0 react [ratio: 1% ** (1 - zoom/offset)]]
+							box [zoom: slider 200 100% marks= 25% step= 1% ratio= 0 react [ratio: 1% ** (1 - zoom/offset)]]
 							text 50
 								react [text: format-number zoom/ratio 1 2]
 								react [refresh-zoom plot-list zoom/ratio]
