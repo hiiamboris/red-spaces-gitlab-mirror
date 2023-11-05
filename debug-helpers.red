@@ -334,8 +334,9 @@ if action? :mold [
 probe: function [
 	"Returns a value after printing its molded form"
 	value [any-type!]
+	/deep /all
 ][
-	print mold :value
+	print mold/:deep/:all :value
 	:value
 ]
 
