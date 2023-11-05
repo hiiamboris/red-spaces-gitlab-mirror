@@ -4297,12 +4297,40 @@ field-ctx: context [
 context [
 	~: self
 	
-	draw: function [space [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		kdrawn: render knob: space/knob
-		size: max space/knob/size fill-canvas canvas fill-x no	;-- never extend along Y axis 
-		space/size: constrain size space/limits
-		free: space/size - knob/size
-		compose/only [translate (1.0 * space/offset . 0.5 * free) (kdrawn)] 
+	draw: function [slider [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+		;; knob
+		kdrawn: render knob: slider/knob
+		size: max slider/knob/size fill-canvas canvas fill-x no	;-- never extend along Y axis 
+		slider/size: constrain size slider/limits
+		free: slider/size - knob/size
+		koffset: 1.0 * slider/offset . 0.5 * free
+		
+		;; marks
+		mdrawn: clear []
+		either slider/marks [
+			period: slider/marks * either integer? slider/marks
+				[either integer? slider/step [slider/step][slider/step * slider/size/x]]
+				[free/x]
+			nmarks: 1 + round-down free/x + 1e-6 / period
+			ssm: slider/spaces/marks
+			mksize: 1 . slider/size/y							;-- default; style may disregard
+			while [nmarks > length? ssm] [append ssm make-space 'mark []]
+			x: half knob/size/x
+			foreach mark ssm [									;@@ use map-each
+				repend mdrawn ['translate x . 0 render/on mark mksize yes yes]
+				x: x + period
+			]
+		][
+			clear slider/spaces/marks
+		]
+		
+		compose/only [(copy mdrawn) translate (koffset) (kdrawn)]	;-- mostly drawn in style, only positioning is here
+	]
+	
+	;@@ given the name, should be generic, just modified here a bit?
+	declare-template 'mark/space [
+		cache: none										;-- it should be enough to just invalidate the slider
+		draw:  :no-draw									;-- drawn by style
 	]
 	
 	declare-template 'knob/space [
@@ -4326,9 +4354,15 @@ context [
 		;; knob location: 0-100%
 		offset: 0%						#type =  [percent! float!] (all [0 <= offset offset <= 1]) :invalidates-look
 		;; keyboard-driven knob displacement: integer = pixels, otherwise = percent of the whole
-		step:   0.5%					#type =  [number!] (step > 0)
+		step:   0.5%					#type == [number!] (step > 0)
+		;; visual scale marks period: integer = multiple of step, otherwise = percent of the whole
+		marks:  none					#type == [number! (marks > 0) none!]
 		
-		knob:   make-space 'knob []		#type =? [object!] (space? knob) :invalidates 
+		spaces: object [
+			knob:  make-space 'knob []
+			marks: []
+		]
+		knob:   spaces/knob				#type =? [object!] (space? knob) :invalidates
 		draw:   func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 ]

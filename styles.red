@@ -295,10 +295,12 @@ do with styling: context [
 			knob:  slider/knob
 			right: slider/size - left: half knob/size/x . slider/size/y
 			stop:  right - left * slider/offset * 1x0 + left
-			compose [
-				line-width 4
-				pen (opaque svmc/text 70%) line (left) (stop)
-				pen (opaque svmc/text 30%) line (stop) (right)
+			compose/deep [
+				push [
+					line-width 4
+					pen (opaque svmc/text 70%) line (left) (stop)
+					pen (opaque svmc/text 30%) line (stop) (right)
+				]
 				(drawn)
 			]
 		]
@@ -306,6 +308,10 @@ do with styling: context [
 		slider/knob: /skip [
 			fill:  opaque svmc/text either focused?/parent [100%][40%]
 			above: reshape-light [line-width 1 fill-pen @(fill) circle (size / 2) (size/x / 2) (size/y / 2)]
+		]
+		slider/mark: function [mark /on canvas fill-x fill-y] [
+			h: second mark/size: 1 by either canvas [canvas/y][1]
+			compose [line-width 1 line (0.5, 0) (0.5 . (h * 0.15)) line (0.5 . (h * 0.85)) (0.5 . h)]
 		]
 	]
 ]
