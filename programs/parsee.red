@@ -244,10 +244,20 @@ context with spaces/ctx expand-directives [
 		old-xy:  0x0
 		runs:    make-stack 2x10
 		run:     none											;-- initial run is ignored
-		; repend runs [run start: 0]
 		; probe new-line/skip to [] profile on 5 
 		foreach [event x region iofs tofs] skip profile 4 [
-			if run [repend run ['box (old-xy) (x by 0)]]		;-- close the previous segment
+			all [												;-- close the previous segment
+				old-xy/y > 0
+				run
+				either any [
+					tail? run
+					(end: tail run  end/-2/y <> old-xy/y)		;-- try to join with the last segment
+				][
+					repend run ['box (old-xy) (x by 0)]
+				][
+					end/-1/x: x
+				]
+			]
 			switch event [
 				!(event-imove) [
 					if run [peak: max peak y: iofs - start]
@@ -260,7 +270,7 @@ context with spaces/ctx expand-directives [
 				!(event-fail) [
 					target: either event = event-match [successes][failures]
 					#assert [run]
-					if run [append/only target run]
+					unless empty? run [append/only target run]
 					runs/pop
 					set [run: start:] runs/top
 					if run [peak: max peak y: iofs - start]
@@ -268,7 +278,7 @@ context with spaces/ctx expand-directives [
 			]
 			old-xy: x by y
 		]
-		prettify/draw compose/deep/only [
+		compose/deep/only [
 			pen off scale 1.0 (1.0 / peak) [
 				(copy failures)
 				(copy successes)
