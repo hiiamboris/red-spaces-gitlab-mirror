@@ -13,8 +13,7 @@ remove-event-func 'tabbing								;-- will be called by the spaces handler
 insert-event-func 'tabbing spaces-tab-handler: function [face event] [
 	all [
 		event/key = #"^-"
-		tabbing/key-events/(event/type)					;-- consume all tab key events
-		not tabbing/avoid-faces/(face/type)				;-- this should exclude host as well - handled by finalizer below
+		face/type <> 'base								;-- handled by the finalizer below
 		not event/ctrl?									;-- let area and tab-panel handle ctrl-tab
 		result: 'stop
 		not host? face									;-- but just in case /avoid-faces is modified and supports general base
