@@ -179,7 +179,7 @@ VID: context [
 	;; basic event dispatching face
 	system/view/VID/styles/host: reshape [
 		default-actor: worst-actor-ever					;-- worry not! this is useful
-		init: [set 'init-window window-of face init-spaces-tree face]
+		init: [set 'init-window window-of self init-spaces-tree self]
 		template: /use (declare-class/manual 'host [
 			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
 			on-change*: function spec-of :classy-object!/on-change*
