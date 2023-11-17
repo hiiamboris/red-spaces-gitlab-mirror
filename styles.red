@@ -310,7 +310,7 @@ do with styling: context [
 			above: reshape-light [line-width 1 fill-pen @(fill) circle (size / 2) (size/x / 2) (size/y / 2)]
 		]
 		slider/mark: function [mark /on canvas fill-x fill-y] [
-			h: second mark/size: 1 by either canvas [canvas/y][1]
+			h: second mark/size: 1 . either canvas [canvas/y][1]
 			compose [line-width 1 line (0.5, 0) (0.5 . (h * 0.15)) line (0.5 . (h * 0.85)) (0.5 . h)]
 		]
 	]
