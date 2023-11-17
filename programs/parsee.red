@@ -108,7 +108,7 @@ context with spaces/ctx expand-directives [
 		to-item: [keep (skip? text: skip-ws skip text prefix)]
 		skip-item: [
 			set item types (
-				append result inner: chart-block/base item text
+				append result inner: chart-block/base/:flat/:only item text types
 				text: skip head text suffix + last inner/2
 			)
 		|	set item skip (text: skip text length? mold/flat item)
@@ -290,7 +290,7 @@ context with spaces/ctx expand-directives [
 	
 	;@@ need to use 'changes' block too (only reason why dump has 'age' is to sync changes to parsing)
 	;@@ if input is modified, this affects offsets after it, thus text highlighting may shift - need to care for
-	decode-dump: function [dump [block!] (parse dump [series! 2 block!])] [
+	decode-dump: function [dump [block!] (parse dump [series! 2 block! hash!])] [
 		set [input: events: changes: named:] dump
 		#assert [not empty? events]								;-- parse can never generate zero events
 		top-level: events/5
@@ -307,7 +307,7 @@ context with spaces/ctx expand-directives [
 			repend named ['top-level top-level]
 		]
 		
-		if on-block: any-block? input [input-charts: make hash! chart-block input]
+		if on-block: any-block? input [input-charts: make hash! chart-block/only input any-block!]
 		; ?? input-charts
 		
 		;; chart-block also lists unnamed nested rules, which are then spread across info objects 
@@ -694,7 +694,7 @@ context with spaces/ctx expand-directives [
 							]
 						]
 						on-wheel [
-							if event/ctrl? [zoom/offset: 100% * clip 0 1 zoom/offset + (10% * event/picked)]
+							if event/ctrl? [zoom/offset: 100% * clip 0 1 zoom/offset + (2% * event/picked)]
 						]
 						react [refresh-progress input-view plot-list marks timeline/age profiles-view/cursor]
 				]
