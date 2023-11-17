@@ -81,42 +81,6 @@ context with spaces/ctx expand-directives [
 	;; spaces mold is not used here
 	mold: :native-mold
 		
-	;@@ remove keywords and scanning
-	keywords: make hash! [
-		| skip quote none end
-		opt not ahead
-		to thru any some while
-		if into fail break reject
-		set copy keep collect case						;-- collect set/into/after? keep pick?
-		remove insert change							;-- insert/change only?
-		#[true]
-	]
-
-	;; I haven't found any other way to extract the names
-	;; I tried collecting first words of the 'fetch' event,
-	;; but sometimes it may be at 'opt name' and who knows what other cases are possible
-	scan-rule-names: function [rule [block!]] [
-		result:  make #() 32							;-- only named
-		scanned: make hash! 32							;-- also unnamed rules (avoid recursion and double scanning)
-		parse rule scan-block: [
-			p: if (find/only/same scanned head p) to end
-		|	p: (append/only scanned head p)
-			any [
-				set w word! (
-					if all [
-						not keywords/:w
-						block? try [block: get/any w]
-					][
-						parse result/:w: block scan-block
-					]
-				)
-			|	ahead block! into scan-block
-			|	skip
-			]
-		]
-		result
-	]
-
 	;; measure the geometry of molded any-blocks
 	decor: make hash! #hide [map-each/eval type (to [] any-block!) [
 		molded: mold append make get type 0 [| |]
@@ -327,15 +291,14 @@ context with spaces/ctx expand-directives [
 	;@@ need to use 'changes' block too (only reason why dump has 'age' is to sync changes to parsing)
 	;@@ if input is modified, this affects offsets after it, thus text highlighting may shift - need to care for
 	decode-dump: function [dump [block!] (parse dump [series! 2 block!])] [
-		set [cloned: events: changes:] dump
+		set [input: events: changes: named:] dump
 		#assert [not empty? events]								;-- parse can never generate zero events
-		input:     events/2
 		top-level: events/5
 		; ?? input ?? changes print ["events:" mold/all events]
 		
 		marks: make block! (length? events) / 6 + 1 * 2			;-- [rule offset] pairs at each age
 		
-		named: to hash! scan-rule-names top-level				;-- named rules dictionary: name -> info object
+		#assert [hash? named]									;-- named rules dictionary: name -> info object
 		either found: find/only/same named top-level [			;-- top level rule may be named in case: parse input name
 			top-level-name: found/-1
 		][
@@ -370,7 +333,7 @@ context with spaces/ctx expand-directives [
 		;; decoder's immediate data
 		scope-stack: clear []							;-- [scope info pos depth...] quartets; depth may change for the same scope
 		depth: 0
-		age:   -1
+		age:  -1
 		
 		new-age: func [scope info "current, possibly unnamed" pos] [
 			mark: offset->mark info/chart skip? pos/:irule
@@ -407,6 +370,7 @@ context with spaces/ctx expand-directives [
 			;; infer high level features
 			old-info: select/only/same/skip rules head old/:irule 2
 			new-info: select/only/same/skip rules head new/:irule 2
+			
 			into-named?: if
 				entered?: all [new/:ievent = 'push  block? new/:isubj]
 				[new-info/name]
@@ -443,7 +407,6 @@ context with spaces/ctx expand-directives [
 			]
 			
 			if exited? [
-				; clear set [scope: _: _: depth:] skip tail scope-stack -4
 				set [scope: _: old: depth:] skip tail scope-stack -8
 				clear skip tail scope-stack -4
 			]
@@ -519,7 +482,6 @@ context with spaces/ctx expand-directives [
 		
 		; ?? named/top-level
 		; ?? named/rule
-		
 		to map! compose/only [
 			max-age:      (max 0 age)					;-- >= 0
 			named:        (named)						;-- (map)  info of named rules:    name -> info-object
@@ -781,5 +743,4 @@ context with spaces/ctx expand-directives [
 
 ];context with spaces/ctx expand-directives [
 
-do [cli/process-into ParSEE]
-;@@ remember/restore window offset/size
+trap/catch [cli/process-into ParSEE] [print thrown quit/return 1]	;-- return nonzero so the backend displays the error
