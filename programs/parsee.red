@@ -96,6 +96,7 @@ context with spaces/ctx expand-directives [
 	
 	;@@ since this is O(depth^2) it would be better if mold had a callback
 	;; returned format: [rule-block chart-block ...] (may be multiple pairs if there are nested unnamed rules)
+	;; chart format: ["outer rule text" before-item1 before-item2 ... before-last-item after-last-item after-subrule]
 	chart-block: function [
 		"Obtain molded text offsets for all block offsets (deeply)"
 		rule [any-block!]
@@ -109,34 +110,48 @@ context with spaces/ctx expand-directives [
 		skip-item: [
 			set item types (
 				append result inner: chart-block/base/:flat/:only item text types
-				text: skip head text suffix + last inner/2
+				text: skip head text last inner/2
 			)
-		|	set item skip (text: skip text length? mold/flat item)
+		|	set item skip (text: skip text length? mold/:flat item)
 		]
 		skip-to-next: [
-			end keep (skip? skip-ws text)
+			end keep (skip? text)
 		|	keep (skip? text: skip-ws skip text sep)
 		]
 		parse rule [
 			collect after chart [
 				keep (head text) to-item any [skip-item skip-to-next]
+				end keep (suffix + skip? text)
 			]
 		]
 		result
 	]
 	
 	#assert [
-		[[] ["[]" 1]] = chart-block []
+		[[] ["[]" 1 2]] = chart-block []
 		[
-		    [[]] ["[[]]" 1 3] 
-		    [] ["[[]]" 2]
-		] = chart-block [[]]		
+		    [[]] ["[[]]" 1 3 4] 
+		    [] ["[[]]" 2 3]
+		] = chart-block [[]]
 		[
-			[1 2 ["30" ["40"] []] 5] [{[1 2 ["30" ["40"] []] 5]} 1 3 5 22 23] 
-			["30" ["40"] []] [{[1 2 ["30" ["40"] []] 5]} 6 11 18 20] 
-			["40"] [{[1 2 ["30" ["40"] []] 5]} 12 16] 
-			[] [{[1 2 ["30" ["40"] []] 5]} 19]
+			[a/b/c/d] ["[a/b/c/d]" 1 8 9]
+			a/b/c/d ["[a/b/c/d]" 1 3 5 7 8 8]
+		] = chart-block/only [a/b/c/d] any-block!
+		[
+			[1 2 ["30" ["40"] []] 5] [{[1 2 ["30" ["40"] []] 5]} 1 3 5 22 23 24] 
+			["30" ["40"] []] [{[1 2 ["30" ["40"] []] 5]} 6 11 18 20 21]
+			["40"] [{[1 2 ["30" ["40"] []] 5]} 12 16 17]
+			[] [{[1 2 ["30" ["40"] []] 5]} 19 20]
 		] = chart-block [1 2 [{30} [{40}] []] 5]
+		[
+			[
+				i/b/u/red ["Hello" font 32]
+			] [{[^/    i/b/u/red ["Hello" font 32]^/]} 6 16 33 34]
+			i/b/u/red [{[^/    i/b/u/red ["Hello" font 32]^/]} 6 8 10 12 15 15]
+			["Hello" font 32] [{[^/    i/b/u/red ["Hello" font 32]^/]} 17 25 30 32 33]
+		] = chart-block/only [
+			i/b/u/red ["Hello" font 32]
+		] any-block!
 	]
 	
 	locate-age: function [
@@ -308,7 +323,6 @@ context with spaces/ctx expand-directives [
 		]
 		
 		if on-block: any-block? input [input-charts: make hash! chart-block/only input any-block!]
-		; ?? input-charts
 		
 		;; chart-block also lists unnamed nested rules, which are then spread across info objects 
 		charts: map-each [name rule] named [chart-block/flat rule]
