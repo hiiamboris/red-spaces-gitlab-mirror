@@ -33,18 +33,18 @@ initial-text: [
 	break break
 	p ["It implements all features needed to build your own " bold "word processor" /bold
 	   ", but can also be handy in many other " bold "applications:" /bold]
-	li [!(bullet) "as a Draw-based " !(code "area") " widget (main goal of the implementation)"]
-	li [!(bullet) "to type rich text in " italic "chat clients"]
-	li [!(bullet) "to compose " italic "emails and forum messages"]
-	li [!(bullet) "for " italic "note-taking apps"]
-	li [!(bullet) "to edit " italic "wiki pages or math sheets"]
-	li [!(bullet) "to write " italic "documentation" /italic " for your own program"]
+	li [@[bullet] "as a Draw-based " @[code "area"] " widget (main goal of the implementation)"]
+	li [@[bullet] "to type rich text in " italic "chat clients"]
+	li [@[bullet] "to compose " italic "emails and forum messages"]
+	li [@[bullet] "for " italic "note-taking apps"]
+	li [@[bullet] "to edit " italic "wiki pages or math sheets"]
+	li [@[bullet] "to write " italic "documentation" /italic " for your own program"]
 	break
-	p ["Structurally, " !(link "editor" %reference.md#editor) " is a scrollable wrapper around " !(link "document" %reference.md#document)
-	   " which itself is a vertical list of " !(link "rich-content" %reference.md#rich-content) " spaces that each represent a paragraph."]
+	p ["Structurally, " @[link "editor" %reference.md#editor] " is a scrollable wrapper around " @[link "document" %reference.md#document]
+	   " which itself is a vertical list of " @[link "rich-content" %reference.md#rich-content] " spaces that each represent a paragraph."]
 	p ["A paragraph can " italic "include any other space" /italic ", though only those spaces that define the /clone facet can be copied and pasted (a very limited set currently)."]
 	p ["Paragraph supports all basic text formatting attributes, colors, font face and font size, alignment, indentation, but its "
-	   italic "real magic" /italic " lies in the " italic "ability to wrap" /italic " any included space that defines the /sections facet. " !(code "For example, this long span of code is a single space that gets properly wrapped despite having an outline and having no clue about paragraph's existence.") " Moreso, as you may notice this paragraph has " italic "fill" /italic " alignment and code span gets properly spaced without interrupting its outline."] align= 'fill
+	   italic "real magic" /italic " lies in the " italic "ability to wrap" /italic " any included space that defines the /sections facet. " @[code "For example, this long span of code is a single space that gets properly wrapped despite having an outline and having no clue about paragraph's existence."] " Moreso, as you may notice this paragraph has " italic "fill" /italic " alignment and code span gets properly spaced without interrupting its outline."] align= 'fill
 	p ["Document provides some basic automation, like handling of keys and attribute inherence for new chars. Yet the trickiest feature of it is undo/redo history that gracefully handles rich text with spaces! Even trickier: if you use the button above to insert a table, each table cell contains a separate document, and history is shared between them. Thus pressing Ctrl+Z in a cell may undo an edit in the main document and vice versa."]
 	break
 	p [size: 10 "Now go on and try to edit this text yourself!"]
@@ -440,7 +440,7 @@ view reshape [
 	host 640x400 [
 		column [
 			editor-toolbar
-			editor: editor focus !(reshape initial-text)
+			editor: editor focus @[reshape initial-text]
 		]
 	]
 ]

@@ -15,7 +15,7 @@ declare-template 'hint/box [
 ]
 
 ;@@ should it be here or in vid.red?
-lay-out-menu: function [spec [block!] /local code name space value tube list flags radial? round?] reshape [
+lay-out-menu: function [spec [block!] /local code name space value tube list flags radial? round?] [
 	;@@ preferably VID/S should be used here and in hints above
 	row*:        clear []								;-- space names of a single row
 	menu*:       clear []								;-- row names list

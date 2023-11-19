@@ -187,16 +187,16 @@ context with spaces/ctx expand-directives [
 		at-age2: locate-age profile age2
 		; probe new-line/skip to [] profile on 5 ?? at-age1 ?? at-age2
 		options: either back? [[
-			!(event-imove) [dst-flag/:frange/2: dst-offset + 1 - dst-flag/:frange/1]
-			!(event-open)  [src-flag/:frange/2: 0]
-			!(event-match)
-			!(event-fail)  [dst-flag/:fcolor: light/yellow]
+			@[event-imove] [dst-flag/:frange/2: dst-offset + 1 - dst-flag/:frange/1]
+			@[event-open]  [src-flag/:frange/2: 0]
+			@[event-match]
+			@[event-fail]  [dst-flag/:fcolor: light/yellow]
 		]] [[		
 			;; do not rewind length on exit, let color stay: ;@@ or any better way?
-			!(event-imove) [if 0 < len: dst-offset + 1 - dst-flag/:frange/1 [dst-flag/:frange/2: len]]
-			!(event-open)  [if tail? dst-flag [reduce/into [(dst-offset + 1 by 0) 'backdrop light/yellow] dst-flag]]
-			!(event-match) [src-flag/:fcolor: light/green]
-			!(event-fail)  [src-flag/:fcolor: light/red]
+			@[event-imove] [if 0 < len: dst-offset + 1 - dst-flag/:frange/1 [dst-flag/:frange/2: len]]
+			@[event-open]  [if tail? dst-flag [reduce/into [(dst-offset + 1 by 0) 'backdrop light/yellow] dst-flag]]
+			@[event-match] [src-flag/:fcolor: light/green]
+			@[event-fail]  [src-flag/:fcolor: light/red]
 		]]
 		; ?? [age1 age2]
 		dst: at-age1 while [not same? src: dst at-age2] [
@@ -238,15 +238,15 @@ context with spaces/ctx expand-directives [
 				]
 			]
 			switch event [
-				!(event-imove) [
+				@[event-imove] [
 					if run [peak: max peak y: iofs - start]
 				]
-				!(event-open) [
+				@[event-open] [
 					runs/push [run: make [] 32 start: iofs]		;-- stash the run for later restoration
 					y: 0										;-- new run starts at zero height
 				]
-				!(event-match)
-				!(event-fail) [
+				@[event-match]
+				@[event-fail] [
 					target: either event = event-match [successes][failures]
 					#assert [run]
 					unless empty? run [append/only target run]
@@ -471,12 +471,12 @@ context with spaces/ctx expand-directives [
 			while [event: profile/:i-next-event] [
 				profile: skip profile 5
 				switch event [
-					!(event-open) [
+					@[event-open] [
 						append regions region: nregions			;-- region is 0-based for faster replay
 						nregions: 1 + nregions
 					]
-					!(event-match)
-					!(event-fail) [
+					@[event-match]
+					@[event-fail] [
 						take/last regions
 						region: any [last regions 0]
 					]
@@ -660,9 +660,9 @@ context with spaces/ctx expand-directives [
 				name: text 100
 				vlist tight [
 					plot: profile-plot max-age= max-age
-					on-move= quote !(func [space path] [
+					on-move= quote @[func [space path] [
 						timeline/offset: 100% * clip 0 1 path/2/x / space/size/x
-					])
+					]]
 					box left margin= 2x1 color= colors/canvas [
 						rule: text font= monofont color= colors/text
 					]
@@ -675,12 +675,12 @@ context with spaces/ctx expand-directives [
 		default conf/size:   system/view/screens/1/size - 0x60
 		prof/reset
 		view/tight/options window: layout reshape [
-			title !(`"ParSEE - (file)"`) 
+			title @[`"ParSEE - (file)"`] 
 			host [
 				column [
 					text bold "Parsed input:"
 					cell color= colors/canvas [scrollable [
-						input-view: text !(input-text) limits= 100x100 .. none
+						input-view: text @[input-text] limits= 100x100 .. none
 							color= colors/text font= monofont
 							age= 0 rule= none			;-- last state stored for fast replay
 					]]
@@ -701,7 +701,7 @@ context with spaces/ctx expand-directives [
 								react [refresh-zoom plot-list zoom/ratio]
 						] 
 					]
-					profiles-view: list-view selectable tight source= !(plot-list) selected= [1] cursor= 1
+					profiles-view: list-view selectable tight source= @[plot-list] selected= [1] cursor= 1
 						on-key-down [
 							if sign: switch event/key [left [-1] right [1]] [
 								timeline/offset: clip 0% 100% timeline/offset + (sign / max-age) stop

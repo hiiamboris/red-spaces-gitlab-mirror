@@ -16,8 +16,8 @@ default config/text: "cell [text {some stuff} green]"
 ; view/no-wait/flags/options compose [
 view/flags/options reshape [
 	title "VID/S experimentation polygon"
-	text "VID/S code:" space: area 400x80 focus !(config/text) return
-	host: host !(config/size) white react [
+	text "VID/S code:" space: area 400x80 focus @[config/text] return
+	host: host @[config/size] white react [
 		try [
 			face/space:    first lay-out-vids load/all space/text
 			config/text:   space/text

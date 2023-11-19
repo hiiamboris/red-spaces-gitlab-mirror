@@ -84,8 +84,8 @@ do with styling: context [
 	checkered-pen: reshape [							;-- used for focus indication
 		pattern 4x4 [
 			scale 0.5 0.5 pen off
-			; fill-pen !(svmc/panel)  box 0x0  8x8
-			fill-pen !(svmc/text) box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
+			; fill-pen @[svmc/panel]  box 0x0  8x8
+			fill-pen @[svmc/text] box 1x0 5x1  box 1x5 5x8  box 0x1 1x5  box 5x1  8x5
 		]
 	]
 	; serif-12: make font! [name: svf/serif size: 12 color: svmc/text]	;@@ GTK fix for #4901
@@ -110,10 +110,10 @@ do with styling: context [
 		/round radius [linear!]
 		/margin mrg: (line . line / 2) [planar!]
 	][
-		reshape-light [
+		reshape [
 			push [
-			/?	pen      @(pen)				/if pen
-			/?	fill-pen @(fill-pen)		/if fill-pen
+				pen      @(pen)				/if pen
+				fill-pen @(fill-pen)		/if fill-pen
 				line-width @(line)
 				box @(mrg) @(size - mrg) @(radius)
 			]
@@ -135,10 +135,10 @@ do with styling: context [
 	define-styles/unique reshape [
 		base: [
 			below: [
-				fill-pen !(svmc/panel)
-				font     !(fonts/text)
+				fill-pen @[svmc/panel]
+				font     @[fonts/text]
 				line-width 2
-				pen      !(svmc/text)
+				pen      @[svmc/text]
 			]
 		]
 
@@ -153,15 +153,15 @@ do with styling: context [
 			below: [(make-box size 1 select self 'color none)]
 		]
 		caret: [
-			; [pen off fill-pen !(contrast-with svmc/panel)]
-			below: [pen off fill-pen !(svmc/text)]
+			; [pen off fill-pen @[contrast-with svmc/panel]]
+			below: [pen off fill-pen @[svmc/text]]
 		]
 		selection: [
-			; below: [pen (checkered-pen) fill-pen !(opaque 'text 30%)]
-			below: [pen off fill-pen !(opaque 'text 30%)]
+			; below: [pen (checkered-pen) fill-pen @[opaque 'text 30%]]
+			below: [pen off fill-pen @[opaque 'text 30%]]
 			;@@ workaround for #5133 needed by workaround for #4901: clipping makes fill-pen black
 			#if linux? [
-				below: [pen !(svmc/text) fill-pen off line-width 1 box 1x1 (size - 2)]
+				below: [pen @[svmc/text] fill-pen off line-width 1 box 1x1 (size - 2)]
 			]
 		]
 		
@@ -253,7 +253,7 @@ do with styling: context [
 
 		grid-view/window: [
 			; #assert [size]
-			below: [(make-box size 0 'off !(opaque 'text 50%))]
+			below: [(make-box size 0 'off @[opaque 'text 50%])]
 		]
 
 		menu/ring/clickable: [
@@ -264,24 +264,25 @@ do with styling: context [
 			below: [(make-box/round size 1 none color 50)]
 		]
 		
-		hint: function [box] /skip [
+		hint: function [box] [
 			drawn: box/draw								;-- draw to obtain the size
 			m: box/margin / 2
-			reshape [
-				@(make-box/round/margin box/size 1 none none 3 1x1 + m)
+			o: box/origin
+			reshape/with [@! /if'] [
+				@!(make-box/round/margin box/size 1 none none 3 1x1 + m)
 				;@@ TODO: arrow can be placed anywhere really, just more math needed
 				push [
-					matrix [1 0 0 -1 0 @(box/size/y)]	/if o <> 0x0
-					shape [move @(m + 4x1) line 0x0 @(m + 1x4)]
-				]							/if o: box/origin	;-- no arrow if hint was adjusted by window borders
-				!(drawn)
+					matrix [1 0 0 -1 0 @!(box/size/y)]	/if' o <> 0x0
+					shape [move @!(m + 4x1) line 0x0 @!(m + 1x4)]
+				]										/if' o	;-- no arrow if hint was adjusted by window borders
+				@![drawn]
 			]
 		]
 		
-		rich-content: /skip [
-			below: reshape-light [
-			/?	font @(font)		/if font
-			/?	pen @(color)		/if color
+		rich-content: [
+			below: reshape/with [@! /if'] [
+				font @!(font)		/if' font
+				pen @!(color)		/if' color
 			]
 		]
 		rich-content/text: rich-content/paragraph: [	;-- these override font with their own, so [font] draw command isn't enough
@@ -305,9 +306,9 @@ do with styling: context [
 			]
 		]
 		
-		slider/knob: /skip [
+		slider/knob: [
 			fill:  opaque svmc/text either focused?/parent [100%][40%]
-			above: reshape-light [line-width 1 fill-pen @(fill) circle (size / 2) (size/x / 2) (size/y / 2)]
+			above: reshape/with [@!] [line-width 1 fill-pen @!(fill) circle (size / 2) (size/x / 2) (size/y / 2)]
 		]
 		slider/mark: function [mark /on canvas fill-x fill-y] [
 			h: second mark/size: 1 . either canvas [canvas/y][1]

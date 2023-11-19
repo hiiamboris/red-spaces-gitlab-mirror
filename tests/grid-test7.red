@@ -61,7 +61,7 @@ view/no-wait/options [
 				old-draw: :draw
 				depth: 0
 				;; trick: this cell style uses the same canvas size to ensure cache hits
-				set-style 'grid/grid-view function [gview] reshape [
+				set-style 'grid/grid-view function [gview] [
 					drawn: gview/draw
 					compose/only [scale (cell-size/x / max 1 gview/size/x) (cell-size/y / max 1 gview/size/y) (drawn)]
 				]

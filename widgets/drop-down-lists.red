@@ -206,8 +206,8 @@ context with spaces/ctx expand-directives [
 		right	[self/align/x:  1]
 	]
 	extend VID/styles reshape [
-		drop-box:   [template: drop-box    facets: !(facets)]
-		drop-field: [template: drop-field  facets: !(facets)]
+		drop-box:   [template: drop-box    facets: @[facets]]
+		drop-field: [template: drop-field  facets: @[facets]]
 	]
 ];context with spaces/ctx expand-directives [
 

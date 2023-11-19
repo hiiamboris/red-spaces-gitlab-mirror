@@ -79,11 +79,11 @@ view/no-wait/options/flags reshape [
 	host: host with [size: system/view/screens/1/size - 54x120] [
 		zoo: zoomer with [zoom: [x 0.5 y 0.5] canvas: host/size - 40] [
 			column [
-				row !(
+				row @[
 					map-each method compare [
 						compose/deep [box [text (form method) with [font: make font! [size: 20]]]]
 					]
-				)
+				]
 				row weight= 1 /use (
 					map-each method compare [
 						compose/deep [

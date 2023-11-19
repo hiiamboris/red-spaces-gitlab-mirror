@@ -42,12 +42,12 @@ view/no-wait/options/flags reshape [
 		; ]
 		row tight [
 			column tight weight= 1 [
-				box left forest [rich-content !(compose source) align= 'left]
-				box right blue  [rich-content !(compose source) align= 'right]
+				box left forest [rich-content @[compose source] align= 'left]
+				box right blue  [rich-content @[compose source] align= 'right]
 			]
 			column tight weight= 1 [
-				box center blue [rich-content !(compose source) align= 'center]
-				box left forest [rich-content !(compose source) align= 'fill]
+				box center blue [rich-content @[compose source] align= 'center]
+				box left forest [rich-content @[compose source] align= 'fill]
 			]
 		]
 	] react [

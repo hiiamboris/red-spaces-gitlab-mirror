@@ -640,11 +640,11 @@ scrollable-ctx: context [
 		unless fits? [render space/scroll-timer]				;-- scroll-timer has to appear in the tree for timers
 		space/scroll-timer/rate: pick [0 16] fits?: sshow = 0x0	;-- turns off timer when unused!
 		viewport: space/size - (scrollers * reverse sshow)		;-- include 'free' size in the viewport
-		quietly space/map: reshape-light [
+		quietly space/map: reshape [
 			@(content) [offset: (0,0) size: @(viewport)]
-		/?	@(hscroll) [offset: @(viewport * 0x1) size: @(hscroll/size)]	/if sshow/x = 1
-		/?	@(vscroll) [offset: @(viewport * 1x0) size: @(vscroll/size)]	/if sshow/y = 1
-		/?	@(space/scroll-timer) [offset: (0,0) size: (0,0)]				/if not fits?	;-- list it for tree correctness
+			@(hscroll) [offset: @(viewport * 0x1) size: @(hscroll/size)]	/if sshow/x = 1
+			@(vscroll) [offset: @(viewport * 1x0) size: @(vscroll/size)]	/if sshow/y = 1
+			@(space/scroll-timer) [offset: (0,0) size: (0,0)]				/if not fits?	;-- list it for tree correctness
 		]
 		
 		invalidate/only hscroll									;-- let scrollers know they were changed
@@ -3319,11 +3319,11 @@ grid-ctx: context [
 		;@@ relax clipping when content fits - for dropdowns to be supported by headers
 		;@@ current clipping mode was meant for spanned heading cells mainly, and for normal cells translation
 		reshape [
-			;-- headers also should be fully clipped in case they're multicells, so they don't hang over the content:
-			clip  0x0         !(xy1)           !(drawn-common-header)	/if drawn-common-header
-			clip !(xy1 * 1x0) !(xy2/x . xy1/y) !(drawn-col-header)		/if drawn-col-header
-			clip !(xy1 * 0x1) !(xy1/x . xy2/y) !(drawn-row-header)		/if drawn-row-header
-			clip !(xy1)       !(xy2)           !(drawn-normal)
+			;; headers also should be fully clipped in case they're multicells, so they don't hang over the content:
+			clip  0x0         @[xy1]           @[drawn-common-header]	/if drawn-common-header
+			clip @[xy1 * 1x0] @[xy2/x . xy1/y] @[drawn-col-header]		/if drawn-col-header
+			clip @[xy1 * 0x1] @[xy1/x . xy2/y] @[drawn-row-header]		/if drawn-row-header
+			clip @[xy1]       @[xy2]           @[drawn-normal]
 		]
 	]
 	

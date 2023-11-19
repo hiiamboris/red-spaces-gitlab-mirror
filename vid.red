@@ -128,7 +128,7 @@ VID: context [
 			template: rich-content
 			facets: [
 				percent! baseline
-				block! !(func [block] [compose/only/deep [kit/do-batch self [deserialize (block)]]])	;-- high level source dialect support for VID
+				block! @[func [block] [compose/only/deep [kit/do-batch self [deserialize (block)]]]]	;-- high level source dialect support for VID
 				@(props/text-align)
 			]
 		]
@@ -141,13 +141,13 @@ VID: context [
 				integer! rate
 				float!   rate
 				time!    rate
-				block!   !(func [block] [
+				block!   @[func [block] [
 					compose/deep/only [
 						actors: object [
 							on-time: function [space path event delay] (block)
 						]
 					]
-				])
+				]]
 			]
 		]
 		grid [
@@ -180,7 +180,7 @@ VID: context [
 	system/view/VID/styles/host: reshape [
 		default-actor: worst-actor-ever					;-- worry not! this is useful
 		init: [set 'init-window window-of self init-spaces-tree self]
-		template: /use (declare-class/manual 'host [
+		template: @[declare-class/manual 'host [
 			;; make a chimera of classy-object's and face's on-change so it works as a face and supports class features
 			on-change*: function spec-of :classy-object!/on-change*
 				with self append copy body-of :classy-object!/on-change* compose/only [
@@ -202,7 +202,7 @@ VID: context [
 			;; render generation number, used to detect live spaces (0 = never rendered):
 			generation: 0.0						#type =  [float!]
 			queue:      make hash! 200			#type    [hash! block!]	;-- queued events to process
-		])
+		]]
 	]
 	
 	

@@ -62,8 +62,8 @@ tubes: collect [
 		keep reshape [
 			cell none .. 170x200 [
 				vlist [
-					heading data= !(#composite "axes: (mold axes)")
-					row tight spacing= 5x5 axes= !(axes) limits= !(lim1 .. lim2) !(boxes)
+					heading data= @[#composite "axes: (mold axes)"]
+					row tight spacing= 5x5 axes= @[axes] limits= @[lim1 .. lim2] @[boxes]
 				]
 			]
 		]

@@ -163,7 +163,7 @@ events: context [
 		"Define event handlers for any number of spaces"
 		def [block!] "[name: [on-event [space path event] [...]] ...]"
 		/local blk
-	] reshape [
+	][
 		prefix: copy [handlers]
 
 		=style-def=: [
