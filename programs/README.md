@@ -130,9 +130,9 @@ ParSEE allows you to get an almost immediate **answer** for the questions:
 - [Overall decoder evaluation on XML codec's example](parsee-case-eval.md)
 - TBD: deadlock case (need realistic code for an example; try `parsee "1" [while [opt skip]]` for now)
 
-A few **examples** of block dialects (clickable):
+A few **examples** (clickable):
 
-| Function spec dialect | Rich-text dialect | @toomasv's graph dialect | Red (old) lexer |
+| Function spec dialect (block) | Rich-text dialect (block) | @toomasv's graph dialect (block) | Red (old) lexer (string) |
 |-|-|-|-|
 | [ <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-fspec.gif /> ](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-fspec.gif) | [ <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-rtd.gif /> ](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-rtd.gif) | [ <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-graph.gif /> ](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-graph.gif) | [ <img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-lexer-small.gif /> ](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-lexer.gif) | 
 
