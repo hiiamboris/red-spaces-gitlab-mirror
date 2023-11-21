@@ -1320,7 +1320,7 @@ tube-ctx: context [
 		kit:     ~/kit
 		margin:  0
 		spacing: 0
-		align:   -1x-1	#type :invalidates-look =? [pair!] (-1x-1 +<= align +<= 1x1)
+		align:   -1x-1	#type :invalidates-look =? [pair! (-1x-1 +<= align +<= 1x1) block!]
 		axes:    [e s]	#type :invalidates [block!]
 						(find/only [					;-- literal listing allows it to appear in the error output
 							[n e] [n w]  [s e] [s w]  [e n] [e s]  [w n] [w s]
