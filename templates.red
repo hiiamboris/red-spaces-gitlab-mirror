@@ -190,9 +190,11 @@ compose-map: function [
 	foreach [space box] map [
 		all [list  not find/same list space  continue]	;-- skip names not in the list if it's provided
 		; all [limits  not boxes-overlap? xy1 xy2 o: box/offset o + box/size  continue]	;-- skip invisibles ;@@ buggy - requires origin
-		if zero? area? box/size [continue]				;-- don't render empty elements (also works around #4859)
 		cmds: render/:window space xy1 xy2
-		unless empty? cmds [							;-- don't spawn empty translate/clip structures
+		unless any [
+			empty? cmds									;-- don't spawn empty translate/clip structures
+			zero? area? box/size						;-- don't render empty elements (also works around #4859)
+		][
 			compose/only/into [
 				translate (box/offset) (cmds)
 			] tail r
