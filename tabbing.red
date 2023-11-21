@@ -24,7 +24,13 @@ do with tabbing/window-walker [
 		]
 	]
 	has-child?:  function [face [object!]] [not empty? pane-of face]
-	first-child: function [face [object!]] [all [pane: pane-of face  pane/1]]
+	first-child: function [face [object!]] [
+		all [
+			pane: pane-of face
+			pos:  find pane object!
+			pos/1
+		]
+	]
 	last-child:  function [face [object!]] [
 		all [
 			pane: pane-of face
@@ -79,6 +85,7 @@ register-finalizer [key] function [space [object!] path [block!] event [event! m
 		event/key = #"^-"
 		not event/ctrl?									;-- ctrl-tab must mean smth else
 		not stop?										;-- was not eaten by any space
-		set-focus focus/find-next-focal-*ace (pick [back forth] event/shift?)
+		new: focus/find-next-focal-*ace (pick [back forth] event/shift?)
+		set-focus new
 	]
 ]
