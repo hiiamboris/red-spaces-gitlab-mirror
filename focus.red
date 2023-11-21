@@ -111,26 +111,22 @@ focus: make classy-object! declare-class 'focus-context [
 		]
 	]
 	
-	;@@ TODO: do not enter hidden tab panel's pane (or any other hidden item?)
+	*ace-enabled?:   function [face [object!]] [		;-- spaces has no support for disabling yet
+		tabbing/enabled? either is-face? face [face][host-of face]
+	]
+	*ace-focusable?: function [face [object!]] [
+		either is-face? face
+			[tabbing/focusable? face]
+			[find focus/focusable face/type]
+	]
+	*ace-visitor: function [parent [object! none!] child [object!]] [
+		if all [*ace-focusable? child *ace-enabled? child] [break/return child]
+	]
 	find-next-focal-*ace: function [dir "forth or back"] [
-		focused: any [last-valid-focus compose [(system/view/screens/1) (only window)]]		;-- screen-relative path
-		#debug focus [#print "last valid focus path: (mold as path! focused)"]
-		reverse: dir <> 'forth 
-		foreach-*ace/next/:reverse path found: focused [		;-- default to already focused item (e.g. it's the only focusable)
-			#debug focus [
-				space: last path 
-				text: mold/flat/part any [select space 'text  select space 'data] 40 
-				#print "find-next-focal-*ace @(mold path), text=(text)"
-			]
-			accepted: either space? obj: last path [focusable][focusable-faces]
-			all [
-				find accepted obj/type
-				deep-check path [state enabled? visible?]
-				found: path
-				break
-			]
+		if focused: any [current window] [
+			tabbing/window-walker/forward?: dir = 'forth
+			foreach-node focused tabbing/window-walker :*ace-visitor
 		]
-		last found
 	]
 
 ]
