@@ -17,15 +17,20 @@ dump-event: function [event] [
 	help event
 ]
 
+get-full-path: function [*ace [object!]] [
+	path: append clear [] *ace
+	while [*ace: *ace/parent] [append path *ace]
+	reverse copy path
+]
+
 dump-tree: function [
-	"List hierarchical tree of currently rendered spaces"
+	"List hierarchical tree of currently rendered faces & spaces"
 	/from host [object!] "Root face to list from (by default - the screen)" (host? host)
 ][
-	foreach-*ace path: any [host system/view/screens/1] [
-		spc: last path
-		probe path
+	foreach-*ace *ace: any [host system/view/screens/1] [
+		probe get-full-path *ace
 	]
-	()
+	exit
 ]
 
 dorc: does [do read-clipboard]

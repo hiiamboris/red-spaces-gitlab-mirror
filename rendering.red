@@ -90,7 +90,7 @@ context [
 	#debug profile [
 		;; checks after full face render for any invalidated spaces (have /cache enabled but /cached empty):
 		verify-validity: function [host [object!] (host? host)] [
-			paths: sift list-spaces host/space [		;-- obtain a list of possibly invalidated spaces
+			paths: sift list-*aces host/space [			;-- obtain a list of possibly invalidated spaces
 				path .. obj: last path
 				obj/cache								;-- cache enabled?
 				empty? obj/cached						;-- no cached slots?

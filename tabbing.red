@@ -16,13 +16,7 @@ do with tabbing/window-walker [
 	window?:     function [face [object!]] [all [is-face? face  face/type = 'window]]
 	next-linked: function [face [object!]] [all [is-face? face  select face/options 'next]]
 	prev-linked: function [face [object!]] [all [is-face? face  select face/options 'prev]]
-	pane-of:     function [face [object!]] [
-		case [
-			not is-face? face [select face 'map]
-			host? face        [reduce [face/space]]
-			'other-face       [face/pane]
-		]
-	]
+	pane-of:     :traversal/pane-of
 	has-child?:  function [face [object!]] [not empty? pane-of face]
 	first-child: function [face [object!]] [
 		all [

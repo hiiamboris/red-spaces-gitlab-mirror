@@ -102,7 +102,7 @@ do/expand [
 				#include %traversal.red
 				#include %focus.red
 				#include %hittest.red
-				#include %tabbing.red
+				#include %tabbing.red					;-- requires traversal/pane-of
 				#include %single-click.red
 				#include %timelines.red
 				#include %edit-keys.red

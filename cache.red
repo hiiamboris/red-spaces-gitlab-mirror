@@ -161,7 +161,7 @@ invalidate-tree: function [
 	"Deeply invalidate spaces tree of given HOST"
 	host [object!] (host? host)							;@@ or accept space instead?
 ][
-	foreach-space [path space] host/space [invalidate/only space]
+	foreach-*ace space: host/space [invalidate/only space]
 ]
 	
 	
