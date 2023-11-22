@@ -43,9 +43,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;;   fill-x fill-y [logic! none!]  fill along canvas axes flags: flag along 'axis' is ignored completely,
 		;;      while the opposite flag controls whether whole list width extends to canvas or not (but items always fill the width)
 		;;   limits        [object! none!]
-		;;   origin         [point2D! none!]  unrestricted, offsets whole map, default=0x0
+		;;   origin       [point2D! none!]  unrestricted, offsets whole map, default=0x0
 		;;   anchor       [integer! none!] index of the item at axis=margin (used by list-view), default=1
-		;;   length       [integer! none!] in pixels, when to stop adding items (used by list-view), default=unlimited
+		;;   length        [linear! none!] in pixels, when to stop adding items (used by list-view), default=unlimited
 		;;                                 does not include anchor size and both margins
 		;;   reverse?       [logic! none!] true if items should be counted back from the anchor (used by list-view), default=false
 		;;   do-not-extend? [logic! none!] true if sticking out items cannot extend list's width (used by list-view); default=false
@@ -77,7 +77,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				limits   [object! (range? limits) none!]
 				origin   [point2D! none!]
 				anchor   [integer! (anchor > 0) none!]
-				length   [integer! (length >= 0) none!]
+				length   [linear! (length >= 0) none!]
 				reverse? [logic! none!]
 				do-not-extend? [logic! none!]
 			]]
