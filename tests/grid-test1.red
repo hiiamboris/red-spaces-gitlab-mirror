@@ -24,6 +24,6 @@ view/no-wait/options [
 	status: text 300x40
 ] [offset: 10x10]
 
-foreach-*ace/next path system/view/screens/1 [probe path]
+dump-tree system/view/screens/1
 either system/build/config/gui-console? [run-console][do-events]
 
