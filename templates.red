@@ -1047,6 +1047,8 @@ paragraph-ctx: context [
 		];frame: object [
 	];kit: make-kit [
 	
+	;@@ 'sections' is subverted by #5433, which ruins rich-test0
+	#assert [zero? caret-to-offset rtd-layout [" abc"] 1]
 	
 	;@@ in the current design it is rendered by text, so can only be styled as field/text/caret, not field/caret
 	;@@ should I move rendering into field? (need to consider document as well)
