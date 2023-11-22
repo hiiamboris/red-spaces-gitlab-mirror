@@ -207,7 +207,7 @@ VID: context [
 	
 	
 	;; used internally in host's `init` only
-	init-spaces-tree: function [face [object!] /local focused] [
+	init-spaces-tree: function [face [object!] (host? face) /local focused] [
 		unless spec: select face/actors 'worst-actor-ever [exit]
 		face/actors/worst-actor-ever: none
 		#assert [function? :spec]
