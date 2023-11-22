@@ -26,8 +26,9 @@ invalidates-look: function [space [object!] word [word!] value [any-type!]] [
 
 ;; normalizes /margin & /spacing to a pair, for easier handling
 on-margin-spacing-change: function [space [object!] word [word!] value [linear! planar!] old [any-type!]] [
-	if :old <> new: (1,1) * value [
-		invalidates space word quietly space/:word: new
+	if :old <> value [
+		quietly space/:word: new: (1,1) * value			;-- force margin into correct type
+		if :old <> new [invalidates space word new]		;-- only invalidate if really changed
 	] 
 ]
 
