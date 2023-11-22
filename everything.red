@@ -45,6 +45,7 @@ do/expand [
 	; #include %../common/composite.red
 	#include %../common/relativity.red
 	#include %../common/tabbing.red						;-- extended by spaces/tabbing.red
+	; #include %../common/tree-hopping.red				;-- included by tabbing.red
 	#include %../common/scoping.red
 	#include %../common/collect-set-words.red
 	#include %../common/print-macro.red
