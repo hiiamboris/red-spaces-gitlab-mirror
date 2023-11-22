@@ -150,12 +150,12 @@ if action? :mold [
 								either 'rich-text = :value/type [ 
 									native-mold value/text
 								][
-									if point2D? set/any 'size :value/size [size: to pair! value/size] 
+									if point2D? set/any 'size :value/size [try [size: to pair! value/size]] 
 									rejoin [:value/type ":" mold* :size limit]
 								]
 							]
 							space? value [
-									if point2D? set/any 'size :value/size [size: to pair! value/size] 
+									if point2D? set/any 'size :value/size [try [size: to pair! value/size]] 
 								rejoin [:value/type ":" mold* :size limit]
 							]
 							(class-of value) = class-of font! [native-mold value/name]
