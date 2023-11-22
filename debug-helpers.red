@@ -28,7 +28,7 @@ dump-tree: function [
 	/from host [object!] "Root face to list from (by default - the screen)" (host? host)
 ][
 	foreach-*ace *ace: any [host system/view/screens/1] [
-		probe get-full-path *ace
+		probe as path! get-full-path *ace
 	]
 	exit
 ]
