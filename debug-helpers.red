@@ -316,6 +316,11 @@ if action? :mold [
 					string: rejoin [form to-hex value "h"]		;-- convert to hex
 					emit [string]
 				]
+				point2D! [
+					unless all [value: round/to value 0.1]
+					string: native-mold/:all/:flat :value
+					emit [string]
+				]
 			][
 				string: native-mold/:all/:flat :value
 				emit [string]
