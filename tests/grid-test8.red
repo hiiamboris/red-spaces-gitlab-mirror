@@ -84,14 +84,14 @@ view/no-wait/options/flags reshape [
 						compose/deep [box [text (form method) with [font: make font! [size: 20]]]]
 					]
 				]
-				row weight= 1 /use (
+				row weight= 1 @[
 					map-each method compare [
 						compose/deep [
 							grid-view content-flow= 'vertical source= data-source
 							with [grid/autofit: quote (method)]
 						]
 					]
-				)
+				]
 			]
 		]
 	]
