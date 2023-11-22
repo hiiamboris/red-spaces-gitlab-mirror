@@ -23,15 +23,23 @@ wrap2: func [i] [
 ]
 
 prefix: append/dup {} "label text " 5
-view/no-wait/options expand-directives [
+w: view/no-wait/options expand-directives [
 	below
-	host focus [
+	host: host focus [
 		hlist [
 			list-view 200x200 source= map-each i 15 [i] wrap-data= :wrap1
 			list-view 200x200 source= map-each i 15 [i] wrap-data= :wrap2
 		]
 	]
 	on-over [status/text: mold hittest face/space event/offset]
+	; on-key [
+	; print "--->"
+		; tabbing/window-walker/forward?: on
+		; foreach-node w tabbing/window-walker func [parent child] [
+			; print spaces/ctx/space-id child
+		; ]
+	; print "<---"
+	; ]
 	status: text 400x70
 ] [offset: 10x10]
 
