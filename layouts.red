@@ -803,7 +803,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				fill-x   [none! logic!]
 				fill-y   [none! logic!]
 				limits   [object! (range? limits) none!]
-				indent   [block! (parse indent [2 [integer! | none!]]) none!]
+				indent   [block! (parse indent [2 [set-word! integer!]]) none!]
 			]]
 			default canvas: infxinf
 			default fill-x: no
