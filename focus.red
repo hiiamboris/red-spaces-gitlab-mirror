@@ -47,6 +47,7 @@ focus: make classy-object! declare-class 'focus-context [
 	add-to-history: function [space [object!]] [
 		#debug focus [#print "adding (space/type):(space/size) to focus history"]
 		face: either is-face? space [space][host-of space]
+		#assert [face  "attempt to focus an out-of-tree (not yet drawn?) space"]	;@@ maybe call VID/update-focus in this case?
 		self/window: window-of face
 		append hist: history space
 		remove/part hist hist << 10						;-- limit history length
@@ -167,6 +168,7 @@ focus-space: function [
 	]
 	#debug focus [#print "moving focus from (mold/only reduce [old]) to (mold/only reduce [space])"]
 	
+	;@@ bring focused item into scrollable's view - maybe via on-focus handler?
 	focus/send-unfocus old
 	focus/send-focus space
 	focus/add-to-history space
