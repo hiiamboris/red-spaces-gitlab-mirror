@@ -270,26 +270,26 @@ doc-ctx: context [
 		
 		paragraph-range: function [
 			"Get offset range of paragraph containing given offset"
-			para [integer! object!] "Paragraph number or its space object"
+			offset [integer! object!] "Paragraph object or document offset"
 		][
-			either integer? para [
-				second caret->paragraph para
+			either integer? offset [
+				second caret->paragraph offset
 			][
-				plen: batch para [length]
-				0 thru plen + get-paragraph-offset space para
+				plen: batch offset [length]
+				0 thru plen + get-paragraph-offset space offset
 			]
 		]
 		
 		paragraph-head: function [
 			"Get offset of the start of paragraph containing given offset"
-			offset [integer! object!] "Paragraph number or its space object"
+			offset [integer! object!] "Paragraph object or document offset"
 		][
 			first paragraph-range offset
 		]
 		
 		paragraph-tail: function [
 			"Get offset of the end of paragraph containing given offset"
-			offset [integer! object!] "Paragraph number or its space object"
+			offset [integer! object!] "Paragraph object or document offset"
 		][
 			second paragraph-range offset
 		]
@@ -373,6 +373,20 @@ doc-ctx: context [
 				caret-row-shift space offset side 'down 0
 			]
 			
+			row-head: function [
+				"Get caret (offset, side) of the start of row"
+				offset [integer!] side [word!]
+			][
+				caret-row-shift space offset side 'head 0
+			]
+			
+			row-tail: function [
+				"Get caret (offset, side) of the end of row"
+				offset [integer!] side [word!]
+			][
+				caret-row-shift space offset side 'tail 0
+			]
+		
 			page-above: function [
 				"Get caret (offset, side) one page above"
 				offset [integer!] side [word!]
@@ -431,6 +445,8 @@ doc-ctx: context [
 				far-tail  [length]
 				head      [paragraph-head here]			;@@ or use row's head/tail? exclude indentation or not?
 				tail      [paragraph-tail here]
+				row-head  [frame/row-head here space/caret/side]
+				row-tail  [frame/row-tail here space/caret/side]
 				prev-word [word-before    here]
 				next-word [word-after     here]
 				line-up   [frame/line-above here space/caret/side]
@@ -719,7 +735,7 @@ doc-ctx: context [
 		doc   [object!]
 		caret [integer!]
 		side  [word!]
-		dir   [word!] (find [up down] dir)
+		dir   [word!] (find [up down head tail] dir)
 		shift [linear!] (shift >= 0) "0 for one line, else number of extra pixels (for paging)"
 	][
 		set [para: pofs: plen:] caret->paragraph doc caret
@@ -734,18 +750,27 @@ doc-ctx: context [
 		]
 		pxy1/y: rxy1/y									;-- extend caret box to the full row
 		pxy2/y: rxy2/y
-		edge-row?: any [
-			all [dir = 'up   prow = 1]					;-- first row in the paragraph
-			all [dir = 'down prow = nrows]				;-- last row in the paragraph
+		switch dir [
+			up down [
+				edge-row?: any [
+					all [dir = 'up   prow = 1]					;-- first row in the paragraph
+					all [dir = 'down prow = nrows]				;-- last row in the paragraph
+				]
+				shift: as-point2D 0 (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
+				xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
+			]
+			head [xy: pxy + rxy1 + 1]
+			tail [xy: pxy + rxy2 - 1]
 		]
-		shift: as-point2D 0 (shift + 1 + either edge-row? [doc/spacing][para/frame/spacing])
-		xy: pxy + either dir = 'down [pxy2 + shift][pxy1 - shift]
 		xy: clip xy 0x0 doc/size - 0x1
 		caret': point->caret doc xy
 		if caret' [										;-- may be none if outside the document
-			limits: either dir = 'down					;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
-				[caret + 1 thru doc/length]
-				[0 thru (caret - 1)]
+			limits: switch dir [
+				down [caret + 1 thru doc/length]		;-- ensure a minimum shift of 1 caret slot (for items spanning multiple rows)
+				up   [0 thru (caret - 1)]
+				head [0 thru caret]
+				tail [caret thru doc/length]
+			]
 			caret'/offset: clip limits/1 limits/2 caret'/offset
 		]
 		caret'
@@ -840,11 +865,12 @@ doc-ctx: context [
 	
 	;@@ should it support /items override? what will be the use case? spoilers? (for now length accounts for every paragraph)
 	declare-template 'document/list [
-		kit:       ~/kit
-		content:   []		#type :on-content-change
-		axis:      'y		#type (axis = 'y)			;-- protected
-		spacing:   5		#type [linear!] :invalidates	;-- interval between paragraphs
-		margin:    1x0									;-- don't let caret become fully invisible at the end of the longest line
+		kit:      ~/kit
+		content:  []	#type :on-content-change
+		axis:     'y	#type (axis = 'y)				;-- protected
+		spacing:  5		#type [linear!] :invalidates	;-- interval between paragraphs
+		margin:   1x0									;-- don't let caret become fully invisible at the end of the longest line
+		weight:   1										;-- stretch by default ;@@ or not?
 		page-size: function [] [						;-- needs access to the parent viewport for paging
 			vp: any [get-safe 'parent/viewport 0x0]
 			max 0 (pick vp 'y) * 90%
