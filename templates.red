@@ -1142,7 +1142,9 @@ container-ctx: context [
 		quietly cont/map: frame/map		;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
 		cont/size: constrain frame/size cont/limits		;@@ is this ok or layout needs to know the limits?
 		cont/origin: any [frame/origin (0,0)]
-		compose/only [translate (negate cont/origin) (drawn)]
+		drawn: compose/only [translate (negate cont/origin) (drawn)]
+		unless frame/size +<= cont/size [drawn: compose/only [clip 0x0 (cont/size) (drawn)]]
+		drawn
 	]
 	
 	format-items: function [space [object!]] [
