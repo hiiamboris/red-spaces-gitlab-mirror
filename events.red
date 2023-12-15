@@ -34,8 +34,11 @@ events: context [
 	]
 	
 	copy-event: function [event [event!]] [
-		also result: copy event-prototype
+		result: copy event-prototype
 		foreach word system/catalog/accessors/event! [result/:word: :event/:word]
+		;@@ can't repro this in isolation, but somehow without copy flags of KB events get empty! need to find out why!
+		result/flags: copy event/flags
+		result
 	]
 	
 	register-as: function [map [map!] types [block!] handler [function!] /priority /local blk] [
