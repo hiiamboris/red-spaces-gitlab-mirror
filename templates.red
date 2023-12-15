@@ -215,7 +215,7 @@ no-draw: does [[]]
 
 ;; used internally for empty spaces size estimation
 set-empty-size: function [space [object!] canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
-	canvas: either positive? space/weight
+	canvas: either all [w: select space 'weight  w > 0]
 		[fill-canvas canvas fill-x fill-y][(0,0)]		;-- don't stretch what isn't supposed to stretch
 	space/size: constrain canvas space/limits
 ]
@@ -349,7 +349,7 @@ cell-ctx: context [
 		;; canvas can be infinite or half-infinite: inf dimensions should be replaced by space/size (i.e. minimize it)
 		size:    max size fill-canvas canvas fill-x fill-y		;-- only extends along fill-enabled axes
 		space/size: constrain size space/limits
-		; #print "size: (size) space/size: (space/size) fill: (fill)"
+		; #print "size: (size) space/size: (space/size) fill: (fill-x) (fill-y) limits: (space/limits)"
 		
 		free:   space/size - content/size - mrg2
 		offset: (to point2D! space/margin) + max (0,0) free * (space/align + 1) / 2
