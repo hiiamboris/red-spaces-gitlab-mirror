@@ -1231,7 +1231,7 @@ list-ctx: context [
 			]
 			cloned
 		]
-		format: does [container-ctx/format space select [x "^-" y "^/"] axis]
+		format: does [container-ctx/format space select [x "^-" y "^/"] space/axis]
 		frame: object [
 			sections: does [~/get-sections space]
 		]
