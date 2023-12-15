@@ -191,7 +191,7 @@ scheduler: context [
 		]
 	]
 
-	#assert [1291100108 = checksum mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
+	#assert [1291100108 = checksum native-mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
 	event-loop-depth: 0									;@@ used to work around #5377
 	set 'do-events function spec-of native-do-events: :do-events [
