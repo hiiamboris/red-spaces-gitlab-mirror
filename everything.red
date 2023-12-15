@@ -91,13 +91,13 @@ do/expand [
 				#include %cache.red
 				#include %rendering.red
 				#include %layouts.red
-				#include %event-scheduler.red
-				#include %events.red					;-- requires auxi, event-scheduler, layouts, styles
-				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %source.red
 				#include %clipboard.red
 				#include %templates.red					;-- requires clipboard on inclusion
 				#include %vid.red
+				#include %event-scheduler.red			;-- requires vid (host? func)
+				#include %events.red					;-- requires auxi, event-scheduler, layouts, styles
+				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
 				#include %popups.red
 				#include %traversal.red
 				#include %focus.red
