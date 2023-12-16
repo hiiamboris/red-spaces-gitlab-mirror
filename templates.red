@@ -1861,6 +1861,15 @@ rich-content-ctx: context [								;-- rich content
 			reload
 		]
 	
+		unmark-range: function [
+			"Remove all attributes from given range"
+			range [pair! none!]
+		][
+			unless all [range  range/1 <> range/2] [exit]
+			rich/attributes/clear space/data range
+			reload
+		]
+	
 		insert-items: function [
 			"Insert items at given offset"
 			offset [word! integer!]
