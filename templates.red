@@ -1817,7 +1817,7 @@ rich-content-ctx: context [								;-- rich content
 			rich/source/serialize space/data
 		]
 		
-		reload: function ["Reload content from data"] [space/data: space/data]	;-- triggers on-data-change
+		reload: function ["Reload content from data"] [trigger 'space/data]	;-- triggers on-data-change
 	
 		select-range: function [
 			"Replace selection"
