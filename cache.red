@@ -234,7 +234,6 @@ get-host-path: function [
 	] [return none]
 	
 	gen:  host/generation
-	path: clear []
 	append parents space								;-- space's generation has to be verified as well 
 	foreach obj next parents [
 		if obj/cached/-2 < gen [return none]			;-- space generation is older than the host: orphaned (unused) subtree
