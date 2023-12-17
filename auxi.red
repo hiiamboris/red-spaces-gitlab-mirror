@@ -179,6 +179,16 @@ inside?: make op! function [
 	within? point 0x0 space/size
 ]
 
+above: function [										;-- a replacement for space/parent/parent/parent/parent shit
+	"Get at parent space of specific type (or none)"
+	child [object!]
+	type  [word!]
+][
+	path: reverse next get-host-path child
+	forall path [if path/1/type = type [return path/1]]			;@@ use locate
+	none
+]
+
 host-of: function [space [object!]] [
 	all [path: get-host-path space  path/1]
 ]
@@ -737,11 +747,11 @@ context [
 	find-y: function [fun [object!] y [number!]] [
 		locate fun/points fun/yindex fun/ystep y
 	]
-	#assert [
+	#hide [#assert [
 		f: build-index [0 0 1 2 2 4 2 5 4 8] 3
 		[1 1 3 3 7 7 7] = map-each x [0 1 1.1 2 2.1 3.9 4] [index? find-x f x]
 		[2 2 4 4 6 8 8] = map-each y [0 2 2.1 4 4.1 5.1 8] [index? find-y f y]
-	]
+	]]
 	
 	;; 'reproject' meaning get inverse projection from X to function line and then project into Y
 	;@@ maybe there's a better name I don't see yet... X2Y and Y2X func pair?
@@ -891,6 +901,7 @@ set-pair: function [
 	set words/2 pair/2
 ]
 #hide [#assert [
+	a: b: 0
 	set-pair [a b] 2x3
 	a = 2
 	b = 3
@@ -1156,14 +1167,14 @@ find-same-path: function [block [block!] path [path!]] [
 	none
 ]
 
-#assert [
+#hide [#assert [
 	(a: object [] b: object [])
 	same-paths? as path! reduce [a b] reduce [a b]
 	2 = index? r: find-same-path reduce [
 		as path! reduce [copy a b]
 		as path! reduce [a b]
 	] as path! reduce [a b]
-]
+]]
 
 
 kit-catalog: make map! 40
