@@ -196,7 +196,10 @@ scheduler: context [
 	event-loop-depth: 0									;@@ used to work around #5377
 	set 'do-events function spec-of native-do-events: :do-events [
 		either no-wait [
-			native-do-events/no-wait
+			trap/all/catch
+				[process-any-event]
+				[print thrown]
+			probe native-do-events/no-wait
 		][
 			;; 'head' to account for GUI console which enters event loop too:
 			if window: last head system/view/screens/1/pane [	;@@ what if windows were reordered?
