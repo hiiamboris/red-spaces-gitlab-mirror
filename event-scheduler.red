@@ -199,7 +199,7 @@ scheduler: context [
 			trap/all/catch
 				[process-any-event]
 				[print thrown]
-			probe native-do-events/no-wait
+			native-do-events/no-wait
 		][
 			;; 'head' to account for GUI console which enters event loop too:
 			if window: last head system/view/screens/1/pane [	;@@ what if windows were reordered?
