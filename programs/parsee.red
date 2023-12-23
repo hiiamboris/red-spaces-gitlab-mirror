@@ -15,6 +15,7 @@ Red [
 #process off
 do/expand [
 #include %../../common/format-number.red
+#include %../../common/data-store.red
 #include %../../cli/cli.red
 ]
 #process on
@@ -632,7 +633,7 @@ context with spaces/ctx expand-directives [
 	;@@ layout: grid-view with 2 vlists (1 pinned), so rule names are always visible
 	;@@ for that grid-view will have to support row selection, like in list-view
 	;@@ BUG: when profiles are too wide it won't allow to scroll to them, likely triggering slide during intermediate redraws
-	visualize-parse: function [file [file!] /config conf: #() [map!]] [
+	visualize-parse: function [file [file!] /geometry geom: #() [map!]] [
 		;; load the dump file
 		input: first data: load/as file 'redbin
 		decoded: decode-dump data
@@ -671,8 +672,8 @@ context with spaces/ctx expand-directives [
 		]
 		
 		;; run the UI
-		default conf/offset: -8x0 
-		default conf/size:   system/view/screens/1/size - 0x60
+		default geom/offset: -8x0 
+		default geom/size:   system/view/screens/1/size - 0x60
 		prof/reset
 		view/tight/options window: layout reshape [
 			title @[`"ParSEE - (file)"`] 
@@ -713,46 +714,19 @@ context with spaces/ctx expand-directives [
 						react [refresh-progress input-view plot-list marks timeline/age profiles-view/cursor]
 				]
 			] react [face/size: face/parent/size - 20]
-		] [offset: conf/offset flags: 'resize size: conf/size]
+		] [offset: geom/offset flags: 'resize size: geom/size]
 		prof/show
-		conf/offset: window/offset
-		conf/size:   window/size
+		geom/offset: window/offset
+		geom/size:   window/size
 	];visualize-parse: function [file [file!]] [
-	
-	;@@ I need to generalize this; used too often
-	get-config-name: function [] [
-		if all [
-			not system/options/script
-			path: system/options/boot
-		][
-			take/last path: normalize-dir to-red-file path
-			set [path: _:] split-path path
-			path/parsee.cfg
-		]
-	]
-	load-config: function [] [
-		any [
-			all [
-				conf: get-config-name
-				exists? conf
-				attempt [to map! load/all conf]
-			]
-			#()
-		]
-	]
-	save-config: function [config [map!]] [
-		if conf: get-config-name [
-			attempt [write conf mold/only to [] config]
-		]
-	]
 	
 	set 'parsee function [
 		"Parsing flow visual analysis tool"
 		dump-file [file!] "Path to a .pdump file to analyze"
 	][
-		config: load-config
-		visualize-parse/config dump-file config
-		save-config config
+		geom: data-store/load-state
+		visualize-parse/geometry dump-file geom
+		data-store/save-state geom
 	]
 
 ];context with spaces/ctx expand-directives [
