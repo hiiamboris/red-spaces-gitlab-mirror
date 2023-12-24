@@ -91,7 +91,7 @@ context [
 		;; checks after full face render for any invalidated spaces (have /cache enabled but /cached empty):
 		verify-validity: function [host [object!] (host? host)] [
 			paths: sift list-*aces host/space [			;-- obtain a list of possibly invalidated spaces
-				path .. obj: last path
+				obj .. 
 				obj/cache								;-- cache enabled?
 				empty? obj/cached						;-- no cached slots?
 				obj/size +< infxinf						;-- has a finite size? (else can't be cached)
