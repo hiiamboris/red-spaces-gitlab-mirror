@@ -930,7 +930,7 @@ rich-text-block!: make rich-text-span! [
 	name:   'rich-text-block
 	data:   []
 	length: does [max 0 (length? data) - 1 + sum map-each item data [batch item [length]]]
-	format: function [] [to format: {} map-each/eval item data [[batch item [format] #"^/"]]]
+	format: function [] [to format: {} join map-each/eval item data [[batch item [format]]] #"^/"]
 	copy:   function [] [
 		;; tricky! need to clone paragraphs but not their inner spaces! (see notes)
 		data: system/words/copy self/data
