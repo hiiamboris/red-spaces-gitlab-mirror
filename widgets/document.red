@@ -698,6 +698,7 @@ doc-ctx: context [
 	
 	;; used to correct caret and selection offsets after an edit
 	adjust-offsets: function [doc [object!] offset [integer!] shift [integer!]] [
+		; #assert [doc/caret/parent =? doc]
 		foreach path [doc/selected/1 doc/selected/2 doc/length doc/caret/offset] [
 			if attempt [offset <= value: get path] [
 				set path max offset value + shift
@@ -830,13 +831,23 @@ doc-ctx: context [
 			if old-holder [old-holder/caret: none]
 			if new-holder [
 				new-holder/caret: any [shared-caret make-space 'caret []]
+				new-holder/caret/parent: new-holder
 			]
 		]
 		if new-holder [									;-- update offsets
-			new-holder/caret/side:     doc/caret/side
-			new-holder/caret/offset:   offset - pofs
-			new-holder/caret/width:    doc/caret/width
-			new-holder/caret/visible?: doc/caret/visible?
+			foreach [attr code] [
+				side		doc/caret/side
+				offset		(offset - pofs)
+				width		doc/caret/width
+				visible?	doc/caret/visible?
+			][
+				value: do code
+				if new-holder/caret/:attr <> value [
+					invalid?: on
+					quietly new-holder/caret/:attr: value
+				]
+			]
+			if invalid? [invalidate/only new-holder]	;-- because caret has /cache=none, have to manually invalidate the parent
 		]
 		
 		drawn: doc/list-draw/on canvas fill-x fill-y
