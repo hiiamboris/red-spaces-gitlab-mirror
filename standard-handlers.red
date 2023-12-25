@@ -138,7 +138,7 @@ define-handlers [
 		on-focus   [space path event] [if space/selectable [invalidate space/list]]
 		on-unfocus [space path event] [if space/selectable [invalidate space/list]]
 		
-		on-down [space path event] [
+		on-up [space path event] [
 			; ?? [space/origin space/window/origin space/anchor/offset]		
 			unless space/selectable [exit]				;-- this handler is only responsible for selection
 			if set [item:] locate path [obj - .. obj/type = 'item] [
@@ -152,7 +152,7 @@ define-handlers [
 				range: either all [event/shift? multi?] [i][i thru i]
 				batch space [
 					select-range/mode range mode
-					move-cursor i 
+					if i <> here [move-cursor i]		;-- don't move the already selected item around
 				]
 				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
 				;@@ also it will conflict with current touch-friendly dragging, so must be optional

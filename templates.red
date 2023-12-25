@@ -2748,8 +2748,18 @@ list-view-ctx: context [
 					xy2: viewport - xy1
 					if all [
 						not direction
-						all [xy1/:y <= target-xy1/:y target-xy1/:y <= xy2/:y]
-						all [xy1/:y <= target-xy2/:y target-xy2/:y <= xy2/:y]
+						any [
+							all [								;-- item fully within the viewport
+								xy1/:y <= target-xy1/:y target-xy1/:y <= xy2/:y
+								xy1/:y <= target-xy2/:y target-xy2/:y <= xy2/:y
+							]
+							;; this case should prevent huge (>viewport) item from jumping up/down on clicks:
+							;@@ still need a smarter algorithm... but not sure how should it work yet
+							all [								;-- viewport fully within the item
+								target-xy1/:y <= xy1/:y xy1/:y <= target-xy2/:y
+								target-xy1/:y <= xy2/:y xy2/:y <= target-xy2/:y
+							]
+						]
 					][
 						exit									;-- already visible and no direction forced, so do nothing
 					]
