@@ -60,6 +60,7 @@ do/expand [
 	#include %../common/xyloop.red
 	#include %../common/modulo.red
 	; #include %../common/with.red
+	#include %../common/join.red
 	#include %../common/split.red
 	#include %../common/catchers.red
 	#include %../common/is-face.red

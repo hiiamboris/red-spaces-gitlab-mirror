@@ -502,21 +502,6 @@ zip: function [
 	"1-3-"          = zip "13" #"-"
 ]
 
-;; cannot be based on zip, because delimiter may be series too :(
-delimit: function [
-	"Return copy of LIST with items separated by a DELIMITER"	;-- modifying version would be O(n^2) slow
-	list      [series!]
-	delimiter [any-type!]
-][
-	result: make list 2 * length? list					;-- hard to estimate delimiter size e.g. in block to string conversion :(
-	unless tail? list [									;@@ use map-each
-		append/only result :list/1
-		list: next list
-		forall list [append/only append result :delimiter :list/1]
-	]
-	result
-]
-
 ;@@ make a REP with this? (need use cases)
 ;@@ this is no good, because it treats paths as series
 native-swap: :system/words/swap
