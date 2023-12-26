@@ -227,6 +227,35 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			] sign > 0
 			map'
 		]
+		
+		;; return format for list of n items:
+		;; - before 1st item               [margin 1 1   offset], -INF <= offset < 0 (margin-size is unused)
+		;; - inside k-th item              [item   k k   offset], 0 <= offset < item-size,    1 <= k <= n
+		;; - between k-th and k+1-th items [space  k k+1 offset], 0 <= offset < spacing-size, 1 <= k < n
+		;; - after last item               [margin n n   offset], 0 <= offset <= INF, n is useful for ranges
+		;; NOTE: 'margin' in list-view relates to anything outside the current frame, including non-drawn items and spacing
+		;; so for list-view margin index will not be 1 or n, but frame/range/1 or frame/range/2 
+		locate-line: function [
+			frame [block! object! map!]
+			level [linear!]
+		][
+			#assert [frame  "locate-line requires frame data"]
+			y: frame/axis
+			set [k: offset:] search/mode/for k: 1 n: half length? frame/map [
+				geom: pick frame/map k * 2
+				geom/offset/:y
+			] 'interp level
+			geom:   pick frame/map k * 2
+			offset: offset - geom/offset/:y
+			k:      k - 1 + frame/range/1
+			reduce case [
+				offset < 0            [['margin k k     offset]]
+				offset < geom/size/:y [['item   k k     offset]]
+				k = frame/range/2     [['margin k k     offset - geom/size/:y]]
+				'else                 [['space  k k + 1 offset - geom/size/:y]]
+			]
+		]
+		
 	]
 	
 	tube: context [
