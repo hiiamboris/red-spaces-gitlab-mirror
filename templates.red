@@ -677,6 +677,10 @@ scrollable-ctx: context [
 		map:   []
 		cache: [size map]
 
+		behavior: make map! [
+			draggable: pan								;-- dragging: false=disabled; pan=pan content (more options supported by inherited templates)
+		]
+			
 		into: func [xy [planar!] /force child [object! none!]] [
 			~/into self xy child
 		]
@@ -1199,7 +1203,7 @@ list-ctx: context [
 	into: function [list [object!] xy [planar!] item [object! none!]] [
 		if item [return into-map list/map xy item]
 		y: list/axis
-		i: first search/mode/for i: 1 half length? list/map [
+		i: first search/mode/for i: 1 half length? list/map [	;@@ unify this with list-view somehow
 			geom: pick list/map i * 2
 			geom/offset/:y
 		] 'interp xy/:y
@@ -2511,40 +2515,52 @@ list-view-ctx: context [
 		moved
 	]
 
-	;@@ move this into list? hardly makes sense to make offsets window-relative
-	;@@ OTOH, list is limited and has no continuation around window borders
-	;; an item is "before y" if y >= its (offset/y + size/y)
-	;; an item is "after y"  if y < its offset/y
+	get-items-span: function [
+		space   [object!]
+		offset1 [linear! planar!] "Offsets are window-relative"
+		offset2 [linear! planar!]
+		whole?  [logic!] "Items must fully fit or only intersect with the offsets?"
+	][
+		y: space/list/axis
+		offset1: offset1 along y - woy: space/list/frame/window-origin/:y	;-- make offsets map-relative
+		offset2: offset2 along y - woy
+		if reversed?: offset1 > offset2 [swap 'offset1 'offset2]
+		set [type1: i1: i1': y1:] layouts/list/locate-line space/list/frame offset1
+		set [type2: i2: i2': y2:] layouts/list/locate-line space/list/frame offset2
+		fix: pick [1 0] whole?
+		r1: switch type1 [
+			item   [i1 + fix]
+			space  [i1']
+			margin [either y1 <  0 [i1][return none]]
+		]
+		r2: switch type2 [
+			item   [i2 - fix]
+			space  [i2]
+			margin [either y2 >= 0 [i2][return none]]
+		]
+		either reversed? [r2 thru r1][r1 thru r2]
+	]
+
+	;; an item is "before y" if y >= its (offset/y + size/y), i.e. it wholly fits before y
+	;; an item is "after y"  if y < its offset/y, i.e. it wholly fits after y
+	;; this returns only indexes of items present in the map!
 	get-next-item: function [
 		space  [object!]
-		offset [linear! planar!]
+		offset [linear! planar!] "Window-relative"
 		dir    [word!] (find [before after] dir)
 	][
-		list: space/list
-		y:    list/axis
-		if planar? offset [offset: offset/:y]
-		if empty? map: list/frame/map [return none]
-		
-		if either dir = 'before [
-			first-geom: second map
-			offset < (first-geom/offset/:y + first-geom/size/:y)
-		][
-			last-geom: last map
-			offset >= last-geom/offset/:y
-		] [return none]
-		
-		used-size: pick [1 0] dir = 'before
-		target: offset - list/frame/window-origin/:y
-		if dir <> 'before [target: target + 1]			;-- +1 to ensure strict 'y < offset'
-		found: search/mode/for i: 1 n: half length? map [
-			geom: pick map i * 2
-			geom/offset/:y + (geom/size/:y * used-size)
-		] 'interp target
-		#assert [found]
-		pick found pick [1 3] dir = 'before
+		list:  space/list
+		y:     list/axis
+		range: list/frame/range
+		set [type: i: i': dy:] layouts/list/locate-line offset - list/frame/window-origin/:y
+		new: switch type [
+			item   [either dir = 'before [if i > range/1 [i - 1]][if i < range/2 [i + 1]]]
+			space  [either dir = 'before [i][i']]
+			margin [either dir = 'before [if dy >= 0 [range/2]][if dy < 0 [range/1]]]
+		]
 	]
 				
-	axial-shift: function [
+	axial-shift: function [								;-- used for paging
 		"Find a new item index further along main axis"
 		space [object!]
 		index [integer!] "From given item (must be in the map)"
@@ -2558,23 +2574,15 @@ list-view-ctx: context [
 		old-geom:  pick list/map 2 * (index - range/1 + 1)
 		#assert [block? old-geom]
 		old-y:     old-geom/offset/:y					;-- shift down counts from item's top
+		old-y:     old-y + list/frame/window-origin/:y	;-- it needs window-relative offset
 		if shift < 0 [old-y: old-y + old-geom/size/:y]	;-- shift up counts from item's bottom
 		new-y:     old-y + shift
-		new-y:     new-y + list/frame/window-origin/:y	;-- item-before/after requires window-relative coordinates
+		span:      get-items-span space old-y new-y yes
+		unless span [return pick range shift < 0]
 		sign:      sign? shift
-		new-index: clip range/1 range/2 either shift > 0 [
-			i: any [
-				get-next-item space new-y 'before		;-- may return none if no more items
-				range/2									;-- select farthest item then
-			]
-			max range/1 + i - 1 index + sign			;-- move at least by one item
-		][
-			i: any [
-				get-next-item space new-y 'after		;-- may return none if no more items
-				range/1									;-- select farthest item then
-			]
-			min range/1 + i - 1 index + sign			;-- move at least by one item
-		]
+		new-index: clip range/1 range/2 either shift > 0
+			[max span/2 index + sign]					;-- move at least by one item
+			[min span/2 index + sign]
 	]
 
 	kit: make-kit 'list-view [
@@ -2634,7 +2642,9 @@ list-view-ctx: context [
 		][
 			if word? target [target: locate target]
 			target: clip 1 length target
-			frame/move-to/:margin/:no-clip target mrg
+			if space/behavior/follows-cursor? [
+				frame/move-to/:margin/:no-clip target mrg
+			]
 			space/cursor: target
 		]
 		
@@ -2669,6 +2679,15 @@ list-view-ctx: context [
 		frame: object [
 			displayed: func ["Get a range of currently displayed items"] [space/list/frame/range]
 		
+			items-between: function [
+				"Get item index range between given window offsets along primary axis (as pair), or none if outside"
+				offset1 [linear! planar!]
+				offset2 [linear! planar!]
+				/whole "Only count items that fully fit the given primary axis range"
+			][
+				~/get-items-span space offset1 offset2 whole 
+			]
+			
 			item-before: function [
 				"Get item index before given window offset along primary axis; or none"
 				offset [linear! planar!]
@@ -2838,12 +2857,15 @@ list-view-ctx: context [
 		;; hash by default so it can scale out of the box for the general case ;@@ auto convert block to hash? on >3-4 items?
 		selected:    make hash! 4	#type    [hash! block!] :invalidates-list
 		
-		;; selection mode: only affects event handlers
-		;; its still possible to programmatically select anything, but how keys behave highly depends on /selectable
-		selectable:  none			#type    [word! (find [single multi] selectable) none!]
-		
 		;; current item (for keyboard navigation purposes), doesn't have to be selected 
 		cursor:      none			#type =? [integer! (cursor > 0) none!] :invalidates-list
+		
+		extend behavior [
+			; draggable:       pan						;-- inherited from scrollable; also supports: select=multi-item selection
+			;; its still possible to programmatically select anything, but how keys behave highly depends on /selectable
+			selectable:      #[none]					;-- none=don't select; single=select one item; multi=many items at once
+			follows-cursor?: #[true]					;-- cursor fully shows itself on movement
+		]
 
 		;; see anchor description in the spec above
 		anchor: make classy-object! anchor-spec

@@ -237,7 +237,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		;; so for list-view margin index will not be 1 or n, but frame/range/1 or frame/range/2 
 		locate-line: function [
 			frame [block! object! map!]
-			level [linear!]
+			level [linear!] "Map-relative (level=0 maps to frame/origin)"
 		][
 			#assert [frame  "locate-line requires frame data"]
 			y: frame/axis
