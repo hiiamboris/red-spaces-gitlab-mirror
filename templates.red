@@ -508,7 +508,7 @@ scrollable-ctx: context [
 	;@@ TODO: less awkward spec possible?
 	move-by: function [
 		space   [object!]
-		amount  [word! integer!]
+		amount  [word! linear!]
 		dir     [word!]
 		axis    [word!]
 		scale   [number! none!]
@@ -692,7 +692,7 @@ scrollable-ctx: context [
 		;@@ move these into kit
 		move-by: func [
 			"Offset viewport by a fixed amount"
-			amount [word! integer!] "'line or 'page or offset in pixels"
+			amount [word! linear!] "'line or 'page or offset in pixels"
 			dir    [word!]          "'forth or 'back"
 			axis   [word!]          "'x or 'y"
 			/scale factor [number!] "Default: 0.8 for page, 1 for the rest"
