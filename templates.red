@@ -680,6 +680,9 @@ scrollable-ctx: context [
 		behavior: make map! [
 			draggable: pan								;-- dragging: false=disabled; pan=pan content; scroll=scroll when out of the viewport
 		]
+		
+		;@@ temporary kludge for scroll-dragging, until I decide how to better handle it
+		last-xy: (0,0)
 			
 		into: func [xy [planar!] /force child [object! none!]] [
 			~/into self xy child

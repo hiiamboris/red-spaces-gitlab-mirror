@@ -38,6 +38,7 @@ define-handlers [
 			unless find [hscroll vscroll] select item 'type [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
 			if space/behavior/draggable [start-drag path]
+			space/last-xy: path/2								;@@ kludge
 		]
 		on-up [space path event] [stop-drag pass]
 		on-over [space path event] [
@@ -60,12 +61,12 @@ define-handlers [
 					forth-arrow-geom: select/same scroll/map scroll/forth-arrow
 					back-arrow-geom:  select/same scroll/map scroll/back-arrow
 					band:   scroll/size/:x - forth-arrow-geom/size/:x - back-arrow-geom/size/:x
-					csize:  space/content/size				;@@ may get out of sync with the map?
+					csize:  space/content/size					;@@ may get out of sync with the map?
 					vport:  space/viewport
 					hidden: csize/:x - vport/:x
-					ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
-					ofs: ofs/:x / max 1 band				;-- scale it down by scrollbar's size 
-					ofs: ofs * (csize * axis2pair x)		;-- now scale up by content size
+					ofs: drag-offset skip path 2				;-- get offset relative to the scrollbar
+					ofs: ofs/:x / max 1 band					;-- scale it down by scrollbar's size 
+					ofs: ofs * (csize * axis2pair x)			;-- now scale up by content size
 				]
 			][
 				switch space/behavior/draggable [
@@ -73,17 +74,12 @@ define-handlers [
 						if own? [ofs: negate drag-offset path]
 					]
 					scroll [
-						;@@ this mode must be handled by the timer, but not yet possible
-						unless (xy: path/2) inside? space [
-							cxy:  xy - center: half space/size
-							cxy': cxy / center					;-- normalized to [-1,-1]..[1,1]
-							ofs:  cxy' - (cxy' / max abs cxy'/x abs cxy'/y) * center
-						]
+						space/last-xy: path/2					;@@ kludge
 					]
 				]
 			]
-			if ofs [space/clip-origin space/origin - ofs]	;-- clipping in the event handler guarantees validity of size
-			if own? [start-drag path]						;-- restart from the new offset or it will accumulate
+			if ofs [space/clip-origin space/origin - ofs]		;-- clipping in the event handler guarantees validity of size
+			if own? [start-drag path]							;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -144,18 +140,17 @@ define-handlers [
 				][
 					;; scroll viewport when dragging out of it (useful for content selection)
 					;; this relies on on-over rewriting drag-path on every event, because timer doesn't have access to offsets
-					;@@ disabled until the upgrade of the dragging system - for now only handled by over event
-					; if all [
-						; scrollable/behavior/draggable = 'scroll
-						; not xy inside? scrollable
-					; ][
-						; cxy: xy - center: half scrollable/size
-						; cxy': cxy / center						;-- normalized to [-1,-1]..[1,1]
-						; ofs: cxy' - (cxy' / max abs cxy'/x abs cxy'/y) * center
-						; unless zero? ofs [
-							; scrollable/clip-origin scrollable/origin - ofs
-						; ]
-					; ]
+					if all [
+						scrollable/behavior/draggable = 'scroll
+						not (xy: scrollable/last-xy) inside? scrollable		;@@ kludge
+					][
+						cxy: xy - center: half scrollable/size
+						cxy': cxy / center						;-- normalized to [-1,-1]..[1,1]
+						ofs: cxy' - (cxy' / max abs cxy'/x abs cxy'/y) * center
+						unless zero? ofs [
+							scrollable/clip-origin scrollable/origin - ofs
+						]
+					]
 				]
 			]
 		]
