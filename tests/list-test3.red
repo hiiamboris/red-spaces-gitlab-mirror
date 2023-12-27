@@ -29,7 +29,10 @@ view/no-wait/options [
 			either pick [
 				rejoin ["message " i ": " copy/part lorem random length? lorem]
 			][none]									;-- /size = none for unlimited
-		] with [list/margin: 10x20]
+		] with [
+			list/margin: 10x20
+			; behavior/draggable: 'scroll
+		]
 	]
 	on-over [
 		status/text: mold hittest face/space event/offset
