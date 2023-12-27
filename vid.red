@@ -80,9 +80,9 @@ VID: context [
 			template: list-view
 			spec:     [list/spacing: 5x5 list/axis: 'y]
 			facets:   [
-				tight [list/spacing: 0x0]				;-- different from #tight prop
-				selectable       [selectable: 'single]
-				multi-selectable [selectable: 'multi]
+				tight            [list/spacing: 0x0]			;-- different from #tight prop
+				selectable       [behavior/selectable: 'single]
+				multi-selectable [behavior/selectable: 'multi]
 			]
 		]
 		label [

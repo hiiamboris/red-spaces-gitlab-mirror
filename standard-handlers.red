@@ -37,32 +37,53 @@ define-handlers [
 			;; remove cells or other content from the path, as they do not have to persist during window moves:
 			unless find [hscroll vscroll] select item 'type [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
-			start-drag path
+			if space/behavior/draggable [start-drag path]
 		]
 		on-up [space path event] [stop-drag pass]
 		on-over [space path event] [
-			unless dragging?/from space [pass exit]		;-- let inner spaces handle it
+			unless own?: dragging?/from space [pass]			;-- let inner spaces handle it
+			unless all [
+				drag-path
+				found: find/reverse/same next drag-path space	;-- only handled if started anywhere inside this scrollable
+			] [exit]					
 			set [_: _: item: _: subitem:] path
-			either find [hscroll vscroll] select item 'type [	;-- item may be none
-				if 'thumb <> select subitem 'type [exit]		;-- do not react to drag of arrows (used by timer)
-				scroll: item
-				x:      scroll/axis
-				;; map/subitem/size should take precedence over subitem/size
-				;; because map can get fetched from cache without affecting subitem object sizes (they become invalid at this point)
-				forth-arrow-geom: select/same scroll/map scroll/forth-arrow
-				back-arrow-geom:  select/same scroll/map scroll/back-arrow
-				band:   scroll/size/:x - forth-arrow-geom/size/:x - back-arrow-geom/size/:x
-				csize:  space/content/size				;@@ may get out of sync with the map?
-				vport:  space/viewport
-				hidden: csize/:x - vport/:x
-				ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
-				ofs: ofs/:x / max 1 band				;-- scale it down by scrollbar's size 
-				ofs: ofs * (csize * axis2pair x)		;-- now scale up by content size
+			switch/default select item 'type [					;-- item may be none
+				hscroll vscroll [
+					unless all [
+						own?
+						'thumb = select subitem 'type			;-- do not react to drag of arrows (used by timer)
+					] [exit]
+					scroll: item
+					x:      scroll/axis
+					;; map/subitem/size should take precedence over subitem/size
+					;; because map can get fetched from cache without affecting subitem object sizes (they become invalid at this point)
+					forth-arrow-geom: select/same scroll/map scroll/forth-arrow
+					back-arrow-geom:  select/same scroll/map scroll/back-arrow
+					band:   scroll/size/:x - forth-arrow-geom/size/:x - back-arrow-geom/size/:x
+					csize:  space/content/size				;@@ may get out of sync with the map?
+					vport:  space/viewport
+					hidden: csize/:x - vport/:x
+					ofs: drag-offset skip path 2			;-- get offset relative to the scrollbar
+					ofs: ofs/:x / max 1 band				;-- scale it down by scrollbar's size 
+					ofs: ofs * (csize * axis2pair x)		;-- now scale up by content size
+				]
 			][
-				ofs: negate drag-offset path			;-- dragged by an empty area
+				switch space/behavior/draggable [
+					pan [
+						if own? [ofs: negate drag-offset path]
+					]
+					scroll [
+						;@@ this mode must be handled by the timer, but not yet possible
+						unless (xy: path/2) inside? space [
+							cxy:  xy - center: half space/size
+							cxy': cxy / center					;-- normalized to [-1,-1]..[1,1]
+							ofs:  cxy' - (cxy' / max abs cxy'/x abs cxy'/y) * center
+						]
+					]
+				]
 			]
-			space/clip-origin space/origin - ofs		;-- clipping in the event handler guarantees validity of size
-			start-drag path								;-- restart from the new offset or it will accumulate
+			if ofs [space/clip-origin space/origin - ofs]	;-- clipping in the event handler guarantees validity of size
+			if own? [start-drag path]						;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -106,16 +127,36 @@ define-handlers [
 			invalidate space/vscroll/thumb
 		]
 		scroll-timer: [
-			on-time [space path event delay [percent!]] [	;-- press & hold way of scrolling
-				unless dragging? [exit]
-				set [spc: _: item: _: subitem:] drag-path
-				unless spc =? path/-1 [exit]				;-- dragging started inside another space - ignore it
-				scrollable: path/-1
-				scrollable/move-by/scale
-					switch/default select subitem 'type [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
-					switch subitem/type [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
-					any [select [hscroll x vscroll y] select item 'type  exit]
-					delay + 100%
+			on-time [space path event delay [percent!]] [		;-- press & hold way of scrolling
+				unless all [
+					drag-path
+					found: find/reverse/same next drag-path path/-1
+				] [exit]
+				set [scrollable: xy: item: _: subitem:] found
+				switch/default select item 'type [				;-- 'item' can be none
+					hscroll vscroll [
+						scrollable/move-by/scale
+							switch/default select subitem 'type [back-page forth-page ['page] back-arrow forth-arrow ['line]] [exit]
+							switch subitem/type [back-arrow back-page ['back] forth-arrow forth-page ['forth]]
+							any [select [hscroll x vscroll y] item/type]
+							delay + 100%
+					]
+				][
+					;; scroll viewport when dragging out of it (useful for content selection)
+					;; this relies on on-over rewriting drag-path on every event, because timer doesn't have access to offsets
+					;@@ disabled until the upgrade of the dragging system - for now only handled by over event
+					; if all [
+						; scrollable/behavior/draggable = 'scroll
+						; not xy inside? scrollable
+					; ][
+						; cxy: xy - center: half scrollable/size
+						; cxy': cxy / center						;-- normalized to [-1,-1]..[1,1]
+						; ofs: cxy' - (cxy' / max abs cxy'/x abs cxy'/y) * center
+						; unless zero? ofs [
+							; scrollable/clip-origin scrollable/origin - ofs
+						; ]
+					; ]
+				]
 			]
 		]
 	]
@@ -135,15 +176,39 @@ define-handlers [
 
 	;-- *************************************************************************************
 	list-view: extends 'inf-scrollable [
-		on-focus   [space path event] [if space/selectable [invalidate space/list]]
-		on-unfocus [space path event] [if space/selectable [invalidate space/list]]
+		on-focus   [space path event] [if space/behavior/selectable [invalidate space/list]]
+		on-unfocus [space path event] [if space/behavior/selectable [invalidate space/list]]
 		
+		on-down [space path event] [
+			if space/behavior/draggable = 'select [
+				multi?: space/behavior/selectable = 'multi
+				if set [item:] locate path [obj - .. obj/type = 'item] [
+					i: space/list/frame/range/1 + half skip? find/same space/list/map item
+					mode: case [
+						all [event/shift? multi?] ['extend]
+						all [event/ctrl?  multi?] ['invert]
+						'default                  ['replace]
+					]
+					range: either all [event/shift? multi?] [i][i thru i]
+					batch space [
+						select-range/mode range mode
+						if i <> here [move-cursor i]		;-- don't move the already selected item around
+					]
+				]
+				if multi? [
+					#assert [path/3/type = 'window]
+					start-drag/with path window-y1: path/4/y
+				]
+			]
+		]
 		on-up [space path event] [
 			; ?? [space/origin space/window/origin space/anchor/offset]		
-			unless space/selectable [exit]				;-- this handler is only responsible for selection
+			unless space/behavior/selectable [exit]		;-- this handler is only responsible for selection
+			stop-drag
+			exit
 			if set [item:] locate path [obj - .. obj/type = 'item] [
-				i: space/list/frame/range/1 + half -1 + index? find/same space/list/map item
-				multi?: space/selectable = 'multi
+				i: space/list/frame/range/1 + half skip? find/same space/list/map item
+				multi?: space/behavior/selectable = 'multi
 				mode: case [
 					all [event/shift? multi?] ['extend]
 					all [event/ctrl?  multi?] ['invert]
@@ -154,18 +219,43 @@ define-handlers [
 					select-range/mode range mode
 					if i <> here [move-cursor i]		;-- don't move the already selected item around
 				]
+				; if space/behavior/draggable = 'select [
+				; ]
 				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
 				;@@ also it will conflict with current touch-friendly dragging, so must be optional
 			]
 			;; let scrollable get the event, for dragging viewport by item
 		]
 		
+		on-over [space path event] [
+			unless all [
+				dragging?/from space
+				space/behavior/draggable = 'select
+				space/behavior/selectable = 'multi
+			] [exit]
+			exit
+			wy1: drag-parameter
+			wy2: path/4/y
+			set-pair [i1: i2:] batch space [frame/items-between wy1 wy2]
+			?? [i1 i2]
+			multi?: space/behavior/selectable = 'multi
+			mode: case [
+				all [event/shift? multi?] ['extend]
+				all [event/ctrl?  multi?] ['invert]
+				'default                  ['replace]
+			]
+			batch space [
+				select-range/mode i1 thru i2 mode
+				if i2 <> here [move-cursor i2]			;-- don't move the already selected item around
+			]
+		]
+		
 		on-key-down [space path event] [
-			unless space/selectable [exit]				;-- this handler is only responsible for selection
+			unless space/behavior/selectable [exit]		;-- this handler is only responsible for selection
 			list:   space/list
 			y:      list/axis
 			range:  list/frame/range
-			multi?: space/selectable = 'multi
+			multi?: space/behavior/selectable = 'multi
 			
 			;@@ would be nice to use key->plan here but it's tuned for editing text paragraphs
 			switch/default event/key [

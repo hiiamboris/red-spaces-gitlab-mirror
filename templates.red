@@ -678,7 +678,7 @@ scrollable-ctx: context [
 		cache: [size map]
 
 		behavior: make map! [
-			draggable: pan								;-- dragging: false=disabled; pan=pan content (more options supported by inherited templates)
+			draggable: pan								;-- dragging: false=disabled; pan=pan content; scroll=scroll when out of the viewport
 		]
 			
 		into: func [xy [planar!] /force child [object! none!]] [

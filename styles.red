@@ -204,7 +204,7 @@ do with styling: context [
 		]
 		list-view/window/list/item: [
 			lview:  parent/parent/parent				;@@ how to simplify this?
-			margin: either lview/selectable [(4,2)][(0,0)]	;-- add little margin to draw frame on
+			margin: either lview/behavior/selectable [(4,2)][(0,0)]	;-- add little margin to draw frame on
 		]
 		
 		;; "☒☐" make lines too big! needs custom draw code, not symbols
