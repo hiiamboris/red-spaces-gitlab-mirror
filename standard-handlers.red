@@ -34,10 +34,10 @@ define-handlers [
 				item =? space/content [pass]			;-- let content handle it, but still start dragging (e.g. grid-view within grid-view)
 				; item = none []							;-- dragging by the empty area of scrollable
 			]
-			;; remove cells or other content from the path, as they do not have to persist during window moves:
-			unless find [hscroll vscroll] select item 'type [clear skip path 2]
+			; ;; remove cells or other content from the path, as they do not have to persist during window moves:
+			; unless find [hscroll vscroll] select item 'type [clear skip path 2]
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
-			if space/behavior/draggable [start-drag path]
+			if space/behavior/draggable [unless dragging? [start-drag path]]
 			space/last-xy: path/2								;@@ kludge
 		]
 		on-up [space path event] [stop-drag pass]
@@ -79,7 +79,7 @@ define-handlers [
 				]
 			]
 			if ofs [space/clip-origin space/origin - ofs]		;-- clipping in the event handler guarantees validity of size
-			if own? [start-drag path]							;-- restart from the new offset or it will accumulate
+			if own? [if space/behavior/draggable = 'pan [start-drag path]]	;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -175,35 +175,9 @@ define-handlers [
 		on-unfocus [space path event] [if space/behavior/selectable [invalidate space/list]]
 		
 		on-down [space path event] [
-			if space/behavior/draggable = 'select [
-				multi?: space/behavior/selectable = 'multi
-				if set [item:] locate path [obj - .. obj/type = 'item] [
-					i: space/list/frame/range/1 + half skip? find/same space/list/map item
-					mode: case [
-						all [event/shift? multi?] ['extend]
-						all [event/ctrl?  multi?] ['invert]
-						'default                  ['replace]
-					]
-					range: either all [event/shift? multi?] [i][i thru i]
-					batch space [
-						select-range/mode range mode
-						if i <> here [move-cursor i]		;-- don't move the already selected item around
-					]
-				]
-				if multi? [
-					#assert [path/3/type = 'window]
-					start-drag/with path window-y1: path/4/y
-				]
-			]
-		]
-		on-up [space path event] [
-			; ?? [space/origin space/window/origin space/anchor/offset]		
-			unless space/behavior/selectable [exit]		;-- this handler is only responsible for selection
-			stop-drag
-			exit
+			multi?: space/behavior/selectable = 'multi
 			if set [item:] locate path [obj - .. obj/type = 'item] [
 				i: space/list/frame/range/1 + half skip? find/same space/list/map item
-				multi?: space/behavior/selectable = 'multi
 				mode: case [
 					all [event/shift? multi?] ['extend]
 					all [event/ctrl?  multi?] ['invert]
@@ -212,28 +186,27 @@ define-handlers [
 				range: either all [event/shift? multi?] [i][i thru i]
 				batch space [
 					select-range/mode range mode
-					if i <> here [move-cursor i]		;-- don't move the already selected item around
+					if i <> here [move-cursor i]				;-- don't move the already selected item around
 				]
-				; if space/behavior/draggable = 'select [
-				; ]
-				;@@ add box selection by dragging? esp. tricky if user expects dragging to turn on scrolling and sliding when out of the viewport
-				;@@ also it will conflict with current touch-friendly dragging, so must be optional
 			]
+			if all [multi? space/behavior/draggable <> 'pan] [start-drag path]	;-- start selection by dragging
 			;; let scrollable get the event, for dragging viewport by item
+		]
+		
+		on-up [space path event] [
+			if dragging?/from space [stop-drag]
 		]
 		
 		on-over [space path event] [
 			unless all [
-				dragging?/from space
-				space/behavior/draggable = 'select
-				space/behavior/selectable = 'multi
+				drag-path
+				found: find/reverse/same next drag-path space	;-- dragging from inside of this list-view, maybe from the item
+				multi?: space/behavior/selectable = 'multi
 			] [exit]
-			exit
-			wy1: drag-parameter
-			wy2: path/4/y
-			set-pair [i1: i2:] batch space [frame/items-between wy1 wy2]
-			?? [i1 i2]
-			multi?: space/behavior/selectable = 'multi
+			y:    space/list/axis
+			wxy1: found/4
+			wxy2: path/4
+			set-pair [i1: i2:] batch space [frame/items-between wxy1/:y wxy2/:y]
 			mode: case [
 				all [event/shift? multi?] ['extend]
 				all [event/ctrl?  multi?] ['invert]
