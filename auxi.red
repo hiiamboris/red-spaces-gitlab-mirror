@@ -48,7 +48,7 @@ linear?: func [value [any-type!]] [find linear! type? :value]
 
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
-	pair [planar! (0x0 +<= pair) linear! (0 <= pair)]
+	pair [planar! linear!]
 	axis [word!] (find [x y] axis)
 ][
 	pick pair * 1x1 axis
