@@ -1175,7 +1175,7 @@ make-kit: function [name [path! (parse name [2 word!]) word!] spec [block!]] [
 	kit: object append keep-type spec set-word! [do-batch: none]	;-- must not be named 'batch' since global batch is used by kits
 	kit/do-batch: function
 		["(Generated) Evaluate plan for given space" space [object!] plan [block!]]
-		with kit compose [do with self copy plan]		;-- must copy or may get context not available errors on repeated batch
+		with kit compose [do bind/copy plan self]				;-- must copy or may get context not available errors on repeated batch
 	do with [:kit :kit/do-batch] spec
 	kit
 ]
