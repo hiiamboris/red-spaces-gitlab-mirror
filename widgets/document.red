@@ -516,7 +516,7 @@ doc-ctx: context [
 	
 		copy-range: function [
 			"Copy and return specified range of items"
-			range [pair!]
+			range: 0x0 [pair! none!]
 			/text  "Return it as plain text"
 			/block "Always return paragraph list"
 			/clip  "Write it into clipboard"

@@ -1851,7 +1851,7 @@ rich-content-ctx: context [								;-- rich content
 		;@@ adding a sigil to all (or only some) funcs is no better
 		copy-range: function [
 			"Extract and return given range of data"
-			range [pair!] /text "Extract as plain text"
+			range: 0x0 [pair! none!] /text "Extract as plain text"
 		][
 			range: clip range 0 length					;-- avoid overflow on inf * 2
 			slice: copy/part space/data range * 2 + 1
