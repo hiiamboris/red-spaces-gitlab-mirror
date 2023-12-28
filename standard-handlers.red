@@ -227,7 +227,7 @@ define-handlers [
 			
 			;@@ would be nice to use key->plan here but it's tuned for editing text paragraphs
 			switch/default event/key [
-				#"C" [batch space [copy-items/clip selected]]
+				#"C" [if event/ctrl? [batch space [copy-items/clip selected]]]
 				
 				#" " [									;-- space/ctrl+space selected item toggle
 					if i: space/cursor [
