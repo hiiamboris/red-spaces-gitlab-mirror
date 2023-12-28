@@ -381,6 +381,7 @@ cell-ctx: context [
 				child: space/content
 				format: batch child [format]
 			]
+			#debug clipboard [#print "  box/format (\(space-id space): (mold/part format 120)"]
 			format
 		]
 		frame: object [
@@ -928,7 +929,10 @@ paragraph-ctx: context [
 	;; TIP: use kit/do [help self] to get help on it
 	kit: make-kit 'text [
 		clone:  does [clone-space space [text flags color margin weight font command]]
-		format: does [copy space/text]
+		format: does [
+			#debug clipboard [#print "  text/format (\(space-id space)): (mold/part space/text 120)"]
+			copy space/text
+		]
 		
 		;@@ space/text or space/layout/text here?
 		;@@ what isn't drawn doesn't exist and using space/text may lead to offsets > current /size
@@ -1164,6 +1168,7 @@ container-ctx: context [
 	format: function [space [object!] separator [string!]] [
 		list: format-items space
 		unless empty? separator [list: delimit list separator]
+		#debug clipboard [#print "  container/format (\(space-id space)): (mold/part to {} list 120)"]
 		to {} list
 	]
 	
@@ -1317,6 +1322,7 @@ tube-ctx: context [
 			list: container-ctx/format-items space
 			if find [n w ↑ ←] space/axes/1 [list: reverse list]
 			list: delimit list either find [e w → ←] space/axes/1 ["^-"]["^/"]
+			#debug clipboard [#print "  tube/format (\(space-id space)): (mold/part to {} list 120)"]
 			to {} list
 		]
 	]
@@ -1976,9 +1982,11 @@ rich-text-span!: make clipboard/text! [
 	data:   []
 	length: does [half length? data]
 	format: function [] [
-		to format: {} map-each [item [object!]] extract data 2 [
+		text: to format: {} map-each [item [object!]] extract data 2 [
 			batch item [format]
 		]
+		#debug clipboard [#print "  rich-text-span/format: (mold/part text 120)"]
+		text
 	]
 	copy:  does [remake rich-text-span! [data: (system/words/copy data)]]
 	clone: function [] [
@@ -2617,7 +2625,10 @@ list-view-ctx: context [
 				text: batch item [format]
 				[text #"^/"]
 			]
-			if clip [write-clipboard result]
+			if clip [
+				#debug clipboard [#print "list-view/copy-items (\(space-id space)): (mold/part result 120)"]
+				clipboard/write result
+			]
 			result
 		]
 		
@@ -3605,7 +3616,9 @@ grid-ctx: context [
 			]
 			delimit cells "^-"
 		]
-		to {} delimit rows "^/"
+		text: to {} delimit rows "^/"
+		#debug clipboard [#print "  grid/format (\(space-id grid)): (mold/part text 120)"]
+		text
 	]
 	
 	;@@ move grid internal funcs here!
@@ -4157,7 +4170,10 @@ field-ctx: context [
 			/clip "Write it into clipboard"
 		][
 			slice: copy/part space/text range + 1
-			if clip [clipboard/write slice]
+			if clip [
+				#debug clipboard [#print "field/copy-range (\(space-id space)): (mold/part slice 120)"]
+				clipboard/write slice
+			]
 			slice
 		]
 			
@@ -4174,7 +4190,11 @@ field-ctx: context [
 				integer? limit [limit: as-pair space/caret/offset limit]
 				pair? limit [
 					limit: system/words/clip 0 length order-pair limit 
-					if clip [clipboard/write copy/part space/text limit + 1]
+					if clip [
+						slice: copy/part space/text limit + 1
+						#debug clipboard [#print "field/remove-range (\(space-id space)): (mold/part slice 120)"]
+						clipboard/write slice
+					]
 					if limit/1 <> limit/2 [
 						record [ 
 							remove/part  skip space/text limit/1  n: span? limit

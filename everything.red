@@ -35,6 +35,7 @@ do/expand [
 	; #debug set timer									;-- turn on to see timer events
 	; #debug set styles									;-- turn on to see which styles get applied
 	; #debug set paragraph								;-- turn on to see words inside paragraph layout
+	; #debug set clipboard								;-- turn on to see clipboard writes and 'format' result
 	; #debug set grid-view
 	; #debug set list-view
 	

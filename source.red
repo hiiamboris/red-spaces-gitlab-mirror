@@ -293,6 +293,7 @@ rich: context [											;@@ what would be a better name?
 				space? :item [append result batch item [format]]
 			]
 		]
+		#debug clipboard [#print "  rich/source/format: (mold/part result 120)"]
 		result
 	]
 	#assert ["abc" = source/format [#"a" 1 #"b" 0 #"c" 1]]
