@@ -44,7 +44,7 @@ color-name: function [color [tuple! none!]] [			;-- used for debug output to eas
 	]
 ]
 
-space-id: function [space [object!]] [					;-- used to identify spaces in debug sessions
+space-id: function [[no-trace] space [object!]] [		;-- used to identify spaces in debug sessions
 	#composite "(color-name select space 'color) (space/type):(space/size)"	
 ]
 
@@ -101,6 +101,7 @@ if action? :mold [
 		]]
 		
 		set 'mold function [
+			[no-trace]
 			{Returns a source format string representation of a value}
 			value [any-type!]
 			/only "Exclude outer brackets if value is a block" 
@@ -120,7 +121,7 @@ if action? :mold [
 		;@@ perhaps I should not override global mold, but only probe/??/save
 		;@@ otherwise high chance of breaking user code
 		mold-stack: make hash! 100						;-- used to avoid cycles
-		mold*: function [value [any-type!] limit /extern deep flat] with :mold reshape [
+		mold*: function [[no-trace] value [any-type!] limit /extern deep flat] with :mold reshape [
 			; print native-mold reduce [only all :value]
 			sp: " "
 			output: make string! 16
