@@ -659,10 +659,20 @@ scrollable-ctx: context [
 		compose/only [(cdrawn) (compose-map/only space/map reduce [hscroll vscroll])]
 	]
 		
+	kit: make-kit 'scrollable [
+		format: function [] [
+			format: copy {}								;-- used when child has no format
+			all [
+				child: space/content
+				format: batch child [format]
+			]
+			#debug clipboard [#print "  scrollable/format (\(space-id space): (mold/part format 120)"]
+			format
+		]
+	]
+	
 	declare-template 'scrollable/space [
-		;@@ make limits a block to save some RAM?
-		; limits: 50x50 .. none		;-- in case no limits are set, let it not be invisible
-		
+		kit:          ~/kit
 		;; at which point `content` to place: >0 to right below, <0 to left above:
 		origin:       (0,0)
 		weight:       1
@@ -1159,9 +1169,9 @@ container-ctx: context [
 	]
 	
 	format-items: function [space [object!]] [
+		format: copy {}
 		list: map-each i space/items/size [				;-- copy what is visible (items), not what is present (content)
-			item: space/items/pick i
-			when select item 'format (item/format)		;-- omit items that cannot be formatted
+			batch item: space/items/pick i [format]
 		]
 	]
 	
@@ -3609,10 +3619,11 @@ grid-ctx: context [
 	format: function [grid [object!]] [
 		if grid/infinite? [return copy {}]
 		bounds: grid/cells/size
+		format: copy {}
 		rows: map-each/only irow bounds/y [
 			cells: map-each/only icol bounds/x [		;-- /only so even empty cells are separated by tabs
 				cell: grid/cells/pick icol by irow
-				when all [cell in cell 'format] (cell/format)
+				batch cell [format]
 			]
 			delimit cells "^-"
 		]

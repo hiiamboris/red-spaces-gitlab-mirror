@@ -514,6 +514,10 @@ doc-ctx: context [
 			]
 		]
 	
+		format: function ["Copy whole text as a string"] [		;-- used by structural copying (ctrl-c) mechanism
+			copy-range/text everything
+		]
+	
 		copy-range: function [
 			"Copy and return specified range of items"
 			range: 0x0 [pair! none!]
@@ -898,7 +902,7 @@ doc-ctx: context [
 		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [~/draw self canvas fill-x fill-y]
 	]
 	
-	editor-kit: make-kit 'editor [
+	editor-kit: make-kit 'editor/scrollable [
 		frame: object [
 			adjust-origin: function ["Adjust document origin so that caret is visible"] [
 				#assert [0x0 +< space/viewport]
