@@ -1331,9 +1331,9 @@ tube-ctx: context [
 		format: function [] [
 			list: container-ctx/format-items space
 			if find [n w ↑ ←] space/axes/1 [list: reverse list]
-			list: delimit list either find [e w → ←] space/axes/1 ["^-"]["^/"]
-			#debug clipboard [#print "  tube/format (\(space-id space)): (mold/part to {} list 120)"]
-			to {} list
+			list: join list either find [e w → ←] space/axes/1 ["^-"]["^/"]
+			#debug clipboard [#print "  tube/format (\(space-id space)): (mold/part list 120)"]
+			list
 		]
 	]
 
