@@ -2188,6 +2188,7 @@ window-ctx: context [
 		unless zero? area? size [						;-- optimization ;@@ although this breaks the tree, but not critical?
 			-org: negate window/origin
 			;@@ maybe off fill flags when window is less than content? or off them always?
+			; ?? [-org size canvas]
 			cdraw: render/window/on content -org -org + size canvas fill-x fill-y
 			;; window/origin may have been modified by render of content! (e.g. list-view)
 			
@@ -2199,6 +2200,7 @@ window-ctx: context [
 		]
 		#debug sizing [if window/size <> size [#print "resizing window to (size)"]]
 		window/size: size
+		; ?? [window/size size content/size window/origin]
 		;; map should never contain infinite sizes: clip the drawn child area to window
 		mapsize: size - window/origin
 		quietly window/map: compose/deep [(content) [offset: (window/origin) size: (mapsize)]]
@@ -2264,6 +2266,7 @@ inf-scrollable-ctx: context [
 			]
 		]
 		;; transfer offset from scrollable into window, in a way detectable by on-change
+		; ?? [wofs wofs' window/origin space/origin before after wsize viewport]
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
 			#debug sizing [#print "sliding (space-id space) with (space/content) by (wofs' - wofs)"]
@@ -2441,7 +2444,7 @@ list-view-ctx: context [
 		shift: either anchor/reverse? [
 			#assert [anchor/offset >= 0]
 			#assert [not list/limits]							;-- else /size may be constrained and shouldn't be relied upon
-			anchor/offset - (frame/size/:axis - length)			;-- subtract extra part overhanging after the length
+			anchor/offset - (max 0 frame/size/:axis - length)	;-- subtract extra part overhanging after the length
 		][
 			#assert [anchor/offset <= 0]
 			anchor/offset
@@ -2495,7 +2498,7 @@ list-view-ctx: context [
 		window: lview/window
 		anchor: lview/anchor
 		y:      list/axis
-		if list/frame/anchor <> anchor/index [exit]		;-- forbid slide after anchor is changed (otherwise it resets anchor back)
+		if list/frame/anchor <> anchor/index [return none]		;-- forbid slide after anchor is changed (otherwise it resets anchor back)
 		; if window/origin <> list/frame/window-origin [exit]
 
 		;; it's possible that multiple slides occur without a draw, resulting in no visible item suitable as a new anchor

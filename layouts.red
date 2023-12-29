@@ -156,6 +156,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			filled:   size/:y - margin/:y				;-- filled length is not constrained and only has 1 margin (used by 'available?')
 			size:     constrain size limits				;-- do not let size exceed the limits (this clips the drawn layout)
 			#assert [0x0 +<= size +< (1e7 by 1e7)]
+			; prin [count "^-"] ?? [canvas size]
 			;@@ omit some of these?
 			frame: compose/only [
 				size:         (size)
