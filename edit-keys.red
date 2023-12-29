@@ -59,6 +59,13 @@ context [
 					compose [(deselect?) (action) (distance)]
 				] 
 				delete backspace [compose [(action) (distance)]]
+				insert [
+					case [
+						event/ctrl?  [[copy-range/clip selected]]
+						event/shift? [[remove-range selected  paste here]]
+						'else        [[]]
+					]
+				]
 				#"A" [[select-range everything]]
 				#"C" [[copy-range/clip selected]]
 				#"X" [[remove-range/clip selected]]
