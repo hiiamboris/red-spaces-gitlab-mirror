@@ -444,8 +444,8 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 			clear paths
 			list/data: collect [
 				i: 0
-				foreach-*ace path: system/view/screens/1 [
-					append/only paths path
+				foreach-*ace obj: system/view/screens/1 [
+					append/only paths path: get-screen-path obj
 					keep reduce [mold path i: i + 1]
 				]
 			]
@@ -477,7 +477,7 @@ debug-draw: function ["Show GUI to inspect spaces Draw block"] [
 					][
 						drawn: reduce [
 							free/draw:  render    last path
-							sized/draw: render/on last path sized/size
+							sized/draw: render/on last path to point2D! sized/size yes yes
 						]
 						mold prettify/draw pick drawn not rea/canvas?
 					]
