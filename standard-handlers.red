@@ -36,8 +36,12 @@ define-handlers [
 			]
 			; ;; remove cells or other content from the path, as they do not have to persist during window moves:
 			; unless find [hscroll vscroll] select item 'type [clear skip path 2]
+			
 			;; start dragging anyway, e.g. for dragging by content or by empty area:
-			if space/behavior/draggable [unless dragging? [start-drag path]]
+			; if space/behavior/draggable [unless dragging? [start-drag path]]
+			;; let child scrollable override dragging of parent scrollable:
+			if space/behavior/draggable [start-drag path]		;@@ need more elegant solution
+			
 			space/last-xy: path/2								;@@ kludge
 		]
 		on-up [space path event] [stop-drag pass]
