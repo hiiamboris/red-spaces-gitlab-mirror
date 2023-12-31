@@ -604,7 +604,7 @@ enhance: function [
 	fg-hsl: RGB2HSL resolve-color color
 	sign: pick [1 -1] fg-hsl/3 >= bg-hsl/3
 	fg-hsl/3: clip 0% 100% fg-hsl/3 + (amnt - 1 / 2 * sign)
-	HSL2RGB fg-hsl
+	HSL2RGB/tuple fg-hsl
 ]
 
 ;@@ any better name?
