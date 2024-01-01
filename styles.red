@@ -184,7 +184,7 @@ do with styling: context [
 			canvas: min canvas cell/size
 			color: any [
 				select cell 'color
-				if cell/pinned? [mix 'panel opaque 'text 15%]
+				if cell/pinned? [impose 'panel opaque 'text 15%]
 			]
 			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
 			reduce [bgnd drawn]

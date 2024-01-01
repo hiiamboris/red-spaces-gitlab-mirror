@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by thru . abs half linear! linear? planar! planar? range! range? make-range .. using when only trigger mix clip ortho boxes-overlap? infxinf opaque batch run-console]
+exports: [by thru . abs half linear! linear? planar! planar? range! range? make-range .. using when only trigger impose clip ortho boxes-overlap? infxinf opaque batch run-console]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -576,7 +576,7 @@ resolve-color: function [color [tuple! word! issue!]] [
 	]
 ]
 
-mix: function [
+impose: function [
 	"Impose COLOR onto BGND and return the resulting color"
 	bgnd  [tuple! word!] "Alpha channel ignored"
 	color [tuple! word!] "Alpha channel determines blending amount"
@@ -588,9 +588,9 @@ mix: function [
 ]
 
 #assert [
-	0.0.0   = mix 0.0.0     0.0.0
-	0.0.0   = mix 100.50.10 0.0.0
-	50.25.5 = mix 100.50.10 0.0.0.128
+	0.0.0   = impose 0.0.0     0.0.0
+	0.0.0   = impose 100.50.10 0.0.0
+	50.25.5 = impose 100.50.10 0.0.0.128
 ]
 
 
