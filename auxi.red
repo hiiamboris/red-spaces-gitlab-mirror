@@ -594,6 +594,49 @@ impose: function [
 ]
 
 
+HSL2XYZ: function [
+	"Transform HSL cylindrical coordinate into cartesian XYZ"
+	HSL [point3D!]
+][
+	as-point3D
+		HSL/2 * cosine HSL/1
+		HSL/2 * sine   HSL/1
+		HSL/3
+]
+
+XYZ2HSL: function [
+	"Transform cartesian XYZ coordinate into HSL cylindrical"
+	XYZ [point3D!]
+][
+	as-point3D
+		(arctangent2 XYZ/2 XYZ/1) + 360 % 360			;-- map [-180,180] into [0,360)
+		vec-length? XYZ/1 . XYZ/2						;-- this doesn't check if it's >1, assumes correct
+		XYZ/3
+]
+
+blend: function [
+	"Get new color from a projection of BGND->COLOR vector scaled by AMNT (alpha channels ignored)"
+	bgnd  [tuple! word!]
+	color [tuple! word!]
+	amnt  [number!] "< 100% to pull color closer to bgnd, > 100% to push further"
+][
+	;; in XYZ space it's possible to e.g. push red->green towards cyan
+	bg-xyz: HSL2XYZ RGB2HSL resolve-color bgnd
+	fg-xyz: HSL2XYZ RGB2HSL resolve-color color
+	hsl: XYZ2HSL fg-xyz - bg-xyz * (clip -1e10 1e10 amnt) + bg-xyz	;-- avoid 1.#inf - leads to unwanted NaNs
+	HSL2RGB/tuple clip (0,0,0) (360,1,1) hsl
+]
+
+#assert [
+	255.0.0    = blend red green  0
+	0.255.0    = blend red green  1
+	191.191.63 = blend red green  0.5
+	255.0.81   = blend red green -1
+	0.255.81   = blend red green  2
+	255.0.127  = blend red green -1.#inf
+	0.255.127  = blend red green  1.#inf
+]
+
 enhance: function [
 	"Push COLOR further from BGND (alpha channels ignored)"
 	bgnd  [tuple! word!]
@@ -603,7 +646,7 @@ enhance: function [
 	bg-hsl: RGB2HSL resolve-color bgnd
 	fg-hsl: RGB2HSL resolve-color color
 	sign: pick [1 -1] fg-hsl/3 >= bg-hsl/3
-	fg-hsl/3: clip 0% 100% fg-hsl/3 + (amnt - 1 / 2 * sign)
+	fg-hsl/3: clip 0 1 fg-hsl/3 + (amnt - 1 / 2 * sign)
 	HSL2RGB/tuple fg-hsl
 ]
 
