@@ -91,6 +91,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			spacing: spacing * 1x1						;-- pair normalization needed by document
 			direction: either reverse? [-1][1]
 			default do-not-extend?: no
+			#assert [anchor = clip anchor 1 count]		;@@ need to find this bug: anchor is sometimes 0 or >count
+			anchor: clip anchor 1 count
 			x: ortho y: axis
 			guide: axis2pair y
 			item-canvas: get-item-canvas canvas limits axis margin
@@ -119,7 +121,6 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			;;   then limits/:x is checked when extending or contracting the list width
 			;;   along main axis items canvas is always infinite
 			;;   but final list length is clipped/extended by limits/:y (hiding items or adding empty space)
-			
 			loop 2 [									;-- two render cycles
 				size: (0,0)
 				map:  fill abs length direction			;@@ avg+2dev, estimator/corrector
@@ -141,6 +142,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				break									;-- no second render cycle if canvas is the same
 			]
+			
 			if direction < 0 [reverse/skip map 2]		;-- order items top-down
 			geom1:    map/2
 			geom2:    last map
@@ -208,6 +210,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				size:  max size item/size						;-- accumulate width
 				i:     sign + range/2: i						;-- `range/2: i` relies on guaranteed add-item after draw-next
 			]
+			#assert [do ith-item]
 			do draw-next
 			length: length + item/size/:y				;-- don't count anchor in the length (required by list-view)
 			limit:  pos/:y + (sign * length) 
