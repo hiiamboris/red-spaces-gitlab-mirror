@@ -1358,27 +1358,6 @@ context [
 	set 'new-rich-text does [make light-face! rtd-template]
 ]
 
-;@@ workaround for #5165! - remove me once it's fixed
-#if linux? [
-	native-caret-to-offset: :caret-to-offset
-	set 'caret-to-offset function [
-	    {Given a text position, returns the corresponding coordinate relative to the top-left of the layout box} 
-	    face [object!] 
-	    pos [integer!] 
-	    /lower "lower end offset of the caret" 
-	][
-		either lower [
-			;@@ this also suffers from #3812: /with is ignored by size-text, have to work around!
-			rt: new-rich-text
-			quietly rt/text: copy/part face/text 0x1 + pos
-			add native-caret-to-offset face pos
-				size-text rt
-		][
-			native-caret-to-offset face pos
-		]
-	]
-]
-
 run-console: function ["Reenter console event loop"] [
 	print "--== Spaces Console ==--^/"
 	system/console/run/no-banner
