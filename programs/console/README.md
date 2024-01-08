@@ -19,7 +19,23 @@ Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/
 - extensible via **plugins**, with some available out of the box
 - includes whole **`red-common`, `red-spaces` and `red-cli`** functionality
 - a CLI library-based program, can be both used standalone and to run scripts
-- extremely crash-happy xD ¯\\\_(ツ)\_/¯ (but saves and restores the log so it's not lost) 
+- extremely crash-happy xD ¯\\\_(ツ)\_/¯ (but saves and restores the log so it's not lost)
+
+#### CLI syntax
+
+```
+$ spaces-console --help
+Spaces Console 8-Jan-2024 Advanced REPL for Red built on top of Spaces by hiiamboris
+
+Syntax: spaces-console [options] [script]
+
+Options:
+      --reset    Run console with no state (use in case it's broken)
+      --catch    If script is given, don't close after it finishes
+      --version  Display program version and exit
+  -h, --help     Display this help text and exit
+
+```
 
 ## Available plugins
 
