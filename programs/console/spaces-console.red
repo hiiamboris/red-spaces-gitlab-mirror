@@ -5,7 +5,7 @@ system/script/header: [											;@@ workaround for #4992
 	title:       "Spaces Console"
 	description: "Advanced REPL for Red built on top of Spaces"
 	author:      @hiiamboris
-	license:     BSD-3
+	license:     {Distributed under the 3-clause BSD license}
 ]
 
 ;@@ `ask` and `input` aren't supported - how to implement them in this layout? extend log-entry?
