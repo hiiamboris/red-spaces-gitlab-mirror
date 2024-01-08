@@ -9,7 +9,7 @@ Spaces Console is an experimental GUI console replacement for use with Spaces an
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/spaces-console.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/spaces-console), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/spaces-console-mac). 
 
-![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-spaces-console.gif)
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-spaces-console.gif />
 
 ## Features
 
