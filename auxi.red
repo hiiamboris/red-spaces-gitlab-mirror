@@ -6,7 +6,7 @@ Red [
 
 ; #include %../common/assert.red
 ;@@ not sure if infxinf should be exported, but it's used by custom styles, e.g. spiral
-exports: [by thru . abs half linear! linear? planar! planar? range! range? make-range .. using when only trigger impose clip ortho boxes-overlap? infxinf opaque blend batch run-console]
+exports: [by thru . abs half linear! linear? planar! planar? range! range? make-range .. using when only trigger impose clip ortho boxes-overlap? infxinf opaque blend batch]
 
 ; ;; readability helper instead of reduce/into [] clear [] ugliness
 ; #macro [#reduce-in-place block!] func [[manual] s e] [
@@ -1356,11 +1356,6 @@ context [
 		(system/view/VID/styles/rich-text/template)
 	]
 	set 'new-rich-text does [make light-face! rtd-template]
-]
-
-run-console: function ["Reenter console event loop"] [
-	print "--== Spaces Console ==--^/"
-	system/console/run/no-banner
 ]
 
 

@@ -221,24 +221,7 @@ scheduler: context [
 		]
 	]
 	
-	;; View and GUI console are using some functions with compiled version of 'do-events'
-	;; I have to recreate these to switch them to the new scheduler
-	;@@ unfortunately commands are not added to history, and terminal/line contains junk :/
-	;@@ I really should dump this console and make my own
+	;; View is using some functions with compiled version of 'do-events'
+	;; I have to recreate it to switch to the new scheduler
 	set 'view func spec-of :view body-of :view
-	if attempt [system/console/gui?] [
-		; do with gui-console-ctx/terminal [do-ask-loop: :do-events]
-		do with gui-console-ctx/terminal [ask: func spec-of :ask body-of :ask]
-		do with system/words             [ask: func spec-of :ask body-of :ask]
-		do with system/console           [run: func spec-of :run body-of :run]
-		insert-event-func 'spaces-workaround-for-5377 function [face event] [		;@@ workaround for #5377
-			all [
-				face =? gui-console-ctx/console
-				event/type = 'key-down
-				event/key = #"^M"
-				step/down 'event-loop-depth
-				none
-			]
-		]
-	]
 ]
