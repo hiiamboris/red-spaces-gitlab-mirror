@@ -617,4 +617,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	]
 ]	
 
+if system/platform <> 'Windows [								;-- needed to disarm kludges included into `quit` function
+	set '_save-cfg none
+	set '_terminate-console none
+]
 spaces-console/startup
