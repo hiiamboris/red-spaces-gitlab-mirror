@@ -6,6 +6,10 @@ include_toc: true
 
 # Programs written with Spaces
 
+## [Spaces Console](console/)
+
+Experimental Spaces-based paragraph-oriented GUI console replacement. [Navigate to it...](console/)
+
 ## [Red Inspector](red-inspector.red)
 
 A GUI tool to browse current interpreter's state.
