@@ -267,6 +267,14 @@ events: context [
 					hittest target event/offset
 				]
 				key key-down key-up enter [
+					if all [
+						event/type = 'key						;-- workaround for AltGr producing printable keys
+						char? event/key
+						parse event/flags ['control opt 'shift 'alt]	;-- this seems always sorted
+					][
+						event/flags: exclude event/flags [control alt]
+						event/ctrl?: no
+					]
 					focused?: yes								;-- event should not be detected by parent spaces
 					if face/space [
 						focus/window: event/window				;-- init /window on 1st event, or if another window got activated
