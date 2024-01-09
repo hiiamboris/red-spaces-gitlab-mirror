@@ -37,16 +37,16 @@ spaces-console: context [
 	#assert [native? :native-print]
 ]
 
-#include %../../../cli/console-on-demand.red
+#if any [rebol true = :inlining?] [
+	#include %../../../cli/console-on-demand.red
+	#include %../../../red-src/red/environment/console/help.red	;-- for compiled access to help (already there if interpreted)
+]
 #process off
 
 do/expand [
 	#include %../../../cli/cli.red
 	#include %../../widgets/document.red
 	#include %../../../common/everything.red					;-- data-store is required, rest is there to make console more powerful
-	#if any [rebol true = :inlining?] [
-		#include %../../../red-src/red/environment/console/help.red	;-- for compiled access to help (already there if interpreted)
-	]
 ]
 system/console: spaces-console: make spaces-console with spaces/ctx expand-directives [
 	~: self
