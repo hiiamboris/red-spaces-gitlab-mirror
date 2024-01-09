@@ -37,6 +37,14 @@ Options:
 
 ```
 
+#### Running from sources
+
+You need up to date mirrors of other used repositories (alongside `spaces`):
+- [`red-common`](https://codeberg.org/hiiamboris/red-common) as `common`, required for anything Spaces-based
+- [`red-cli`](https://codeberg.org/hiiamboris/red-cli) as `cli` - used to read command line
+
+`red spaces-console.red` command from the directory where it's located should start it.
+
 ## Available plugins
 
 All currently implemented plugins can be **installed** with this command in the console:
