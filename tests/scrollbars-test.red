@@ -22,15 +22,15 @@ view/no-wait/options [
 	below
 	b: host [
 		vlist [
-			scrollbar with [size: 400x20 amount: 0.5 axis: 'x]
-			scrollbar with [size: 200x20 amount: 0.5 axis: 'x]
-			scrollbar with [size: 100x20 amount: 0.5 axis: 'x]
-			scrollbar with [size: 75x20  amount: 0.5 axis: 'x]
-			scrollbar with [size: 50x20  amount: 0.5 axis: 'x]
-			scrollbar with [size: 40x20  amount: 0.5 axis: 'x]
-			scrollbar with [size: 30x20  amount: 0.5 axis: 'x]
-			scrollbar with [size: 20x20  amount: 0.5 axis: 'x]
-			scrollbar with [size: 10x20  amount: 0.5 axis: 'x]
+			scrollbar with [size: (400,20) amount: 0.5 axis: 'x]
+			scrollbar with [size: (200,20) amount: 0.5 axis: 'x]
+			scrollbar with [size: (100,20) amount: 0.5 axis: 'x]
+			scrollbar with [size: (75,20)  amount: 0.5 axis: 'x]
+			scrollbar with [size: (50,20)  amount: 0.5 axis: 'x]
+			scrollbar with [size: (40,20)  amount: 0.5 axis: 'x]
+			scrollbar with [size: (30,20)  amount: 0.5 axis: 'x]
+			scrollbar with [size: (20,20)  amount: 0.5 axis: 'x]
+			scrollbar with [size: (10,20)  amount: 0.5 axis: 'x]
 		]
 	]
 	on-over [
