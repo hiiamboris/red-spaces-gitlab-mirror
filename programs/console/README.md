@@ -39,7 +39,7 @@ Options:
 
 #### Running from sources
 
-You need up to date mirrors of other used repositories (alongside `spaces`):
+If you don't want to use binary release for some reason, you need up to date mirrors of other used repositories (alongside `spaces`):
 - [`red-common`](https://codeberg.org/hiiamboris/red-common) as `common`, required for anything Spaces-based
 - [`red-cli`](https://codeberg.org/hiiamboris/red-cli) as `cli` - used to read command line
 
