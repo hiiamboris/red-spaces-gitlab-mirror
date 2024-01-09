@@ -44,7 +44,9 @@ do/expand [
 	#include %../../../cli/cli.red
 	#include %../../widgets/document.red
 	#include %../../../common/everything.red					;-- data-store is required, rest is there to make console more powerful
-	#include %../../../red-src/red/environment/console/help.red	;-- for compiled access to help
+	#if any [rebol true = :inlining?] [
+		#include %../../../red-src/red/environment/console/help.red	;-- for compiled access to help (already there if interpreted)
+	]
 ]
 system/console: spaces-console: make spaces-console with spaces/ctx expand-directives [
 	~: self
