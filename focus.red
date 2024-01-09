@@ -48,6 +48,7 @@ focus: make classy-object! declare-class 'focus-context [
 		#debug focus [#print "adding (space/type):(space/size) to focus history"]
 		face: either is-face? space [space][host-of space]
 		#assert [face  "attempt to focus an out-of-tree (not yet drawn?) space"]	;@@ maybe call VID/update-focus in this case?
+		; unless face [?? histories ?? window ?? space ?? space/content/1 ?? space/content/1/content/1 probe host-of space]		
 		self/window: window-of face
 		append hist: history space
 		remove/part hist hist << 10						;-- limit history length
@@ -89,8 +90,10 @@ focus: make classy-object! declare-class 'focus-context [
 		][
 			invalidate space							;-- let space remove its focus decoration
 			events/with-stop [							;-- init a separate stop flag for a separate event
-				unfocus-event!/face: path/1
-				events/process-event as [] path unfocus-event! [] yes
+				event: copy events/event-prototype
+				event/face: path/1
+				event/type: 'unfocus
+				events/process-event as [] path event [] yes
 			]
 		]
 	]	
@@ -105,8 +108,10 @@ focus: make classy-object! declare-class 'focus-context [
 			invalidate space							;-- let space paint its focus decoration
 			native-set-focus host: path/1
 			events/with-stop [							;-- init a separate stop flag for a separate event
-				focus-event!/face: host
-				events/process-event as [] path focus-event! [] yes
+				event: copy events/event-prototype
+				event/face: host
+				event/type: 'focus
+				events/process-event as [] path event [] yes
 			]
 			unless system/view/auto-sync? [show window-of host]	;-- otherwise keys won't be detected
 		]
@@ -147,10 +152,6 @@ focused?: function [
 	]
 ]
 
-
-;; since I can't create events, but still gotta tell previewers/finalizers what kind of event it is, have to work around
-focus-event!:   object [type: 'focus   face: none]
-unfocus-event!: object [type: 'unfocus face: none]
 
 ;@@ should this refocus windows?
 focus-space: function [
@@ -225,7 +226,7 @@ context [
 	]
 	
 	;@@ this fixes the situation when a host in a new window has got focus but `focus-checker` didn't receive 'focus' event
-	register-previewer [key-down] function [space [object!] path [block!] event [event! map! object!]] [
+	register-previewer [key-down] function [space [object!] path [block!] event [map!]] [
 		focus-checker event/face event
 	]
 ]
@@ -233,7 +234,7 @@ context [
 
 register-previewer/priority
 	[down mid-down alt-down aux-down dbl-click]			;-- button clicks on host may change focus
-	function [space [object!] path [block!] event [event! map! object!]] [
+	function [space [object!] path [block!] event [map!]] [
 		;@@ should it avoid focusing if stop flag is set?
 		#debug focus [#print "attempting to focus (space-id space)"]
 		path: get-host-path space

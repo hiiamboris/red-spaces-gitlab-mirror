@@ -231,10 +231,10 @@ popups: context [
 			none
 		]	
 		
-		travel: func [event [event! map! object!]] [	;-- distance from hint show point to current point
+		travel: func [event [map!]] [					;-- distance from hint show point to current point
 			distance? primed/anchor face-to-window event/offset event/face
 		]
-		maybe-hide-hint: function [event [event! map! object!]] [
+		maybe-hide-hint: function [event [map!]] [
 			if any [
 				event/away?								;-- moved off the hint; away event should never be missed as it won't repeat!
 				10 <= travel event						;-- distinguish pointer move from sensor jitter
@@ -247,7 +247,7 @@ popups: context [
 		
 		;; over event should be tied to spaces and is guaranteed to fire even if no space below
 		register-previewer [over] function [
-			space [object! none!] path [block!] event [event! map! object!]
+			space [object! none!] path [block!] event [map!]
 		][
 			; #assert [event/window/type = 'window]
 			unless head? path [exit]					;-- don't react on multiple events on the same path
@@ -279,7 +279,7 @@ popups: context [
 	
 		;; context menu display support
 		register-finalizer [alt-up] function [					;-- finalizer so other spaces can eat the event
-			space [object! none!] path [block!] event [event! map! object!]
+			space [object! none!] path [block!] event [map!]
 		][
 			;@@ maybe don't trigger if pointer travelled from alt-down until alt-up? 
 			if all [

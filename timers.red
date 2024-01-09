@@ -34,7 +34,7 @@ timers: context [
 	timer-resolution: 0:0								;-- measured automatically
 	timer-host: none									;-- a single host face that is used for resolution estimation
 
-	events/on-time: function [face [object!] event [event! map! object!]] [	;-- events reserve this slot
+	events/on-time: function [face [object!] event [map!]] [	;-- events reserve this slot
 		#debug profile [prof/manual/start 'timers]
 		either face =? timer-host [update-resolution][update-timer-host face]
 		process-timers face event
@@ -68,7 +68,7 @@ timers: context [
 	
 	time: none											;-- cached to all `now` less often
 
-	process-timers: function [face [object!] event [event! map! object!] /extern time] [
+	process-timers: function [face [object!] event [map!] /extern time] [
 		;; timer has no target (as is the case with focused space or pointed at)
 		;; and scanning of the whole tree for `rate` facets, all the time, is out of question - or this code will take 99% CPU time
 		;; to win performance I maintain a list of all 'armed' timers at the cost of having to explicitly render each timer

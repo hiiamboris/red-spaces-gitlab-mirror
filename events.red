@@ -14,7 +14,7 @@ events: context [
 	on-time: none										;-- set by timers.red
 
 	;-- previewers and finalizers are called before/after handlers
-	;-- both have the same args format: [space [object!] path [block!] event [event! object! map! none!]]
+	;-- both have the same args format: [space [object!] path [block!] event [map! none!]]
 	;-- stop? command indicates that event was "eaten" and becomes true after:
 	;-- any previewer or finalizer calls `stop`
 	;-- any normal event handler does not call `pass`
@@ -48,7 +48,7 @@ events: context [
 				parse spec-of :handler [
 					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
 					word! opt quote [block!]
-					word! opt [set blk block! if ([event! map! object!] = sort copy blk)]
+					word! opt quote [map!]
 					opt [word! opt [quote [percent!] | quote [percent! none!] | quote [none! percent!]]]
 					opt [/local to end]
 				]
@@ -106,15 +106,15 @@ events: context [
 	export [register-previewer register-finalizer delist-previewer delist-finalizer]
 
 
-	do-previewers: func [path [block!] event [event! object! map!] args [block!]] [
+	do-previewers: func [path [block!] event [map!] args [block!]] [
 		do-global previewers path event args
 	]
 
-	do-finalizers: func [path [block!] event [event! object! map!] args [block!]] [
+	do-finalizers: func [path [block!] event [map!] args [block!]] [
 		do-global finalizers path event args
 	]
 
-	do-global: function [map [map!] path [block!] event [event! object! map!] args [block!]] [
+	do-global: function [map [map!] path [block!] event [map!] args [block!]] [
 		unless list: map/(event/type) [exit]
 		space: path/1									;-- space can be none if event falls into space-less area of the host
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
@@ -219,10 +219,7 @@ events: context [
 		=spec-def=: [									;-- just validation, to protect from errors
 			#expect word! opt [ahead block! #expect quote [object!]]	;-- space [object!]
 			#expect word! opt [ahead block! #expect quote [block!]]		;-- path [block!]
-			#expect word! opt [
-				set blk block! if ([event! map! object!] = sort copy blk)
-			|	ahead block! #expect quote [event! map! object!]
-			]
+			#expect word! opt [ahead block! #expect quote [map!]]
 			opt [if (name = 'on-time) not [refinement! | end]
 				#expect word! opt [ahead block! #expect quote [percent!]]
 			]
@@ -256,7 +253,7 @@ events: context [
 	;; other events' path does not (tree node format)
 	;; focus/unfocus events have not 'event' arg!
 	;@@ any way to unify these 2 formats?
-	dispatch: function [face [object!] event [event! object! map!] /local result /extern resolution last-on-time] [
+	dispatch: function [face [object!] event [map!] /local result /extern resolution last-on-time] [
 		focused?: no
 		with-stop [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
@@ -316,7 +313,7 @@ events: context [
 	]
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
-	do-handler: function [spc-name [path!] handler [function!] path [block!] event [event! object! map!] args [block!]] [
+	do-handler: function [spc-name [path!] handler [function!] path [block!] event [map!] args [block!]] [
 		space: first path: shallow-clone/into path cache/get	;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
@@ -330,7 +327,7 @@ events: context [
 	;; e.g.: up event closes the menu face, over event slips in and changes template
 	do-handlers: function [
 		"Evaluate normal event handlers applicable to PATH"
-		path [block!] event [event! object! map!] args [block!] focused? [logic!]
+		path [block!] event [map!] args [block!] focused? [logic!]
 		/local word _
 	][
 		if commands/stop? [exit]
@@ -378,7 +375,7 @@ events: context [
 	process-event: function [
 		"Process the EVENT calling all respective event handlers"
 		path  [block!] "Path on the space tree to lookup handlers in"
-		event [event! object! map!] "View event or simulated"
+		event [map!]   "View event or simulated"
 		args  [block!] "Extra arguments to the event handler"
 		focused? [logic!] "Skip parents and go right into the innermost space"
 	][

@@ -74,7 +74,7 @@ tabbing/visitor: function [parent [object! none!] child [object!]] [
 ;; handler for spaces - only eats Tab key if space didn't process it
 ;; has to be `key` event (if it's key-down, the following `key` event after refocus goes into the wrong space)
 ;@@ consider reacting to key-down and consuming the next key/key-up events when refocused
-register-finalizer [key] function [space [object!] path [block!] event [event! map! object!]] [
+register-finalizer [key] function [space [object!] path [block!] event [map!]] [
 	all [
 		event/key = #"^-"
 		not event/ctrl?									;-- ctrl-tab must mean smth else

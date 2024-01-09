@@ -29,9 +29,6 @@ context [
 		none											;-- let other event funcs process it
 	]
 	
-	;; virtual forged 'over' event template
-	false-event: construct map-each word system/catalog/accessors/event! [to set-word! word]
-	
 	;; logic here is to repeat hittest and see if any space in the new path differs from the last path
 	;; last path should be updated by every host's 'over' and 'time' event
 	last-paths: make hash! 2							;@@ suffers from REP #129
@@ -41,7 +38,7 @@ context [
 		host-offset [planar!]							;-- no event/offset for 'time' event, have to use the old one
 	][
 		case [
-			not host/space   [exit]						;-- not initialized - no hittesting
+			not host/space [exit]						;-- not initialized - no hittesting
 			all [
 				drag?: events/dragging?					;-- during dragging away condition is registered routinely
 				event/type <> 'time						;-- but it still may have moved on the frame
@@ -58,12 +55,11 @@ context [
 		hittest/into template host-offset clear new-path: []
 		
 		if moved?: not same-paths? old-path new-path [
-			if event/type = 'time [						;@@ can't write event/offset, have to provide virtual event:
-				false-event/type:   'over
-				false-event/face:   host				;-- host is event/face but see fix for #5278 
-				false-event/window: event/window
-				false-event/offset: host-offset
-				event: false-event
+			event: events/copy-event event
+			if event/type = 'time [
+				event/type:   'over
+				event/offset: host-offset
+				#assert [event/face =? host]
 			]
 			;; while 'over' now lands into another space, we need to send the event into the old one, as 'away notice'
 			hittest/into old-path host-offset clear path: []	;-- update coordinates along the old-path
