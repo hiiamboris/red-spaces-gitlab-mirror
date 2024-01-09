@@ -11,6 +11,22 @@ system/script/header: [											;@@ workaround for #4992
 ;@@ `ask` and `input` aren't supported - how to implement them in this layout? extend log-entry?
 ;@@ console shortcuts - ls, pwd, etc - aren't implemented - need a plugin with them?
 
+{	;@@ TODOs:
+	save also size/offset ahead of crash
+	session manager plugin to save/load logs
+	faster printing
+	scroller and list-view bugs need design fixes
+	paragraph reordering
+	undo/redo entries removal?
+	
+	;@@ somewhere on the horizon:
+	paragraph grouping/structuring... -> step tracing
+	Red inspector instead of mold output limiting
+	live editing:
+		As with libraries and modules, we should be able to work at low levels, then step up a layer and make sub-assemblies, design interfaces to those, test them, include them in a project, along with custom data interface needs and viewers; organize those elements for high level understanding and business use cases, allowing each person or team to work with their own custom environment but also see how people are using them. So it's not just a pre-config'd cloud IDE container with your dependencies, but a stack of views you can navigate, collaborating with people above and below the technical level you focus on.	 
+}
+
+
 #include %../../everything.red
 ; #do [disable-space-cache?: on]
 
