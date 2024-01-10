@@ -124,8 +124,10 @@ cache: context [
 			forall slots [								;@@ use for-each
 				if all [
 					slots/2 < old-gen					;-- slot is old
-					nan? slots/1/x / slots/1/x			;-- keep [infxinf infx0 0xinf 0x0] canvases (always relevant, unlike 0x319 or smth)
-					nan? slots/1/y / slots/1/y
+					not all [
+						nan? slots/1/x / slots/1/x		;-- keep [infxinf infx0 0xinf 0x0] canvases (always relevant, unlike 0x319 or smth)
+						nan? slots/1/y / slots/1/y
+					]
 					;@@ maybe fetch should also ignore old finite slots?
 				][
 					slot: slots
