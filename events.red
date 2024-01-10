@@ -369,7 +369,7 @@ events: context [
 					commands/stop								;-- stop after current stack unless `pass` gets called
 					foreach handler list [						;-- whole list is called regardless of stop flag change
 						#assert [function? :handler]
-						do-handler template :handler target event args	;@@ should handler index in the list be reported on error?
+						do-handler hpath :handler target event args	;@@ should handler index in the list be reported on error?
 						if commands/blocked? [break]
 					]
 				]
@@ -420,7 +420,7 @@ events: context [
 		]
 	]
 	
-	start-drag: func [
+	start-drag: function [
 		"Start dragging marking the initial state by PATH"
 		path [path! block!]
 		/with param [any-type!] "Attach any data to the dragging state"
