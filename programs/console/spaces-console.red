@@ -12,11 +12,11 @@ system/script/header: [											;@@ workaround for #4992
 ;@@ console shortcuts - ls, pwd, etc - aren't implemented - need a plugin with them?
 
 {	;@@ TODOs:
-	save also size/offset ahead of crash
 	session manager plugin to save/load logs
-	faster printing
+	(even) faster printing
 	scroller and list-view bugs need design fixes
 	paragraph reordering
+	highlighting of output, when it can be transcoded? (may be slow)
 	undo/redo entries removal?
 	arguments underlining?
 	
@@ -96,7 +96,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	][
 		do-hooks 'on-exit
 		preserve-log
-		data-store/save-state state
+		preserve-state/force									;-- some plugin may forget to set /modified
 		quit-return code
 	]
 
@@ -118,7 +118,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 		data-store/write-file 'data target text
 		include-into state/plugins target						;-- may already be there if updating
-		data-store/save-state state
+		preserve-state/force
 	]
 	
 	remove-plugin: function [
@@ -127,7 +127,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	][
 		target: second split-path to-red-file file
 		exclude-from state/plugins target
-		data-store/save-state state
+		preserve-state/force
 	]
 	
 	load-plugin: function [
@@ -357,7 +357,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	;; *************************************************
 	
 	;; log preservation/restoration
-	log-modified?: no											;-- flag helps to avoid disk writes while inactive
+	log-modified?:   no											;-- flag helps to avoid disk writes while inactive
+	state-modified?: yes										;-- assume that plugins change it on load (more good than harm)
 	
 	preserve-log: function ["Save current commands log"] [		;-- to restore after a crash or quit
 		if log-modified? [
@@ -373,6 +374,13 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		log/source: map-each [/i command] commands [
 			also entry: make-space 'log-entry []
 			entry/rows/input/set-text command
+		]
+	]
+	
+	preserve-state: function ["Save current state" /force] [
+		if any [force state-modified?] [
+			data-store/save-state state
+			self/state-modified?: no
 		]
 	]
 	
@@ -562,12 +570,14 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 
 	;; I can't leverage reactivity or 'clear-reactions' will break the console, have to rely on events
 	on-terminal-resize: function [terminal event] [
-		maybe host/size: terminal/size - 4
-		state/size:      terminal/size
-		state/offset:    terminal/offset						;@@ required - see #5452
+		maybe host/size:   terminal/size - 4
+		state/size:        terminal/size
+		state/offset:      terminal/offset						;@@ required - see #5452
+		~/state-modified?: yes
 	]
 	on-terminal-move:   function [terminal event] [
-		state/offset:    terminal/offset
+		state/offset:      terminal/offset
+		~/state-modified?: yes
 	]
 	
 	
@@ -587,7 +597,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 			origin 2x2
 			host: host with [size: ~/state/size - 4 rate: 34] [		;-- decreased rate for less resource usage
 				log: log multi-selectable source= lay-out-vids [log-entry] 
-				rate= 0:0:3 on-time [preserve-log]
+				rate= 0:0:3 on-time [preserve-log preserve-state]
 			]
 		] 'resize [offset: ~/state/offset]
 	]
