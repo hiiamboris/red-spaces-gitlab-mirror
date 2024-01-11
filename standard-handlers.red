@@ -193,7 +193,7 @@ define-handlers [
 					if i <> here [move-cursor i]				;-- don't move the already selected item around
 				]
 			]
-			if all [multi? space/behavior/draggable <> 'pan] [start-drag path]	;-- start selection by dragging
+			; if all [multi? space/behavior/draggable <> 'pan] [start-drag path]	;-- start selection by dragging
 			;; let scrollable get the event, for dragging viewport by item
 		]
 		
