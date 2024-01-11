@@ -18,6 +18,7 @@ system/script/header: [											;@@ workaround for #4992
 	scroller and list-view bugs need design fixes
 	paragraph reordering
 	undo/redo entries removal?
+	arguments underlining?
 	
 	;@@ somewhere on the horizon:
 	paragraph grouping/structuring... -> step tracing
@@ -222,7 +223,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 		
 	declare-template 'log-editor/editor []						;-- replace generic template with a named one, for extensibility
-	declare-template 'log-viewer/scrollable []
+	declare-template 'log-viewer/scrollable [content: make-space 'paragraph []]
 	; declare-template 'log-text/document []
 	
 	append focus/focusable 'log-viewer
@@ -230,10 +231,10 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	
 	row-draw: function [row [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
 		drawn: row/tube-draw/on canvas fill-x fill-y			;-- have to draw a frame to estimate length
-		either any [row/kind = 'input  row/document/length > 0] [
+		either any [row/kind = 'input  not empty? row/text/text] [
 			if row/kind = 'input [
 				;@@ for some reason width is bigger until first output is shown :/
-				width: row/document/size/x - row/viewer/vscroll/size/x
+				width: row/document/size/x - row/editor/vscroll/size/x
 				maybe ~/size/x: to integer! width / monofont-cell/x
 			]
 			drawn
@@ -262,9 +263,6 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		spacing:	5
 		
 		;; inlined sub-spaces right here, for easier path access
-		editor:      make-space 'log-editor [limits: none .. (1.#inf, 200)]
-		viewer:      make-space 'log-viewer [content: editor/content  content-flow: 'vertical  limits: none .. (1.#inf, 200)]
-		document:    editor/content
 		prefix:      make-space 'text []
 		suffix:      make-space 'text []
 		left-field:  make-space 'box [limits: 20 .. 20 align: 0x-1 content: prefix]
@@ -272,32 +270,50 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		
 		kind: 'input	#type [word!] (find [input output result] kind)
 			#on-change [space word value] [
-				center: switch value [input ['editor] output result ['viewer]]
-				center: space/:center
-				center/limits/max/y: select #(input 1.#inf output 400 result 120) value
+				if height: select #(output 400 result 120) value [
+					space/viewer/limits/max/y: height
+				]
 				space/prefix/text: select #(input ">>" output "" result "==") value
-				space/content: reduce with space [left-field center right-field]
 			]
 			
-		extra-text: {}											;-- keeps trailing newline, which is never shown
+		tube-draw: :draw
+		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
+			~/row-draw self canvas fill-x fill-y
+		]
+	]
+	declare-template 'log-row-input/log-row [
+		type:     'log-row
+		editor:   make-space 'log-editor []
+		document: editor/content
+		content:  reduce [left-field editor right-field]
+		
 		get-text: does [batch document [copy-range/text everything]]
 		set-text: func [text [string!]] [
 			text: trim/all/with copy text #"^M"					;-- fixes ^M char appearing in `help` output
 			batch document [change-range everything text]
 		]
 		
-		tube-draw: :draw
-		draw: func [/on canvas [point2D!] fill-x [logic!] fill-y [logic!]] [
-			~/row-draw self canvas fill-x fill-y
-		]
 	]
 	
+	declare-template 'log-row-output/log-row [
+		type:     'log-row
+		viewer:   make-space 'log-viewer [content-flow: 'vertical  limits: none .. (1.#inf, 400)]
+		text:     viewer/content
+		content:  reduce [left-field viewer right-field]
+		
+		extra-text: {}											;-- keeps trailing newline, which is never shown
+		get-text: does [copy text/text]
+		set-text: func [text [string!]] [
+			self/text/text: trim/all/with copy text #"^M"		;-- fixes ^M char appearing in `help` output
+		]
+	]
+		
 	;; a group that enforces order - simplifies working with the log
 	declare-template 'log-entry/cell [
 		rows: context [											;@@ use map-each
-			input:  make-space 'log-row [kind: 'input]
-			output: make-space 'log-row [kind: 'output]
-			result: make-space 'log-row [kind: 'result]
+			input:  make-space 'log-row-input []
+			output: make-space 'log-row-output [kind: 'output]
+			result: make-space 'log-row-output [kind: 'result]
 		]
 		content: make-space 'list [
 			axis:    'y
@@ -326,8 +342,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	
 	define-styles [
 		log-entry/list/log-row/box/text:
-		log-entry/list/log-row/log-editor/document/rich-content:
-		log-entry/list/log-row/log-viewer/document/rich-content: [font: monofont]
+		log-entry/list/log-row/log-editor/document/rich-content: [font: monofont]
+		log-entry/list/log-row/log-viewer/paragraph: [font: monofont margin: 1x0]
 		
 		log-entry: [below: [push [line-width 0.3 box -2x-2 (size + 2) 3]]]
 	]
