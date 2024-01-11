@@ -171,9 +171,10 @@ context [
 		set words skip slot 2 							;-- skip [children drawn]: at [size map etc..]
 		if deep? [
 			foreach [child ccanvas] slot/1 [
-				all [
+				if all [
 					ccanvas <> cache/last-canvas child
 					set [words': slot':] cache/fetch child ccanvas
+				][
 					restore-from-cache child words' slot' yes
 					cache/update-generation child 'cached ccanvas
 				] 
