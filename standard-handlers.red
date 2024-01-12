@@ -268,6 +268,7 @@ define-handlers [
 						all [multi? event/shift? not far-jump?]	['range]
 						any [far-jump? not event/ctrl?] ['single]
 					]
+					batch space [slide]					;-- slide it before it was modified ;@@ needs to consider invalidation type ideally
 					switch select? [
 						range [
 							mode: either event/ctrl? ['include]['extend]
@@ -279,7 +280,6 @@ define-handlers [
 					]
 					batch space [
 						move-cursor/no-clip new			;-- /no-clip is safe as long as given margin does not exceed list/margin
-						; slide
 					]
 				]
 				

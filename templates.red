@@ -2231,9 +2231,10 @@ inf-scrollable-ctx: context [
 	
 	;; must be called from within render so `available?`-triggered renders belong to the tree and are styled correctly
 	slide: function [space [object!]] [
+		if empty? space/cached [return no]				;-- don't slide if invalidated ;@@ kludge: not gonna work with cache disabled
 		#debug grid-view [#print "origin in inf-scrollable/slide: (space/origin)"]
 		window: space/window
-		unless find/same/only space/map window [exit]	;-- likely window was optimized out due to empty canvas 
+		unless find/same/only space/map window [return no]	;-- likely window was optimized out due to empty canvas 
 		wofs': wofs: negate window/origin				;-- (positive) offset of window within its content
 		#assert [window/size]
 		wsize:  window/size
@@ -2906,6 +2907,7 @@ list-view-ctx: context [
 				all [
 					0 < i i <= any [data/size 1.#inf]			;-- since data/pick can return any value, this is the only way to limit it
 					any [
+						;@@ test that value returned by data/pick i is the same as the one used to create item i ?
 						select item-cache i						;-- no /skip needed because datatypes enforce it
 						also item: wrap-data data/pick i
 							repend item-cache [i item now/utc/precise] 
