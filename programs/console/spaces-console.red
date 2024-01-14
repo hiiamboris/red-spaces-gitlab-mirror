@@ -159,6 +159,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		"Append value to captured output"
 		value [any-type!]
 	] with :capture-output [
+		invalidate/only target
 		row: target/rows/output
 		text: append append row/get-text row/extra-text :value
 		row/extra-text: either #"^/" = last text [form take/last text][{}]	;-- keep the last newline but never show it
@@ -230,28 +231,24 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	append focus/focusable 'log
 	
 	row-draw: function [row [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		drawn: row/tube-draw/on canvas fill-x fill-y			;-- have to draw a frame to estimate length
-		either any [row/kind = 'input  not empty? row/text/text] [
-			if row/kind = 'input [
-				;@@ for some reason width is bigger until first output is shown :/
-				width: row/document/size/x - row/editor/vscroll/size/x
-				maybe ~/size/x: to integer! width / monofont-cell/x
-			]
-			drawn
-		][
-			set-empty-size row canvas fill-x fill-y
-			return quietly row/map: copy []
+		drawn: row/tube-draw/on canvas fill-x fill-y
+		if row/kind = 'input [
+			drawn: row/tube-draw/on canvas fill-x fill-y
+			;; auto adjust console/size/x from acquired size
+			;@@ for some reason width is bigger until first output is shown :/
+			width: row/document/size/x - row/editor/vscroll/size/x
+			maybe ~/size/x: to integer! width / monofont-cell/x
 		]
+		drawn
 	]		
 	
 	row-kit: make-kit 'log-row/tube [
-		tube-format: :format
 		format: function [] [
-			either space/document/length = 0 [
-				copy {}
-			][
-				join container-ctx/format-items space " "
-			]
+			either either space/kind = 'input
+				[space/document/length = 0]
+				[empty? space/text/text]
+			[copy {}]
+			[join container-ctx/format-items space " "]
 		]
 	]
 	
@@ -308,6 +305,16 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 	]
 		
+	entry-draw: function [entry [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
+		quietly entry/content/content: reduce [entry/rows/input]
+		foreach row [output result] [
+			unless empty? entry/rows/:row/text/text [
+				append entry/content/content entry/rows/:row	;-- mainly this allows to avoid empty lines on ^C
+			]
+		]
+		entry/cell-draw/on canvas fill-x fill-y
+	]
+		
 	;; a group that enforces order - simplifies working with the log
 	declare-template 'log-entry/cell [
 		rows: context [											;@@ use map-each
@@ -319,7 +326,10 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 			axis:    'y
 			spacing: 2
 			content: values-of rows
+			cache:   none										;-- entry-draw changes list/content so it can't be cached
 		]
+		cell-draw: :draw
+		draw: func [/on canvas fill-x fill-y] [~/entry-draw self canvas fill-x fill-y]
 	]
 	
 	declare-template 'log/list-view [							;-- renamed for custom events
@@ -414,6 +424,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		;@@ trim newlines in a fast way
 		; while [#"^/" = last output] [take/last output]			;@@ trim/tail/with is useless - REP #52 
 		; entry/rows/output/set-text output 
+		invalidate entry										;-- may not be auto-detected because of not all rows present in /content
 		entry/rows/result/set-text case [
 			error [form result]
 			unset? :result [{}]
