@@ -24,6 +24,7 @@ system/console/plugins/smart-paste: context with spaces/ctx [
 		data [object!]
 	][
 		if data/name = 'text [
+			data: data/clone
 			parse data/data [any [
 				remove ">> " thru [#"^/" | end]					;-- remove only prefix for commands
 			|	remove thru [#"^/" | end]						;-- remove output and result totally
@@ -61,7 +62,7 @@ system/console/plugins/smart-paste: context with spaces/ctx [
 			either multi-command? data [						;-- paste multiple commands as entries
 				paste-commands data
 			][
-				text: decode-clipboard data						;-- paste single command as text
+				text: data/format								;-- paste single command as text
 				#assert [string? text]
 				batch space [
 					remove-range selected

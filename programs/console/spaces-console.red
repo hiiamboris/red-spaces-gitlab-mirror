@@ -563,6 +563,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 					do-hooks/with 'on-editor-key-down reduce [space path event]
 				]
 				on-key [space path event] [
+					~/log-modified?: yes						;-- turn on next log save
 					if empty? event/flags [ 
 						switch event/key [
 							#"^M" [								;-- enter key evaluates
