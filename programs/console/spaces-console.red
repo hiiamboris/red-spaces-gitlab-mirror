@@ -12,9 +12,10 @@ system/script/header: [											;@@ workaround for #4992
 ;@@ console shortcuts - ls, pwd, etc - aren't implemented - need a plugin with them?
 
 {	;@@ TODOs:
-	plugins auto-update somehow
+	plugins auto-reload after update/install
 	don't move caret to next entry unless it's at the end? or use a modifier, like ctrl to disable move?
 	when copying, output is prefixed by a space - remove it
+	allow partial selection (for copy) on output/result
 	session manager plugin to save/load logs
 	(even) faster printing
 	scroller and list-view bugs need design fixes
@@ -105,6 +106,34 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 
 	;; where to look for plugins if not cloned locally (e.g. using binary release)
 	plugin-repo: https://codeberg.org/hiiamboris/red-spaces/raw/branch/master/programs/console
+	last-update: now/utc/precise
+	
+	maybe-update: function ["Once an hour check for plugin updates"] [
+		all [
+			0:10 < difference last-timer last-activity			;-- kick in after some inactivity
+			1:00 < difference last-timer last-update			;-- check once per hour max
+			update-plugins
+		]
+	]
+	
+	update-plugins: function ["Update installed plugins from the web"] [
+		~/last-update: now/utc/precise
+		foreach plugin state/plugins [
+			trap/catch [
+				set [code: map: text:] read/info plugin-repo/:plugin
+			] [continue]
+			if code <> 200 [continue]
+			if local: data-store/find-file 'data plugin [
+				parse remote-time: next split map/last-modified #" " [
+					2 [skip insert "-"] skip insert "/" skip change "GMT" "Z"
+				]
+				remote-time: load rejoin remote-time
+				; print ["FOR" plugin "local=" query local "remote=" remote-time]
+				if remote-time > query local [local: none]		;-- only update to a newer version
+			]
+			unless local [data-store/write-file 'data plugin text]
+		]
+	]
 	
 	install-plugin: function [
 		"Install or update a plugin from the file source (takes effect after console restart)"
@@ -142,7 +171,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	]
 	load-plugins: function ["Load all plugins from local data store"] [
 		for-each [file [file!]] state/plugins [load-plugin file]
-	] 
+	]
 	
 	
 	;; *************************************************
@@ -613,7 +642,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 			origin 2x2
 			host: host with [size: ~/state/size - 4 rate: 34] [		;-- decreased rate for less resource usage
 				log: log multi-selectable source= lay-out-vids [log-entry] 
-				rate= 0:0:3 on-time [preserve-log preserve-state]
+				rate= 0:0:3 on-time [preserve-log preserve-state maybe-update]
 			]
 		] 'resize [offset: ~/state/offset]
 	]
