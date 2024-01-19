@@ -162,7 +162,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		"Append value to captured output"
 		value [any-type!]
 	] with :capture-output [
-		invalidate/only target
+		invalidate target
 		row: target/rows/output
 		text: append append row/get-text row/extra-text :value
 		~/last-activity: ~/last-timer
