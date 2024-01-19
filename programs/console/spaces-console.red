@@ -12,6 +12,9 @@ system/script/header: [											;@@ workaround for #4992
 ;@@ console shortcuts - ls, pwd, etc - aren't implemented - need a plugin with them?
 
 {	;@@ TODOs:
+	plugins auto-update somehow
+	don't move caret to next entry unless it's at the end? or use a modifier, like ctrl to disable move?
+	when copying, output is prefixed by a space - remove it
 	session manager plugin to save/load logs
 	(even) faster printing
 	scroller and list-view bugs need design fixes
@@ -162,6 +165,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		invalidate/only target
 		row: target/rows/output
 		text: append append row/get-text row/extra-text :value
+		~/last-activity: ~/last-timer
 		row/extra-text: either #"^/" = last text [form take/last text][{}]	;-- keep the last newline but never show it
 		row/set-text text										;@@ need a lower level faster (without undo) setter
 	]
@@ -616,10 +620,26 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	
 	show-terminal: function ["Display console REPL window"] [
 		#assert [terminal]
+		insert-event-func 'adaptive-rate-function :adaptive-rate-function
 		view/no-wait terminal
 		loop 5000 [do-events/no-wait]							;@@ focus kludge - fixme (otherwise fails in window-of randomly!)
 		try [set-focus log/source/1/rows/input/document]		;@@ but just in case: let rather focus fail than startup
 		do-hooks 'on-show
+	]
+	
+	last-timer: last-activity: now/utc/precise					;-- times of last time event and of user's last interaction with the console
+	adaptive-rate-function: function [
+		"Autoadjust host rate based on activity"
+		face [object!] event [map! event!]
+	][
+		if any [face =? host face =? terminal] [
+			either event/type = 'time
+				[~/last-timer: now/utc/precise]
+				[~/last-activity: last-timer]
+			elapsed: difference last-timer last-activity
+			maybe host/rate: 1 + to integer! 33 / (elapsed / 0:0:5 + 1)
+			none												;-- indicate success
+		]
 	]
 	
 	startup: function ["CLI entry point"] [
