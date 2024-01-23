@@ -46,6 +46,6 @@ prof/show
 prof/reset
 print "==================="
 ; foreach-*ace/next path system/view/screens/1 [probe path]
-either system/build/config/gui-console? [print "---"][do-events]
+do-events
 prof/show
 

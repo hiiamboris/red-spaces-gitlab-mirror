@@ -115,7 +115,7 @@ view/no-wait/options [
 ] [offset: 10x10]
 
 prof/show prof/reset
-either system/build/config/gui-console? [run-console][do-events]
+do-events
 prof/show
 
 

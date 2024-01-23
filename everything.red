@@ -4,12 +4,15 @@ Red [
 	; needs:  view										;@@ doesn't work, has to be in the main script
 ]
 
+;; check to prevent double inclusion (esp. when running tests from spaces-console)
+#if not value? 'spaces-included? [
+set 'spaces-included? true 								;-- must be done in the code, not in the preprocessor, bcuz inclusion is 2-stage!  
+
 ;@@ I only partially understand why/how all this magic works
 ;@@ a huge lot of bugs is fixed by using %include-once
 ;@@ since it's a macro, it has to be #included, not `do`ne (`do` forgets macros)
 ;@@ for some reason, it won't affect #includes of this very file,
 ;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
-
 ; #do [verbose-inclusion?: yes]							;-- enable to dump filenames
 #include %../common/include-once.red					;-- the rest can use the improved include
 #do [
@@ -125,3 +128,5 @@ do/expand [
 	]
 ]
 #process on
+
+];#if not value? 'spaces-included? [ 

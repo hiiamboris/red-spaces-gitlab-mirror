@@ -25,5 +25,5 @@ view/no-wait/options [
 ] [offset: 10x10]
 
 dump-tree system/view/screens/1
-either system/build/config/gui-console? [run-console][do-events]
+do-events
 

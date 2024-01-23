@@ -51,5 +51,5 @@ view/no-wait/options [
 ] [offset: 10x10]
 ; debug-draw
 ; foreach-*ace/next path system/view/screens/1 [probe path]
-either system/build/config/gui-console? [run-console][do-events]
+do-events
 
