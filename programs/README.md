@@ -118,7 +118,7 @@ Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/
 
 Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a lot of compiler workarounds to make a binary ☺
 
-## [ParSEE - Parsing flow visual analysis tool](parsee-tool.red)
+## [ParSEE - Parsing flow visual analysis tool](parsee.red)
 
 Debug your `parse` code with ease!
 
