@@ -143,7 +143,7 @@ A few **examples** (clickable):
 ### Setup
 
 ParSEE UI is Spaces-based, but it would be unwise to require Spaces to be included into every small rule we may wish to debug. For this reason the project is split into **two parts**:
-1. [`common/parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) **backend** that collects info during a Parse run
+1. [`common/parsee.red`](https://codeberg.org/hiiamboris/red-common/src/branch/master/parsee.red) **backend** that collects info during a Parse run (it *replaces* native `parse`)
 2. [`spaces/parsee.red`](parsee.red) Spaces-based **frontend** that displays and helps analyze it
 
 So to set things up you'll **need**:
