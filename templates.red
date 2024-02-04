@@ -3857,7 +3857,7 @@ grid-view-ctx: context [
 		content-flow: 'planar
 		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
-			switch type?/word :source [
+			switch/default type?/word :source [
 				block! [
 					case [
 						pick [:source/(xy/2)/(xy/1)]
@@ -3866,7 +3866,8 @@ grid-view-ctx: context [
 					]
 				]
 				map! [either pick [source/:xy][source/size]]
-				'else [ERROR "Unsupported data source type: (mold type? :source)"]
+			][
+				ERROR "Unsupported data source type: (mold type? :source)"
 			]
 		] #type [function!] :invalidates
 
