@@ -3202,6 +3202,7 @@ grid-ctx: context [
 		bounds: grid/calc-bounds
 		xlim: bounds/x
 		#assert [integer? xlim]							;-- row size cannot be calculated for infinite grid
+		#assert [xlim <= 50  "warning: automatic row height estimation may be very slow on wide tables!"]
 		hmin: make block! xlim + 1						;-- can't be static because has to be reentrant!
 		append hmin any [grid/heights/min 0]
 		path: when not same? grid last current-path (get-host-path grid)	;-- let cells be rendered with proper style path
