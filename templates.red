@@ -3110,7 +3110,7 @@ grid-ctx: context [
 					if before > 0 [sub-def* prev-key before]
 					
 					if 'auto = size: array/:key [		;-- row is marked for autosizing
-						#assert [array =? heights]
+						#assert [array =? grid/heights]
 						size: grid/row-height? key		;-- try to fetch it from the cache or calculate
 					]
 					if 0 = sub* 1 size + sp [throw 1]	;-- this cell contains level
@@ -3309,6 +3309,9 @@ grid-ctx: context [
 			render/on mcspace canvas yes no					;-- render content to get it's size - in case it was invalidated
 			mcsize: canvas/x . cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
 			mcdraw: render/on mcspace mcsize yes yes		;-- re-render to draw the full background
+			unless mcspace/size +<= mcsize [
+				mcdraw: compose/only [clip 0x0 (mcsize) (mcdraw)]	;-- cell itself doesn't clip content to canvas, so grid has to do that
+			]
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
 			repend map [mcspace geom]					;-- map may contain the same space if it's both pinned & normal
