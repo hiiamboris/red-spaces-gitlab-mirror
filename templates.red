@@ -3152,8 +3152,8 @@ grid-ctx: context [
 
 	locate-point: function [grid [object!] xy [planar!] screen? [logic!]] [
 		if screen? [
-			unless (pinned: grid/pinned) +<= pinned-area: 0x0 [	;-- nonzero pinned rows or cols?
-				pinned-area: grid/spacing + grid/get-offset-from 1x1 (pinned + 1x1)
+			unless grid/pinned +<= pinned-area: 0x0 [	;-- nonzero pinned rows or cols?
+				pinned-area: grid/margin - grid/spacing + grid/get-offset-from 1x1 (grid/pinned + 1x1)
 			]
 			;; translate heading coordinates into the beginning of the grid
 			unless (pinned-area - grid/origin) +<= xy [xy: xy + grid/origin]
