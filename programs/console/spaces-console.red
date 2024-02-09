@@ -1,5 +1,5 @@
 Red [
-	needs:       view
+	needs:       [view json]
 ]
 system/script/header: [											;@@ workaround for #4992
 	title:       "Spaces Console"
@@ -708,7 +708,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 			][
 				unless terminal/state [show-terminal]			;-- may have been shown by a print call; calls 'on-show' hooks
 				do-events
-			] 
+				prof/show
+			]
 			terminate 0											;-- calls 'on-exit' hooks
 		]
 	
