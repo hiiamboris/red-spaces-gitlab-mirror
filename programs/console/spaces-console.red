@@ -58,13 +58,13 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	
 	size: 80x1000												;-- terminal size in chars; only /x is normally used (set by row-draw)
 	
-	plugins: #()												;-- where plugins may put their contexts if they wish to
+	plugins: #[]												;-- where plugins may put their contexts if they wish to
 	
-	state: #(
+	state: #[
 		size:    600x400										;-- last window size
-		offset:  #[none]										;-- last window offset
+		offset:  #(none)										;-- last window offset
 		plugins: []												;-- plugins to auto load from data store
-	)
+	]
 	
 	
 	;; *************************************************
@@ -72,7 +72,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	;; *************************************************
 	
 	;; hooks for plugins to extend: plugin itself is initialized before window is shown
-	hooks: #(
+	hooks: #[
 		on-show:			[]									;-- nullary; after window is shown
 		on-exit:			[]									;-- nullary; after window is closed
 		on-editor-key:		[]									;-- [space path event]; in on-key event of the editor
@@ -80,7 +80,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		on-log-key:			[]									;-- [space path event]; in on-key event of the log (list-view)
 		on-log-key-down:	[]									;-- [space path event]; in on-key-down event of the log (list-view)
 		;@@ more to come
-	)
+	]
 	do-hooks: function [
 		"Evaluate a group of console hooks"
 		group [word!]
@@ -300,10 +300,10 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		
 		kind: 'input	#type [word!] (find [input output result] kind)
 			#on-change [space word value] [
-				if height: select #(output 400 result 120) value [
+				if height: select #[output 400 result 120] value [
 					space/viewer/limits/max/y: height
 				]
-				space/prefix/text: select #(input ">>" output "" result "==") value
+				space/prefix/text: select #[input ">>" output "" result "=="] value
 			]
 			
 		tube-draw: :draw

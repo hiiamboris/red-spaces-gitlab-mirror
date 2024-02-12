@@ -300,8 +300,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					block! [(
 						all [
 							2 >= length? align
-							find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/1
-							find [#[none] n s e w ↑ ↓ → ← ↔ ↕] align/2
+							find [#(none) n s e w ↑ ↓ → ← ↔ ↕] align/1
+							find [#(none) n s e w ↑ ↓ → ← ↔ ↕] align/2
 						]
 					)]
 					none!
@@ -628,8 +628,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    #assert [
 	    	[] = list-words []
 	    	; [0x1 1 #[true]  0x0] = list-words []
-	    	[(0,6) 6 #[false] 0x3] = list-words [1 2 3]
-	    	[(0,3) 3 #[true] 0x2  (3,9) 6 #[false] 2x5  (9,13) 4 #[true] 5x6] = list-words [-1 -2 1 2 3 -4]
+	    	[(0,6) 6 #(false) 0x3] = list-words [1 2 3]
+	    	[(0,3) 3 #(true) 0x2  (3,9) 6 #(false) 2x5  (9,13) 4 #(true) 5x6] = list-words [-1 -2 1 2 3 -4]
 	    ]
 	    
 	    ;@@ ensure this is not called with /force-wrap 
@@ -656,13 +656,13 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 	    ]
 	    #assert [
 	    	10 = get-min-total-width-2D [] 10 20
-	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 0
-	    	36 = get-min-total-width-2D [0x6 6 #[false] 0x3] 30 35
-	    	23 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 30
-	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 30
-	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 12
-	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[true] 5x6] 10 12
-	    	19 = get-min-total-width-2D [0x3 3 #[true] 0x2  3x9 6 #[false] 2x5  9x13 4 #[false] 5x6] 10 2
+	    	36 = get-min-total-width-2D [0x6 6 #(false) 0x3] 30 0
+	    	36 = get-min-total-width-2D [0x6 6 #(false) 0x3] 30 35
+	    	23 = get-min-total-width-2D [0x3 3 #(true) 0x2  3x9 6 #(false) 2x5  9x13 4 #(false) 5x6] 10 30
+	    	19 = get-min-total-width-2D [0x3 3 #(true) 0x2  3x9 6 #(false) 2x5  9x13 4 #(true) 5x6] 10 30
+	    	19 = get-min-total-width-2D [0x3 3 #(true) 0x2  3x9 6 #(false) 2x5  9x13 4 #(false) 5x6] 10 12
+	    	19 = get-min-total-width-2D [0x3 3 #(true) 0x2  3x9 6 #(false) 2x5  9x13 4 #(true) 5x6] 10 12
+	    	19 = get-min-total-width-2D [0x3 3 #(true) 0x2  3x9 6 #(false) 2x5  9x13 4 #(false) 5x6] 10 2
 	    ]
 	    
 		;; copy words into buffer, until it fits row-width (or until scaling factor worsens in 'scale mode)

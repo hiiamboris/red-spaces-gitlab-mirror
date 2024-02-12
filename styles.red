@@ -78,7 +78,7 @@ define-styles: function [
 
 do with styling: context [
 	;@@ TODO: ideally colors & fonts should not be inlined - see REP #105
-	unless svm/colors [svm/colors: copy #()]			;@@ MacOS fix for #4740
+	unless svm/colors [svm/colors: copy #[]]			;@@ MacOS fix for #4740
 	unless svmc/text  [svmc/text: black]				;@@ GTK fix for #4740
 	unless svmc/panel [svmc/panel: white - svmc/text]	;@@ GTK fix for #4740
 	checkered-pen: reshape [							;-- used for focus indication
@@ -93,8 +93,8 @@ do with styling: context [
 	;-- very experimental `either` shortener: logic | true-result | false-result
 	|: make op! func [a b] [
 		switch/default :a [
-			#[true] [:b]
-			#[false][true]
+			#(true) [:b]
+			#(false)[true]
 		] [:a]
 	]
 

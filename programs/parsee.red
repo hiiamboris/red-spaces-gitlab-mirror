@@ -69,7 +69,7 @@ context with spaces/ctx expand-directives [
 	i-next-event:   5
 
 	;; colors for the parsing profiles plots need to be fixed, but I adapt them to night/day mode:
-	colors: #()													;-- saturated colors
+	colors: #[]													;-- saturated colors
 	colors/panel: any [attempt [system/view/metrics/colors/panel] white]
 	dark?: (brightness? colors/panel) < 0.5
 	extend colors map-each [color [issue!]] either dark?
@@ -633,7 +633,7 @@ context with spaces/ctx expand-directives [
 	;@@ layout: grid-view with 2 vlists (1 pinned), so rule names are always visible
 	;@@ for that grid-view will have to support row selection, like in list-view
 	;@@ BUG: when profiles are too wide it won't allow to scroll to them, likely triggering slide during intermediate redraws
-	visualize-parse: function [file [file!] /geometry geom: #() [map!]] [
+	visualize-parse: function [file [file!] /geometry geom: #[] [map!]] [
 		;; load the dump file
 		input: first data: load/as file 'redbin
 		decoded: decode-dump data

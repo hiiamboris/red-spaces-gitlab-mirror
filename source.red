@@ -83,13 +83,13 @@ rich: context [											;@@ what would be a better name?
 	
 	store-attrs []										;-- empty attribute set is always present and has zero index
 	#assert [											;-- other attributes are added for testing purposes
-		1 = store-attrs [bold #[true]]
-		2 = store-attrs [bold #[true] underline #[true]]
+		1 = store-attrs [bold #(true)]
+		2 = store-attrs [bold #(true) underline #(true)]
 		3 = store-attrs [size 8]
 		4 = store-attrs [size 12]
 		4 = store-attrs [size 12]
 		3 = attrs->index [size 8]
-		[bold #[true]] = index->attrs 1
+		[bold #(true)] = index->attrs 1
 	]
 	
 	
@@ -135,7 +135,7 @@ rich: context [											;@@ what would be a better name?
 		copy ranges
 	]
 	
-	#assert [ [0x3 [bold #[true]]] = extract-ranges [_ 1 _ 1 _ 1] ]
+	#assert [ [0x3 [bold #(true)]] = extract-ranges [_ 1 _ 1 _ 1] ]
 
 	;; external context allows me to use /copy word without shadowing the global one
 	attributes: context [

@@ -60,10 +60,10 @@ scheduler: context [
 		key key-down key-up enter
 		; focus unfocus 	-- internally generated ;@@ but maybe these will be required too
 		time
-		#[true]											;-- used to be able to use path notation (faster)
+		#(true)											;-- used to be able to use path notation (faster)
 	]
 	
-	delay-norms: #(										;-- delay norm per event type, used for prioritization
+	delay-norms: #[										;-- delay norm per event type, used for prioritization
 		time     500
 		; drawing  300									;-- not reported to the event function
 		; moving   200									;-- only concerns windows not hosts
@@ -73,20 +73,20 @@ scheduler: context [
 		over     100
 		drag     100
 		wheel    100
-	)
+	]
 	default-delay: 50
 	for-each type event-types [default delay-norms/:type: default-delay]
 	
 	groupable: make hash! append keys-of delay-norms true		;-- 'true' allows to use path notation which is faster than find
 
 	;; event groups determine which events can or cannot be grouped with each other
-	groups: #(
+	groups: #[
 		time     time
 		drawing  drawing
-	)
+	]
 	for-each type exclude event-types [time drawing] [groups/:type: 'normal]
 
-	finish-times: #()									;-- timestamp of last event of each type processing finish(!)
+	finish-times: #[]									;-- timestamp of last event of each type processing finish(!)
 	for-each type event-types [finish-times/:type: now/utc/precise]
 	
 	shared-queue: make [] 200							;-- for dispatching events by host
@@ -207,9 +207,9 @@ scheduler: context [
 				depth: step 'event-loop-depth
 				while [all [window/state depth = event-loop-depth]] [	;-- there's one event loop per window, so leave once it's closed
 					switch native-do-events/no-wait [			;-- fetch all pending events ;@@ may deadlock?
-						#[true]  [continue]
-						#[false] []
-						#[none]  [break]
+						#(true)  [continue]
+						#(false) []
+						#(none)  [break]
 					]
 					trap/all/catch
 						[unless process-any-event [wait 1e-3]]	;-- wait is also tainted by single do-events/no-wait

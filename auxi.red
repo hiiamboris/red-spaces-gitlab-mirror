@@ -289,7 +289,7 @@ context [
 	;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
 	factor: 1.4											;-- https://stackoverflow.com/q/1100311
 	log-factor: log-e factor
-	free-list: #()
+	free-list: #[]
 	
 	;; `make` alternative that uses a free list of series when possible - to reduce GC load
 	set 'obtain function [
@@ -973,7 +973,7 @@ normalize-alignment: function [
 		align
 	][
 		;; center/middle are the default and do not need to be specified, but double arrows are still supported ;@@ should be?
-		dict: [n ↑ [0x-1] s ↓ [0x1] e → [1x0] w ← [-1x0] #[none] ↔ ↕ [0x0]]
+		dict: [n ↑ [0x-1] s ↓ [0x1] e → [1x0] w ← [-1x0] #(none) ↔ ↕ [0x0]]
 		align: ox + oy * add switch align/1 dict switch align/2 dict
 		either ox/x =? 0 [reverse align][align]
 	]
@@ -1320,7 +1320,7 @@ distribute: function [
 	[ 50  50]     == distribute 100 [1  1]     [2e9 2e9]
 	[ 25  50  25] == distribute 100 [1  2   1] [2e9 2e9 2e9]
 	[ 33  33  34] == distribute 100 [1  1   1] [2e9 2e9 2e9]
-	[ 33  33  34] == distribute 100 [1  1   1] [#[none] #[none] #[none]]
+	[ 33  33  34] == distribute 100 [1  1   1] [#(none) #(none) #(none)]
 	[  0 100   0] == distribute 100 [0  1   0] [2e9 2e9 2e9]
 	[ 33  34  33] == distribute 100 [1  1   1] [2e9 2e9  33]
 	[  1   2   3] == distribute 100 [1  1   1] [  1   2   3]

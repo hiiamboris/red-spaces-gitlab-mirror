@@ -354,7 +354,7 @@ spaces/templates/space: declare-class 'space [
 	limits:  none
 	parent:  none	
 	cache:   [size]	
-	cached:  tail copy [0.0 #[none]]
+	cached:  tail copy [0.0 #(none)]
 ]
 ```
 Serves no other function: has zero size and draws nothing.\
@@ -1247,7 +1247,7 @@ For more info about these functions, create a grid `g: make-space 'grid []` and 
 
 An [`inf-scrollable`](#inf-scrollable) wrapper around [`grid`](#grid), used to display finite or infinite amount of **data**.
 
-| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #(default 40)<br>	grid/heights: #(default 20)<br>	data: func [/pick xy /size] [either size [ [x #[none] y #[none]] ][ xy ]]<br>]</pre><br>Tip: `size/x = size/y = none` means infinite in both directions |
+| ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-gridview.png) | <pre>grid-view with [<br>	grid/widths:  #[default 40]<br>	grid/heights: #[default 20]<br>	data: func [/pick xy /size] [either size [ [x #(none) y #(none)] ][ xy ]]<br>]</pre><br>Tip: `size/x = size/y = none` means infinite in both directions |
 |-|-|
 | ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-template-gridview-autofitted.gif) | <pre>grid-view source= [<br>	[1 "22 22"]<br>	["3 3 3" "4444 4444 4444 4444"]<br>]</pre> |
 
@@ -1286,7 +1286,7 @@ Adds new facets:
 `data` is a picker interface that abstracts the data selection:
 - called as `data/size` it should return the X and Y data limits as either:
   - a `pair!` if data is finite
-  - a block `[x: #[none] y: #[none]]` if at least one limit is infinite (the other one can be an integer; also `none`s can be omitted following block selection rules: `[]` is equivalent to `[x: none y: none]`)
+  - a block `[x: #(none) y: #(none)]` if at least one limit is infinite (the other one can be an integer; also `none`s can be omitted following block selection rules: `[]` is equivalent to `[x: none y: none]`)
 - called as `data/pick xy` it should return the data value at (row=y, col=x), xy >= 1x1
 
 Default `data` just acts as a wrapper around `source`, picking from it and returning it's `source/size` value. But can be redefined to use any other source. In this case `source` will be unused.

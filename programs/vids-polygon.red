@@ -9,10 +9,10 @@ Red [
 #include %../../common/load-anything.red
 #include %../../common/data-store.red
 
-config: data-store/load-config/name/defaults %vids-polygon.cfg #(
+config: data-store/load-config/name/defaults %vids-polygon.cfg #[
 	size: 400x300
 	text: "cell [text {some stuff} green]"
-)
+]
 ; debug-draw
 ; view/no-wait/flags/options compose [
 view/flags/options reshape [

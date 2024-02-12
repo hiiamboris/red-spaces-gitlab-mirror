@@ -57,7 +57,7 @@ boxes: [
 
 width: 130
 ; aligns: map-each/only x [-1 0 1] [ map-each y [-1 0 1] [as-pair x y] ]
-aligns: map-each/only y [↑ #[none] ↓] [ map-each/only x [← #[none] →] [trim reduce [x y]] ]
+aligns: map-each/only y [↑ #(none) ↓] [ map-each/only x [← #(none) →] [trim reduce [x y]] ]
 ; aligns: [[[← ↑]]]
 tubes: collect [
 	; for-each [/i axes] [ [e s] [e n]  [s w] [s e]  [w n] [w s]  [n e] [n w] ] [

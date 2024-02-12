@@ -373,7 +373,7 @@ editor-tools: context [
 		doc [object!] font [word! (font = 'pick) none! object!] "Use 'pick to pop up a requester"
 	][ 
 		if font = 'pick [font: request-font]
-		default font: [name: #[none] size: #[none]]
+		default font: [name: #(none) size: #(none)]
 		either range: batch doc [selected] [
 			batch doc [
 				mark-range range 'font font/name

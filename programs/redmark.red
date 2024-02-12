@@ -103,7 +103,7 @@ do/expand with spaces/ctx [
 		]
 		cell/rich-content: [
 			default font: ~styling/fonts/text/1
-			align: select #(-1 left 0 center 1 right) parent/align/x	;-- carry cell alignment into text
+			align: select #[-1 left 0 center 1 right] parent/align/x	;-- carry cell alignment into text
 		]
 		pre: [
 			margin: 10

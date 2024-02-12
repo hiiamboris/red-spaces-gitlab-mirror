@@ -50,8 +50,8 @@ view/no-wait [
 			row tight center [ 
 				rocket: rocket hint="Retro-styled racing space ship"
 					menu= reshape [
-						"Approve the course" #[true] (print "On our way") 
-						"Alter the course" #[false] (rocket/angle: random 360 invalidate rocket print "Adjusting...")
+						"Approve the course" #(true) (print "On our way") 
+						"Alter the course" #(false) (rocket/angle: random 360 invalidate rocket print "Adjusting...")
 						"Beam me up" "🔭" (print "Zweeee..^/- Welcome onboard!")
 						"Thrusters overload" @[r-switch: make-space 'switch [state: on]] (
 							r-switch/state: rocket/burn?: not rocket/burn?

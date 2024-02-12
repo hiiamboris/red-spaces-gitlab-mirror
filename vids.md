@@ -532,7 +532,7 @@ The following additional syntax allows one to control the cell coordinate:
 Example:
 ```
 view [host [
-	grid 5x5 widths= #(default 50) heights= #(default 50) [
+	grid 5x5 widths= #[default 50] heights= #[default 50] [
 		cell [text "a"] cell [text "b"] return
 		text "c" text "d"
 		at 4x4 text "e" text "f"
@@ -589,8 +589,8 @@ Example from [`popups-test.red`](tests/popups-test.red):
 ```
 menu: reshape [
 	;) note usage of logic values for sigils:
-	"Approve the course" #[true] (print "On our way")
-	"Alter the course" #[false] (
+	"Approve the course" #(true) (print "On our way")
+	"Alter the course" #(false) (
 		rocket/angle: random 360
 		invalidate rocket
 		print "Adjusting..."

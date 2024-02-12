@@ -25,7 +25,7 @@ system/console/plugins/tab-completion: context with spaces/ctx [
 		]
 		either list [
 			unless empty? suffix [								;-- /match doesn't work with {}
-				formed: #()
+				formed: #[]
 				remove-each w list [
 					f: any [formed/:w formed/:w: form w]
 					not find/match f suffix

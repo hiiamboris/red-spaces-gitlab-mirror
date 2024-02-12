@@ -334,7 +334,7 @@ Event handler description **DSL quick reference**:
 
 ### Event handler spec
 
-Handler spec almost always takes 3 arguments: `space path event`. Only `on-time` event accepts an additional `delay` argument.\ 
+Handler spec almost always takes 3 arguments: `space path event`. Only `on-time` event accepts an additional `delay` argument.\
 It's possible to provide typesets: `space [object!] path [block!] event [event! none!] delay [percent!]`
 
 | usual name | accepted types | description |

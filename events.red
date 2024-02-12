@@ -20,13 +20,13 @@ events: context [
 	;-- any normal event handler does not call `pass`
 	;-- "eaten" events do not propagate further into normal event handlers, but do into all previewers & finalizers
 	;-- map format: event/type [word!] -> list of functions
-	previewers: #()
-	finalizers: #()
+	previewers: #[]
+	finalizers: #[]
 
 	;-- we want extensibility so this is a map of maps:
 	;-- format: space-name [word!] -> on-event-type [word!] -> list of event functions
 	;--         space-name [word!] -> sub-space-name [word!] -> ... (reentrant, supports paths)
-	handlers: #()
+	handlers: #[]
 
 
 	event-prototype: make map! collect [
@@ -186,7 +186,7 @@ events: context [
 			append prefix name
 			#debug events [print ["Defining" mold as path! prefix when base ("from") when base (base)]]
 			path: as path! prefix
-			map: either base [copy-deep-map get base][copy #()]
+			map: either base [copy-deep-map get base][copy #[]]
 			set path map
 			fill-body body map
 			take/last prefix

@@ -13,8 +13,8 @@ system/console/plugins/highlighting: context with spaces/ctx [
 	;; rules must be a map of: datatype! -> block! [attr value ...]
 	default spaces-console/state/highlight-rules:				;@@ rules should be GUI-configured 
 	default-rules: make map! [
-		set-word! [color @(blend 'panel 'text  150%)  bold #[true]]
-		set-path! [color @(blend 'panel 'text  150%)  bold #[true]]
+		set-word! [color @(blend 'panel 'text  150%)  bold #(true)]
+		set-path! [color @(blend 'panel 'text  150%)  bold #(true)]
 		string!   [color @(blend 'text  magenta 50%)]
 		binary!   [color @(blend 'text  magenta 50%)]
 		integer!  [color @(blend 'text  cyan    50%)]
@@ -23,18 +23,18 @@ system/console/plugins/highlighting: context with spaces/ctx [
 		pair!     [color @(blend 'text  cyan    50%)]
 		point2D!  [color @(blend 'text  cyan    50%)]
 		point3D!  [color @(blend 'text  cyan    50%)]
-		paren!    [color @(blend 'text  blue    50%)  bold #[true]]
-		block!    [color @(blend 'text  black   50%)  bold #[true]]
-		url!      [color @(blend 'text  sky     50%)  underline #[true]]
+		paren!    [color @(blend 'text  blue    50%)  bold #(true)]
+		block!    [color @(blend 'text  black   50%)  bold #(true)]
+		url!      [color @(blend 'text  sky     50%)  underline #(true)]
 		native!   [color @(blend 'text  green   50%)]
 		action!   [color @(blend 'text  green   50%)]
 		op!       [color @(blend 'text  green   50%)]
 		function! [color @(blend 'text  green   50%)]
-		unset!    [color @(blend 'text  red     50%)  bold #[true]]
+		unset!    [color @(blend 'text  red     50%)  bold #(true)]
 	]
 	
 	;; resulting colors need not appear in the state, only used locally
-	colors: to #() reshape to [] spaces-console/state/highlight-rules
+	colors: to #[] reshape to [] spaces-console/state/highlight-rules
 
 	foreach-token: function [
 		"Evaluate code for each loaded datatype in the text"
@@ -87,7 +87,7 @@ system/console/plugins/highlighting: context with spaces/ctx [
 		"Check if word exists in global context without loading it"
 		word [string!]
 	][
-		formed: #()
+		formed: #[]
 		foreach w words-of system/words [
 			f: any [formed/:w formed/:w: form w]
 			if word = f [return yes]

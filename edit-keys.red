@@ -6,7 +6,7 @@ Red [
 
 key->plan: none
 context [
-	near-moves: #(
+	near-moves: #[
 		left       [by -1]
 		right      [by  1]
 		backspace  [by -1]
@@ -17,15 +17,15 @@ context [
 		down       'line-down
 		page-up    'page-up
 		page-down  'page-down
-	)
-	far-moves:  extend copy near-moves #(
+	]
+	far-moves:  extend copy near-moves #[
 		left      'prev-word
 		right     'next-word
 		backspace 'prev-word
 		delete    'next-word
 		home      'far-head
 		end       'far-tail
-	)
+	]
 
 	set 'key->plan function [
 		"Turn keyboard event into an edit plan"

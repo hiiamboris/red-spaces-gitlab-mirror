@@ -44,8 +44,8 @@ context [
 		margin:  2x2
 		spacing: 1x1
 		autofit: none
-		heights: copy #(min 10 default auto)
-		widths:  copy #(default 80)
+		heights: copy #[min 10 default auto]
+		widths:  copy #[default 80]
 	]
 	
 	;; limits the displayed size of big blocks/objects

@@ -34,7 +34,7 @@ context [
 	;@@ need full list of entities, but it's huge and who's using that junk anyway
 	;@@ need also an :emoji: decoder - https://gist.github.com/rxaviers/7360908 
 	decode-entity: function [name [string!]] [
-		dict: #(
+		dict: #[
 			"lt"    "<"
 			"gt"    ">"
 			"amp"   "&"
@@ -46,7 +46,7 @@ context [
 			"deg"   "°"
 			"laquo" "«"
 			"raquo" "»"
-		)
+		]
 		any [
 			select dict name
 			rejoin ["&" name ";"]
@@ -88,7 +88,7 @@ context [
 			]
 			=flush= (
 				trim name  trim link
-				codec: select #(%.gif gif %.png png %.jpg jpeg %.jpeg jpeg) suffix? link
+				codec: select #[%.gif gif %.png png %.jpg jpeg %.jpeg jpeg] suffix? link
 				either image [
 					link: as either find/match link "http" [url!][file!] link
 					image: any [

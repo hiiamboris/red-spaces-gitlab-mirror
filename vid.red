@@ -20,7 +20,7 @@ VID: context [
 	; ]
 	
 	;; these help avoid repetition:
-	props: #(
+	props: #[
 		spacious [margin: spacing: 10x10]
 		tight    [tight [margin: spacing: 0x0]]
 		align [											;-- used by box and tube
@@ -45,7 +45,7 @@ VID: context [
 			ellipsize [flags: append flags 'ellipsize]
 			; wrap      [flags: append flags 'wrap]		;-- no wrap flag by design, choose text vs paragraph instead 
 		]
-	)
+	]
 		
 	;; specifications for VID/S styles available in `lay-out-vids`
 	styles: make map! reshape [

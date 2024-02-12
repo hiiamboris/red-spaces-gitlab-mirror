@@ -11,7 +11,7 @@ exports: [make-space declare-template space?]
 
 space-object!: copy classy-object!
 
-templates: #()											;-- map for extensibility
+templates: #[]											;-- map for extensibility
 
 ;; default on-change function to avoid replicating it in every template
 invalidates: function [space [object!] word [word!] value [any-type!]] [
@@ -39,7 +39,7 @@ templates/space: declare-class 'space [					;-- minimum basis to build upon
 	draw:   :no-draw  	#type   [function!]
 	;; `drawn` is an exception and not held in the space, so just `size`:
 	cache:  [size]		#type   [block! none!]
-	cached: tail copy [(0,0) 0.0 #[none]]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
+	cached: tail copy [(0,0) 0.0 #(none)]	#type [block!]	;-- used internally to check if space is connected to the tree, and holds cached facets
 	limits: none		#type   [object! (range? limits)  none!] :invalidates
 	; rate: none
 ]
@@ -2884,8 +2884,8 @@ list-view-ctx: context [
 		extend behavior [
 			; draggable:       pan						;-- inherited from scrollable; also supports: select=multi-item selection
 			;; its still possible to programmatically select anything, but how keys behave highly depends on /selectable
-			selectable:      #[none]					;-- none=don't select; single=select one item; multi=many items at once
-			follows-cursor?: #[true]					;-- cursor fully shows itself on movement
+			selectable:      #(none)					;-- none=don't select; single=select one item; multi=many items at once
+			follows-cursor?: #(true)					;-- cursor fully shows itself on movement
 		]
 
 		;; see anchor description in the spec above
@@ -4268,7 +4268,7 @@ field-ctx: context [
 			pair?    limit [sel: limit]
 			'else [
 				switch/default limit [
-					none #[none] [sel: none]
+					none #(none) [sel: none]
 					all [sel: 0 thru length]
 				][
 					ofs: batch space [locate limit]		;-- document's locate can return a block

@@ -45,7 +45,7 @@ spaces/templates/space: declare-class 'space [
 	cache:  [size]		#type [block! none!]
 	
 	;) cached holds internal cache data (explained in the relevant chapter)
-	cached: tail copy [0.0 #[none]]	#type [block!]
+	cached: tail copy [0.0 #(none)]	#type [block!]
 ]
 ```
 As you can see, all facets have type, validity check, and equality type used to detect a change. `limits` also triggers invalidation when changed. More about class system you can read in [classy-object.red](https://codeberg.org/hiiamboris/red-common/src/branch/master/classy-object.red).

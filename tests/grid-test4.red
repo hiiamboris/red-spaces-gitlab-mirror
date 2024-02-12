@@ -20,12 +20,12 @@ view/no-wait/options/flags [
 			fps-meter
 			grid-view focus with [
 				grid/pinned: 2x1
-				grid/bounds: [x: #[none] y: #[none]]
+				grid/bounds: [x: #(none) y: #(none)]
 				; grid/content/(1x2): make-space/name 'button [data: "button1"]
 				; grid/content/(2x2): make-space/name 'button  [size: 80x80]
 				; grid/content/(1x1): make-space/name 'button [data: "button2"]
 				data: func [/pick xy /size] [
-					either pick [xy][[x: #[none] y: #[none]]]
+					either pick [xy][[x: #(none) y: #(none)]]
 				]
 				grid/set-span 1x1 2x1
 				grid/set-span/force 2x2 3x2
