@@ -165,7 +165,7 @@ events: context [
 	define-handlers: function [
 		"Define event handlers for any number of spaces"
 		def [block!] "[name: [on-event [space path event] [...]] ...]"
-		/local blk
+		/local blk name spec body path late
 	][
 		prefix: copy [handlers]
 
@@ -204,16 +204,18 @@ events: context [
 		]
 
 		=hndlr-def=: [
+			set late opt [ahead 'late word!] 
 			set name word!
 			set spec [ahead #expect block! into =spec-def=]
 			set body #expect block!
-			(add-handler name spec body)
+			(add-handler name spec body late)
 		]
-		add-handler: function [name spec body] [
+		add-handler: function [name spec body late] [
 			#debug events [print ["-" name]]
 			path: as path! compose [(prefix) (name)]
 			list: any [get path  set path copy []]
-			insert list function spec bind body commands		;-- latest must come first so it can block handlers of its prototype
+			handler: function spec bind body commands
+			insert either late [tail list][list] :handler		;-- latest must come first so it can block handlers of its prototype
 		]
 
 		=spec-def=: [									;-- just validation, to protect from errors
