@@ -9,6 +9,8 @@ Red [
 	}
 ]
 
+#if any [rebol true = :inlining?] [#include %../../cli/console-on-demand.red]
+
 ; recycle/off
 #include %../../cli/cli.red
 ; #include %../../common/assert.red
