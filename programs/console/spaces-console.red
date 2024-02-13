@@ -48,7 +48,7 @@ spaces-console: context [
 ]
 #process off
 
-do/expand [
+do/expand [ ;
 	#include %../../../cli/cli.red
 	#include %../../widgets/document.red
 	#include %../../../common/everything.red					;-- data-store is required, rest is there to make console more powerful
@@ -412,7 +412,12 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	]
 	
 	recover-log: function ["Restore commands log after a crash"] [
-		commands: data-store/load-file 'state %spaces-console.history
+		commands: trap/catch [
+			data-store/load-file 'state %spaces-console.history
+		][
+			native-print thrown
+			none												;-- don't fail if cannot load
+		]
 		if empty? commands [commands: ["help"]]					;-- let help be the default starter's command
 		log/source: map-each [/i command] commands [
 			also entry: make-space 'log-entry []
@@ -687,7 +692,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 					try [write rejoin [file ".bak"] read file]
 				]
 			][
-				~/state: data-store/load-state/defaults state
+				attempt [~/state: data-store/load-state/defaults state]	;-- don't fail if cannot load
 				;; plugins require context declared, but window shouldn't be shown yet - so they can modify styles etc
 				load-plugins
 			]
