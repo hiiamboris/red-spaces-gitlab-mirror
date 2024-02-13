@@ -90,7 +90,7 @@ if action? :mold [
 			get-path! [":" ""]
 			set-path! ["" ":"]
 			hash!     ["hash [" "]"] 
-			map!      ["#(" ")"] 
+			map!      ["#[" "]"] 
 			event!    ["event [" "]"] 
 			object!   ["object [" "]"] 
 			function! ["func" ""] 
