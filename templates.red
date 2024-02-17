@@ -3300,7 +3300,6 @@ grid-ctx: context [
 			] [continue]
 			done/:mcell: true							;-- mark it as drawn
 			
-			pinned?: grid/is-cell-pinned? cell
 			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
 			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
 			
