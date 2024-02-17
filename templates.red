@@ -3156,7 +3156,7 @@ grid-ctx: context [
 				pinned-area: grid/margin - grid/spacing + grid/get-offset-from 1x1 (grid/pinned + 1x1)
 			]
 			;; translate heading coordinates into the beginning of the grid
-			unless (pinned-area - grid/origin) +<= xy [xy: xy + grid/origin]
+			unless grid/frame/xy1 +<= xy [xy: xy - grid/frame/xy1 + pinned-area]
 		]
 		
 		bounds: grid/calc-bounds
@@ -3385,6 +3385,7 @@ grid-ctx: context [
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
 		append grid/map map
+		frame/xy1: xy1  ;frame/xy2: xy2					;@@ need xy2?
 		;; note: draw order (common -> headers -> normal) is important
 		;; because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;; as such, map doesn't need clipping, but draw code does
@@ -3689,6 +3690,7 @@ grid-ctx: context [
 			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
 			limits:  make block! 4						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
 			invalid: make block! 8						;-- invalidation list for the next frame
+			xy1: (0,0)									;-- used to find the headers location on current grid frame
 		] #type [object!]
 		
 		;@@ perhaps 'self' argument should be implicit in on-invalidate?
