@@ -186,6 +186,7 @@ events: context [
 			append prefix name
 			#debug events [print ["Defining" mold as path! prefix when base ("from") when base (base)]]
 			path: as path! prefix
+			#assert [any [not base  get base]  "inherited template's handlers aren't defined"]
 			map: either base [copy-deep-map get base][copy #[]]
 			set path map
 			fill-body body map
