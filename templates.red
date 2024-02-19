@@ -3156,7 +3156,11 @@ grid-ctx: context [
 				pinned-area: grid/margin - grid/spacing + grid/get-offset-from 1x1 (grid/pinned + 1x1)
 			]
 			;; translate heading coordinates into the beginning of the grid
-			unless grid/frame/xy1 +<= xy [xy: xy - grid/frame/xy1 + pinned-area]
+			foreach x [x y] [
+				if xy/:x <= grid/frame/xy1/:x [
+					xy/:x: xy/:x - grid/frame/xy1/:x + pinned-area/:x
+				]
+			]
 		]
 		
 		bounds: grid/calc-bounds
