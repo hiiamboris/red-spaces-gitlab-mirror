@@ -83,7 +83,7 @@ define-handlers [
 				]
 			]
 			if ofs [space/clip-origin space/origin - ofs]		;-- clipping in the event handler guarantees validity of size
-			if own? [if space/behavior/draggable = 'pan [start-drag path]]	;-- restart from the new offset or it will accumulate
+			if own? [if space/behavior/draggable <> 'scroll [start-drag path]]	;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
