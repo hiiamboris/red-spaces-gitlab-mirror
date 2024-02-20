@@ -140,6 +140,39 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 ]
 
 
+;; kludges for very limited bitset functionality
+nonzero-byte: charset [1 - 255]
+lowest-bit: function [bs [bitset!]] [
+	if bs/0 [return 0]									;-- negated bitset?
+	bin: to #{} bs
+	unless p: find bin nonzero-byte [return none]
+	base: 8 * skip? p
+	repeat i 8 [if find bs bit: base + i - 1 [break]]
+	bit
+]
+
+highest-bit: function [bs [bitset!]] [
+	if bs/2'147'483'647 [return none]					;-- negated bitset
+	bin: to #{} bs
+	unless p: find/last bin nonzero-byte [return none]
+	base: 8 * skip? p
+	repeat i 8 [if find bs bit: base + 8 - i [break]]
+	bit
+]
+
+#assert [
+	none? lowest-bit  charset []
+	none? highest-bit charset []
+	none? highest-bit make bitset! 100
+	0  = lowest-bit  charset [0  - 20]
+	3  = lowest-bit  charset [3  - 20]
+	18 = lowest-bit  charset [18 - 20]
+	20 = highest-bit charset [0  - 20]
+	17 = highest-bit charset [3  - 17]
+	4  = highest-bit charset [3  - 4]
+]
+
+
 {
 	useful pair invariants to test in which quadrant a point is located
 	points: a, b
@@ -150,7 +183,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 	a = min a b <=> b = max a b   
 }
 
-;-- chainable pair comparison - instead of `within?` monstrosity
+;; chainable pair comparison - instead of `within?` monstrosity
 ; >> 1x1 +< 2x2 +<= 3x3 +< 4x4
 ; == 4x4
 
