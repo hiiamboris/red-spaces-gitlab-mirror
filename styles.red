@@ -45,6 +45,10 @@ set-style: function [
 	][
 		style: func spec-of :style body-of :style
 	]
+	#assert [
+		not find/case spec-of :style 'window	"'window' local cannot be used in styles!"	;@@ REP #160, #5485
+		not find/case spec-of :style 'on		"'on' local cannot be used in styles!"		;@@ REP #160, #5485
+	]
 	change pos :style
 	:style
 ]
@@ -185,6 +189,15 @@ do with styling: context [
 			color: any [
 				select cell 'color
 				if cell/pinned? [impose 'panel opaque 'text 15%]
+				if all [								;@@ shitty kludge - need better styles inheritance!
+					'grid = select grid: cell/parent 'type
+					window: grid/parent
+					'grid-view = select gv: window/parent 'type
+					xy: grid-ctx/get-cell-address grid cell
+					gv/is-cell-selected? xy
+				][
+					if cell/pinned? [impose 'panel opaque 'text 25%]
+				]
 			]
 			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
 			reduce [bgnd drawn]
