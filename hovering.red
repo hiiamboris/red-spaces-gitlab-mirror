@@ -12,7 +12,7 @@ Red [
 context [
 	last-offsets: make hash! 2							;@@ suffers from REP #129
 	insert-event-func 'spaces-away-event filtered-event-func [face event] [
-		[over time]
+		[over time down]
 		unless host? face [return none]
 		switch event/type [
 			over [										;-- pointer may have left a space it was in
@@ -24,6 +24,9 @@ context [
 				if offset: select/same last-offsets face [
 					detect-away face event offset
 				]
+			]
+			down [										;-- dragging initializes a new path (probably shorter than a normal one)
+				if pos: find/same last-paths face [fast-remove pos 2]
 			]
 		]
 		none											;-- let other event funcs process it
