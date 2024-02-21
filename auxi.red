@@ -215,13 +215,12 @@ inside?: make op! function [
 ]
 
 above: function [										;-- a replacement for space/parent/parent/parent/parent shit
-	"Get at parent space of specific type (or none)"
+	"Get parent space of specific type (or none)"
 	child [object!]
 	type  [word!]
 ][
-	path: reverse next get-host-path child
-	forall path [if path/1/type = type [return path/1]]			;@@ use locate
-	none
+	while [space? child: child/parent] [if child/type = type [return child]]	;@@ use locate + tree iterator
+	child
 ]
 
 host-of: function [space [object!]] [
