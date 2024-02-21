@@ -37,6 +37,8 @@ digit!: charset [#"0" - #"9"]							;@@ add typical charsets to /common repo
 INFxINF: (1.#inf, 1.#inf)								;-- used too often to always type it numerically
 ;@@ consider: OxINF Ox-INF INFxO -INFxO (so far they don't seem useful)
 
+skip?: func [series [series!]] [-1 + index? series]
+
 half: func [x] [x / 2]
 round-down: func [x] [round/to/floor   x 1]
 round-up:   func [x] [round/to/ceiling x 1]
@@ -591,8 +593,6 @@ order-pair: function [xy [planar!]] [either xy/1 <= xy/2 [xy][reverse xy]]
 order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a block of any number of paths?
 	if greater? get a get b [set a before (b) get a]
 ]
-
-skip?: func [series [series!]] [-1 + index? series]
 
 
 ;@@ this should be just `clip` but min/max have no vector support
