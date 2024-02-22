@@ -33,7 +33,7 @@ events: context [
 		foreach word system/catalog/accessors/event! [keep to set-word! word keep none]
 	]
 	
-	copy-event: function [event [event!]] [
+	copy-event: function [event [event! map!]] [
 		result: copy event-prototype
 		foreach word system/catalog/accessors/event! [result/:word: :event/:word]
 		;@@ can't repro this in isolation, but somehow without copy flags of KB events get empty! need to find out why!
@@ -282,7 +282,9 @@ events: context [
 					if face/space [
 						focus/window: event/window				;-- init /window on 1st event, or if another window got activated
 						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
-						unless focus/current [focus-space focus/find-next-focal-*ace 'forth]
+						unless focus/current [
+							if target: focus/find-next-focal-*ace 'forth [focus-space target]
+						]
 						;; but it still may fail if nothing is focusable
 						unless focused: focus/current [exit]
 						if path: get-host-path focused [
@@ -298,13 +300,12 @@ events: context [
 					;@@ is this check safe enough, or should invalidate set dirty flag for the host?
 					if dirty?: empty? face/space/cached [		;-- only timer updates the view because of #4881
 						#debug profile [prof/manual/start 'drawing]
-						face/draw: render face					;@@ #5130 is the killer of animations
+						face/draw: render face					;@@ #5130 is the killer of animations (really fixed?)
 						; unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
 					]
 					exit										;-- timer does not need further processing
 				]
-				;@@ TODO: simulated hover-in and hover-out events to highlight items when hovering
 				;@@ TODO: `enter` should be simulated because base face does not support it
 				;@@ menu -- make context menus??
 				;@@ select change  -- make these?

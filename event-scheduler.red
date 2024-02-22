@@ -20,6 +20,8 @@ Red [
 		So I can imagine no logic (other than relying on delay anomalies) that would let me to
 		temporarily switch events processing from do-events into the event function.
 		
+		Another use of it is REP #161
+		
 		On design...
 		
 		Generally there are 3 groups of events:
@@ -86,11 +88,15 @@ scheduler: context [
 	]
 	for-each type exclude event-types [time drawing] [groups/:type: 'normal]
 
+	;; similar to system/view/handlers but only for host events
+	;; goal is to have predictable event order (e.g. hovering may call new 'over event immediately before 'time)
+	;; if function throws a 'drop word, event is skipped
+	event-filters: #[]
+
 	finish-times: #[]									;-- timestamp of last event of each type processing finish(!)
 	for-each type event-types [finish-times/:type: now/utc/precise]
 	
 	shared-queue: make [] 200							;-- for dispatching events by host
-
 	insert-event: group-next-event: take-next-event: process-next-event: process-any-event: none
 	context [
 		igroup: 1 ievent: 2 period: 2
@@ -120,7 +126,12 @@ scheduler: context [
 				event: take-next-event host
 				#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
 				#debug focus  [if event/type = 'focus [#print "about to process (event/type) event for (host/type):(host/size)"]]
-				events/dispatch host event
+				if 'drop <> catch [							;@@ should be fcatch, but it would be slower :/
+					foreach [_ filter] event-filters [filter host event]	;-- filters may call out-of-turn events/dispatch themselves
+					'ok
+				][
+					events/dispatch host event
+				]
 				finish-times/(event/type): now/utc/precise		;-- mark the end of processing of this event type
 			]
 		]
@@ -177,18 +188,59 @@ scheduler: context [
 	
 	]
 
+	tracked: #[											;@@ remove this if REP #161 gets implemented
+		flags:     []
+		offset:    (0,0)								;-- screen offset!
+		ctrl?:     #(false)
+		shift?:    #(false)
+		down?:     #(false)
+		mid-down?: #(false)
+		alt-down?: #(false)
+	]
+	
+	track-event: function [
+		"Stash event flags internally"
+		event [event! map!]
+	][
+		switch event/type [
+			over wheel down up click dbl-click 
+			alt-down alt-up mid-down mid-up aux-down aux-up
+			key-down key key-up [						;-- pointer & key events correctly carry all the flags
+				foreach [word _] tracked [				;-- extend can't be used or will include unwanted fields
+					tracked/:word: event/:word 
+				]
+				tracked/offset: face-to-screen tracked/offset event/face
+			]
+		]
+		event
+	]
+	
+	heal-event: function [								;@@ need to gather extensive data on which events needs healing
+		"Ensure correct flags & offset in all events"
+		event [map!]
+	][
+		if event/type = 'time [
+			extend event tracked						;-- timer carries no own state
+			event/offset: screen-to-face event/offset event/face
+		]
+		event
+	]
+	
+	queue-event: function [host event [map!]] [
+		append shared-queue host
+		append append host/queue groups/(event/type) event
+	]
+	
 	;; sometimes this gets window as 'host', likely when no face is in focus
 	insert-event-func 'spaces-event-dispatcher func [host event] [
+		track-event event								;-- keep tracked info up to date, gathering it from ALL faces
 		all [
 			host? host									;@@ maybe /content field not /space?
 			host/space									;-- /space is assigned?
 			accepted-events/(event/type)
-			append shared-queue host
-			append append host/queue
-				groups/(event/type)
-				events/copy-event event
-			none										;-- the event can be processed by other handlers
+			queue-event host heal-event events/copy-event event
 		]
+		none											;-- the event can be processed by other handlers
 	]
 
 	#assert [1291100108 = checksum native-mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]

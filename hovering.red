@@ -10,21 +10,13 @@ Red [
 ;@@ for this design to work, all /into funcs must accept (return none) spaces that are no longer their children!
 
 context [
-	last-offsets: make hash! 2							;@@ suffers from REP #129
-	insert-event-func 'spaces-away-event filtered-event-func [face event] [
-		[over time down]
-		unless host? face [return none]
+	last-paths: make hash! 2							;@@ suffers from REP #129
+	
+	scheduler/event-filters/away-generator: function [face event [map!] "assumes healed event"] [
 		switch event/type [
-			over [										;-- pointer may have left a space it was in
-				pos: any [find/same last-offsets face  tail last-offsets]
-				change change pos face event/offset
-				detect-away face event event/offset
-			]
-			time [										;-- space may have been moved on the last frame
-				if offset: select/same last-offsets face [
-					detect-away face event offset
-				]
-			]
+			over										;-- pointer may have left a space it was in
+			time										;-- space may have been moved on the last frame
+				[if face/space [detect-away face event]]
 			down [										;-- dragging initializes a new path (probably shorter than a normal one)
 				if pos: find/same last-paths face [fast-remove pos 2]
 			]
@@ -34,14 +26,8 @@ context [
 	
 	;; logic here is to repeat hittest and see if any space in the new path differs from the last path
 	;; last path should be updated by every host's 'over' and 'time' event
-	last-paths: make hash! 2							;@@ suffers from REP #129
-	detect-away: function [
-		host        [object!]
-		event       [event!]
-		host-offset [planar!]							;-- no event/offset for 'time' event, have to use the old one
-	][
+	detect-away: function [host [object!] event [map!]] [
 		case [
-			not host/space [exit]						;-- not initialized - no hittesting
 			all [
 				drag?: events/dragging?					;-- during dragging away condition is registered routinely
 				event/type <> 'time						;-- but it still may have moved on the frame
@@ -52,23 +38,24 @@ context [
 			]
 		]
 		
+		if event/type = 'time [							;-- need to synthesize the 'over event?
+			event: copy event
+			event/type: 'over
+			#assert [event/offset]						;-- must be filled by heal-event
+			#assert [event/face =? host]
+		]
+				
 		#debug profile [prof/manual/start 'hovering]
 		old-path: pos/2
 		template: either drag? [old-path][host/space]
-		hittest/into template host-offset clear new-path: []
+		hittest/into template event/offset clear new-path: []
 		
 		if moved?: not same-paths? old-path new-path [
-			event: events/copy-event event
-			if event/type = 'time [
-				event/type:   'over
-				event/offset: host-offset
-				#assert [event/face =? host]
-			]
 			;; while 'over' now lands into another space, we need to send the event into the old one, as 'away notice'
-			hittest/into old-path host-offset clear path: []	;-- update coordinates along the old-path
+			hittest/into old-path event/offset clear path: []	;-- update coordinates along the old-path
 			events/with-stop [events/process-event path event [] no]
+			append clear old-path new-path						;-- stash the modified path
 		]
-		append clear old-path new-path					;-- stash the new path
 		#debug profile [prof/manual/end 'hovering]
 	]
 ]

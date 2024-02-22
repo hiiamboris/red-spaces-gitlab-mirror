@@ -13,6 +13,7 @@ Red [
 		   (because box rotates, there is movement in its own coordinate space)
 		3. when pointer is held in place outside the rotating box, timer should keep triggering on-over
 		   so crosshair should still be around the pointer, save for minor inter-frame lag
+		4. shift? flag should be reliably reported by synthesized over events
 	}
 ]
 
@@ -57,11 +58,14 @@ define-handlers [
 	]
 	box: [
 		on-over [space path event] [
-			; status/text: mold probe hittest host/space event/offset
-			status/text: mold hittest host/space event/offset
+			update-status event
 			space/color: either inside?: 0x0 +<= path/2 +< space/size [magenta][brick]
 		]
 	]
+]
+
+update-status: function [event] [
+	status/text: append mold hittest host/space event/offset pick ["^/SHIFT DOWN" ""] event/shift?
 ]
 
 view/no-wait/options [
@@ -70,10 +74,11 @@ view/no-wait/options [
 		w: wheel [
 			box 150x150 brick [paragraph 70 cyan "crosshair should stay near the pointer, with or without dragging"]
 		] rate= 67 on-time function [space path event delay] [
+			update-status event
 			space/angle: space/angle + (1 + delay)
 		] 
 	]
-	on-over [status/text: mold hittest face/space event/offset]
+	on-over [update-status event]
 	status: text 300x40
 ] [offset: 10x10]
 
