@@ -198,10 +198,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			range:    anchor * 1x1
 			pos:      origin + (margin * set-axis 1x1 y sign)
 			add-item: [
-				; ?? [i pos item/size] 
-				compose/only/deep/into [
+				compose-after map' [
 					(item) [offset (pos) size (item/size) drawn (drawn)]
-				] tail map'
+				]
 			]
 			draw-next: [
 				unless item: do ith-item [break]				;-- stop if no more items
@@ -561,9 +560,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				space: do ith-item
 				#assert [space? :space]
 				drawn: render space						;-- for subparagraphs and lists canvas is infinite
-				compose/deep/only/into [
+				compose-after map [
 					(space) [offset: (offset) size: (space/size) drawn: (drawn)]
-				] tail map
+				]
 				offset/x: offset/x + space/size/x
 				total: max total space/size				;-- need row height for aligning items
 			]
@@ -964,9 +963,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					spaces-drawn: clear []
 					for i: map-ofs1 + 1 map-ofs2 + 1 [
 						geom: pick map i * 2
-						compose/only/into [
+						compose-after spaces-drawn [
 							translate (geom/offset - row-origin-1D) (geom/drawn)
-						] tail spaces-drawn
+						]
 					]
 					
 					offset1: geom1/offset/x - word-x-1D/1		;-- negative x offset of 1st space within the word
@@ -988,10 +987,10 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					word-offset: word-offset + word-width-1D'
 				]
 				word-x1-2D: indent + in-row-indent
-				compose/only/into [
+				compose-after layout-drawn [
 					translate (indent + in-row-indent . row-y0-2D)
 					(copy row-drawn)
-				] tail layout-drawn
+				]
 			
 				indent: indent2
 				row-y1-2D: row-y2-2D + spacing
@@ -1064,9 +1063,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 					center: space/size / 2
 					rad:    radius + max center/x center/y
 					point:  (polar2cartesian rad angle) - center
-					compose/only/deep/into [
+					compose-after map [
 						(space) [offset (pos) size (space/size) drawn (drawn)]
-					] tail map
+					]
 					origin: min origin pos				;-- find leftmost topmost point
 					total:  max total pos + space/size	;-- find total dimensions
 					angle:  angle + step
@@ -1117,9 +1116,9 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				
 				;; lay out boxes into a map and estimate boundaries
 				foreach [_ space _ _ pos size drawn] items [
-					compose/only/deep/into [
+					compose-after map [
 						(space) [offset (pos) size (size) drawn (drawn)]
-					] tail map
+					]
 					origin: min origin pos				;-- find leftmost topmost point
 					total:  max total pos + size		;-- find total dimensions
 				]

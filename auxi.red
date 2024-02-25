@@ -593,6 +593,11 @@ order: function [a [word! path!] b [word! path!]] [		;@@ should this receive a b
 	if greater? get a get b [set a before (b) get a]
 ]
 
+bit-range: func [range [pair!]] [
+	range: order-pair range
+	charset reduce [range/1 '- range/2]
+]
+
 
 ;@@ this should be just `clip` but min/max have no vector support
 clip-vector: function [v1 [vector!] v2 [vector!] v3 [vector!]] [
@@ -1133,6 +1138,10 @@ rechange: function [
 	s == [a 2 6 7]
 	e =? tail s
 ]]
+
+compose-after: function [target [any-list!] template [block!]] [
+	compose/only/deep/into template tail target
+]
 
 ;; main problem with these is they can't be used in performance critical areas, which is quite often the case
 >>: make op! function [
