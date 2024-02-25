@@ -188,19 +188,17 @@ do with styling: context [
 			canvas: min canvas cell/size
 			color: any [
 				select cell 'color
-				if cell/pinned? [impose 'panel opaque 'text 15%]
-				if all [								;@@ shitty kludge - need better styles inheritance!
-					'grid = select grid: cell/parent 'type
-					window: grid/parent
-					'grid-view = select gv: window/parent 'type
-					xy: grid-ctx/get-cell-address grid cell
-					gv/is-cell-selected? xy
-				][
-					if cell/pinned? [impose 'panel opaque 'text 25%]
-				]
+				if cell/pinned? [impose 'panel opaque 'text 10%]
 			]
 			bgnd: make-box canvas 0 'off color			;-- always fill canvas, even if cell is constrained
 			reduce [bgnd drawn]
+		]
+		grid/selection: [
+			below: [(make-box size 0 'off (opaque 'text 20%))]
+			; below: [(make-box size 0 'off glass)]
+		]
+		grid/cursor: [
+			below: when focused?/above 3 [(make-box size 1 checkered-pen 'off)]
 		]
 		
 		grid/cell/paragraph: grid/cell/text: [			;-- make pinned text bold

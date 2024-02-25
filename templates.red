@@ -196,9 +196,7 @@ compose-map: function [
 			empty? cmds									;-- don't spawn empty translate/clip structures
 			zero? area? box/size						;-- don't render empty elements (also works around #4859)
 		][
-			compose/only/into [
-				translate (box/offset) (cmds)
-			] tail r
+			compose-after r [translate (box/offset) (cmds)]
 		]
 	]
 	r
@@ -688,9 +686,7 @@ scrollable-ctx: context [
 		map:   []
 		cache: [size map]
 
-		behavior: make map! [
-			draggable: pan								;-- dragging: false=disabled; pan=pan content; scroll=scroll when out of the viewport
-		]
+		behavior: make map! [draggable: pan]			;-- dragging: false=disabled; pan=pan content; scroll=scroll when out of the viewport
 		
 		;@@ temporary kludge for scroll-dragging, until I decide how to better handle it
 		last-xy: (0,0)
@@ -1145,12 +1141,12 @@ container-ctx: context [
 			; skip?: all [xy2  not boxes-overlap?  pos pos + siz  0x0 xy2 - xy1]
 			; unless skip? [
 			org: any [geom/origin (0,0)]
-			compose/only/deep/into [
+			compose-after drawn [
 				;; clip has to be followed by a block, so `clip` of the next item is not mixed with previous
 				; clip (pos) (pos + siz) [			;-- clip is required to support origin ;@@ but do we need origin?
 				translate (pos + org) (drw)
 				; ]
-			] tail drawn
+			]
 			; ]
 		]
 		quietly cont/map: frame/map		;-- compose-map cannot be used because it renders extra time ;@@ maybe it shouldn't?
@@ -2421,13 +2417,13 @@ list-view-ctx: context [
 			item-offset: geom/offset
 			item-size:   geom/size
 			;@@ skip invisible items to lighten the draw block (e.g. for inactive lists)? but that will disable list caching
-			compose/only/into [translate (item-offset) (item-drawn)] tail drawn
+			compose-after drawn [translate (item-offset) (item-drawn)]
 			case/all [
 				find lview/selected i [
-					compose/only/into [translate (item-offset) (draw-box selection-prototype item-size)] tail drawn
+					compose-after drawn [translate (item-offset) (draw-box selection-prototype item-size)]
 				]
 				lview/cursor = i [
-					compose/only/into [translate (item-offset) (draw-box cursor-prototype item-size)] tail drawn
+					compose-after drawn [translate (item-offset) (draw-box cursor-prototype item-size)]
 				]
 			]
 			i: i + 1
@@ -2447,10 +2443,10 @@ list-view-ctx: context [
 		window/origin: set-axis window/origin axis shift		;@@ or move the list instead? a bit slower
 		
 		; ?? [xy1 xy2 length frame/filled shift anchor/index anchor/offset window/origin lview/origin]
-		compose/into [
+		compose-after frame [
 			window-origin: (window/origin)
 			anchor-offset: (anchor/offset)
-		] tail frame
+		]
 		list/frame: frame
 		list/size:  frame/size
 		quietly list/map: frame/map
@@ -2882,7 +2878,6 @@ list-view-ctx: context [
 		cursor:      none			#type =? [integer! (cursor > 0) none!] :invalidates-list
 		
 		extend behavior [
-			; draggable:       pan						;-- inherited from scrollable; also supports: select=multi-item selection
 			;; its still possible to programmatically select anything, but how keys behave highly depends on /selectable
 			selectable:      #(none)					;-- none=don't select; single=select one item; multi=many items at once
 			follows-cursor?: #(true)					;-- cursor fully shows itself on movement
@@ -3157,8 +3152,8 @@ grid-ctx: context [
 			]
 			;; translate heading coordinates into the beginning of the grid
 			foreach x [x y] [
-				if xy/:x <= grid/frame/xy1/:x [
-					xy/:x: xy/:x - grid/frame/xy1/:x + pinned-area/:x
+				if xy/:x <= grid/frame/offset/:x [
+					xy/:x: xy/:x - grid/frame/offset/:x + pinned-area/:x
 				]
 			]
 		]
@@ -3280,47 +3275,63 @@ grid-ctx: context [
 		grid/size: r
 	]
 		
+	;; can be styled but cannot be accessed (and in fact shared)
+	;@@ similar to rich-content - possible to unify?
+	selection-prototype: make-space 'space [type: 'selection cache: none]	;-- disabled cache to avoid cloning /cached facet
+	cursor-prototype:    make-space 'space [type: 'cursor    cache: none]
+	draw-box: function [prototype [object!] size [point2D!]] [
+		box: copy prototype
+		quietly box/size: size
+		render box
+	]
+	
 	;@@ TODO: at least for the chosen range, cell/drawn should be invalidated and cell/size recalculated
 	draw-range: function [
 		"Used internally by DRAW. Returns map slice & draw code for a range of cells"
-		grid [object!] cell1 [pair!] cell2 [pair!] start [point2D!] "Offset from origin to cell1"
+		grid [object!] xy1 [pair!] xy2 [pair!] start [point2D!] "Offset from origin to xy1"
 	][
-		size:  cell2 - cell1 + 1
-		drawn: make [] size: area? size
-		map:   make block! size * 2						;-- draw appends it, so it can be obtained
-		done:  make map! size							;-- local to this range of cells
-														;-- sometimes the same mcell may appear in pinned & normal part
-		for cell: cell1 cell2 [
-			cell1-to-cell: either cell/x = cell1/x [	;-- pixels from cell1 to this cell
-				grid/get-offset-from cell1 cell
+		span:  xy2 - xy1 + 1
+		drawn: make [] area: area? span
+		map:   make block! area * 2								;-- draw appends it, so it can be obtained
+		done:  make map! area									;-- local to this range of cells
+																;-- sometimes the same mcell may appear in pinned & normal part
+		for xy: xy1 xy2 [
+			cell1-to-cell: either xy/x = xy1/x [				;-- pixels from xy1 to this cell's xy
+				grid/get-offset-from xy1 xy
 			][
-				cell1-to-cell + grid/get-offset-from cell - 1x0 cell	;-- faster to get offset from the previous cell
+				cell1-to-cell + grid/get-offset-from xy - 1x0 xy	;-- faster to get offset from the previous cell
 			]
 
-			mcell: grid/get-first-cell cell				;-- row/col of multicell this cell belongs to
+			mcell-xy: grid/get-first-cell xy					;-- row/col of multicell this cell belongs to
 			if any [
-				done/:mcell								;-- skip mcells that were drawn for this group
-				not content: grid/cells/pick mcell		;-- cell is not defined? skip the draw
+				done/:mcell-xy									;-- skip mcells that were drawn for this group
+				not content: grid/cells/pick mcell-xy			;-- cell is not defined? skip the draw
 			] [continue]
-			done/:mcell: true							;-- mark it as drawn
+			done/:mcell-xy: true								;-- mark it as drawn
 			
-			mcell-to-cell: grid/get-offset-from mcell cell	;-- pixels from multicell to this cell
-			draw-ofs: start + cell1-to-cell - mcell-to-cell	;-- pixels from draw's 0x0 to the draw box of this cell
+			mcell-to-cell: grid/get-offset-from mcell-xy xy		;-- pixels from multicell to this cell
+			draw-ofs: start + cell1-to-cell - mcell-to-cell		;-- pixels from draw's 0x0 to the draw box of this cell
 			
-			mcspace: grid/wrap-space mcell content
-			canvas: (cell-width? grid mcell) . 1.#inf		;-- sum of spanned column widths
-			render/on mcspace canvas yes no					;-- render content to get it's size - in case it was invalidated
-			mcsize: canvas/x . cell-height? grid mcell		;-- size of all rows/cols it spans = canvas size
-			mcdraw: render/on mcspace mcsize yes yes		;-- re-render to draw the full background
+			mcspace: grid/wrap-space mcell-xy content
+			canvas: (cell-width? grid mcell-xy) . 1.#inf		;-- sum of spanned column widths
+			render/on mcspace canvas yes no						;-- render content to get it's size - in case it was invalidated
+			mcsize: canvas/x . cell-height? grid mcell-xy		;-- size of all rows/cols it spans = canvas size
+			mcdraw: render/on mcspace mcsize yes yes			;-- re-render to draw the full background
 			unless mcspace/size +<= mcsize [
 				mcdraw: compose/only [clip 0x0 (mcsize) (mcdraw)]	;-- cell itself doesn't clip content to canvas, so grid has to do that
 			]
 			;@@ TODO: if grid contains itself, map should only contain each cell once - how?
 			geom: compose [offset (draw-ofs) size (mcsize)]
-			repend map [mcspace geom]					;-- map may contain the same space if it's both pinned & normal
-			compose/only/into [							;-- compose-map calls extra render, so let's not use it here
-				translate (draw-ofs) (mcdraw)			;@@ can compose-map be more flexible to be used in such cases?
-			] tail drawn
+			if sel?: all [grid/selected/x/(mcell-xy/x) grid/selected/y/(mcell-xy/y)] [
+				mcdraw: compose/only [(mcdraw) (draw-box selection-prototype mcsize)]	;-- avoid modification in case it's a static block
+			]
+			if mcell-xy = grid/cursor [							;@@ draw cursor on a cell or multi-cell?
+				mcdraw: compose/only [(mcdraw) (draw-box cursor-prototype mcsize)]
+			]
+			repend map [mcspace geom]							;-- map may contain the same space if it's both pinned & normal
+			compose-after drawn [								;-- compose-map calls extra render, so let's not use it here
+				translate (draw-ofs) (mcdraw)					;@@ can compose-map be more flexible to be used in such cases?
+			]
 		]
 		reduce [map drawn]
 	]
@@ -3389,7 +3400,9 @@ grid-ctx: context [
 
 		set [map: drawn-normal:] draw-range grid cell1 cell2 (xy1 - offs1)
 		append grid/map map
-		frame/xy1: xy1  ;frame/xy2: xy2					;@@ need xy2?
+		frame/offset: xy1
+		frame/addr1: cell1
+		frame/addr2: cell2
 		;; note: draw order (common -> headers -> normal) is important
 		;; because map will contain intersections and first listed spaces are those "on top" from hittest's POV
 		;; as such, map doesn't need clipping, but draw code does
@@ -3612,13 +3625,17 @@ grid-ctx: context [
 		clear grid/frame/invalid
 	]
 	
-	pinned?: function [cell [object!] ('cell = select cell 'type)] [	;-- used by cell/pinned?
-		grid: cell										;-- sometimes grid is not an immediate parent
-		while [grid: grid/parent] [if grid/type = 'grid [break]]
-		to logic! all [
-			grid
+	get-cell-address: function [grid [object!] cell [object!] ('cell = select cell 'type)] [
+		all [
 			found: find/same grid/frame/cells cell
-			grid/is-cell-pinned? found/-1
+			found/-1
+		]
+	]
+	pinned?: function [cell [object!]] [				;-- used by cell/pinned?
+		to logic! all [
+			grid: above cell 'grid						;-- sometimes grid is not an immediate parent
+			xy: get-cell-address grid cell
+			grid/is-cell-pinned? xy
 		]
 	]
 	
@@ -3641,6 +3658,107 @@ grid-ctx: context [
 	;@@ move grid internal funcs here!
 	kit: make-kit 'grid [
 		format: does [~/format space]
+		
+		here: function ["Get address of a cell under cursor"] [
+			any [space/cursor 1x1]
+		]
+		
+		locate: function [
+			"Get address of a named location"
+			name [word!]
+		][
+			cursor: here
+			minxy:  space/pinned + 1
+			maxx:   any [space/frame/bounds/x space/frame/addr2/x]	;-- jump to last rendered cell if unlimited
+			maxy:   any [space/frame/bounds/y space/frame/addr2/y]
+			switch/default name [
+				far-head  [minxy]								;-- ^Home leads to first data (not header) cell
+				far-tail  [maxx by maxy]
+				head      [minxy/x by cursor/y]
+				tail      [maxx by cursor/y]
+				line-up   [cursor/x by max cursor/y - 1 minxy/y]
+				line-down [cursor/x by min cursor/y + 1 maxy]
+				; page-up   [frame/page-above here]		;@@ TODO - page jumps
+				; page-down [frame/page-below here]
+			] [here]											;-- unknown words assume current address
+		]
+		
+		;@@ TODO: should be brought into the viewport once I roll out new design (now only possible in grid-view)
+		move-cursor: function [
+			; "Redefine cursor and move viewport to make it fully visible"	;@@ viewport part is TBD!
+			"Redefine cursor"
+			target [word! pair! none!] "none disables cursor"
+			; /margin mrg [integer!] "How much to reserve around the item"
+			; /no-clip "Allow panning outside the window"
+		][
+			either target [
+				if word? target [target: locate target]
+				target: max 1x1 target
+				bounds: space/frame/bounds
+				space/cursor: as-pair
+					min-safe target/x bounds/x					;@@ any easier way? 1.#inf will promote pair to point
+					min-safe target/y bounds/y					;@@ REP #122
+			][
+				space/cursor: none
+			]
+		]
+		
+		select-columns: function [
+			"Redefine columns selection"
+			cols [none! word! bitset! integer! pair! block!] "1-based set of integers or an inclusive range"
+			/mode sel-mode [word!] "Specify selection mode (default: 'replace)"
+		][
+			select-along/:mode 'x cols sel-mode 
+		]
+		
+		select-rows: function [
+			"Redefine rows selection"
+			rows [none! word! bitset! integer! pair! block!] "1-based set of integers or an inclusive range"
+			/mode sel-mode [word!] "Specify selection mode (default: 'replace)"
+		][
+			select-along/:mode 'y rows sel-mode 
+		]
+		
+		select-along: function [
+			"Redefine selection along given axis"
+			axis [word!] (find [x y] axis) "x or y"
+			bits [block! (parse bits [any integer!]) word! (bits = 'all) none! bitset! integer! pair!]
+				"1-based set of integers or an inclusive range or 'all"
+			/mode "Specify selection mode (default: 'replace)"
+				sel-mode: 'replace [word!] (find [replace include exclude invert] sel-mode)
+		][
+			switch type?/word bits [
+				none!    [bits: charset 0]
+				pair!    [bits: bit-range bits]
+				integer! [bits: bit-range bits thru bits]
+				block!   [bits: charset bits]
+				word!    [
+					limit: any [space/frame/bounds/:axis space/frame/addr2/:axis]
+					bits:  bit-range 1 thru limit
+				]
+			]
+			#assert [bitset? bits]
+			old: space/selected/:axis
+			new: switch sel-mode [
+				replace [bits]
+				include [old or bits]
+				exclude [exclude old bits]
+				invert  [old xor bits]
+			]
+			space/selected/:axis: new
+			trigger 'space/selected
+		]
+		
+		;@@ how to select nothing? also in list-view
+		select-range: function [
+			"Redefine selection as a 2D range of cells, or extend up to a given limit"
+			start [word! pair!] "Named location, cell address or 'extend to use existing selection start"
+			limit [word! pair!] "Named location or cell address"
+		][
+			if word? limit [limit: locate limit]
+			if word? start [start: either start = 'extend [here][locate start]]
+			foreach x [x y] [select-along x start/:x thru limit/:x]
+		]
 	]
 	
 	;@@ add simple proportional algorithm?
@@ -3678,6 +3796,14 @@ grid-ctx: context [
 				any [none =? bounds/y  'auto = bounds/y  all [linear? bounds/y  bounds/y >= 0]]
 			])
 			
+		cursor: none	#type =? [pair! none!] :invalidates-look
+		
+		;; selected cells are the crossing of two bitsets; 1-based indexing here so bit 0 is unused
+		selected: make map! reduce [
+			'x charset []
+			'y charset []
+		] #type [map!] ([all [bitset? :selected/x bitset? :selected/y]]) :invalidates-look
+		
 		;; data about the last rendered frame, may be used by /draw to avoid extra recalculations
 		frame: context [								;@@ hide it maybe from mold? unify with /last-frame ?
 			;@@ maybe cache size too here? just to avoid setting grid/size to none in case it's relied upon by some reactors
@@ -3685,7 +3811,10 @@ grid-ctx: context [
 			;@@ maybe width not canvas?
 			canvas:  none								;-- encoded canvas of last draw 
 			;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
-			bounds:  none								;-- WxH number of cells (pair), used by draw & others to avoid extra calculations
+			bounds:  none								;-- WxH number of cells (pair/block), used by draw & others to avoid extra calculations
+			offset:  (0,0)								;-- used to find the headers location on current grid frame
+			addr1:   none								;-- first drawn cell address (excluding pinned)
+			addr2:   none								;-- last drawn cell address - useful for frame navigation
 			heights: make map!   4						;-- cached heights of rows marked for autosizing
 			;; "cell cache" - cached `cell` spaces: [XY cell ...] and [space XY geometry ...]
 			;; persistency required by the focus model: cells must retain sameness, i.e. XY -> cell
@@ -3694,7 +3823,6 @@ grid-ctx: context [
 			;; min & max column widths & heights cache (if not cached, spends 2 more rendering attempts on each render with autofit)
 			limits:  make block! 4						;-- either none(disabled) or block; block is filled by autofit: [W1 H1 W2 H2]
 			invalid: make block! 8						;-- invalidation list for the next frame
-			xy1: (0,0)									;-- used to find the headers location on current grid frame
 		] #type [object!]
 		
 		;@@ perhaps 'self' argument should be implicit in on-invalidate?
@@ -3853,7 +3981,12 @@ grid-view-ctx: context [
 		if object? :gview/grid [invalidate gview/grid]
 	]
 
+	kit: make-kit 'grid-view [
+		format: does [batch space/grid [format]]
+	]
+
 	declare-template 'grid-view/inf-scrollable [
+		kit: ~/kit
 		;@@ TODO: slide-length should ensure window size is bigger than viewport size + slide
 		;@@ situation when jump clears a part of a viewport should never happen at runtime
 		;@@ TODO: maybe a % of viewport instead of fixed jump size?
@@ -3862,6 +3995,9 @@ grid-view-ctx: context [
 		;; reminder: window/slide may change this (together with window/origin) when sliding
 		;; grid/origin mirrors grid-view/origin: former is used to relocate pinned cells, latter is normal part of scrollable
 		origin: (0,0)	#type = #on-change [space word value] [space/grid/origin: value]	;-- grid triggers invalidation
+		
+		;; while grid supports rendering selection, only grid-view has the handlers to interact with it
+		extend behavior [selectable: #(none)]					;-- none=don't select; single=select one cell; multi=cell range
 		
 		content-flow: 'planar
 		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
@@ -3921,6 +4057,14 @@ grid-view-ctx: context [
 					remove/key grid/content xy + xy1 - 1
 				]
 				invalidate self
+			]
+			
+			;@@ should grid support selection or just grid-view? or put low level selection into grid, but events in grid-view?
+			is-cell-selected?: func [
+				"Check if cell XY is marked"
+				xy [pair!]								;@@ check if xy within bounds?
+			][
+				selected/x/(xy/x) and selected/y/(xy/y)
 			]
 		] #type (space? grid)
 		

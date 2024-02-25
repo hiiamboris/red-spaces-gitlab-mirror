@@ -83,7 +83,7 @@ define-handlers [
 				]
 			]
 			if ofs [space/clip-origin space/origin - ofs]		;-- clipping in the event handler guarantees validity of size
-			if own? [if space/behavior/draggable <> 'scroll [start-drag path]]	;-- restart from the new offset or it will accumulate
+			if own? [if not find [scroll select] space/behavior/draggable [start-drag path]]	;-- restart from the new offset or it will accumulate
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -289,7 +289,80 @@ define-handlers [
 	]
 
 	;-- *************************************************************************************
-	grid-view: extends 'inf-scrollable []
+	grid-view: extends 'inf-scrollable [
+		on-down [gview path event] [
+			set [grid: _: cell:] skip path 4
+			if 'cell <> select cell 'type [exit]
+			cxy:    grid-ctx/get-cell-address grid cell
+			multi?: gview/behavior/selectable = 'multi
+			mode:   either all [event/ctrl? multi?] ['invert]['replace]
+			case [
+				grid/pinned +< cxy [
+					start: either all [event/shift? multi?] ['extend][cxy]
+					batch grid [
+						select-range start cxy
+						cursor: max cxy 1 + grid/pinned
+						drag?: on
+					]
+				]
+				not multi? ['done]
+				cxy +<= grid/pinned [
+					batch grid [select-range 1x1 'far-tail]		;-- include headers into selection
+				]
+				x: case [
+					cxy/y <= grid/pinned/y ['x]
+					cxy/x <= grid/pinned/x ['y]
+				] [
+					batch grid [
+						start: either event/shift? [pick here x][cxy/:x]
+						select-along ortho x 'all
+						select-along/mode x start thru cxy/:x mode
+					]
+					cursor: max cxy 1 + grid/pinned
+					drag?: on
+				]
+			]
+			if all [cursor not event/shift?] [					;--  never move cursor on shift-clicks, so it tracks selection start
+				batch grid [move-cursor cursor]
+			]
+			if drag? [
+				clear skip path': shallow-clone path 6			;-- drag around grid, not around its cell
+				start-drag path'
+			]
+			stop/now
+		]
+		
+		on-over [gview path event] [
+			unless all [
+				dragging?/from gview
+				not event/ctrl?									;-- handle only ctrl-click, not ctrl-drag
+				gview/behavior/selectable = 'multi
+			] [exit]
+			set [grid: _: cell:] skip path 4
+			if all ['cell = select cell 'type] [
+				#assert [grid/type = 'grid]
+				cxy: grid-ctx/get-cell-address grid cell
+				case [
+					all [cxy/x <= grid/pinned/x cxy/y > grid/pinned/y] [	;-- rows after header
+						batch grid [
+							select-columns 'all
+							select-rows    (pick here 'y) thru cxy/y
+						]
+					]
+					all [cxy/y <= grid/pinned/y cxy/x > grid/pinned/x] [	;-- columns after header
+						batch grid [
+							select-rows    'all
+							select-columns (pick here 'x) thru cxy/x
+						]
+					]
+					grid/pinned +< cxy [						;-- 2D range selection
+						batch grid [select-range here cxy]
+					]
+				] 
+			]
+			stop/now
+		]
+	]
 
 	;-- *************************************************************************************
 	switch: [
