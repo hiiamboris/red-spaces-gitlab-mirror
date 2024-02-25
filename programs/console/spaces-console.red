@@ -23,6 +23,7 @@ system/script/header: [											;@@ workaround for #4992
 	highlighting of output, when it can be transcoded? (may be slow)
 	undo/redo entries removal?
 	arguments underlining?
+	show word context on hover
 	
 	;@@ somewhere on the horizon:
 	paragraph grouping/structuring... -> step tracing
@@ -235,6 +236,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		reload-func 'system/words/dump-reactions
 		reload-func 'system/lexer/tracer
 		reload-func 'system/words/profile
+		reload-func 'system/words/about
 		system/tools/tracers/emit: :print
 		reload-func last body-of :system/words/parse-trace 
 
