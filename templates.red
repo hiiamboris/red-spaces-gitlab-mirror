@@ -3660,7 +3660,7 @@ grid-ctx: context [
 		format: does [~/format space]
 		
 		here: function ["Get address of a cell under cursor"] [
-			any [space/cursor 1x1]
+			any [space/cursor space/pinned + 1]
 		]
 		
 		locate: function [
@@ -3672,12 +3672,18 @@ grid-ctx: context [
 			maxx:   any [space/frame/bounds/x space/frame/addr2/x]	;-- jump to last rendered cell if unlimited
 			maxy:   any [space/frame/bounds/y space/frame/addr2/y]
 			switch/default name [
-				far-head  [minxy]								;-- ^Home leads to first data (not header) cell
-				far-tail  [maxx by maxy]
-				head      [minxy/x by cursor/y]
-				tail      [maxx by cursor/y]
-				line-up   [cursor/x by max cursor/y - 1 minxy/y]
-				line-down [cursor/x by min cursor/y + 1 maxy]
+				far-head    [minxy]								;-- ^Home leads to first data (not header) cell
+				far-tail    [maxx by maxy]
+				head        [minxy/x by cursor/y]
+				tail        [maxx by cursor/y]
+				line-up     [cursor/x by max cursor/y - 1 minxy/y]
+				line-down   [cursor/x by min cursor/y + 1 maxy]
+				column-head [cursor/x by minxy/y]
+				column-tail [cursor/x by maxy]
+				row-head    [minxy/x by cursor/y]
+				row-tail    [maxx by cursor/y]
+				prev-cell   [(max cursor/x - 1 minxy/x) by cursor/y]
+				next-cell   [(min cursor/x + 1 maxx) by cursor/y]
 				; page-up   [frame/page-above here]		;@@ TODO - page jumps
 				; page-down [frame/page-below here]
 			] [here]											;-- unknown words assume current address
@@ -3758,6 +3764,18 @@ grid-ctx: context [
 			if word? limit [limit: locate limit]
 			if word? start [start: either start = 'extend [here][locate start]]
 			foreach x [x y] [select-along x start/:x thru limit/:x]
+		]
+		
+		selected-range: function ["Get bounding corners of current selection as 2 pairs (or none if no selection)"] [
+			range: [0x0 0x0]
+			foreach x [x y] [
+				bits: space/selected/:x
+				unless lo: lowest-bit bits [return none]
+				hi: highest-bit bits
+				range/1/:x: lo	;max lo space/pinned/:x + 1
+				range/2/:x: hi	;min hi any [space/frame/bounds/:x space/frame/addr2/:x]
+			]
+			copy range
 		]
 	]
 	
@@ -3998,6 +4016,9 @@ grid-view-ctx: context [
 		
 		;; while grid supports rendering selection, only grid-view has the handlers to interact with it
 		extend behavior [selectable: #(none)]					;-- none=don't select; single=select one cell; multi=cell range
+		
+		;; used by event handlers to provide familiar selection behavior
+		selection-start: 1x1	#type [pair!]
 		
 		content-flow: 'planar
 		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
