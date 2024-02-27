@@ -373,6 +373,12 @@ define-handlers [
 					]
 				]
 			
+				#"C" insert [
+					if event/ctrl? [
+						batch grid [copy-selection/clip]
+					]
+				]
+			
 				#" " [
 					if axis: case [
 						event/ctrl?  ['x]

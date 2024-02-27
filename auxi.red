@@ -174,6 +174,15 @@ highest-bit: function [bs [bitset!]] [
 	4  = highest-bit charset [3  - 4]
 ]
 
+unroll-bitset: function [bs [bitset!]] [
+	result: clear []
+	if lo: lowest-bit bs [
+		hi: highest-bit bs
+		for i: lo hi [if bs/:i [append result i]]		;@@ this is really dumb
+	]
+	copy result
+]
+
 
 {
 	useful pair invariants to test in which quadrant a point is located

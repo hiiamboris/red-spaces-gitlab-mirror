@@ -3733,6 +3733,7 @@ grid-ctx: context [
 			/mode "Specify selection mode (default: 'replace)"
 				sel-mode: 'replace [word!] (find [replace include exclude invert] sel-mode)
 		][
+			;@@ TODO: warning on huge bitsets
 			switch type?/word bits [
 				none!    [bits: charset 0]
 				pair!    [bits: bit-range bits]
@@ -3776,6 +3777,31 @@ grid-ctx: context [
 				range/2/:x: hi	;min hi any [space/frame/bounds/:x space/frame/addr2/:x]
 			]
 			copy range
+		]
+		
+		copy-selection: function [
+			"Copy and return selected cells text"
+			/clip "Write it into clipboard"
+		][
+			xs: unroll-bitset space/selected/x
+			ys: unroll-bitset space/selected/y
+			rows: make [] 16
+			row:  make [] 16
+			format: {}									;-- fallback for non-formattable cells
+			#assert [(length? xs) * (length? ys) < 10'000  "Copying huge selection make take hours!"]
+			foreach y ys [
+				foreach x xs [
+					append row batch space/cells/pick x by y [format]
+				]
+				append rows join row #"^-"
+				clear row
+			]
+			text: join rows #"^/"
+			if clip [
+				#debug clipboard [#print "grid/copy-selection (\(space-id space)): (mold/part text 120)"]
+				clipboard/write text
+			]
+			text
 		]
 	]
 	
