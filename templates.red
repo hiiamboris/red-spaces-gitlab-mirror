@@ -1133,6 +1133,7 @@ container-ctx: context [
 		items: make [] len
 		repeat i len [append items cont/items/pick i]	;@@ use map-each
 		frame: make-layout type items settings
+		#assert [frame/map]
 		foreach [_ geom] frame/map [
 			pos: geom/offset
 			siz: geom/size
