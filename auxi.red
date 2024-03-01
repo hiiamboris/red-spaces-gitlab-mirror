@@ -323,49 +323,6 @@ box-distance?: function [
 ; ]
 
 
-;; need this to be able to call event functions recursively with minimum allocations
-;; can't use a static block but can use one block per recursion level
-;; also used in the layout functions (which can be recursive easily)
-;@@ this is too complex and ~10x slower than the GC itself, so only should be used when GC is off
-obtain: stash: none
-context [
-	;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
-	factor: 1.4											;-- https://stackoverflow.com/q/1100311
-	log-factor: log-e factor
-	free-list: #[]
-	
-	;; `make` alternative that uses a free list of series when possible - to reduce GC load
-	set 'obtain function [
-		"Get a series of type TYPE with a buffer of at least SIZE length"
-		type [datatype!] "Any series type" (any [map! = type find series! type])
-		size [linear!]   "Minimal length before reallocation, >= 1"
-	][
-		size:   max 1 size								;-- else log will be infinite
-		name:   to word! type							;-- datatype is not supported by maps
-		ladder: any [free-list/:name  free-list/:name: make hash! 256]
-		step:   round/ceiling/to (log-e size) / log-factor 1
-		either pos: any [
-			find ladder step
-			find ladder step + 1						;-- try little bigger sizes as well
-			find ladder step + 2						;@@ how many to try optimally?
-		][
-			also pos/2  fast-remove pos 2
-		][
-			make type round/ceiling/to factor ** step 1
-		]
-	]
-	
-	set 'stash function [
-		"Put SERIES back into the free list for futher OBTAIN calls"
-		series [series! map!]
-	][
-		type:   type?/word series
-		ladder: any [free-list/:type  free-list/:type: make hash! 256]
-		step:   round/floor/to (log-e length? series) / log-factor 1
-		repend ladder [step clear series]
-	]
-]
-
 ;@@ move into common?
 make-stack: function [
 	"Create a stack of given row size"
