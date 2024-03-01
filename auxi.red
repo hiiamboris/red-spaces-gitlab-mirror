@@ -85,21 +85,6 @@ get-safe: function [path [path! word!]] [				;@@ REP 113; this in case of error 
 ; ]
 
 
-offset-to-caret: func [									;@@ until native support for point
-	{Given a coordinate, returns the corresponding caret position}
-	face [object!]
-	pt   [planar!]
-][
-	system/view/platform/text-box-metrics face to pair! pt 1
-]
-offset-to-char: func [									;@@ until native support for point
-	{Given a coordinate, returns the corresponding character position}
-	face [object!]
-	pt   [planar!]
-][
-	system/view/platform/text-box-metrics face to pair! pt 5
-]
-
 ;@@ copy/deep does not copy inner maps (#2167), clone tries to encode system/words, so this kludge is still must have
 copy-deep-map: function [m [map!]] [
 	m: make map! copy/deep to [] m						;@@ workaround for copy/deep #(map) not copying nested strings/blocks
