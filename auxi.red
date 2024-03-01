@@ -100,29 +100,29 @@ offset-to-char: func [									;@@ until native support for point
 	system/view/platform/text-box-metrics face to pair! pt 5
 ]
 
-
-;@@ copy/deep does not copy inner maps unfortunately, so have to use this everywhere
-;@@ need more generally applicable version (e.g. for block with blocks with maps), but seems to complex/slow for now
+;@@ copy/deep does not copy inner maps (#2167), clone tries to encode system/words, so this kludge is still must have
 copy-deep-map: function [m [map!]] [
 	m: make map! copy/deep to [] m						;@@ workaround for copy/deep #(map) not copying nested strings/blocks
 	foreach [k v] m [if map? :v [m/:k: copy-deep-map v]]
 	m
 ]
 
-;; this version is reliable but allocates 60% more
-;@@ should cloning be based on it?
-clone: function [
+clone: function [										;@@ should space cloning be based on this?
 	"Obtain a complete deep copy of the data"
 	data [any-object! map! series!]
-] with system/codecs/redbin [
-	decode encode data none
-]
-	
-shallow-clone: function [
-	"Make TARGET series a (shallow) clone of SOURCE series"
-	source [series!] /into target: (clear copy source) [series!]
-][
-	at append clear head target head source index? source
+	/flat "Make a shallow copy (unlike native copy, keeps items before head)"
+] with system/codecs/redbin reshape [
+	either flat [
+		switch type?/word :data [
+			@(to [] series!) [
+				at	append (clear copy head data) head data
+					index? data
+			]
+			map! @(to [] any-object!) [copy data] 
+		]
+	][
+		decode encode data none
+	]
 ]
 
 ;; ranges support needed by layout, until such datatype is introduced, have to do with this
@@ -363,21 +363,6 @@ context [
 		ladder: any [free-list/:type  free-list/:type: make hash! 256]
 		step:   round/floor/to (log-e length? series) / log-factor 1
 		repend ladder [step clear series]
-	]
-]
-
-;; main problem of this faster design: doesn't care about length, may result in lots of reallocations
-make-free-list: function [
-	"Create a free list of things with GET and PUT methods defined"
-	type [datatype!] "Type of thing"
-	init [block!]    "Code to create a new thing"
-][
-	object compose/deep [
-		stack: []
-		get: does [either tail? stack [(init)][take/last stack]]
-		put: func [x [(type)]] [
-			append/only stack (either find series! type [ [clear head x] ][ [:x] ])
-		]
 	]
 ]
 

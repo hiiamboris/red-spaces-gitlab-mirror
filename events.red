@@ -5,12 +5,10 @@ Red [
 ]
 
 
-;-- requires auxi.red (make-free-list), styles (to fix svmc/), error-macro.red, event-scheduler.red
+;-- requires auxi.red(?), styles (to fix svmc/), error-macro.red, event-scheduler.red
 
 
 events: context [
-	cache: make-free-list block! [make [] 100]
-
 	on-time: none										;-- set by timers.red
 
 	;-- previewers and finalizers are called before/after handlers
@@ -120,13 +118,12 @@ events: context [
 		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
 		code: compose/into [handler space pcopy event (args) none] clear []
 		foreach handler list [
-			pcopy: shallow-clone/into path cache/get	;-- copy in case user modifies/reduces it, preserve index
+			pcopy: clone/flat path						;-- copy in case user modifies/reduces it, preserve index
 			trap/all/catch code [
 				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
 				kind: either map =? previewers ["previewer"]["finalizer"]
 				#print "*** Failed to evaluate event (kind) (mold/part/flat :handler 100)!^/(msg)"
 			]
-			cache/put pcopy
 		]
 	]
 
@@ -261,7 +258,6 @@ events: context [
 		with-stop [
 			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
 			; #debug events [print ["dispatching" event/type "event from" face/type]]
-			buf: cache/get
 			path: switch/default event/type [
 				over wheel up mid-up alt-up aux-up
 				down mid-down alt-down aux-down click dbl-click [	;-- `click` is simulated by single-click.red
@@ -326,13 +322,12 @@ events: context [
 
 	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
 	do-handler: function [spc-name [path!] handler [function!] path [block!] event [map!] args [block!]] [
-		space: first path: shallow-clone/into path cache/get	;-- copy in case user modifies/reduces it, preserve index
+		space: first path: clone/flat path				;-- copy in case user modifies/reduces it, preserve index
 		code: compose/into [handler space path event (args) none] clear []
 		trap/all/catch code [
 			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
 			#print "*** Failed to evaluate (spc-name)!^/(msg)"
 		]
-		cache/put path
 	]
 
 	;; this needs reentrancy (events may generate other events), so all blocks must not be static
@@ -433,7 +428,7 @@ events: context [
 		#debug events [#print "Starting drag on [(mold copy/part path -99) | (mold path)] with (:param)"]
 		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
 		#assert [not dragging?]
-		drag-in/path: shallow-clone/into path drag-in/head		;-- drag-path will return it at the same index
+		drag-in/head: head drag-in/path: clone/flat path		;-- drag-path will return it at the same index
 		set/any in drag-in 'payload :param
 	]
 
