@@ -664,7 +664,7 @@ scrollable-ctx: context [
 				child: space/content
 				format: batch child [format]
 			]
-			#debug clipboard [#print "  scrollable/format (\(space-id space): (mold/part format 120)"]
+			#debug clipboard [#print "  scrollable/format (space-id space): (mold/part format 120)"]
 			format
 		]
 	]
@@ -3215,6 +3215,7 @@ grid-ctx: context [
 				cell1: grid/get-first-cell xy
 				height1: 0
 				if content: grid/cells/pick cell1 [
+					; #assert [not content/parent =? grid  "cyclic cell wrapping detected!"]	;@@ grid-view has transparent wrapping
 					cspace: grid/wrap-space cell1 content
 					render/on cspace canvas yes no		;-- render to get the size; fill the cell's width
 					height1: cspace/size/y
@@ -3258,6 +3259,7 @@ grid-ctx: context [
 		r + (yspan - 1 * (grid/spacing/y))
 	]
 		
+	;@@ for parts of a multicell this may require row-height/col-width calls - need more designing
 	cell-size?: function [grid [object!] xy [pair!]] [
 		as-point2D (cell-width? grid xy) (cell-height? grid xy) 
 	]
@@ -4028,6 +4030,15 @@ grid-view-ctx: context [
 
 	kit: make-kit 'grid-view [
 		format: does [batch space/grid [format]]
+		
+		;@@ temporary! will be automatic after grid redesign (currently panning can only be done by grid-view, but cursor belongs to the grid)
+		;@@ perhaps in multicells it should draw cursor as big as multicell itself? but then it may make some cells inaccessible using keyboard
+		pan-to-cursor: function [/margin mrg: 0 [linear! planar!]] [
+			csize:  space/grid/cell-size? cursor: space/grid/cursor
+			offset: space/grid/get-offset-from 1x1 cursor
+			pinned: space/grid/get-offset-from 1x1 space/grid/pinned + 1	;-- have to consider pinned area
+			space/move-to/margin space/grid/margin + offset + (csize - pinned / 2) (csize + pinned / 2) + mrg
+		]
 	]
 
 	declare-template 'grid-view/inf-scrollable [
