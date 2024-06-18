@@ -98,8 +98,8 @@ view/no-wait/options expand-directives [
 						if 1 = depth: depth + 1 [				;-- only zoom the topmost grid
 							append clear r old-draw/on canvas fill-x fill-y
 							#debug profile [prof/manual/start 'truncation]
-							; r: copy-deep-limit r 36				;-- 3 levels - 15625 grids
-							r: copy-deep-limit r 24				;-- 2 levels - 625 grids
+							; r: copy-deep-limit r 39				;-- 3 levels - 15625 grids
+							r: copy-deep-limit r 26				;-- 2 levels - 625 grids
 							#debug profile [prof/manual/end 'truncation]
 						]
 						depth: depth - 1
