@@ -4034,6 +4034,38 @@ grid-view-ctx: context [
 	kit: make-kit 'grid-view [
 		format: does [batch space/grid [format]]
 		
+		locate: function [
+			"Get address of a named location"
+			name [word!]
+		][
+			cursor: batch space/grid [here]
+			switch/default name [
+				page-up   [frame/page-above cursor]
+				page-down [frame/page-below cursor]
+			] [batch space/grid [locate name]]
+		]
+		
+		frame: object [
+			;@@ these, as well as next/prev cell locators, should skip the same multicell
+			page-above: function [
+				"Get address of an cell one page above the given one"
+				addr [pair!]
+			][
+				vp: space/viewport
+				xy: space/grid/margin + space/grid/get-offset-from 1x1 addr
+				first space/grid/locate-point xy - (0 . vp/y)
+			]
+			
+			page-below: function [
+				"Get address of an cell one page below the given one"
+				addr [pair!]
+			][
+				vp: space/viewport
+				xy: space/grid/margin + space/grid/get-offset-from 1x1 addr
+				first space/grid/locate-point xy + (0 . vp/y)
+			]
+		]
+		
 		;@@ temporary! will be automatic after grid redesign (currently panning can only be done by grid-view, but cursor belongs to the grid)
 		;@@ perhaps in multicells it should draw cursor as big as multicell itself? but then it may make some cells inaccessible using keyboard
 		pan-to-cursor: function [/margin mrg: 0 [linear! planar!]] [
