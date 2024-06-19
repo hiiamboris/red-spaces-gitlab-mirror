@@ -2245,13 +2245,14 @@ inf-scrollable-ctx: context [
 		foreach x [x y] [
 			any [										;-- prioritizes left/up slide over right/down
 				all [
+					;; NOTE: (- min 0 dir/:x) allows to move the window by long distances onfar jumps in the content (e.g. Ctrl+End)
 					before/:x <= space/look-around
-					0 < avail: window/available? x -1 wofs/:x space/slide-length
+					0 < avail: window/available? x -1 wofs/:x space/slide-length - min 0 before/:x
 					wofs'/:x: wofs'/:x - avail
 				]
 				all [
 					after/:x  <= space/look-around
-					0 < avail: window/available? x  1 wofs/:x + wsize/:x space/slide-length
+					0 < avail: window/available? x  1 wofs/:x + wsize/:x space/slide-length - min 0 after/:x
 					wofs'/:x: wofs'/:x + avail
 				]
 			]
@@ -3059,6 +3060,7 @@ grid-ctx: context [
 	]
 		
 	;; fast row/col locator assuming that widths/heights array size is smaller than the row/col number
+	;@@ may replace it with the search algo?
 	;; returns any of:
 	;;   [margin 1 offset] - within the left margin (or if point is negative, then to the left of it)
 	;;   [cell   1 offset] - within 1st cell
@@ -3860,6 +3862,7 @@ grid-ctx: context [
 			;@@ support more than one canvas? canvas/x affects heights, limits if autofit is on
 			bounds:  none								;-- WxH number of cells (pair/block), used by draw & others to avoid extra calculations
 			offset:  (0,0)								;-- used to find the headers location on current grid frame
+			;@@ also need to know addresses of cells within current window! - for the grid-view key handlers
 			addr1:   none								;-- first drawn cell address (excluding pinned)
 			addr2:   none								;-- last drawn cell address - useful for frame navigation
 			heights: make map!   4						;-- cached heights of rows marked for autosizing
@@ -4035,9 +4038,12 @@ grid-view-ctx: context [
 		;@@ perhaps in multicells it should draw cursor as big as multicell itself? but then it may make some cells inaccessible using keyboard
 		pan-to-cursor: function [/margin mrg: 0 [linear! planar!]] [
 			csize:  space/grid/cell-size? cursor: space/grid/cursor
+			csize:  csize + (space/grid/spacing * 2)
 			offset: space/grid/get-offset-from 1x1 cursor
 			pinned: space/grid/get-offset-from 1x1 space/grid/pinned + 1	;-- have to consider pinned area
-			space/move-to/margin space/grid/margin + offset + (csize - pinned / 2) (csize + pinned / 2) + mrg
+			; ?? [csize offset pinned space/window/origin space/grid/origin]
+			target: space/grid/margin - space/grid/spacing + offset + (csize - pinned / 2) 
+			space/move-to/margin/no-clip target + space/window/origin (csize + pinned / 2) + mrg
 		]
 	]
 
