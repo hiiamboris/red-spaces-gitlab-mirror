@@ -4053,7 +4053,8 @@ grid-view-ctx: context [
 			][
 				vp: space/viewport
 				xy: space/grid/margin + space/grid/get-offset-from 1x1 addr
-				first space/grid/locate-point xy - (0 . vp/y)
+				addr: first space/grid/locate-point xy - (0 . vp/y)
+				max addr space/grid/pinned + 1
 			]
 			
 			page-below: function [
@@ -4062,7 +4063,11 @@ grid-view-ctx: context [
 			][
 				vp: space/viewport
 				xy: space/grid/margin + space/grid/get-offset-from 1x1 addr
-				first space/grid/locate-point xy + (0 . vp/y)
+				addr: first space/grid/locate-point xy + (0 . vp/y)
+				frame: space/grid/frame
+				maxx: any [frame/bounds/x frame/addr2/x]	;-- jump to last rendered cell if unlimited
+				maxy: any [frame/bounds/y frame/addr2/y]
+				min addr maxx by maxy
 			]
 		]
 		
