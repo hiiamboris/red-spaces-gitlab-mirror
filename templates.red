@@ -4099,7 +4099,7 @@ grid-view-ctx: context [
 		extend behavior [selectable: #(none)]					;-- none=don't select; single=select one cell; multi=cell range
 		
 		;; used by event handlers to provide familiar selection behavior
-		selection-start: 1x1	#type [pair!]
+		selection-start: none	#type [pair! none!]
 		
 		content-flow: 'planar
 		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
