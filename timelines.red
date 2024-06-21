@@ -64,6 +64,7 @@ context [
 		copy/part next p period - 1
 	]
 		
+	;@@ add docstrings? (increases timeline size - critical in fields)
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
 		limit:      1000	#type [integer!] (limit >= 20)		;-- max number of events to keep
@@ -71,8 +72,8 @@ context [
 		last-event: func [/for obj [object!]] [~/last-event self obj]	;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]
 		redo:       does [~/redo self]
-		mark:       does [events]
-		unwind:     does [~/unwind self]
+		mark:       does [events]								;-- gets current location in the timeline to save
+		unwind:     does [~/unwind self]						;-- like 'undo' but does not execute 'left' events
 		put: func [space [object!] left [block!] right [block!] /last] [
 			~/put self space left right last
 		]
