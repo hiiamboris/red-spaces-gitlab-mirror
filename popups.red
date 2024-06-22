@@ -15,7 +15,11 @@ declare-template 'hint/box [
 ]
 
 ;@@ should it be here or in vid.red?
-lay-out-menu: function [spec [block!] /local code name space value tube list flags radial? round?] [
+lay-out-menu: function [
+	spec [block!]
+	/title heading [string!]
+	/local code name space value tube list flags radial? round?
+][
 	;@@ preferably VID/S should be used here and in hints above
 	row*:        clear []								;-- space names of a single row
 	menu*:       clear []								;-- row names list
@@ -56,7 +60,14 @@ lay-out-menu: function [spec [block!] /local code name space value tube list fla
 	][	make-space 'list [axis: 'y margin: 4x4]
 	]
 	list/content: flush menu*
-	menu: make-space 'cell [type: 'menu  content: list]
+	either title [
+		h-box: make-space 'box [content: make-space 'text [text: heading flags: [bold]]]
+		inner: make-space 'list [axis: 'y margin: 0x4 spacing: 0x0]
+		inner/content: reduce [h-box list]
+	][
+		inner: list
+	]
+	menu: make-space 'cell [type: 'menu  content: inner]
 	menu
 ]
 
@@ -185,12 +196,13 @@ popups: context [
 		"Show a popup menu at given offset"
 		menu    [block!] "Written using Menu DSL"
 		offset  [planar!]
-		/owner parent [object!] "Space or face object; owner is not hidden"
-		/in    window [object!] "Specify parent window (defaults to focus/window)"
+		/owner parent  [object!] "Space or face object; owner is not hidden"
+		/in    window  [object!] "Specify parent window (defaults to focus/window)"
+		/title heading [string!] "Provide a heading string for the menu" 
 		;@@ maybe also a flag to make it appear above the offset?
 	][
 		host: make-face/spec 'host [rate 25]			;-- reduced timer pressure
-		render host/space: lay-out-menu menu
+		render host/space: lay-out-menu/:title menu heading
 		either radial?: has-flag? :menu/1 'radial [		;-- radial menu is centered
 			offset: offset + host/space/content/origin
 			host/color: svmc/panel + 0.0.0.254			;-- radial menu is transparent but should catch clicks that close it
