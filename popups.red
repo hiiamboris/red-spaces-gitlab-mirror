@@ -95,6 +95,7 @@ popups: context [
 		offset [planar!] "Offset on the window"
 		/in window: focus/window [object! none!] "Specify parent window (defaults to focus/window)"
 		/owner parent [object! none!] "Space or face object; owner is not hidden"
+		/fit "Adjust popup offset for best display if it doesn't fit as is"
 	][
 		#debug popups [#print "about to show popup (space/type):(space/size) at (offset)"] 
 		if space? face: space [							;-- automatically create a host face for it
@@ -106,6 +107,7 @@ popups: context [
 			if zero? face/size [face/size: none]		;-- hint for render to set its size
 			face/draw: render face
 		]
+		if fit [face/offset: clip 0x0 offset window/size - face/size]
 		
 		level: 1
 		if parent [
@@ -193,10 +195,9 @@ popups: context [
 			offset: offset + host/space/content/origin
 			host/color: svmc/panel + 0.0.0.254			;-- radial menu is transparent but should catch clicks that close it
 		][
-			limit: window/size - host/space/size
-			offset: clip offset 0x0 limit				;-- adjust offset so it's not clipped
+			fit: on										;-- adjust offset so it's not clipped
 		]
-		show/owner/in host offset parent window
+		show/owner/in/:fit host offset parent window
 	]
 
 	primed: context [									;-- pending hint data
