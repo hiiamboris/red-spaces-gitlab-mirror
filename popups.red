@@ -150,7 +150,7 @@ popups: context [
 		pointer [planar!]
 		/in window [object!] "Specify parent window (defaults to focus/window)"
 	][
-		if text == get-hint-text [exit]					;-- don't redisplay an already shown hint
+		if text =? get-hint-text [exit]					;-- don't redisplay an already shown hint; sameness test makes sense in e.g. grid-ui
 		#debug popups [#print "about to show hint (mold text) at (pointer)"] 
 		
 		center: window/size / 2
