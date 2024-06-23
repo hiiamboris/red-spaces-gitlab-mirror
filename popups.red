@@ -17,7 +17,7 @@ declare-template 'hint/box [
 ;@@ should it be here or in vid.red?
 lay-out-menu: function [
 	spec [block!]
-	/title heading [string!]
+	; /title heading [string!]
 	/local code name space value tube list flags radial? round?
 ][
 	;@@ preferably VID/S should be used here and in hints above
@@ -60,13 +60,13 @@ lay-out-menu: function [
 	][	make-space 'list [axis: 'y margin: 4x4]
 	]
 	list/content: flush menu*
-	either title [
-		h-box: make-space 'box [content: make-space 'text [text: heading flags: [bold]]]
-		inner: make-space 'list [axis: 'y margin: 0x4 spacing: 0x0]
-		inner/content: reduce [h-box list]
-	][
+	; either title [
+		; h-box: make-space 'box [content: make-space 'text [text: heading flags: [bold]]]
+		; inner: make-space 'list [axis: 'y margin: 0x4 spacing: 0x0]
+		; inner/content: reduce [h-box list]
+	; ][
 		inner: list
-	]
+	; ]
 	menu: make-space 'cell [type: 'menu  content: inner]
 	menu
 ]
