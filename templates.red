@@ -3621,7 +3621,9 @@ grid-ctx: context [
 			; print ["INVAL" mold cell scope]
 			if scope = 'size [
 				either cell [
-					invalidate-xy grid pick find/same grid/frame/cells cell -1
+					if pos: find/same grid/frame/cells cell [
+						invalidate-xy grid pick pos -1
+					]
 				][
 					quietly grid/size: none
 				]
