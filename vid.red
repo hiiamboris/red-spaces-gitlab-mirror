@@ -166,7 +166,7 @@ VID: context [
 	
 	for-each [name spec] styles [spec/facets: make map! spec/facets]	;@@ dumb solution for REP #111
 		
-	;@@ grid-view
+	;@@ grid-view, switch (with logic auto-facet)
 	
 	
 	host?: func ["Check if OBJ is a HOST face" obj [object!]]['host = class? obj]

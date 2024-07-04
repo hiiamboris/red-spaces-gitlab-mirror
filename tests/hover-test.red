@@ -13,7 +13,8 @@ Red [
 		   (because box rotates, there is movement in its own coordinate space)
 		3. when pointer is held in place outside the rotating box, timer should keep triggering on-over
 		   so crosshair should still be around the pointer, save for minor inter-frame lag
-		4. shift? flag should be reliably reported by synthesized over events
+		4. up event outside of the rotating box should indicate by color that the pointer is not captured
+		5. shift? flag should be reliably reported by synthesized over events
 	}
 ]
 
@@ -52,14 +53,15 @@ declare-template 'wheel/space [
 ]
 
 define-handlers [
-	wheel: [
-		on-down [space path event] [start-drag path]
-		on-up   [space path event] [stop-drag]
-	]
 	box: [
+		on-down [space path event] [start-drag path]
+		on-up   [space path event] [
+			stop-drag
+			space/color: either path/2 inside? space [magenta][brick]
+		]
 		on-over [space path event] [
 			update-status event
-			space/color: either inside?: 0x0 +<= path/2 +< space/size [magenta][brick]
+			space/color: either any [path/2 inside? space  probe dragging?/from space] [magenta][brick]
 		]
 	]
 ]
