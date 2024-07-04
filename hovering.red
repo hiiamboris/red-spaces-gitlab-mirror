@@ -10,16 +10,26 @@ Red [
 ;@@ for this design to work, all /into funcs must accept (return none) spaces that are no longer their children!
 
 context [
-	last-paths: make hash! 2							;@@ suffers from REP #129
+	over-face: none										;@@ suffers from REP #129
+	last-path: none
 	
 	scheduler/event-filters/away-generator: function [face event [map!] "assumes healed event"] [
 		switch event/type [
-			over										;-- pointer may have left a space it was in
-			time										;-- space may have been moved on the last frame
-				[if face/space [detect-away face event]]
-			down [										;-- dragging initializes a new path (probably shorter than a normal one)
-				if pos: find/same last-paths face [fast-remove pos 2]
+			over [										;-- pointer may have left a space it was in
+				if select over-face 'space [
+					detect-away over-face event
+				]
+				unless over-face =? face [				;-- hovering over a new host - full reset
+					self/last-path: none
+					self/over-face: if face/space [face]
+				]
 			]
+			time [										;-- space may have been moved on the last frame
+				if all [over-face =? face  face/space] [
+					detect-away face event
+				]
+			]
+			down [self/last-path: none]					;-- dragging initializes a new path (probably shorter than a normal one)
 		]
 		none											;-- let other event funcs process it
 	]
@@ -32,8 +42,8 @@ context [
 				drag?: events/dragging?					;-- during dragging away condition is registered routinely
 				event/type <> 'time						;-- but it still may have moved on the frame
 			] [exit]
-			not pos: find/same last-paths host [		;-- first over for this host?
-				repend last-paths [host make [] 20]
+			not last-path [								;-- first over for this host?
+				self/last-path: make [] 20
 				exit
 			]
 		]
@@ -46,15 +56,14 @@ context [
 		]
 				
 		#debug profile [prof/manual/start 'hovering]
-		old-path: pos/2
-		template: either drag? [old-path][host/space]
+		template: either drag? [last-path][host/space]
 		hittest/into template event/offset clear new-path: []
 		
-		if moved?: not same-paths? old-path new-path [
+		if moved?: not same-paths? last-path new-path [
 			;; while 'over' now lands into another space, we need to send the event into the old one, as 'away notice'
-			hittest/into old-path event/offset clear path: []	;-- update coordinates along the old-path
+			hittest/into last-path event/offset clear path: []	;-- update coordinates along the last-path
 			events/with-stop [events/process-event path event [] no]
-			append clear old-path new-path						;-- stash the modified path
+			append clear last-path new-path						;-- stash the modified path
 		]
 		#debug profile [prof/manual/end 'hovering]
 	]
