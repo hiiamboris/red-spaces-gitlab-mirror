@@ -256,7 +256,7 @@ events: context [
 	dispatch: function [face [object!] event [map!] /local result /extern resolution last-on-time] [
 		focused?: no
 		with-stop [
-			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type]]]
+			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type ":" face/size]]]
 			; #debug events [print ["dispatching" event/type "event from" face/type]]
 			path: switch/default event/type [
 				over wheel up mid-up alt-up aux-up

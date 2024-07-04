@@ -165,6 +165,7 @@ scheduler: context [
 				groupable/:type											;-- this event type cannot be grouped
 				ahead: find/skip/part rest this/:igroup period limit	;-- no similar event ahead
 				type = ahead/:ievent/type								;-- similar event of different type blocks grouping
+				this/away? = ahead/:ievent/away?						;-- cannot group different away states
 			] [return none]
 			
 			;; check if grouping would lead us to a more delayed event, otherwise abort

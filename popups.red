@@ -129,7 +129,7 @@ popups: context [
 		]
 		
 		hide level
-		primed/text: none								;-- without this some event asynchrony may trigger hint redisplay and popup hide
+		primed/text: primed/host: none					;-- without this some event asynchrony may trigger hint redisplay and popup hide
 		save level face
 		unless find/same window/pane face [append window/pane face]
 		face											;-- return the popup face
@@ -213,6 +213,7 @@ popups: context [
 	]
 
 	primed: context [									;-- pending hint data
+		host:      none									;-- host for which hint was primed
 		text:      none
 		show-time: now/utc/precise						;-- when to show next hint
 		anchor:    (0,0)								;-- pointer offset of the over event (timer doesn't have this info)
@@ -226,6 +227,7 @@ popups: context [
 				event/type = 'time
 				host? host								;-- a host face?
 				space? host/space						;-- has a space assigned?
+				primed/host =? host						;-- hint was primed for this particular host?
 				primed/text								;-- hint is available at current pointer offset
 				now/utc/precise >= primed/show-time		;-- time to show it has come
 				show-hint/in primed/text primed/anchor event/window
@@ -254,7 +256,7 @@ popups: context [
 			][
 				hide-hint
 			]
-			primed/text: none							;-- abort primed hint (if any)
+			primed/text: primed/host: none				;-- abort primed hint (if any)
 		]
 		
 		
@@ -279,6 +281,7 @@ popups: context [
 					text: find-facet path 'hint string!			;-- hint is enabled for this space or one of its parents
 				][
 					;; prime new hint display after a delay
+					primed/host:   event/face
 					primed/text:   text
 					primed/anchor: face-to-window event/offset event/face
 					unless get-hint-text [						;-- delay only if no other hint is visible, else immediate
