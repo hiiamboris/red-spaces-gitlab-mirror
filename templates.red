@@ -3774,6 +3774,13 @@ grid-ctx: context [
 			foreach x [x y] [select-along x start/:x thru limit/:x]
 		]
 		
+		;@@ temporary until I find a better interface for it
+		deselect: function [
+			"Remove any existing selection"
+		][
+			foreach x [x y] [select-along x none]
+		]
+		
 		selected-range: function ["Get bounding corners of current selection as 2 pairs (or none if no selection)"] [
 			range: [0x0 0x0]
 			foreach x [x y] [
