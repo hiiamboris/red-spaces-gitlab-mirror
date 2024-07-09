@@ -34,6 +34,7 @@ focus: make classy-object! declare-class 'focus-context [
 	;@@ TODO: to support per-tab, per-page focus history they may have their own histories, or maybe /focus should handle scope too?
 	history: has [w h hist] [									;-- previously focused spaces, including current one
 		unless window [self/window: last head system/view/screens/1/pane]
+		; #assert [window/state]
 		unless hist: select/same histories window [
 			unless window [ERROR "focus/window must be set before using focus/history"]
 			#debug focus [#print "current window detected as: (select window 'type):(select window 'size) (mold select window 'text)"]
@@ -49,7 +50,8 @@ focus: make classy-object! declare-class 'focus-context [
 		face: either is-face? space [space][host-of space]
 		#assert [face  "attempt to focus an out-of-tree (not yet drawn?) space"]	;@@ maybe call VID/update-focus in this case?
 		; unless face [?? histories ?? window ?? space ?? space/content/1 ?? space/content/1/content/1 probe host-of space]		
-		self/window: window-of face
+		w: window-of face
+		if w/state [self/window: w] 
 		append hist: history space
 		remove/part hist hist << 10						;-- limit history length
 	]

@@ -276,7 +276,7 @@ events: context [
 					]
 					focused?: yes								;-- event should not be detected by parent spaces
 					if face/space [
-						focus/window: event/window				;-- init /window on 1st event, or if another window got activated
+						if event/window/state [focus/window: event/window]	;-- init /window on 1st event, or if another window got activated
 						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
 						unless focus/current [
 							if target: focus/find-next-focal-*ace 'forth [focus-space target]
