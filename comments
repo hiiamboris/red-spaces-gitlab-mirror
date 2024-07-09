@@ -80,8 +80,8 @@ this is a good idea though: easy way to make every scrollable area draggable wit
 demo: jedi librarians betting game (assisted), to see how this all works in 2D games, and as a template
 optimize `translate 0x0`
 hints (tooltips) for everything, pluggable
-demo: better console, extensible, paragraph-oriented
-	it could have editable commands that re-evaluate everything below when edited 
++ demo: better console, extensible, paragraph-oriented
++	it could have editable commands that re-evaluate everything below when edited 
 scrollbar should work as a separate space too (e.g. influence some external value)
 + demo: infinitely zoomable table, each cell is the table itself
 +	will require limiting rendering depth (or < 1 pixel size), so it won't stackoverflow
@@ -4428,26 +4428,657 @@ focus needs rewrite, it was a bad design
 	  once host gets focus, let it just schedule all tab events including the initial one, and handle in its own time
 	  although it will still get stuck if receives more tab events than there are spaces on the host
 	  still not a huge issue
-	real problem is inability to track focus changes coming from /selected: facet
+	real problem: is inability to track focus changes coming from /selected: facet
 	have to check in dispatch each key event if focus and event/face are aligned
 	if not, need to force focus into event/face, but what space in it?
 	if I have 2 hosts on a window then tabbing can switch to either first or last space in each host
 	if they're on different windows, there may be no event at all, nor /selected change! only event is the signal of refocus
+	other real problem: can't focus fresh spaces
+	e.g. in the console I add a new line and want to focus it - can't
+	because it's not connected to the tree, and render has no guarantees of connecting it
+	(due to geometry-dependent optimizations, and because 'host-of' by design fails on out-of-tree stuff)
+	I could only manually set all /parent relations, and also modify /cached, but it's an ugly hack
+focus redesign
+	models:
+	- set-focus places a focus event, which sets the /focused state
+	  then /focused is async to set-focus but sync to on-focus
+	- set-focus directly affects /focused state and places a focus event
+	  then /focused is async to on-focus but sync to set-focus
+	- set-focus directly affects /focused state and immediately enters a focus event
+	  then events are not queued, but recursive, but all focused states are sync
+	  possible for two on-focus events to target each other and cause stack overflow
+	  on-focus becomes a priority event, and never standalone (generated inside click or key events usually)
+	constraints:
+	- ability to focus orphaned spaces
+	  blockers:
+	  ? next event may be 'key', not 'draw', and then tabbing may be skip an out of tree widget or be caught by it
+	? VID being able to focus new spaces without connecting them yet
+	- synchrony between 'set-focus' and 'focused' (but not with the painted state or on-focus events)
+	- ability to recover from multitude of View focus bugs
+	- ability of tabbing to gracefully recover from focus being lost in a hidden/removed space
+	- document may be focusable if it's editable, and not focusable if it's readonly
+	unsolvables:
+	? host tabbing queue fillup when there are more tab events than spaces on the host
+	  not sure it's a problem, because View may put that event into a new face once host focuses it
+	  View handles that fine, until my scheduler interferes with event filtering
+there's a problem with VID/S 'style' automatically making set-words local
+	it also gathers irrelevant set-words, eg from `react` blocks or actors
+	somehow I need to extract only space names from it, not even inner style names
+	I can't bind those words at style declaration time because I'm not yet processing the pane block
+	I could reserve a list to put those into and then at pane processing time of each instantiation add to the list
+	but then I need to set those words as their spaces are created, so next `do []` or `react` will have access
+	for that I need to re-create the object with these words on each new word
+	and that means no look-ahead, e.g. if actor refers to 'a' after it then it won't be bound, which is a no-go
+	splitting tree parsing stage from creation also impossible because of do/next usage on facets (expr length is unknown)
+	issuing a warning on extra words collected makes most sense I think
+	or need a change of syntax, e.g. issues for space #names, set-words for facets, or some naming prefix e.g. `export` or `set` or `as` or `let`
+	`facet: 1 as name: style ...` the danger is what if `as` is an operator? fine though, same danger with style names
+	funny VID examples:
+	x: 10   view [style x: text "x" x x x]  ;) 2 faces
+	x: none view [style x: text "x" x x x]	;) 3 faces
+	text: make op! func [a 'b] [b] view [text data 10 text data 10]	;) 1 face
+advanced spaces console	design thoughts brainstorm
+	- packed with whole /common repo (and maybe the inspector?)
+	- paragraph oriented (will document be performant enough? or I should rather use `paragraph`?)
+	  need selection & copying (formatted), so a list-view
+	  only expressions are editors (editable), others are documents
+	  how to select multiple messages+outputs etc if it's not a single buffer?
+	  only by being able to mark them whole list-view items,
+	  so need a margin that will receive events instead of the document, and to draw selection mark (also hourglass)
+	- highlighting out of the box
+	  and GUI plugin to edit hilight rules
+	- coloring of: expressions, results, print output
+	- underline expressions? using tracing? or arity counting?
+	- re-evaluation of history if an expression above is edited
+	- evaluation tooltip - ideally animated but need concurrency, eternal TBD
+	  at least I could leave a "⏳" marker near the currently evluated expression and remove it once it's done
+	- "..." menu for each expression - repeat, forget, copy, clip, ...?
+	  need a way to paste multiple commands (entries) then?
+	  or parse the text for >> == stuff? most useful when copying from gittard
+	- "..." or "🔽" for output/result - to expand them or see in another window
+	- plugins: directory? installation commands and UI? from the web? what will they do? e.g. all mentioned around features
+	- hover-on help? for funcs? datatypes? space templates? if fetched from web, cached?
+	- watch plugin, but need to find good UI and showcase for it
+	- tracer plugin?
+	- simple stats plugin - showing cpu & ram load? (CPU averaged for long enough)
+	  needs to modify the UI, so UI must be modular... somehow
+	- two panels? expr and result? will be nice for copying the code without the need to clean it up
+	  but also must be able to copy both columns, for typical gitter use cases
+	  also the splitter should adjust widths (need a splitter template)
+	  it may become possible to show multiple `view` windows and assign result after they're closed only, yet keep input active
+	  3 panels? 3rd for print output?
+	- live coding plugin?
+	- restore and refill history from the last run?
+	  save often because red loves to crash
+	- installed plugins mean 'loaded' - once files are updated they should automatically be updated in the console
+	so roughly the core engine is:
+	a widget receives keys and pointer input and modifies itself accordingly
+	so I may let plugins add hooks to events first
+	two panels plugin will only have to arrange existing UI items probably
+	stats plugin - new UI item+events, maybe requiring status bar plugin that adds container where these things live
+	tracer and watch plugins - new window probably
+	hover-help plugin - watch events, show tooltips
+	"..." plugin - modify UI structure? need to put input/result in a list
+	re-evaluation - watch events, trigger content updates?
+	highlighting - modifies /flags, perhaps using some high level funcs that will allow to compose multiple plugins like this together
+	so nothing should rely on any widget structure, in order for it to be modifiable
+	ideally whatever new widgets plugins add they should be addressable by a global name
+	with events it's easier: adding handlers is modular
+	with UI I could expose a function that builds the layout out of existing widgets, but...
+	composability between plugins is first issue, hot install is another
+	how to design the log entry? vlist [editor output result]?
+	what about /no-view which may print things asynchronously?
+	perhaps it should print into its own 'output' no matter where it is
+	how to make 'print' aware of the output target, so multiple prints target different areas at the same time?
+		could bind print in immediate code but no deeper.. oh!
+		idea: access a function scope, e.g. `print-into` or `capture-output`
+		but /no-wait scenario will leave this capture function, shit
+		and it's possible the *same* code will need to actively print into different target buffers...
+		if I could trace print to an event and then to window... but for that need to have a global event handler
+		for Spaces it may be possible by accessing 'dispatch', but not for View  
+		ok impossible by the looks of it.. so only synchronous print can be routed
+	output should be a scrollable: so it can contain huge text without breaking the UI
+	result? instead of ellipsizing it - also wrap into a scrollable
+wanted to add highlighting to the document-based spaces console but it's waaaaay too slow
+	paragraphs as spaces are great in that they have a cache
+	but if on every key hit I invalidate all paragraphs, and multiple times, that's a drag
+	maybe I could work on a copy of each paragraph data and then compare and commit?
+	but copying so many spaces all the time is not good either
+	had the idea of isolating paragraph data as blocks somehow and putting all of them into document
+	but paragraphs also have metadata, which complicates the format, and most importantly how to track changes back to paragraphs?
+	looks like the only way is to work on raw copied data
+printing is O(n^2) in spaces console
+	because of primitive get-text/set-text, but modifying them won't solve the issue
+	because paragraph splitting itself gets slower as paragraph size increases
+	idea is to lessen the number of splits by grouping them and flushing by timer
+	still will be O(n^2) because that's the nature of document layout but hopefully scalable enough?
+	at least it'll make me optimize document more... e.g. maybe I should support /window in it
+	or to hell with document - use text for output? simple, but won't be any highlighting
+	or highlighting could be tuned to support plain text...
+my simple dragging model limits are found
+	often we need to select inside content of the scrollable but scroll it while pointer is out of the viewport
+	this may apply to list-view, grid-view, editor, and probably other kinds of content
+	problem is, dragging gets started not by scrollable itself but by content
+	thankfully, my event model still allows scrollable to see the event, so it knows where the pointer is
+		however it should be handled by the timer, so I need to stash the coordinates
+		and I can't stash it in the drag-path or drag-parameter anymore
+		maybe devise a better way to communicate data between handlers? for all cases where events aren't isolated
+		OTOH it's always dragging that groups them, so maybe multiple drags at once?
+			in favor: there will be no dragging conflict when multiple spaces decide to start dragging
+		drag-path includes all I need no matter where it belongs, but only scrollable is guaranteed to update it on every event
+		another idea: add (latest) offsets into all events including timer, which will solve this case, but what of any other?
+	what if there is more than one scrollable in the path?
+		makes sense that all of them will try to scroll?
+		or maybe one (inner) that scrolls eats the event, and outer get it when it has nowhere to scroll?
+		but outer are the first to get the event... so not yet possible
+		(unless every scrollable inspects all inner scrollable origins, which is a mess)
+	dragging?/from is unreliable too, because it can't distinguish between inherited and ancestor handlers - who started drag?
+		e.g. scrollable wants to restart it, but list-view doesn't
+found yet another bug in window slide
+	when I add a new line to the document, and next event is slide-timer
+	timer calls available? which tells that there's some content above the window
+	(available from top draws list in reverse, bottom-up, from the current anchor's bottom, which just got bigger)
+	because it renders content that's bigger than what current window size accomodates
+	it would not glitch if available somehow rendered old content or new render was performed before a call to available
+	temporary kludge could be to re-estimate anchor's bottom based on it's new size, but only for this case
+	still, if available returns 20px, why it shifts by 5000px? was a bug caused by negative 'extra length', fixed
+	maybe I should store 'available?' results in the frame info, so it's constant? (or whatever data is needed to have them)
+	but this info can't be complete, it always requires max distance to look into
+	could be a general solution: disable slide if scrollable was invalidated?
+	on the other hand when I move the cursor I want to slide after invalidation caused by cursor movement
+	somehow I need to disable it only if the drawn size changes (items added/removed or items in the map change their size)
+	this is where invalidation type may be leveraged
+reimagining tabbing here
+	want to use walker instead of the full and heavy listing
+	1st issue is somehow generalize spaces and faces
+		in theory if I can get the current focus I may substitute the functions that find next/previous and that's it
+		focusability of a host also depends on whether it has any focusable spaces atm or not
+		logic:
+		- if face (not host) is focused, find next/prev face:
+		  if it's a host, find first/last focusable space
+		  if none exist, continue
+		- when host is focused:
+		  if space is not connected to the tree, find closest connected one and focus it
+		  if no space is focusable on that host, continue to other faces
+		but better if I generalize the notion of 'pane' so that the same code can work with both spaces and faces, seeing host as a panel
+		so host itself is never focusable but its children are
+		and assume probable invalidity of current focus
+	2nd issue is in spaces the last focused thing may not be connected to the tree anymore, e.g. it scrolled out of the map
+		best if I could find the 'nearest' focusable thing but how?
+		maybe in the case of list-view shift-tab would locate the last visible item, tab - first visible?
+	3rd issue is how to bring focused item into view? using cell/item's on-focus handler?
+funny keyboard layout issue on italian and probably other euro layouts
+	[ and ] are input with AltGr pressed, which is seen as Ctrl+Alt by Red
+	usually we don't want to input keys with Ctrl or Alt or both modifiers
+	and there's no simple way to discern real Ctrl+Alt from AltGr
+	possibilities:
+	- ignoring ctrl+alt when it produces a printable char
+	  I chose this, the only downside is that on-key-down will detect keys that won't be present in on-key event
+	- timing ctrl and alt presses before the on-key
+	- noticing on-key-down events before the on-key
+	  these other solutions require state carried between events, which is a bad design
+there may be better rendering/caching designs.. still looking..
+	maybe isolate size/map tree from the spaces tree to just switch it back and forth as canvas changes.. 
+	maybe /size of the space could be set on a special 'frame validation' stage which would happen before render-face exits
+		to exclude intermediate sizes from reactions
+		to lessen the load on the rendering pipeline by letting it know when final result is required or not.. 
+	and most of all I hate cache's opaqueness - hard to debug.. 
+	and how map gets out of sync with the drawn stuff - there must be a way to share data.. 
+	maybe space configuration may be split from space frame data which can be assigned a block/map/object residing elsewhere.. 
+	ideally if I'll be able to freeze everything and inspect the snapshot of all cached tree frames
+		and 'draw' them (without modifying cache) to oversee
+		maybe see the history of all canvases where it was rendered or fetched for given space.. 
+		and need a way to 'label' certain unique space to track only what happens with it in isolation..
+	cache problem is esp significant in the grid, where I have to cache too many data points
+so the idea is to introduce 'deep pan' concept
+	which would propagate 'show this area' from each child to the parent up to the root
+	this would gracefully solve the problem of cursor hidden deep in the tree of scrollables
+	and of an editor that has to draw the changed document, measure caret box and ensure its viewport shows it (and parent viewports!)
+	(which also all depends on the focused state - no need to show caret/cursor that's not visible)
+	and this also should solve the complexity of window slide, making it higher level
+		should I just offset the origin and let adjustment phase fix it for me?
+		what if I 'message' the render to move it on next frame
+		but multiple key events result in multiple moves, so I may want to increase that number
+		also I need to move e.g. list-view by sizes of previous items, but that will be done simpler - by focal area
+		while scrollbar will move it by messaging origin offsets (corrected before drawing scrollbars)
+		asynchrony of such pending move is scary... better to just set the origin, as now
+		how list-view/draw will know starting/ending items? currently it moves the anchor based on map and available
+		need higher level layout measurement functions that give sizes of individual items etc
+		since there will be frame context for the render, these functions will use its prepared values
+	perhaps there has to be 3 rendering stages of a host
+	1. size estimation - I now believe I can significantly reduce the time of it
+	2. adjustment - where origins may be changed (slide goes here)
+	3. map and drawn production - gives code to draw it
+	there must be a frame data that travels from one stage to another, and all of part of it may go to the cache too
+	I'm thinking of removing /size and /map and maybe even /draw from the space object, leave only properties
+	/size is important in View where it reactively binds faces, but not in Spaces where sizing is automated
+	/map may be hidden in the frame since only hittest and some other inner code needs it
+	/draw I'd rather 'register' using some API that would make inheritance more explicit than 'new-draw: :draw' kludge
+	key insight: attributes of a space do not change during frame render! so there's a possibility to cache results
+	how to maintain multiple rendering contexts for single frame, for different conditions?
+		hold them in the cache? or in frame data? as map size->info? /frame for current, /frames for all?
+		if single invalidaton results in single render, then invalidation doesn't have to be blazing fast as long as sum is good
+		can sections go into frame cache? it must be so
+	there may also be a way to tie this to focus design... need more thoughts
+		focus needs to be placed on something that has no /parent yet
+		possible to do that during drawing?
+		need set-focus -> on-focus event modifies look -> drawn, not drawn -> on-focus -> drawn
+		so I may stick this into adjustment phase, since sizes won't be affected by focus usually
+		problem is capping refocusing performance with drawing frequency
+		e.g. in console if push 'down' and require draw focus each newly created log-entry, it may be sluggish
+		should be easier to make 'connect' function for not-yet-drawn spaces, or </in parent> refinement to make-space
+	maybe I should also make /margin and cell-like stretching common and put it into render?
+		an 'arrange' function could be separated from /draw circuits and generalized/parametrized
+		'slider' arrangement, 'scrollable', 'list'...
+		perhaps using a hidden arranger I could avoid an extra organization level, like 'list' for composite widgets
+		and subdialect for layouts of complex widgets, e.g. `layout: [hlist: [space1 vlist: [space2 space3]]]` - set-words are arrangements
+	one good case in the console: rows that are hidden or shown depending on their content
+		content length in some cases is also only estimated during /draw
+		invalidation may not happen for something that wasn't drawn - needs connecting
+		what's drawn affects what's formatted during ^C
+	what about scrolling? I will need to scroll the window letting caret go out of view
+		focused/unfocused distinction can't help:
+		- when drag-scrolling the scrollable is still in focus
+		- when wheel-scrolling - no focus changes at all
+		- when tabbing into space - it gets focus but may or may not want to go to caret
+		  (likely not, as we want tabbing to be non disruptive)
+		caret must be brought to light only when it moves (probably excluding programmatic movement)
+		space itself must be brought to light only when it gets focused/selected (in a scrollable deep tree)
+		any programmatic bringing needed except when focusing? possibly
+		how to control where window will appear in relation to the shown area? like above/below etc
+			perhaps with a box and a point of importance in it?
+			e.g. newly pasted text region and caret bottom in it
+			or newly selected list item and a point at its top or bottom
+			if we're shift-selecting (text or cells), point of importance is where the cursor is
+			box itself might not be so important though, even in list-view
+			but it makes sense in deep scrollable tree, to help upper scrollables align
+			from a high level perspective: area where change happened and its focal point
+			better: area of change and focal area, so it won't depend on the state that much (higher level description)
+			worth maybe reserving an option to have more than 2 levels of importance? 3? 3rd may be used as a desired margin!
+			allow to use space instead of an area? not fit for list items which don't have cursor but have focus, but as an option - maybe
+		how does info travel from an event, into child's draw which sets importance, and into parent's draw which read importance?
+			I don't want to put these regions in the frame, as 99% of it will be a wasted ram
+			then either it's a function which sets parent's words (too hacky) or result of render call
+			event doesn't really need to do anything if facet change detection handles importance
+			but where facet change stashes info that next render will be using? another facet is too expensive
+			render checking somehow for what changed? reflect self 'changed ? allocation + find requirement..
+			there could be a global hash with spaces and their data that needs delivery to render (cleared after a render)
+			for this use case it's only a flag? or not? (caret/cursor moved is a flag, but change to text is a range)
+			so a per-space arbitrary value signalled to the next frame render
+			then why not make a generalized messaging framework? heavier? but that would allow event handlers to communicate
+			problem with generalized is GC lock of REP-129, unless it's cleaned timely
+			to help with cleaning messages may have categories, e.g. render just would clear whole category
+			maybe not messages but just signals, because messages imply queues and its slower/bulkier
+			just a category for render, category for events, etc.. probable categories: render, event
+				simple implementation: 2.5us send, 1.2us recv min times
+				while messages (no cat): 2.6us send+recv (no cleanup), 7.5us (with cleanup)
+				it's likely that 'change' used by signals will trigger rehash though, slowing everything down
+				why signals may be a better fit is because I only care about the last value
+				I don't really care as there'll rarely be a single message per render, but signals simpler, no need to read all values
+			I should expect only single tree branch to have this area of importance, otherwise makes no sense
+			child may simply add its areas of importance into the frame: as long as it exists for only a few spaces it's no big deal
+			I don't like parent looking into child's frame though - it should not know what its fields mean
+				result of render? weird, don't want it
+				host facet? should not require a host
+				func that modifies words in the parent? too hacky/error prone
+				shared variable? not great design, also error prone
+				func that modifies word inside render? will be lost after child render scope is closed, need to look up in the parent's
+				stack that parallels render calls stack? possible, but more tedious than frame var
+				so okay it will be reserved frame var, e.g. frame/focal (at least that'll be inspectable)
+			signals:
+				region of changed text in document (uses min/max to extend itself with every edit?)
+				new caret location
+				selection extension (e.g. while drag-selecting) - usually also moves caret
+				new selected item
+		scrollable should not attempt to change its origin if dragging is underway
+	how will I tie this to animation? planes and overlays?
+		I want every space to be animatable out of the box, without changes to its code
+		and I want it to be pluggable as easy as adding a setting/flag/whatever
+		common UI animations:
+		- layer sliding/bouncing (incl. bouncing overlaid arrows)
+		  a bit tricky side of a drawer is that it doesn't make the background thinner - it's like(?) an overlay/stack
+		  it may pass clicks when inactive and filter them when active: map will contain overlapping regions
+		- shadowing/appearance/disappearance - opacity or color mix, or overlay, zoom in
+		- video/gif
+		- frame transitions (but impossible atm as distortions, possible as overlays, or parameter easing)
+		will need a special test for common animations
+		animation ideas:
+		- wind carrying away particles of UI until nothing left, or "hit" that shakes the UI and it drops some pixels down
+		  doesn't seem possible without specialized image distortion routine
+		  (wind in principle works with 10-20 stencils but after converting UI into image) 
+		- drawer that uses depth to appear as 3D: when shown it "rotates" along Y onto the screen, when hidden - back
+		  impossible - no depth in draw - only skew - even matrix can't handle that
+		- beating (zoom in/out) UI element - easy - just reports its size as constant (to avoid clip), and draws bigger
+		  will still be clipped by scrollables when they clip whole layer, but not a big issue
+		- UI item travels along a path to its proper place
+		  will need an overlay (maybe non interactive), which at the destination gets replaced by the real UI item
+		  such overlay will need to know item's real geometry (after all distortions!) - so only for non-zoomed UIs
+		- the same can be used massively to 'explode' whole UI from the center or float from around
+		  hard part with global UI items animation is what to consider final items? and those may be deep in containers
+		- same but items fall down as if gravitating, and shake the whole frame when hit their places
+		  need easy interaction between single item and all others on the frame
+			  means animation should define some code to be eval'd once it's finished (or at any other keyframes)
+		- same but items get elastically stretched and released when they approach their places when they contract
+		  should be easy enough to let items draw outside their destined region but pretend that they fit in
+		  though a separate overlay would be less hacky
+		- pager's frame transition: e.g. when moving a page down all items get stretched to the page 'above'
+		  then all items from the page 'below' get stretched into the current page, sort of like an alternative to scrolling :)
+		  this doesn't need any overlay, works out of the box.. it's only hard if only _some_ spaces need special treatment
+		- split frame into multiple skewed bands, sliding into place one by one
+		  or into rays - as if bulleted mirror
+		  whole-frame effects will be possible using paragraph trick: clip and repeat (worthy demo)
+	for better popups support maybe I should handle translation and zoom myself?
+		I could make /margin and /scale and /rotate standard and put generalized code into render itself
+		then I should be able to go up the tree and find out final geometry of a child.. 
+		unless it uses a noncommon distortion, in which case I would be limiting it... not worth it
+		e.g. paragraph's wrapping is quite uncommon distortion, totally can't be generally handled
+		also application of margin precedes any scaling or other transforms inside draw (so margin can't be scaled then)
+animation triggers: (may want a simplified dialect that defines event handlers that trigger animations)
+	- programmatically (for uncommon behaviors - likely majority of cases)
+	- on show, on hide
+	- on focus/unfocus
+	- on click/down/up/select (buttons and lists)
+	- on time (e.g. notification ringer - hate it though)
+	- on screen orientation changes - for the whole UI (rotation, resize) 
+	- reaching predetermined parameter range, e.g.:
+	  for scrollable - origin outside allowed bounds
+	  for pager - page gets 5% out of view or so, starts moving to another page, or another trigger for page change
+	  for progress indicator - progress increase
+	  for images or page loading - loaded state change
+	  for many webpages - scrolling past or before given offset
+	- custom triggers defined elsewhere?
+	where's the line between these point on-event triggers and defining whole UI in terms of how it animates (what Galen pursued)?
+		more likely high level animation will be used to create graphics out of shapes/pics rather than applied to UI items
+		whenever they use parallax it's usually not for UI but for graphics, so probably out of scope of spaces project (maybe as an addon)
+	for a lot (maybe all) of these it's just a parameter animation:
+		e.g. I set /progress' alt value for progress indicator and set style to use for drawing and animate it to reach /progress
+		however if e.g. I have non-linear slow-starting easing I want to avoid restarting the animation every time /progress changes
+		I want to alter the existing animation, just give it another /progress target, but keep the momentum.. how?
+		ideally I want to look up existing animation, e.g. by space object, and modify its target value
+		and animation should then be organized in such a way that it has source, current(unchanged) and target values
+	for accessibility there should be out of the box behaviors that make widgets animated, e.g. 'animated'
+	and maybe I would like to have an #animate source target spec expression in the templates so I don't repeat myself
+		such directive may leverage global animation on-time hook to update the target value (simpler to make animated templates)
+	would be really great to make it higher level but at a glance I don't see how it may work
+		since animation consists of on-event triggers, timers, styles alterations, and works on different parameters and in different ways
+		so far it seems that each animated behavior is very widget-specific
+	can whole-frame 'animate' be a specific type of layouts and defined using same layout mini-DSL?
+		need to figure out how they get parameters and if it's wieldy
+on overlays
+	what if I add a ref /inverse to 'into' and 'hittest', and will be able to project inner points out?
+	that'll solve the issue of unknown transformations, in both animations and popups
+	a default could be to pop up and watch geom/size vs space/size - assume scaling if not equal
+	another way could be to parse the draw block, but there's no /type in it to identify targets
+	(however same? could be used to compare all blocks to those in frame/drawn of every space... probably best option)
+	what if /draw block will be a static block to compose against frame items? doesn't sound great
+	tested parsing idea on tube-test1:
+	- 24ms to get all cached drawn blocks from the tree
+	- 38ms to identify them in the full drawn block
+	it's a bit glitched by the timing should be right - 60ms to prep an animation (after that it can be fast)
+	besides, given that the layout itself is huge and takes ~60ms to draw, it's not very animatable anyway (too low fps)
+	at least I know that this kludge is possible to use to add deep animation to a design that didnt anticipate it
+	another option is to attach a matrix to each drawn child during render, making them kind of independent
+	(though draw still has pens in state and clipping)
+	but ideal solution will be to wait for REP 144 and set each space's matrix when it's drawn?
+	however cached spaces may appear in different places (so different matrices) without re-rendering
+	and that still would mean scanning the whole tree for specific spaces and their matrices
+	what I ideally want is for each time a drawn block is displayed, to renew set of matrices in a summary table
+	such a table could be compiled from individual spaces' matrix blocks (retaining sameness)
+	instead of scanning I could insert something into relevant styles! that's it!
+	style templates in question with code that stashes matrix and type in a table, which then gets animated, perfect
+	overlay template will just hide its contents until animation is finished and pass thru after
+	except how to do it without a separate template? or how to reuse overlay for different goals, like dropdowns?
+	maybe overlay shouldn't be a template, but an alternative rendering target?
+what to do with styling mess?
+	need style inheritance and higher level geometry control
+		for inheritance - either style evaluation (as function), or format that allows inclusion, maybe with <parent>-referring keyword
+		ideally all draw code produced by the style, frame geometry by the /draw, but map must also be made after style adjustments
+	could /size phase fill frame info that style can use and maybe modify? - on adjustment phase
+	could /draw create sizes for components, byt style arrange them and produce drawn code?
+	could I render or at least auto-connect children but eliminate them from the map+drawn conditionally, like in the console?
+		or just enhance tube formatter to skip zero-sized children... though they still have a spacing...
+	maybe for composability I should manually specify mapping of space facets into style inputs?
+		e.g. progress' -> progress when I want to add animatability?
+		can be done by building a map with foreach at style invocation.. will slow down style application, may not be worth it
+sections must be absolute widths somehow! then I'll be able to use search to efficiently locate breakpoint
+	on the other hand that'll make them hard to interleave from various sources... hmm
+	tree form? could text partially update sections on partial edits? probably not
+	in principle if I make 1 space per line or per word of text, that's scalable
+summary plan:
+	light layouts, possibly dialectic
+	sizing func to estimate sizes without map/render
+	maybe layout or arrange func that arranges children, or styles should control that
+		better to not mix styles and layouts, let styles control minor things, layouts - for total redesign
+		maybe layouts just as styles should be separate?
+	it or other func should also produce a map, which user should be able to adjust further or fork the layout to do that
+	flag for draw or in the space that will clip the origin in scrollables
+		or do I even need origin when I have focal areas? scrollbars could shift the focal point
+I just realized this thing about dragging while I was dragging cell to cell in the grid!
+	dragging has a locking depth!
+	e.g. when I select cells I don't want to lock it inside the cell, but inside the grid!
+	but I may want to lock it in the cell if cell handles the dragging
+grid: how should selection work?
+	UX-wise I may support:
+		cell to cell range selection (by dragging or with shift click)
+		ctrl click to add/remove individual cells
+		click on row/col headers to select whole row/col
+		drag around row/col headers to select whole range of rows/cols
+		shift click on row/col headers to mark a range of whole rows/cols
+		ctrl click on row/col headers to add/remove whole rows/cols
+		flow-like cell to cell selection? doesn't seem so useful
+	problem is what to do with all that?
+		suppose I mark a row and a column, how can I meaningfully copy it? can remove sure, but nothing else
+		or if I ctrl-click to select individual cells, how that can be copied?
+		so better to restrict selection to:
+		- 2D range of cells (2 pairs, inclusive, unordered)
+		- column set (as bitset?)
+		- row set (as bitset?)
+		- everything = either set of all columns or (worse) of all rows
+		  what if I press ^A to select everything then ctrl-click on row or on column to exclude it?
+		  ^A cannot know in advance whether to mark rows or cols...
+		then copying and pasting makes sense (e.g. using tab and newline as delimiters, but internally as an object maybe)
+		idea of holding selection as list of ranges (pair couples):
+		- for 2D range it's always a single couple
+		- for columns or rows consecutive range also a single couple
+		- for sparse columns/rows ranges it will be a more than a single couple
+		- everything will be encoded as single couple 1x1 .. last cell
+		why not a map of cell address -> selected or not?
+			because grid may be infinite => infinite map
+			also ^A will be very slow on big grids
+		another idea: 2 bitsets, one of columns one of rows, their intersection is specific cells (2D range)
+			API will be much simpler and faster!
+		higher level API to select columns/rows/everything/2D-range, which will combine it with (or replace) the current selection
+		low level API needs:
+		- FAST checking if cell coordinate is in the selection (for multi-cells - any coordinate can be checked, eg of 1st cell)
+		  this will have to be done for each drawn cell, which will affect its style
+		  for auto-height grids this may affect ALL cells
+		- removal/addition of a range (with separate or auto optimization)
+	selection actions: copy, paste over, clear, unify, split
+	selection modes allowed:
+	- selection forbidden (none) - e.g. for static grids in markdown
+	- single-cell selection ('single)
+	- unrestricted ('multi)
+	problem is in cell invalidation during selection - may try to invalidate infinite or big number of cells
+	idea: let grid handle selection, do not pass it into cells
+	if grid style may just draws a box - hard to handle sparse selections
+	if grid draw checks if each cell is selected - fast but not a great place for it?
+	invalidate only the drawn cells?
+	list-view doesn't invalidate items, just retouches a finished list layout in customized list-draw, and it's wise
+	grid-view should do the same, or I should put selection right into the list/grid layouts
+	in grid's case it's especially helpful to have only viewport being drawn
+grid UX is what I have hard time deciding on
+	suppose user has no pointing device and wants column and row selection and copying, removal, etc
+	means cursor should not be restricted from the header?
+	OTOH it may be a very long way from line 100000 to the header, so unlikely will help
+	though ctrl+arrow may be allowed to jump to row 1 or to row after header
+	but also ctrl+arrow may be used to navigate around normally without triggering selection reset
+	I also want navigation into filter cells to focus filters (but likely on the app level)
+	found guidelines (seem rather common): https://www.w3.org/WAI/ARIA/apg/patterns/grid/
+	perhaps I should use persistent selection? or as an option in behavior? (so normal arrows do not change it)
+	that would be the only way to select non-adjacent columns/rows
+	interestingly, Esc key (and some others) should be handled by the grid itself, even when it's not in focus but some child is
+	this needs extension of the focus model, unless I wanna patch each grid child with this
+		perhaps when key is not handled by the child, it should be offered to all parents?
+		shortcuts is another consideration - should be handled by the host maybe?
+	tabbing wrapping is also proposed, but not a priority
+keyboard grid selection is tricky...
+	using only bitsets how can I support it and make it fast enough?
+	I suppose bitset-based selection is not for gigatables anyway though, too wasteful
+	up to 100k rows? 12kB bitset... fine enough
+	need to determine 4 selection corners, find one that cursor is on and opposite is the start...
+	however if I do that, I need to do the same for drag-selection, since it will scroll and move cursor
+	unwanted slowdown.. but I don't know a better solution yet
+	maybe a /selection-start pair field in grid-view?
+should headers be selected?
+	for ^C it makes sense if we want to paste the grid elsewhere, esp. after ^A
+	for removing whole cols/rows - makes sense too
+	ok then yes
+	what if I select columns and/or rows by dragging, should headers then be selected?
+	perhaps so, not sure, makes some sense
+	but normal 2D range selection?
+	probably no headers!
+when copying grid selection - need to call format on each cell
+	but cells don't exist yet, so need to create them all!
+	but that will take hours! shit
+interesting effect of keyboard navigation on grid UX:
+	when a cursor is on multicell I could:
+	- draw cursor as big as the multicell, and let keys move off it in one hit
+	- draw cursor as small as each inner cell, and let keys navigate across inner cells of a multicell
+	but 1st option, while seems logical, may not allow reaching some cells by keyboard (or not easily), e.g.:
+	A A B
+	C D B <- to reach the D cell is only possible from C hitting Right
+	E E E
+	it seems always reachable, but still it can become a quest
+	what spreadsheets are doing is they remember the actual cursor cell coordinate,
+	but they keep skipping cells in the same direction from it as long as they are in the same mcell
 	
-	  
-;@@ on-change needs access to old value
+
+	
+Giuseppe's wishlist:
+Columns Sorting/resizing,
+Cell editing 
+Column headings 
+Columns hiding (show only selected Ones)
+Optional virtual row Numbers 
+Click and double click events, Right mouse and middle mouse support
++Cliccabile buttons on the side of cell
+Position keeping when opening the grid
++Filtering
+Insert/delete one or more rows or columns (rows are more important)
+Jump to edit a specific Cell
+Read only columns
+Cursor navigation
+Keys combination support
+when data is sorted or filtered, a link to the original data like an index should be kept, so you can delete/modify the root data via code
+cell based actors
+Each actors should have access to x/y position of the Cell, x for the row, y for the column.
+(my own) put filters and size into state file
+
+
+
+
+;@@ standardize grid-view and list-view keys: 
+;@@ https://www.w3.org/WAI/ARIA/apg/patterns/listbox/ 
+;@@ https://www.w3.org/WAI/ARIA/apg/patterns/grid/
+
+;@@ allow parents to receive keys not handled by children, think how shortcuts could work
+
+;@@ consider removing support for function! grid/bounds, as I don't even think it's working (too many places I may have overlooked it)
+;@@ also consider making it a pair instead of none/none - maybe 2e9 will be enough for practical infinity? ('auto is boring too!) 
+
+;@@ consider making list/selected a bitset too!
+
+;@@ really need more control over handlers, e.g. I extend 'field' and don't have access to its final text because it's modified after the extension handler
+;@@ another issue: inf-scrollable(grid-view) when dragging<>pan blocks 'down' events to grid, but should only disable dragging!
+;@@ another issue: want to pass events to children but not to inherited parent handlers - no way if parent calls 'stop'!
+
+;@@ an intersting feat of dragging is that maybe the mod keys at the down event should be applied to the over and up events.. which requires events to communicate with each other, across the same space, or dragging framework to carry this info
+
+;@@ grid row height autoestimation is extremely slow on exoplanets data - but it comes from cells rendering for the whole window (87 columns!)
+;@@ perhaps I'll be able to help that by splitting sizing from rendering, but there's no ideal solution?
+;@@ /autofit makes no sense when no heights are automatic - should I auto disable it?
+
+;@@ hovering should not bother with the time event unless host is re-rendered
+
+;@@ I should consider a high-level indicator or function that would detect if pointer is upon or captured by a space (like over behavior but without movement)
+
+;@@ /clip: auto/none/force flag for rendering context?
+
+;@@ need more general popup window composition maybe?
+
+;@@ common API to paint both rich-content and paragraph (rich-text face)
+
+;@@ structure stylesheet for rapid lookups, e.g. expand style paths into trees, based on lookup order (but need to consider the grand scheme - style inheritance)
+
+;@@ looks like do-handler doesn't need spc-name argument - can extract it in case of errors itself - simplify it!
+
+;@@ VID/S needs redesign in the face of the context dependency danger
+;@@ also I may allow `react` to be used without relation to the above space? e.g. after `do []` or before anything (mb not worth it)
+;@@ also it now binds 'self' anywhere in the style definition to /children, e.g. `on-move= func [path] [move-marker self path]` won't work
+;@@ also 'self' inside actors is bound to events context!
+
+;@@ scrollable should not be focusable when both scrollers are hidden, but how? /focusable? flag as in View? maybe make a pair of scrollers a single focusable (hidden/shown)?
+;@@ focus bug: dragging of list-view item doesn't work until item is focused?? I can't determine when it happens
+;@@ child scrollables require dragging override to work - is there a better design?
+
+;@@ on focus - bring focused item into view
+
+;@@ grid-ui shows how complicated can UX be, where various mechanics possibly not aware of each other must play together well
+;@@ I need to design a more declarative and high-level approach to UX, otherwise it quickly becomes a mess even I don't understand
+
+;@@ dragging is tricky: e.g. grid wants to lock dragging inside itself, but allow some children to override it, e.g. scrollbars
+
+;@@ style inheritance issue: if I make a derivative of grid-view e.g. 'grid-edit', I also have to derive all the styles that refer to grid-view, and I don't even know how to list them; but this all should be automatic somehow...
+;@@ and also there's "focusable", while I just need to clone a template without all this nonsense bookkeeping!
+
+;@@ current focus model does not allow a key to be ignored by a focused field inside the grid so that grid would pick it up! focus should not be isolated
+
+;@@ another case where events should interact with each other is tabbing: if it eats key-down it should also eat up key and key-up! and another twist is that all three must be received by the same space, not by different ones
+
+;@@ there's currently no way to prevent scrollable inside a grid-view cell to stop receiving focus from clicks (except for renaming it to other-scrollable), which leaves too little high level control over focusing (in particular I want to click on a column then ctrl-+ to insert another column but the key goes into an inner scrollable)
+
+;@@ if an event handler inherits another handler, how is `stop` flag controlled? is it necessary for one of the handlers to call 'pass' or the last one should call 'pass'? it's a design mess atm
+
+;@@ work on systemizing the edge cases of focus: focusing not yet drawn space (has no host/window attached) - either from VID/S or after a space was just added, not drawn yet (possible that Tab event follows and fails then? how to keep focus/window up to date?) - this may mean focusing an isolated widget then rendering it and connecting focus to window etc
+;@@ another case in grid-ui: on click on a cell a field appears that need to be focused - but field gets connected asynchronously by next render; main complication comes from focus/unfocus events needing a complete path to work, but that path is not known
+
+;@@ browser is able to scroll all layers of content to the moving caret
+;@@	with spaces, editor scrolls itself but outside scrollables do not - how to fix?
+
+;@@ change pair to point in the docs!
+;@@ change event typesets in the docs and make event a map everywhere 
 ;@@ in scheduler: see if any other than timer events come during resize/menu, switch to immediate processing
 ;@@ remove object events, make map events! e.g. in hovering.red
 ;@@ focus needs debugging across multiple windows - need 2 windows in focus-test
+;@@ doc /children facet (from VID/S) or any better name?
+
+;@@ grid needs a LOT of work, it's so awkward to use:
+;@@ how e.g. I can tie some column width to canvas? 
+;@@ custom autofit algo is too much, maybe I can add a constraint-based one though: percents widths after integers
+
+;@@ can grid itself know its actual displayed size inside grid-view? so paging could be added directly into it
+
+;@@ there's some 'vsync' kind of issues in grid, e.g. visible on grid-ui:
+;@@ when I hold the arrow key, it paints grid-view background as not fully finished; need to solve it
+
+;@@ key navigation across the bottom of grid-ui's huge grid shows how bad idea it was performance-wise to have a fixed 0x0 origin - need to make grid relative
+
+;@@ feat for list-view to disable deselection
 
 ;@@ draw an illustration of list-view/origin and window/origin, in docs
 ;@@ explain how scrollbar imposes a performance limitation on the list
 ;@@ (could be fixed by scrollwheel or decorrelating thumb size from viewport size)
 
 ;@@ consider a vlist of plots: each plot is huge and can only be drawn on a viewport, but can list support it?
-	
-;@@ using apply simplify passing of arguments into layouts
 
+;@@ there's a general issue of clipping not being done when /limits require it - how to solve generally without slowing down? put into render?
+
+;@@ seems to be a "bug" in list-view, when I clear its source, anchor can be outside 1..count limits
+
+;@@ doc behaviors once I'm more sure in them; list-view/selectable is no longer a facet!
+;@@ doc that events are only maps now
+
+	
 
 Paragraph layout design...
 |                                                    <- total-width ->                                               |
@@ -12620,3 +13251,89 @@ still 3x slower than make compose/only
 		; obj
 	; ]
 ; ]
+
+initial lexical tracer - with a workaround no longer needed
+; lexical-tracer: function [
+	; event [word!]
+	; input [string!]
+	; type  [word! datatype!]
+	; line  [integer!]
+	; token
+; ] with :foreach-token [
+	; [scan load open close error]
+	; path?: find any-path! type
+	; switch event [
+		; scan  [report?: not path?]
+		; open  [if path? [append opens token/1]]
+		; close [if report?: path? [token: (take/last opens) thru token/2]]
+		; error [input: next input]							;-- protect from deadlock
+	; ]
+	; if report? [
+		; set spec/1 to word! type
+		; set spec/2 token
+		; do code
+	; ]
+	; event <> 'error											;@@ have to load values because of #5444
+	; false
+; ]
+
+free lists I used when GC was too dangerous
+; ;; main problem of this faster design: doesn't care about length, may result in lots of reallocations
+; make-free-list: function [
+	; "Create a free list of things with GET and PUT methods defined"
+	; type [datatype!] "Type of thing"
+	; init [block!]    "Code to create a new thing"
+; ][
+	; object compose/deep [
+		; stack: []
+		; get: does [either tail? stack [(init)][take/last stack]]
+		; put: func [x [(type)]] [
+			; append/only stack (either find series! type [ [clear head x] ][ [:x] ])
+		; ]
+	; ]
+; ]
+
+sophisiticated but slow free list version
+; ;; need this to be able to call event functions recursively with minimum allocations
+; ;; can't use a static block but can use one block per recursion level
+; ;; also used in the layout functions (which can be recursive easily)
+; ;@@ this is too complex and ~10x slower than the GC itself, so only should be used when GC is off
+; obtain: stash: none
+; context [
+	; ;; for faster lookup of specific sizes, a ladder of discrete sizes (factor^n) is used
+	; factor: 1.4											;-- https://stackoverflow.com/q/1100311
+	; log-factor: log-e factor
+	; free-list: #[]
+	
+	; ;; `make` alternative that uses a free list of series when possible - to reduce GC load
+	; set 'obtain function [
+		; "Get a series of type TYPE with a buffer of at least SIZE length"
+		; type [datatype!] "Any series type" (any [map! = type find series! type])
+		; size [linear!]   "Minimal length before reallocation, >= 1"
+	; ][
+		; size:   max 1 size								;-- else log will be infinite
+		; name:   to word! type							;-- datatype is not supported by maps
+		; ladder: any [free-list/:name  free-list/:name: make hash! 256]
+		; step:   round/ceiling/to (log-e size) / log-factor 1
+		; either pos: any [
+			; find ladder step
+			; find ladder step + 1						;-- try little bigger sizes as well
+			; find ladder step + 2						;@@ how many to try optimally?
+		; ][
+			; also pos/2  fast-remove pos 2
+		; ][
+			; make type round/ceiling/to factor ** step 1
+		; ]
+	; ]
+	
+	; set 'stash function [
+		; "Put SERIES back into the free list for futher OBTAIN calls"
+		; series [series! map!]
+	; ][
+		; type:   type?/word series
+		; ladder: any [free-list/:type  free-list/:type: make hash! 256]
+		; step:   round/floor/to (log-e length? series) / log-factor 1
+		; repend ladder [step clear series]
+	; ]
+; ]
+
