@@ -37,10 +37,14 @@ context [
 			with space left
 			with space right
 		]
-		if timeline/limit * period < length? timeline/events [	;-- trim the head
+		if timeline/count > timeline/limit [			;-- trim the head
 			n: round/to timeline/limit * 5% 1
 			remove/part timeline/events n * period
 		]
+	]
+	
+	count: function [timeline [object!]] [
+		divide skip? timeline/events period
 	]
 	
 	elapsed?: function [timeline [object!]] [
@@ -68,6 +72,7 @@ context [
 	set 'timeline! make classy-object! declare-class 'timeline [
 		events:     []
 		limit:      1000	#type [integer!] (limit >= 20)		;-- max number of events to keep
+		count:      does [~/count self]							;-- current number of past events
 		elapsed?:   does [~/elapsed? self]						;-- can return none if timeline is empty
 		last-event: func [/for obj [object!]] [~/last-event self obj]	;-- only returns arguments to 'put', not the time
 		undo:       does [~/undo self]
