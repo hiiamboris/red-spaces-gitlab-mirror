@@ -104,11 +104,12 @@ if action? :mold [
 			[no-trace]
 			{Returns a source format string representation of a value}
 			value [any-type!]
-			/only "Exclude outer brackets if value is a block" 
-			/all  "Return value in loadable format" 
-			/flat "Exclude all indentation"
-			/deep "Expand nested structures on all levels" 
-			/part "Limit the length of the result" 
+			/only   "Exclude outer brackets if value is a block" 
+			/all    "Return value in loadable format" 
+			/flat   "Exclude all indentation"
+			/deep   "Expand nested structures on all levels"
+			/native "Pass over arguments to the native mold instead" 
+			/part   "Limit the length of the result" 
 				limit: (pick [100'000'000  10'000] all) [integer!] (limit >= 0)
 		][
 			indent: make string! 32
@@ -122,6 +123,7 @@ if action? :mold [
 		;@@ otherwise high chance of breaking user code
 		mold-stack: make hash! 100						;-- used to avoid cycles
 		mold*: function [[no-trace] value [any-type!] limit /extern deep flat] with :mold reshape [
+			if native [return native-mold/:only/:all/:flat/:part :value limit]
 			; print native-mold reduce [only all :value]
 			sp: " "
 			output: make string! 16
@@ -387,8 +389,8 @@ context [												;-- replace compiled mold with interpreted mold, and add /d
 	body: body-of :system/words/save
 	parse body rule: [any [
 		ahead any-list! into rule
-	|	ahead any-path! into [thru 'mold insert ('deep) to end]
-	|	change only 'mold ('mold/deep)
+	|	ahead any-path! into [thru 'mold insert ('native) to end]
+	|	change only 'mold ('mold/native)
 	|	skip
 	]]
 	set 'save func spec-of :system/words/save body
