@@ -61,7 +61,7 @@ define-handlers [
 		]
 		on-over [space path event] [
 			update-status event
-			space/color: either any [path/2 inside? space  probe dragging?/from space] [magenta][brick]
+			space/color: either any [path/2 inside? space  dragging?/from space] [magenta][brick]
 		]
 	]
 ]
