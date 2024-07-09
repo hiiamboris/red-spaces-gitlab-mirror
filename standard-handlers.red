@@ -20,7 +20,7 @@ define-handlers [
 	;-- *************************************************************************************
 	scrollable: [
 		on-down [space path event] [
-			set [_: _: item: _: subitem:] path
+			set [item: _: subitem:] skip path 2
 			case [
 				find [hscroll vscroll] select item 'type [		;-- move or start dragging
 					axis: item/axis
@@ -29,34 +29,39 @@ define-handlers [
 						back-arrow  [space/move-by 'line 'back  axis]
 						forth-page  [space/move-by 'page 'forth axis]
 						back-page   [space/move-by 'page 'back  axis]
+						thumb       [drag?: on]
 					]
 				]
-				item =? space/content [pass]			;-- let content handle it, but still start dragging (e.g. grid-view within grid-view)
-				; item = none []							;-- dragging by the empty area of scrollable
+				any [item =? space/content  item = none] [		;-- 'none' is useful if content is smaller than the scrollable
+					drag?: find [pan scroll] space/behavior/draggable
+					clear skip (path: clone/flat path) 4		;-- drag by content, not by its child (child may override this)
+					pass										;-- content may still handle it (e.g. grid-view within grid-view)
+				]
 			]
-			; ;; remove cells or other content from the path, as they do not have to persist during window moves:
-			; unless find [hscroll vscroll] select item 'type [clear skip path 2]
-			
-			;; start dragging anyway, e.g. for dragging by content or by empty area:
-			; if space/behavior/draggable [unless dragging? [start-drag path]]
-			;; let child scrollable override dragging of parent scrollable:
-			if space/behavior/draggable [start-drag path]		;@@ need more elegant solution
+			;; don't override drags from inherited handlers (grid-view, etc.), but override from parent handlers (child takes priority)
+			if all [drag?  not dragging?/from space] [start-drag path]
 			
 			space/last-xy: path/2								;@@ kludge
 		]
-		on-up [space path event] [stop-drag pass]
+		
+		on-up [space path event] [
+			either dragging?/from space [						;-- since 'down' is sent to children, let 'up' be sent as well
+				if (drag-offset path) +<= (3,3) [pass]			;-- do not eat clicks on content, only drags (experimental) ;@@ or pass anyway?
+				stop-drag
+			][
+				pass
+			]
+		]
+		
 		on-over [space path event] [
-			unless own?: dragging?/from space [pass]			;-- let inner spaces handle it
-			unless all [
-				drag-path
-				found: find/reverse/same next drag-path space	;-- only handled if started anywhere inside this scrollable
-			] [exit]					
-			set [_: _: item: _: subitem:] path
+			unless own?: dragging?/from space [pass exit]		;-- let inner spaces handle it
+			
+			set [item: _: subitem:] skip path 2
 			switch/default select item 'type [					;-- item may be none
 				hscroll vscroll [
 					unless all [
 						own?
-						'thumb = select subitem 'type			;-- do not react to drag of arrows (used by timer)
+						thumb?: 'thumb = select subitem 'type	;-- do not react to drag of arrows (used by timer)
 					] [exit]
 					scroll: item
 					x:      scroll/axis
@@ -83,7 +88,12 @@ define-handlers [
 				]
 			]
 			if ofs [space/clip-origin space/origin - ofs]		;-- clipping in the event handler guarantees validity of size
-			if own? [if not find [scroll select] space/behavior/draggable [start-drag path]]	;-- restart from the new offset or it will accumulate
+			if own? [
+				if any [
+					thumb?
+					not find [scroll select] space/behavior/draggable
+				] [start-drag path]								;-- restart from the new offset or it will accumulate
+			]
 		]
 		on-key-down [space path event] [
 			; unless single? path [pass exit]
@@ -162,10 +172,10 @@ define-handlers [
 
 	;-- *************************************************************************************
 	inf-scrollable: extends 'scrollable [	;-- adds automatic window movement when near the edges
-		on-wheel    [space path event] [space/slide]	;-- faster wheel-scrolling, without slide-timer delays
+		on-wheel [space path event] [space/slide]		;-- faster wheel-scrolling, without slide-timer delays
 		;; trick here is that inf-scrollable/on-key fires after scrollable/on-key-down:
 		;@@ (otherwise I would have to extend the handler dialect to add delayed handlers, child after parent - maybe I should?)
-		on-key [space path event] [space/slide pass]	;-- most useful for fast seamless scrolling on pageup/pagedown
+		on-key   [space path event] [space/slide pass]	;-- most useful for fast seamless scrolling on pageup/pagedown
 		slide-timer: [
 			on-time [space path event delay] [			;-- during scroller dragging
 				path/-1/slide
@@ -291,9 +301,10 @@ define-handlers [
 	;-- *************************************************************************************
 	grid-view: extends 'inf-scrollable [
 		on-down [gview path event] [
-			set [grid: _: cell:] path >> 4
+			set [grid: _: cell:] skip path 4
 			if 'cell <> select cell 'type [exit]
 			cxy:    grid-ctx/get-cell-address grid cell
+			unless cxy [exit]
 			multi?: gview/behavior/selectable = 'multi
 			mode:   either all [event/ctrl? multi?] ['invert]['replace]
 			cursor: max cxy grid/pinned + 1 
@@ -323,23 +334,29 @@ define-handlers [
 				]
 			]
 			if drag? [
-				clear skip path': shallow-clone path 6			;-- drag around grid, not around its cell
+				if locate path [o - .. find [hscroll vscroll] o/type] [	;-- allow scrollbars in children to override grid dragging ;@@ a kludge!
+					pass exit
+				]
+				clear skip (path': clone/flat path) 6			;-- drag around grid, not around its cell
 				start-drag path'
+				stop/now
 			]
-			stop/now
+			; stop/now
+			; pass
 		]
 		
 		on-over [gview path event] [
 			unless all [
 				dragging?/from gview
 				not event/ctrl?									;-- handle only ctrl-click, not ctrl-drag
+				start: gview/selection-start
 				gview/behavior/selectable = 'multi
-			] [exit]
-			set [grid: _: cell:] path >> 4
+			] [pass exit]
+			set [grid: _: cell:] skip path 4
 			if all ['cell = select cell 'type] [
 				#assert [grid/type = 'grid]
 				cxy: grid-ctx/get-cell-address grid cell
-				start: gview/selection-start
+				unless cxy [exit]
 				case [
 					all [cxy/x <= grid/pinned/x cxy/y > grid/pinned/y] [	;-- rows after header
 						batch grid [
@@ -369,7 +386,7 @@ define-handlers [
 			switch/default event/key [
 				#"A" [
 					if event/ctrl? [
-						batch grid [select-range 1x1 'far-tail]		;-- include headers into selection
+						batch grid [select-range 1x1 'far-tail]	;-- include headers into selection
 					]
 				]
 			
@@ -379,11 +396,12 @@ define-handlers [
 					]
 				]
 			
-				#" " [
+				#" " [											;-- column or row selection
 					if axis: case [
 						event/ctrl?  ['x]
 						event/shift? ['y]
 					][
+						gview/selection-start: none				;-- indicate it's not an area selection
 						batch grid [
 							select-along ortho axis 'all
 							select-along axis cursor/:axis
@@ -391,6 +409,7 @@ define-handlers [
 					]
 				]
 				
+				;@@ consider navigation across multicells - follow spreadsheets behavior
 				up down left right page-up page-down home end [
 					target: pick select [
 						up        [column-head line-up]
@@ -399,15 +418,40 @@ define-handlers [
 						end       [far-tail tail]
 						left      [row-head prev-cell]
 						right     [row-tail next-cell]
-						; page-down ['page-down]
-						; page-up   ['page-up]
+						page-down [page-down page-down]
+						page-up   [page-up   page-up]
 					] event/key event/ctrl?
 					multi?: all [gview/behavior/selectable = 'multi event/shift?]
+					batch gview [cursor: locate target]
 					batch grid [
-						move-cursor cursor: locate target
-						unless multi? [gview/selection-start: cursor]
-						select-range gview/selection-start cursor
+						old-cursor: here
+						;@@ these should be known automatically, in the frame or where
+						cell1: first grid/locate-point org: negate gview/window/origin
+						cell2: first grid/locate-point org + gview/window/size
+						; ?? [org cell1 cell2 old-cursor]
+						cursor-drawn?: cell1 +<= old-cursor +<= cell2
+						repeatable?: find [line-up line-down prev-cell next-cell page-up page-down] target
+						;@@ temporary limit until redesign:
+						;@@ moving cursor outside the currently drawn area shows empty space until filled by multiple slides
+						;@@ it's slow when holding arrow keys, so I disable it (but for far jumps it's a necessity to have it)
+						if any [cursor-drawn? not repeatable?] [
+							move-cursor cursor
+							old-sel: selected-range
+							either all [multi? old-sel not gview/selection-start] [	;-- current selection is not a limited area, but bits
+								axis: either cursor/y = old-cursor/y ['x]['y]
+								select-along/mode axis old-cursor/:axis thru cursor/:axis 'include
+							][									;-- current selection is either empty or a limited area
+								either multi? [
+									default gview/selection-start: old-cursor
+								][
+									gview/selection-start: cursor
+								]
+								select-range gview/selection-start cursor
+							]
+						]
 					]
+					batch gview [pan-to-cursor]
+					gview/slide									;@@ put into the batch
 				]
 			][exit]												;-- let unhandled keys go into inf-scrollable
 			stop/now
@@ -439,6 +483,8 @@ define-handlers [
 		on-click [space path event] [
 			do space/command
 		]
+		on-down [space path event] []					;-- prevent clicks from passing over to children
+		on-up   [space path event] []
 	]
 	
 	data-clickable: extends 'clickable []
@@ -524,7 +570,7 @@ define-handlers [
 		;; so we have to use both, just separate who handles what
 		on-key [space path event] [					;-- char keys branch (inserts stuff as you type)
 			unless is-key-printable? event [			;-- handled by on-key-down (e.g. ctrl+BS=#"^~") 
-				if event/key = #"^-" [pass]				;-- let tab pass thru
+				unless find [#"^[" #"^M" #"^H" left right delete home end insert] event/key [pass]	;-- keys unhandled by field can go to the parent
 				exit									;@@ what about enter key / on-enter event?
 			]
 			;@@ TODO: input validation / filtering
@@ -536,9 +582,12 @@ define-handlers [
 			invalidate/only space/caret					;@@ any way to properly invalidate both at once? -- need layout under cache
 		]
 		
-		on-key-down [space path event] [			;-- control keys & key combos branch (navigation)
-			;@@ up/down keys may be used for spatial navigation
+		on-key-down [space path event] [				;-- control keys & key combos branch (navigation)
 			if is-key-printable? event [exit]
+			unless any [
+				event/ctrl?
+				find [#"^[" #"^M" #"^H" left right delete home end insert] event/key
+			] [pass exit]	;-- keys unhandled by field can go to the parent
 			batch space compose [
 				(key->plan event space/selected)
 				frame/adjust-origin
@@ -546,7 +595,13 @@ define-handlers [
 			invalidate space
 		]
 
-		on-key-up [space path event] []					;-- eats the event so it's not passed forth
+		on-key-up [space path event] [					;-- eats the event so it's not passed forth
+			unless any [
+				is-key-printable? event
+				event/ctrl?
+				find [#"^[" #"^M" #"^H" left right delete home end insert] event/key
+			] [pass]									;-- keys unhandled by field can go to the parent
+		]
 
 		on-down [space path event] [
 			batch space [
