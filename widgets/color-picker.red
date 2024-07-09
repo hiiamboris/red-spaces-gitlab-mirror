@@ -13,7 +13,7 @@ context expand-directives with spaces/ctx [
 		hue: space/hue // 360
 		sat: clip 0 1   space/saturation
 		lgt: clip 0 1   space/lightness
-		space/color: HSL2RGB/tuple reduce [hue sat lgt]
+		space/color:    HSL2RGB/tuple as-point3D 1 * hue 1 * sat 1 * lgt	;-- convert from % into float
 		invalidate/only space/spaces/lightness
 		invalidate      space/spaces/palette
 	]
@@ -22,7 +22,10 @@ context expand-directives with spaces/ctx [
 		if unset? :space/spaces [exit]					;-- uninitialized yet
 		if space =? try [get bind 'space :on-HSL-change] [exit]	;-- avoid being triggered by on-hsl-change
 		do-atomic [										;-- disallow reactions until all 3 values are set
-			set with space [hue saturation lightness] RGB2HSL value
+			hsl: RGB2HSL value
+			space/hue:        hsl/1
+			space/saturation: hsl/2
+			space/lightness:  hsl/3
 		]
 		invalidate/only space/spaces/lightness
 		invalidate      space/spaces/palette
