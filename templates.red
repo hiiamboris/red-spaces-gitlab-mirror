@@ -4187,7 +4187,16 @@ grid-view-ctx: context [
 				]
 			][
 				size: data/size
-				#assert [pair? size  "data/size must return a pair! value"]
+				#assert [
+					any [
+						pair? size
+						all [
+							block? size
+							any [none? size/x integer? size/x]
+							any [none? size/y integer? size/y]
+						]
+					]
+				]
 				size
 			]
 		]
