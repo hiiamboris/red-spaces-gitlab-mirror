@@ -4185,7 +4185,11 @@ grid-view-ctx: context [
 					grid/content/:xy					;@@ need to think when to free this up, maybe when cells get hidden
 					grid/content/:xy: grid/wrap-space xy wrap-data data/pick xy
 				]
-			][data/size]
+			][
+				size: data/size
+				#assert [pair? size  "data/size must return a pair! value"]
+				size
+			]
 		]
 		grid/calc-bounds: grid/bounds: does [grid/cells/size]
 	]
