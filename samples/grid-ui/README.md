@@ -1,6 +1,6 @@
 # A [Grid Editor](grid-edit.red) demo
 
-<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-editor.gif></img>
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-editor.gif></img>
 
 Features:
 - columns can be resized by dragging area between column headers (very slow :/)
