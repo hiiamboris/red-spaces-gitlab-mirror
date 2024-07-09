@@ -4111,7 +4111,7 @@ grid-view-ctx: context [
 		selection-start: none	#type [pair! none!]
 		
 		content-flow: 'planar
-		source: make map! [size: (0,0)]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
+		source: make map! [size: 0x0]	#on-change :on-source-change	;-- map is more suitable for spreadsheets than block of blocks
 		data: function [/pick xy [pair!] /size] [
 			switch/default type?/word :source [
 				block! [
