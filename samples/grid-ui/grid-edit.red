@@ -11,7 +11,7 @@ Red [
 		- multiple columns can be selected by dragging across column headers or clicking and Ctrl-clicking
 		- multiple rows can be selected by dragging across row headers or clicking and Ctrl-clicking
 		- whole grid data can be selected by clicking on the header intersection "#" or by Ctrl+A key combo
-		- limited 2D area can be selected by dragging from between non-header cells
+		- limited 2D area can be selected by dragging between non-header cells
 		- cursor navigation across grid using arrow keys (also supports jumps with Ctrl)
 		- keyboard selection of 2D data area using Shift and arrow keys (including Ctrl+Shift)
 		- whole rows and columns can be selected with Ctrl+Space and Shift+Space keys, and extended with Shift+arrows 
