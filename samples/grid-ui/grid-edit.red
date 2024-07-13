@@ -427,7 +427,7 @@ context with spaces/ctx expand-directives [
 									grid/widths/:col 
 									grid/widths/default
 								] 
-							gedit/refresh/headers
+							invalidate grid
 							stop-drag
 							start-drag path
 							stop/now
