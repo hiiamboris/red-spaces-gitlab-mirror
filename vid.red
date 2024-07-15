@@ -114,6 +114,7 @@ VID: context [
 			;@@ so any reactions placed upon field/caret/stuff will not fire unless I explicitly make caret reactive
 			;@@ #4529 could solve this for all spaces
 			spec: [
+				quietly caret/on-change*: func spec-of :caret/on-change* copy body-of :caret/on-change* 
 				insert body-of :caret/on-change*
 					with [caret :caret/on-change*] [			;-- newlines are imporant here for mold readability
 						system/reactivity/check/only self word
@@ -424,6 +425,7 @@ VID: context [
 				;@@ this is a kludge for lacking PR #4529, remove me
 				;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
 				if any [def/link  not empty? def/reactions] [
+					quietly space/on-change*: func spec-of :space/on-change* copy body-of :space/on-change* 
 					insert body-of :space/on-change*
 						with [space :space/on-change*] [		;-- newlines are imporant here for mold readability
 							system/reactivity/check/only self word
