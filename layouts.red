@@ -296,13 +296,13 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 				]
 				align    [
 					pair! (-1x-1 +<= align +<= 1x1)
-					block! [(
+					block! (
 						all [
 							2 >= length? align
 							find [#(none) n s e w ↑ ↓ → ← ↔ ↕] align/1
 							find [#(none) n s e w ↑ ↓ → ← ↔ ↕] align/2
 						]
-					)]
+					)
 					none!
 				]
 				margin   [planar!] (0x0 +<= margin)
