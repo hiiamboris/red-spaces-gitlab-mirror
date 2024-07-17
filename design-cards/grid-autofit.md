@@ -84,7 +84,7 @@ Key difference from `width-total` is that weights equal `W₂×H₂`, not `W₂`
 
 This becomes trickier as whatever width estimates are obtained, they have to be contained within `[W₁..W₂]` range. I had a strict solution but dropped it in favor of simple binary search, which should be no slower, and eventually faster as vectors support in Red improves.
 
-The algorithm is explained in `area-difference`, with the only distinction is that constants <code>C<sub>i</sub></code> are zeroes for this case.
+The algorithm is explained in `area-difference`, with the only distinction is that constants <code>W₀<sub>i</sub></code> are zeroes for this case.
 
 It is based on the following assumption:
 - Product of column width by it's height `W×H` is constant, so <code>ΣW<sub>i</sub>×H = H×ΣW<sub>i</sub> = H×Σ(W₁<sub>i</sub>+ΔW<sub>i</sub>) = H×TW₁ + H×ΣΔW<sub>i</sub> = H×TW₁ + H×(TW-TW₁) = ΣW₂<sub>i</sub>×H₂</code>, where <code>ΔW<sub>i</sub></code> is column's width extension over minimum.
