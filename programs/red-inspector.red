@@ -24,7 +24,7 @@ Red [
 ; do/expand [#include %../stylesheets/glossy.red]
 #process on
 
-import/only spaces/ctx [top]
+top: :spaces/ctx/top
 append spaces/focus/focusable 'tube
 
 mold: :native-mold
