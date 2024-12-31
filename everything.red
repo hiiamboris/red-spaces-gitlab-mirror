@@ -13,7 +13,7 @@ set 'spaces-included? true 								;-- must be done in the code, not in the prep
 ;@@ since it's a macro, it has to be #included, not `do`ne (`do` forgets macros)
 ;@@ for some reason, it won't affect #includes of this very file,
 ;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
-; #do [verbose-inclusion?: yes]							;-- enable to dump filenames
+#do [verbose-inclusion?: yes]							;-- enable to dump filenames
 #include %../common/include-once.red					;-- the rest can use the improved include
 #do [
 	;; when compiling, this needs `inline` to get the `-t os` argument!
@@ -44,46 +44,52 @@ do/expand [
 	
 	#include %../common/assert.red
 	#assert off
-	#include %../common/expect.red
 	#include %../common/setters.red
-	; #include %../common/composite.red
+	#include %../common/with.red
+	#include %../common/trace-deep.red
+	#include %../common/expect.red
+	#include %../common/catchers.red
+	#include %../common/composite.red
 	#include %../common/relativity.red
+	#include %../common/xyloop.red
+	#include %../common/without-gc.red
+	#include %../common/tree-hopping.red
 	#include %../common/tabbing.red						;-- extended by spaces/tabbing.red
-	; #include %../common/tree-hopping.red				;-- included by tabbing.red
 	#include %../common/scoping.red
 	#include %../common/collect-set-words.red
 	#include %../common/print-macro.red
 	#include %../common/error-macro.red
 	#include %../common/prettify.red
-	#include %../common/clock.red
+	#include %../common/charsets.red
+	#include %../common/exponent-of.red
+	#include %../common/format-readable.red
+	#include %../common/shallow-trace.red
 	#include %../common/profiling.red
 	#include %../common/extrema.red
-	; #include %../common/map-each.red
+	#include %../common/selective-catch.red
+	#include %../common/reshape.red
 	#include %../common/new-apply.red
 	#include %../common/new-each.red
-	#include %../common/xyloop.red
 	#include %../common/modulo.red
-	; #include %../common/with.red
+	#include %../common/interleave.red
 	#include %../common/join.red
 	#include %../common/split.red
-	#include %../common/catchers.red
 	#include %../common/is-face.red
 	#include %../common/color-models.red
 	#include %../common/contrast-with.red
 	#include %../common/keep-type.red
 	#include %../common/clip.red
 	#include %../common/step.red
-	; #include %../common/typecheck.red
-	; #include %../common/selective-catch.red
+	#include %../common/count.red
+	#include %../common/typecheck.red
 	#include %../common/forparse.red
 	#include %../common/mapparse.red
-	#include %../common/reshape.red
 	#include %../common/sift-locate.red
 	#include %../common/do-queued-events.red
 	#include %../common/show-trace.red
 	#include %../common/do-atomic.red
 	#include %../common/classy-object.red
-	; #include %../common/advanced-function.red			;-- included by search.red
+	#include %../common/advanced-function.red			;-- included by search.red
 	#include %../common/search.red
 	#include %../common/load-anything.red				;-- required to load data saved by custom 'save'
 	
