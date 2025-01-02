@@ -1,483 +1,741 @@
 Red [
-	title:   "Event processing pipeline for Spaces"
-	author:  @hiiamboris
-	license: BSD-3
+	title:    "Event processing for Spaces"
+	author:   @hiiamboris
+	license:  BSD-3
+	provides: spaces.events
+	depends:  [spaces.auxi spaces.macros  global with error map-each reshape advanced-function]
 ]
-
-
-;-- requires auxi.red(?), styles (to fix svmc/), error-macro.red, event-scheduler.red
 
 
 events: context [
-	on-time: none										;-- set by timers.red
+	;; original (but split) event sheets tree, used for inheritance:
+	;; each sheet is a map with fields:
+	;;   scope    = path of original definition (block of set-words and refinements only)
+	;;   ancestor = from where to inherit events (template name as word/path, or none)
+	;;   order    = [below | above] (word, or none)
+	;;   source   = original of event handlers (only) sheet (block)
+	;;   handlers = compiled event handlers matrix (map of id -> func)
+	sheets:     make map! 50
+	
+	;; compiled event handlers matrix tree, optimized for lookup speed (uses reversed paths):
+	;; each matrix item resolves to a #value -> block! [path! path! ...] = a list of sheet paths
+	;; each included sheet path resolves to a /handlers compiled event matrix (map of id -> func)
+	;; paths are resolved in left to right order when sinking, right to left when bubbling
+	handlers:   make map! 50
+	
+	;; reference data and support functions
+	support:    none
+	
+	;; stuff related to event encoding
+	encoding:   none
+	
+	;; stuff related to the define-handlers dialect
+	dialect:    none
+	
+	;; stuff related to sheet and matrix storage and lookups
+	storage:    none
+	
+	;; the very core of event processing
+	processing: none
+	
+	;; "commands" available to each event handler function
+	commands:   none
 
-	;-- previewers and finalizers are called before/after handlers
-	;-- both have the same args format: [space [object!] path [block!] event [map! none!]]
-	;-- stop? command indicates that event was "eaten" and becomes true after:
-	;-- any previewer or finalizer calls `stop`
-	;-- any normal event handler does not call `pass`
-	;-- "eaten" events do not propagate further into normal event handlers, but do into all previewers & finalizers
-	;-- map format: event/type [word!] -> list of functions
-	previewers: #[]
-	finalizers: #[]
-
-	;-- we want extensibility so this is a map of maps:
-	;-- format: space-name [word!] -> on-event-type [word!] -> list of event functions
-	;--         space-name [word!] -> sub-space-name [word!] -> ... (reentrant, supports paths)
-	handlers: #[]
+	;; the highest level event definition function
+	global define-handlers: function [
+		"Define event handlers using Event DSL"
+		sheet [block!]
+	][
+		paths: storage/load-sheet sheet
+		;; separate load phase allows to be independent of definition order:
+		foreach path paths [storage/load-handlers/deep path]
+	]
+]
 
 
-	event-prototype: make map! collect [
-		foreach word system/catalog/accessors/event! [keep to set-word! word keep none]
+;; reference data and support functions
+events/support: context [
+	event-types: make hash! [
+		time
+		over wheel up mid-up alt-up aux-up
+		down mid-down alt-down aux-down click dbl-click
+		key key-down key-up enter
+		focus unfocus
+	]
+	pointer-event-types: make hash! [
+		over wheel up mid-up alt-up aux-up
+		down mid-down alt-down aux-down click dbl-click
+	]
+	event-flags: make hash! [
+		control alt shift
+		down alt-down mid-down aux-down
 	]
 	
-	copy-event: function [event [event! map!]] [
-		result: copy event-prototype
-		foreach word system/catalog/accessors/event! [result/:word: :event/:word]
-		;@@ can't repro this in isolation, but somehow without copy flags of KB events get empty! need to find out why!
-		result/flags: copy event/flags
-		result
+	is-pointer-event?: function [type [word!]] [
+		to logic! find pointer-event-types type
+	]
+	is-valid-event?: function [type [word!]] [
+		to logic! find event-types type
+	]
+	is-valid-flag?: function [type [word!]] [
+		to logic! find event-flags type
+	]
+]
+
+	
+;; functions for event data encoding
+events/encoding: context with events [
+	encode-type: function [
+		"Get a numeric code for given event TYPE"
+		type    [word!]    "E.g. 'over"
+		return: [integer!] "In range [1..255]"
+	][
+		index? any [
+			find support/event-types type
+			ERROR "Unsupported event type '(type)' encountered"
+		]
+	]									
+
+	encode-flag: function [
+		"Get a bitmask for given event FLAG"
+		flag    [word!]    "E.g. 'shift"
+		return: [integer!] ">= 256"
+	][
+		256 << skip? any [
+			find support/event-flags flag
+			ERROR "Unsupported event flag '(flag)' encountered"
+		]
+	]									
+
+	encode-flags: function [
+		"Get a bitmask for a set of event FLAGS"
+		flags   [block!]
+		return: [integer!]
+	][
+		mask: 0
+		foreach flag flags [mask: mask or encode-flag flag]		;@@ use 'accumulate'?
+		mask
+	]									
+
+	encode-event: function [									;-- has to be fast, for constant runtime use
+		"Obtain unique id of the event for event sheet mapping"
+		type    [word!]
+		flags   [block!]
+		return: [integer!]
+	][
+		(encode-type type) or (encode-flags flags)
+	]
+
+	#assert [
+		1		= encode-event 'time []
+		3074	= encode-event 'over [shift down]
+		error? try [encode-event 'over [garbage]]
 	]
 	
-	register-as: function [map [map!] types [block!] handler [function!] /priority /local blk] [
-		delist-from map :handler						;-- duplicate protection, in case of multiple includes etc.
-		#assert [										;-- validate the spec to help detect bugs
-			any [
-				parse spec-of :handler [
-					word! opt [quote [object!] | quote [object! none!] | quote [none! object!]]
-					word! opt quote [block!]
-					word! opt quote [map!]
-					opt [word! opt [quote [percent!] | quote [percent! none!] | quote [none! percent!]]]
-					opt [/local to end]
-				]
-				(source handler  none)
-			] "invalid handler spec"
-		]
-		inject: either priority [:insert][:append]
-		foreach type types [
-			#assert [word? type]
-			list: any [map/:type  map/:type: copy []]
-			inject list :handler
-			bind body-of :handler commands
-		]
-		:handler
-	]
-
-	delist-from: function [map [map!] handler [function!]] [
-		foreach [_ list] map [
-			remove-each fn list [:handler =? :fn]
-		]
-	]
-
-	register-previewer: func [
-		"Register a previewer in the event chain; remove previous instances"
-		types [block!] "List of event/type words that this HANDLER supports"
-		handler [function!] "func [space path event]"
-		/priority "Insert at the start of the event previewers chain"
+	list-ids: function [
+		"List all permitted event ids with given TYPE and required FLAGS"
+		type    [word! none!] "Use 'none' to list all possible types"
+		flags   [block!]
+		return: [block!]
 	][
-		register-as/:priority previewers types :handler
-	]
-
-	register-finalizer: func [
-		"Register a finalizer in the event chain; remove previous instances"
-		types [block!] "List of event/type words that this HANDLER supports"
-		handler [function!] "func [space path event]"
-		/priority "Insert at the start of the event finalizers chain"
-	][
-		register-as/:priority finalizers types :handler
-	]
-
-	delist-previewer: func [
-		"Unregister a previewer from the event chain"
-		handler [function!] "Previously registered"
-	][
-		delist-from previewers :handler
-	]
-
-	delist-finalizer: func [
-		"Unregister a finalizer from the event chain"
-		handler [function!] "Previously registered"
-	][
-		delist-from finalizers :handler
-	]
-
-	export [register-previewer register-finalizer delist-previewer delist-finalizer]
-
-
-	do-previewers: func [path [block!] event [map!] args [block!]] [
-		do-global previewers path event args
-	]
-
-	do-finalizers: func [path [block!] event [map!] args [block!]] [
-		do-global finalizers path event args
-	]
-
-	do-global: function [map [map!] path [block!] event [map!] args [block!]] [
-		unless list: map/(event/type) [exit]
-		space: path/1									;-- space can be none if event falls into space-less area of the host
-		;@@ none isn't super elegant here, for 4-arg handlers when delay is unavailable
-		code: compose/into [handler space pcopy event (args) none] clear []
-		foreach handler list [
-			pcopy: clone/flat path						;-- copy in case user modifies/reduces it, preserve index
-			trap/all/catch code [
-				msg: form/part thrown 1000				;@@ should be formed immediately - see #4538
-				kind: either map =? previewers ["previewer"]["finalizer"]
-				#print "*** Failed to evaluate event (kind) (mold/part/flat :handler 100)!^/(msg)"
+		result: clear []
+		req-mask: encode-flags flags
+		types: either type
+			[reduce [encode-type type]] 
+			[list 1 thru ntypes: length? support/event-types]
+		repeat i 1 << nflags: length? support/event-flags [
+			mask: i - 1 << 8
+			if mask or req-mask = mask [
+				foreach type types [append result id: type or mask]
 			]
 		]
+		copy result
 	]
+	
+	#assert [
+		[3330 3842 7426 7938 11522 12034 15618 16130 19714 20226 23810 24322 27906 28418 32002 32514]
+			= list-ids 'over [shift control down]
+		2000 < length? list-ids none []
+	]
+]
+	
 
-	; copy-handlers: function [
-	; 	"Make wrappers for event handlers from STYLE"
-	; 	style [word! path! block!] "Style name"		;-- requires style name so we can build paths
+;; define-handlers dialect support
+events/dialect: context with events [ 
+;@@ ^ temporary(?) 'with' kludge
+; events/dialect: context [ 
+
+	;; rules for strict syntax checking and error reporting
+	grammars: object [
+		~~p: none												;-- ~~p used by #expect :(
+		handlers: object [
+			w: none
+			=type=:     [set w word! if (support/is-valid-event? w)]
+			=flag=:     [set w word! '+ if (support/is-valid-flag? w)]
+			=mask=:     [some [opt '* any =flag= =type= opt paren!] | '*]	;-- single '*' can only be a standalone mask, and has no args
+			=handler=:  [=mask= #expect block!]
+		]
+		groups: object [
+			=names=:    [some [set-word! | refinement!]]
+			=ancestor=: [ahead word! ['above | 'below] #expect [lit-word! | lit-path!]]
+			=group=:    [=names= opt =ancestor= #expect block!]
+		]
+		sheet: with handlers with groups [any [end | #expect [=group= | =handler=]]]
+		scope: groups/=names=
+	]
+	
+	decode-mask: function [
+		"Decode a Handlers DSL event MASK into a map"
+		mask    [block!] "E.g. [* shift + key]"
+		return: [map!]   "#[type [word! none!] flags [block!] args [block!] fuzzy? [logic!]]"
+		/local flags args code ids
+	][
+		=type=:  [set type [not '* word!]]
+		=flag=:  [ahead [not '* word! '+] keep word! '+]
+		=flags=: [collect set flags any =flag=]
+		=args=:  [set args opt paren! (args: to [] only args)]
+		=code=:  [set code #expect block!]
+		=mask=:  [
+			'* =flags= =type=   (fuzzy?: yes)
+		|	'* (flags: copy []) (fuzzy?: yes)
+		|	   =flags= =type=   (fuzzy?: no)
+		]
+		parse mask [#expect =mask= =args= #expect [end | block!]]	;-- block is left for in-line decoding of the dialect
+		as-map [type: flags: args: fuzzy?:]
+	]
+	
+	#assert [
+		#[
+			type:	#(none)
+			flags:	[]
+			args:	[]
+			fuzzy?:	#(true)
+		] = decode-mask [*]
+		#[
+			type:	down
+			flags:	[]
+			args:	[]
+			fuzzy?:	#(false)
+		] = decode-mask [down]
+		#[
+			type:	over
+			flags:	[shift]
+			args:	[arg]
+			fuzzy?:	#(false)
+		] = decode-mask [shift + over (arg)]
+		error? try [decode-mask []]
+		error? try [decode-mask [* shift +]]
+		error? try [decode-mask [* + over]]
+		error? try [decode-mask [* * over]]
+	]
+	
+	split-sheet: function [
+		"Split Event DSL sheet into two parts: children and event handlers"
+		sheet   [block!]
+		return: [block!] "[children handlers]"
+	][
+		;; since it is the only func with access to the original block, it also has to report syntax errors:
+		parse sheet grammars/sheet
+		
+		;; then after the check, parse rules can be relaxed:
+		children:   clear []
+		handlers:   clear []
+		=nested=:   [collect after children keep pick [[set-word! | refinement!] thru block!]]
+		=handler=:  [collect after handlers keep pick [word! thru block!]]
+		parse sheet [any [=handler= | =nested=]]
+		reduce [copy children copy handlers]
+	]
+	
+	#assert [
+		[[a: b: [1] c: [3]] [* [2]]] = split-sheet [a: b: [1] * [2] c: [3]]
+	]
+	
+	; parse-children: function [
+		; "Parse a children sheet and return them as a map: name -> sheet"
+		; children [block!]
+		; return:  [map!] "Keys are words and refinements"
 	; ][
-	; 	r: copy #()
-	; 	style: to [] style
-	; 	spec: get as path! compose [handlers (style)]
-	; 	unless spec [return r]
-	; 	foreach [hname hfunc] spec [
-	; 		either map? m: :hfunc [
-	; 			r/:hname: copy-handlers compose [(style) (hname)]
-	; 		][
-	; 			spec: copy spec-of :hfunc
-	; 			clear find spec refinement!
-	; 			r/:hname: func spec compose [
-	; 				(as path! compose [handlers (style) (to word! hname)]) (spec)
-	; 			]
-	; 		]
-	; 	]
-	; 	r
+		; groups: object [
+			; =names=:    [some [set-word! | refinement!]]
+			; =ancestor=: [ahead word! ['above | 'below] #expect lit-word!]
+			; =group=:    [=names= opt =ancestor= #expect block!]
+		; ]
+		; sheet: with handlers with groups [any [end | #expect [=group= | =handler=]]]
 	; ]
 
-	;-- it's own DSL:
-	;-- new-style: [                              
-	;--   OR                                      
-	;-- new-style: extends 'other-style [         
-	;--     on-down [space path event] [...]      
-	;--     on-time [space path event delay] [...]
-	;--     inner-style: [                        
-	;--         ...                               
-	;--     ]                                     
-	;-- ]                                         
-	define-handlers: function [
-		"Define event handlers for any number of spaces"
-		def [block!] "[name: [on-event [space path event] [...]] ...]"
-		/local blk name spec body path late
+	compile-handler: function [
+		"Make an event handler function out of a [type args body] BLOCK in given tree PATH"
+		scope [block!] (parse scope grammars/scope)
+		type  [word!] "Only needed to decide if path argument contains coordinates"
+		args  [block!]
+		body  [block!]
+		/local w
 	][
-		prefix: copy [handlers]
-
-		=style-def=: [
-			set name set-word! (name: to word! name)
-			['extends
-				set base #expect [lit-word! | word! | lit-path! | path!] (
-					if lit-word? base [base: to word! base]
-					;; I'm not inserting whole prefix as then it would need a workaround to remove smth from it
-					base: as path! compose [handlers (to [] base)]
-				)
-			|	(base: none)
-			]
-			set body #expect block!
-			(add-style/from name body base)
+		offsets?: support/is-pointer-event? type
+		
+		;; offset is negative for nested handlers
+		offset: 1 - length? scope
+		
+		;; innermost set-word determines the kit to use - may differ between scopes
+		target: find/last scope set-word!
+		
+		;; names add support for using template names in the handlers
+		names: parse scope [collect some [set w skip keep (to set-word! w)]]	;@@ use map-each
+		
+		args:  parse args  [collect any  [set w skip keep (to set-word! w)]]	;@@ use map-each
+		
+		bind body commands
+		; spec: compose [event (args)]
+		body: reshape [
+			processing/fill-args event path @[args]	/if not empty? args	;@@ or pass args after the event?
+			set @[names] skip path @[offset]		/if offset <> 0
+			@[names/1] path/1						/if offset = 0
+			using @[to word! target/1] @[body]		/if target		;-- expose body to the kit
+			@(body)									/if not target	;-- only refinements in the scope? no kit then
 		]
-		add-style: function [name body /from base [none! path!]] [
-			append prefix name
-			#debug events [print ["Defining" mold as path! prefix when base ("from") when base (base)]]
-			path: as path! prefix
-			#assert [any [not base  get base]  "inherited template's handlers aren't defined"]
-			map: either base [copy-deep-map get base][copy #[]]
-			set path map
-			fill-body body map
-			take/last prefix
-		]
-
-		fill-body: function [body map] [
-			parse body =style-body=
-		]
-		=style-body=: [
-			any [
-				not end
-				ahead #expect [word! | set-word!]
-				=style-def= | =hndlr-def=
-			]
-		]
-
-		=hndlr-def=: [
-			set late opt [ahead 'late word!] 
-			set name word!
-			set spec [ahead #expect block! into =spec-def=]
-			set body #expect block!
-			(add-handler name spec body late)
-		]
-		add-handler: function [name spec body late] [
-			#debug events [print ["-" name]]
-			path: as path! compose [(prefix) (name)]
-			list: any [get path  set path copy []]
-			handler: function spec bind body commands
-			insert either late [tail list][list] :handler		;-- latest must come first so it can block handlers of its prototype
-		]
-
-		=spec-def=: [									;-- just validation, to protect from errors
-			#expect word! opt [ahead block! #expect quote [object!]]	;-- space [object!]
-			#expect word! opt [ahead block! #expect quote [block!]]		;-- path [block!]
-			#expect word! opt [ahead block! #expect quote [map!]]
-			opt [if (name = 'on-time) not [refinement! | end]
-				#expect word! opt [ahead block! #expect quote [percent!]]
-			]
-			opt [not end #expect /local to end]
-		]
-
-		ok?: parse def [any [not end ahead #expect set-word! =style-def=]]	;-- no handlers in the topmost block allowed
-		#assert [ok?]
+		function [event path] new-line body on
 	]
-
-	export [define-handlers]
-	; export [copy-handlers define-handlers extend-handlers]
-
-
-
-	;; stack-like wrappers for `commands` usage
-	;; have to be separate because `stop?` is valid until all finalizers are done (e.g. in simulated events)
-	with-stop: function [code [block!]] [
-		stop?: block?: no								;-- force logic type
-		do code
+	
+	;; max mask size atm is ~115kB (5000 k/v pairs)
+	compile-sheet: function [
+		"Create an event matrix out of Handlers DSL sheet"
+		scope   [block!] "Scope for the handler functions" (parse scope grammars/scope)
+		sheet   [block!] "Handlers only: [event masks (extra arguments) [code] ...]"
+		return: [map!]   "A map! of: event id -> function"
+		/local _ masks code
+	][
+		matrix:  clear #[]										;-- static matrix to lessen RAM load
+		=mask=:  [opt '* not '* word! any ['+ word!] opt paren! | '*]
+		=masks=: [collect set masks some [ahead word! keep copy _ =mask=]]
+		=code=:  [set code block!]
+		process: [
+			foreach mask masks [
+				map: decode-mask mask
+				ids: either map/fuzzy?
+					[encoding/list-ids map/type map/flags]
+					[reduce [encoding/encode-event map/type map/flags]]
+				fun: compile-handler scope map/type map/args code
+				foreach id ids [matrix/:id: any [:matrix/:id :fun]]	;-- late definitions do not override the previous ones
+			]
+		]
+		parse sheet [any [end | #expect =masks= #expect =code= (do process)]]
+		copy&clear matrix										;-- always clear static sheet to free references to code
 	]
+	
+	; extend-matrix: function [
+		; "Extend an exisitng event MATRIX with a new SHEET"
+		; matrix [map!]   "Map of id -> function"
+		; sheet  [block!] "[event mask [code] ...]"
+	; ][
+		; extend compile-event-sheet spec sheet
+	; ]
+	
+]
+	
 
-	;-- has to be set later so we can refer to 'events' to get the drag functions
-	commands: none
+;; events/handlers matrix: storage and lookups
+events/storage: context with events [
 
-	;; fundamentally there are 3 types of events here:
-	;; - events tied to a coordinate (mouse, touch) - then hittest is used to obtain path
-	;; - events tied to focus (keyboard, focus changes) - these use focus/current path in the tree
-	;; - events without both (timer) - but timer has path too, and also delay
-	;; coordinate events' path includes pairs of coordinates (hittest format)
-	;; other events' path does not (tree node format)
-	;; focus/unfocus events have not 'event' arg!
-	;@@ any way to unify these 2 formats?
-	dispatch: function [face [object!] event [map!] /local result /extern resolution last-on-time] [
-		focused?: no
-		with-stop [
-			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type ":" face/size]]]
-			; #debug events [print ["dispatching" event/type "event from" face/type]]
-			path: switch/default event/type [
-				over wheel up mid-up alt-up aux-up
-				down mid-down alt-down aux-down click dbl-click [	;-- `click` is simulated by single-click.red
-					;@@ should spaces all be `all-over`? or dupe View 'all-over flag into each space?
-					target: either dragging? [head drag-path][face/space]
-					hittest target event/offset
+	fetch-handlers: function [
+		"Retrieve a LIST of event handler matrix paths for the given tree PATH in events/handlers"
+		path    [path! block! word!]
+		return: [block! none!]
+	][
+		attempt [fetch-path-value/reverse events/handlers path]
+	]
+	
+	store-handlers: function [
+		"Store a LIST of event handler matrix paths for the given tree PATH in events/handlers"
+		path [path! block! word!]
+		list [block!] (parse list [any path!])				;-- each item: events/sheets/.../#value -> sheet (map!)
+	][
+		trees/store-path-value/reverse events/handlers path list
+	]
+	
+	find-handlers: function [
+		"Find the most specialized event handlers sequence for the given tree PATH in events/handlers"
+		path    [block! path! word!]    "Reversed before lookup"
+		/part n [integer! block! path!] "Match only a part of the path"
+		return: [block! none!]
+	][
+		trees/match-path/:part events/handlers path n
+	]
+	
+	;; events/sheets tree storage
+	
+	store-sheet: function [
+		"Store a parsed event handlers SHEET for the given tree PATH in events/sheets"
+		path  [path! block! word!]
+		sheet [map!]
+	][
+		trees/store-path-value events/sheets path sheet
+	]
+	
+	fetch-sheet: function [
+		"Retrieve the event sheet for a given tree PATH in events/sheets"
+		path    [path! block! word!] "Should exist in events/sheets map"
+		return: [map!]
+	][
+		get trees/make-access-path 'events/sheets path
+	]
+	
+	;@@ this has a lot of /dialect-related code, but idk how to extract it
+	load-sheet: function [
+		"Parse an event sheet, compile it and store it in the events/sheets tree"
+		sheet [block!] "May contain event handlers as well as child sheets"
+		;; refinements are needed for recursion mainly:
+		/in scope: (make [] 4) [block!] (parse scope dialect/grammars/scope)
+		/from
+			order    [word!] (find [below above] order)
+			ancestor [path! (parse ancestor [some word!]) word!]
+		/into paths: (make [] 4) [block!] "Where to put a list of modified tree paths" 
+		return: [block!] "Paths list is returned, including children"
+		/local w name
+	][
+		set [children: source:] dialect/split-sheet sheet
+		if all [empty? scope not empty? source] [ERROR "No handlers allowed at the root level"]
+		
+		;; create and store the sheet as a tree leaf
+		unless empty? source [
+			scope:    new-line/all copy scope no			;-- store the original set-word/refinement scope
+			handlers: dialect/compile-sheet scope source
+			store-sheet
+				path: mapparse [set w skip] to path! scope [to word! w]	;@@ use map-each when fast
+				map:  as-map [scope: order: ancestor: source: handlers:]
+			append/only paths path
+		]
+		
+		unless empty? children [
+			=fetch=:    [ahead [some =name= opt [=order= =ancestor=] set sheet block!]]
+			=process=:  [some [set name =name= (do dive)] opt [=order= =ancestor=] block!]
+			=name=:     [set-word! | refinement!]
+			=order=:    [set order ['above | 'below]]
+			=ancestor=: [set ancestor [lit-word! | lit-path!]]
+			=group=:    [(do reset) =fetch= =process=]
+			reset:      [order: ancestor: none]
+			dive:       [
+				append scope name
+				apply 'load-sheet [sheet /in on scope /from order order do ancestor /into on paths]
+				take/last scope
+			]
+			parse children [any [end | #expect =group=]]
+		]
+		unique paths										;-- for load-handlers use; unique to avoid reloading of the same subtrees
+	]
+	
+	load-handlers: function [
+		"Export an event sheet from given PATH in events/sheets into events/handlers"
+		path [path! block! (parse path [some word!]) word!]
+		/deep "Also load handlers of all children"
+	][
+		if deep [
+			path:  to [] path								;-- copy it, will be modified
+			scope: get trees/make-access-path/scope 'sheets path
+			foreach [key value] scope [						;-- use for-each [key [word!] value] for filtering
+				if key = #value [continue]
+				append path key
+				load-handlers/deep path
+				take/last path
+			]
+		]
+		
+		sheet: get full-path: trees/make-access-path 'sheets path
+		append full-path 'handlers
+		list: reduce [full-path]
+		while [sheet/order] [
+			#assert [find [below above] sheet/order]
+			#assert [find [word! path!] type?/word sheet/ancestor]
+			commit: switch sheet/order [above [:append] below [:insert]]
+			sheet:  get full-path: trees/make-access-path 'sheets sheet/ancestor
+			commit/only list (append full-path 'handlers)
+		]
+		store-handlers path list
+		list
+	]
+]
+		
+
+;; the very core of event processing
+events/processing: context with events [
+
+	;; chain of event processors, each is a func [event [map!]]
+	pipeline:   make [] 16
+	
+	;; each map is: event-type -> list of funcs
+	;; each previewer/finalizer should also be a func [event [map!]]
+	previewers: make #[] map-each/eval type support/event-types [[type copy []]]
+	finalizers: make #[] map-each/eval type support/event-types [[type copy []]]
+	
+	
+	;; main entry point from the scheduler into event processing
+	dispatch: function [
+		"Dispatch host event along the events pipeline"
+		event [map!]
+	][
+		prepare-event event
+		foreach proc pipeline [proc event]
+	]
+	
+	prepare-event: function [
+		"Fill in additional fields of the event (when applicable)"
+		event [map!] "(modified)"
+	][
+		event/id: encoding/encode-event event/type event/flags	;-- used for fast lookups in event matrices
+		event/done?: no											;-- only a marker for some event processors
+		event/direction: 'down									;-- used to avoid duplicate 'sink' calls
+		switch/default event/type [
+			@(to [] support/pointer-event-types) [
+				event/hittest: hittest event/face event/offset
+				event/path:    keep-type event/hittest object!
+			]
+			key key-down key-up focus unfocus [
+				event/path: get-host-path keyboard/focus
+			]
+			; time []
+		][
+			event/path: reduce [event/face]
+		]
+		event/lookup: lookup: copy event/path					;-- path of words (types) used for handler lookups
+		forall lookup [lookup/1: lookup/1/type]					;@@ use map-each when fast ;@@ any better name than /lookup?
+	]
+	
+	;@@ it's possible to split this func into multiple per-event-type - worth it?
+	fill-args: function [										;-- called from inside event handlers 
+		"Fill given words with arguments specific to given EVENT type"
+		event [map!]
+		path  [block!]
+		args  [block!]
+	][
+		switch event/type [
+			time [
+				timer: path/1/timer
+				dt: difference timers/time timer/planned
+				set args 100% * (dt / timer/period)
+			]
+			@(to [] support/pointer-event-types) [
+				xy: pick event/hittest 2 * index? path
+				; dxy: ???
+				set args xy
+			]
+			key key-down key-up [
+				set args event/key
+			]
+			; focus unfocus [
+			; ]
+		]
+	]
+	
+	;; the point of this func is to form a basis for the equivalence
+	;; of parent/child and ancestor/descendant relationships
+	;; so that 'sink'&'bubble' work similarly in both scenarios
+	;; it doesn't test against event/id, because it's convenient for timers this way
+	list-handlers: function [
+		"List all now existing handlers for given event parameters"
+		path   [block!] (not empty? path)
+		lookup [block!] (equal? length? path length? lookup)
+		/target "Omit all parents, list only for the innermost child"
+		return: [block!] "[handler-path event-path ...] list"
+	][
+		if target [path: top path]
+		handlers: clear []
+		forall path [
+			if sequence: storage/find-handlers/part lookup index? lookup [
+				foreach handler-path sequence [
+					append/only append/only handlers handler-path path
 				]
-				key key-down key-up enter [
-					if all [
-						event/type = 'key						;-- workaround for AltGr producing printable keys
-						char? event/key
-						parse event/flags ['control opt 'shift 'alt]	;-- this seems always sorted
-					][
-						event/flags: exclude event/flags [control alt]
-						event/ctrl?: no
-					]
-					focused?: yes								;-- event should not be detected by parent spaces
-					if face/space [
-						if event/window/state [focus/window: event/window]	;-- init /window on 1st event, or if another window got activated
-						;; if nothing is focused (but apparently the host has focus), try to focus first focusable
-						unless focus/current [
-							if target: focus/find-next-focal-*ace 'forth [focus-space target]
-						]
-						;; but it still may fail if nothing is focusable
-						unless focused: focus/current [exit]
-						if path: get-host-path focused [
-							#assert [path/1 =? event/face  "event is dispatched into the wrong host!"]
-							as [] path
-						] 
-					]
-				]
-				; focus unfocus ;-- generated internally by focus.red
-				time [
-					on-time face event							;-- handled by timers.red
-					#assert [face/space]
-					;@@ is this check safe enough, or should invalidate set dirty flag for the host?
-					if dirty?: empty? face/space/cached [		;-- only timer updates the view because of #4881
-						#debug profile [prof/manual/start 'drawing]
-						face/draw: render face					;@@ #5130 is the killer of animations (really fixed?)
-						; unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
-						#debug profile [prof/manual/end   'drawing]
-					]
-					exit										;-- timer does not need further processing
-				]
-				;@@ TODO: `enter` should be simulated because base face does not support it
-				;@@ menu -- make context menus??
-				;@@ select change  -- make these?
-				; drag-start drag drop move moving resize resizing close  -- no need
-				; zoom pan rotate two-tap press-tap   -- android-only?
-				; create created  -- simulate these? (they're still undocumented mostly in View)
-			] [exit]											;-- ignore unsupported events
-			#debug events [#print "dispatch path: (mold path)"]
-			if path [
-				#assert [block? path]							;-- for event handler's convenience, e.g. `set [..] path`
-				;-- empty when hovering out of the host or over empty area of it
-				;-- actually also empty when clicking outside of other spaces, so disabled
-				; #assert [any [not empty? path  event/type = 'over]]
-				process-event path event [] focused?
 			]
 		]
+		copy handlers			
+	]
+	
+	sink-event: function [	
+		"Evaluate next handler for the EVENT and 'stop' unless 'bubble' is called"
+		event    [map!]
+		handlers [block!] "[handler-path event-path ...] remaining"
+	][
+		catch/name [
+			foreach [handler-path event-path] handlers [
+				if handler: select (get handler-path) event/id [
+					do-handler :handler event event-path
+					commands/stop								;-- both error and success of a handler = automatic full stop
+				]
+			]													;-- no handler found for given id = same as 'bubble'
+		] 'bubble												;-- 'bubble' may resume the upper 'sink' call
 	]
 
-	;-- used for better stack trace, so we know error happens not in dispatch but in one of the event funcs
-	do-handler: function [spc-name [path!] handler [function!] path [block!] event [map!] args [block!]] [
-		space: first path: clone/flat path				;-- copy in case user modifies/reduces it, preserve index
-		code: compose/into [handler space path event (args) none] clear []
-		trap/all/catch code [
-			msg: form/part thrown 400					;@@ should be formed immediately - see #4538
-			#print "*** Failed to evaluate (spc-name)!^/(msg)"
-		]
+	do-handler: function [
+		"Evaluate an event handler with its errors trapped safely and reported"
+		handler [function!] "func [event [map!] path [block!]]"
+		event   [map!]      "Event to pass to the handler"
+		path    [block!]    "Path to pass to the handler"
+		/type type': "handler" [string!] "Specify handler type (for error reports only)"
+	][
+		trap/keep/catch [handler event path] [
+			lookup: map-each obj path [obj/type]				;-- infer lookup path used
+			#print "*** Error in '(event/type)' (type') for (lookup)^/(thrown)"
+			?? handler
+			;@@ should erroneous handlers be disabled after 1-2-3 errors?
+		]														;-- errors are contained inside each individual handler
 	]
-
-	;; this needs reentrancy (events may generate other events), so all blocks must not be static
-	;; e.g.: up event closes the menu face, over event slips in and changes template
+	
 	do-handlers: function [
-		"Evaluate normal event handlers applicable to PATH"
-		path [block!] event [map!] args [block!] focused? [logic!]
-		/local word _
+		"Evaluate a predefined list of event handlers"
+		event    [map!]
+		handlers [block!] "[handler-path event-path ...] pairs"
 	][
-		if commands/stop? [exit]
-		hnd-name: select system/view/evt-names event/type		;-- prepend "on-"
-		#assert [hnd-name  "Unsupported event type detected"]
+		catch/name [sink-event event handlers] 'stop			;-- unknown throws pass through (e.g. halt)
+	]
+	
+	do-sink+bubble: function [
+		"Common event processing: sink an event then bubble it up"
+		event [map!]
+	][
+		if event/type = 'time [exit]							;-- timers are not sunk/bubbled
+		do-handlers event list-handlers event/path event/lookup
+	]
+	
+	do-global: function [
+		"Internal wrapper for previewers and finalizers evaluation"
+		array [map!]
+		event [map!]
+	][
+		type: pick ["previewer" "finalizer"] array =? previewers
+		foreach handler array/(event/type) [
+			catch/name [
+				do-handler/type :handler event event/path type
+			] 'stop												;-- 'stop' may stop sinking but never other previewers/finalizers 
+		]
+	]
+	
+	do-previewers: function [
+		"Carry event through the previewers list"
+		event [map!]
+	][
+		do-global previewers event
+	]
+	
+	do-finalizers: function [
+		"Carry event through the finalizers list"
+		event [map!]
+	][
+		do-global finalizers event
+	]
+	
+	do-render: function [
+		"Do host rendering: for timers only"
+		event [map!]
+	][
+		unless event/type = 'time [exit]						;-- rendering is only done on time event
+		canvas: copy #[size: (0,0) axis: xy mode: fill]
+		canvas/size: event/face/size
+		rendering/render-host event/face canvas					;-- render assigns host/draw on its own
+	]
+	
+	;@@ move this into scheduler instead? and remove host/on-time?
+	do-timers: function [
+		"Singular event processing: for timers only"
+		event [map!]
+	][
+		if event/type = 'time [timers/fire]						;-- this only handles timers
+	]
+	
+	arm-timer: function [
+		"Arm the SPACE's TIMER and set its code to call the relevant on-time handler"
+		space [object!]
+		timer [map!]
+		/now "Make it fire ASAP (if inactive only)"
+	][
+		lookup: append clear [] path: get-host-path space		;-- prefetch tree path to save time on timer evaluation
+		forall lookup [lookup/1: lookup/1/type]					;@@ use map-each
+		handlers: list-handlers/target path lookup				;-- list handlers at arm time, not at timer fire time (optimization)
+		timer/code: compose/only [do-handlers (bind 'event :do-timers) (handlers)]
+		timers/arm/:now timer
+	]
+	
+	disarm-timer: function [
+		"Disarm the SPACE's TIMER"
+		space [object!] "(unused for now)"
+		timer [map!]
+	][
+		timers/disarm timer
+	]
 		
-		spec:  pick [ word [word _] ] object? second path		;-- remove coordinates
-		unit:  pick [1 2] object? second path
-		wpath: clear copy path									;-- word-only path needed to locate handler
-		foreach (spec) path [append wpath word/type]			;@@ use `map-each` - manual fill is slow
-		#assert [not find wpath planar!]
-		
-		len: length? wpath
-		template: change make path! len + 3 [_ _]				;-- at index=3 (tiny optimization)
-		
-		i2: either focused? [len][1]							;-- keyboard events should only go into the focused space
-		while [i2 <= len] [										;-- walk from the outermost spaces to the innermost
-			;; last space is usually the one handler is intereted in, not `screen`
-			;; (but can be empty e.g. on over/away? event, then space = none as it hovers outside the host)
-			target: skip path i2 - 1 * unit						;-- position path at the space that receives event
-			do-previewers target event args
-			
-			unless commands/stop? [
-				hpath: append append/part						;-- construct full path to the handler
-					clear template 
-					wpath  skip wpath i2						;-- slice [1,i2] of wpath
-					hnd-name
-				repeat i1 i2 [									;-- walk from the longest (specific) path to the shortest (generic)
-					change hpath: next hpath 'handlers
-					unless block? list: get-safe hpath [continue]
-					commands/stop								;-- stop after current stack unless `pass` gets called
-					foreach handler list [						;-- whole list is called regardless of stop flag change
-						#assert [function? :handler]
-						do-handler hpath :handler target event args	;@@ should handler index in the list be reported on error?
-						if commands/blocked? [break]
-					]
-				]
-			]
-			
-			do-finalizers target event args
-			i2: i2 + 1
-		]
-	]
 
-	process-event: function [
-		"Process the EVENT calling all respective event handlers"
-		path  [block!] "Path on the space tree to lookup handlers in"
-		event [map!]   "View event or simulated"
-		args  [block!] "Extra arguments to the event handler"
-		focused? [logic!] "Skip parents and go right into the innermost space"
+	;; here it makes sense to place 'do-render' after 'do-timers' (both are on the 'time' event)
+	;; so that timers may make changes to the layout and it may be updated immediately
+	;; other events will have to wait for the next 'time' event for changes to have effect
+	repend clear pipeline [:do-previewers :do-sink+bubble :do-timers :do-finalizers :do-render]
+
+	register-as: function [
+		"Internal wrapper for previewers and finalizers registering"
+		array   [map!]
+		mask    [block!]    "List of event types"
+		handler [function!] "func [event [map!]]"
+		/priority "Put before other previewers"
 	][
-		#debug profile [prof/manual/start 'process-event]
-		unless commands/stop? [do-handlers path event args focused?]
-		#debug profile [prof/manual/end 'process-event]
-	]
-
-
-	;-- pointer can only be captured by single space at a time, so this info is shared:
-	drag-in: object [
-		head: path: []									;-- `head` alias is needed to avoid a LOT of `head path` calls
-		payload: none
-	]
-	
-
-	dragging?: function [
-		"True if in dragging mode"
-		/from space [object!] "Only if SPACE started it"
-	][
-		case [
-			empty? drag-in/head [no]
-			not from [yes]
-			space? source: drag-in/path/1 [space =? source]
+		action: either priority [:insert][:append]
+		foreach type mask [
+			#assert [find support/event-types type]
+			bind body-of :handler commands
+			action array/:type :handler
 		]
 	]
 	
-	stop-drag: function [
-		"Stop dragging; return truthy if stopped, none otherwise"
+	global register-previewer: function [
+		"Add HANDLER into the event previewers sequence"
+		mask    [block!] "List of event types"
+		handler [function!] "func [event [map!]]"
+		/priority "Put before other previewers"
 	][
-		if dragging? [
-			drag-in/payload: none						;-- let GC release it
-			clear drag-in/head
-		]
+		register-as/:priority previewers mask :handler
 	]
 	
-	start-drag: function [
-		"Start dragging marking the initial state by PATH"
-		path [path! block!]
-		/with param [any-type!] "Attach any data to the dragging state"
+	global register-finalizer: function [
+		"Add HANDLER into the event finalizers sequence"
+		mask    [block!] "List of event types"
+		handler [function!] "func [event [map!]]"
+		/priority "Put before other finalizers"
 	][
-		#debug events [if dragging? [#print "WARNING: Dragging override detected: (mold drag-path)->(mold path)"]]
-		#debug events [#print "Starting drag on [(mold copy/part path -99) | (mold path)] with (:param)"]
-		if dragging? [stop-drag]						;@@ not yet sure about this, but otherwise too much complexity
-		#assert [not dragging?]
-		drag-in/head: head drag-in/path: clone/flat path		;-- drag-path will return it at the same index
-		set/any in drag-in 'payload :param
+		register-as/:priority finalizers mask :handler
 	]
-
-	drag-path: func ["Return path that started dragging (or none)"] [
-		if dragging? [:drag-in/path]					;@@ copy or not?
-	]
-	
-	drag-parameter: func ["Fetch the user data attached to the dragging state"] [
-		:drag-in/payload
-	]
-	
-	drag-offset: function [
-		"Get current dragging offset (or none if not dragging)"
-		path [path! block!] "index of PATH controls the space to which offset will be relative to"
-	][
-		unless dragging? [return none]
-		path': at drag-in/head index? path
-		set [spc': ofs':] path'
-		set [spc:  ofs: ] path
-		#assert [
-			spc =? spc'									;-- only makes sense to track it within the same space
-			space? spc
-			planar? ofs
-			planar? ofs'
-		]
-		ofs - ofs'
-	]
-
-	;@@ export dragging functions or not? (they're available to event handlers anyway)
-
 ]
 
-;-- toolkit available to every event handler/previewer/finalizer
-;-- designed following REP#80 - commands, not return values
-events/commands: context with events [
-	;-- flag is local to each handler's call, so we have to use a hack here
-	;@@ question here is what is the default behavior: pass the event further or not?
-	;@@ let's try with 'stop' by default
-	stop:     func [/now] with :with-stop [stop?: yes block?: now]	;-- used by previewers/finalizers, also to block handler stack
-	stop?:    does with :with-stop [stop?]
-	blocked?: does with :with-stop [block?]
-	pass:     does with :with-stop [stop?: block?: no]			;-- stop is ignored for timer events
 
-	;-- the rest does not require a stack but should be available too
-	dragging?:      :events/dragging?
-	stop-drag:      :events/stop-drag
-	start-drag:     :events/start-drag
-	drag-path:      :events/drag-path
-	drag-parameter: :events/drag-parameter
-	drag-offset:    :events/drag-offset
+;; hints on commands design and operation:
+;; 'sink' evaluates and returns so the parent handler can resume itself
+;;   just a recursively called function, initiated by 'do-sink+bubble'
+;;   throws a 'stop' exception if next handler fails (errors out) or returns/exits
+;;   but automatically exits (bubbles up) if event/done? is set
+;; 'bubble' has to throw to get out of the possible inner function calls, but stop at handler level
+;;   caught by 'sink-event', so it can then resume the upper handler
+;; 'stop' has to throw to get out of the possible inner function and all handler calls
+;;   caught by 'do-handlers' and its wrappers ('do-sink-bubble', 'do-previewers/finalizers')
+events/commands: context with events/processing [
+	sink:   does with :sink-event [
+		unless event/done? [sink-event event next next handlers]	;@@ or throw an error on double sink attempt?
+	]
+	bubble: does with :sink-event [
+		throw/name event 'bubble								;@@ maybe use fcatch? but throw/name is faster
+	]
+	stop:   does with :sink-event [
+		event/done?: yes
+		throw/name event 'stop
+	]
 ]
+			
+
+#hide [#assert [												;-- this test requires 'commands' defined
+	[1288 14088 4872 5896 6920 7944 13064 15112 16136 21256 22280 23304 24328 29448 30472 31496 32520]
+	= keys-of sheet: events/dialect/compile-sheet [abc: /def] [
+		shift + control + down [1]
+		mid-down + alt-down + alt + shift + control + down [2]
+		* alt + control + alt-down + down [3]
+	]
+	code1: events/encoding/encode-event 'down [shift control]
+	code2: events/encoding/encode-event 'down [mid-down alt-down alt shift control]
+	code3: events/encoding/encode-event 'down [aux-down alt-down alt control]
+	find/only body-of select sheet code1 [1]
+	find/only body-of select sheet code2 [2]
+	find/only body-of select sheet code3 [3]
+]]
 

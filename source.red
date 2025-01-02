@@ -1,7 +1,9 @@
 Red [
-	title:   "Rich-content editor basis and source format codec"
-	author:  @hiiamboris
-	license: BSD-3
+	title:    "Rich-content editor basis and source format codec"
+	author:   @hiiamboris
+	license:  BSD-3
+	provides: spaces.source
+	depends:  [spaces.mold spaces.geometry  interleave advanced-function]
 	description: {
 		This provides an internal efficient format for holding rich-content /data:
 			[item1 attr1 item2 attr2 ...]
@@ -43,6 +45,8 @@ Red [
 	}
 ]
 
+;@@ this should be not in the core, but a part of rich text support; and clipboard should be extensible enough to just plug it in
+
 ;@@ should there be a single items/attributes array for the whole document composed from many paragraphs sources?
 
 ;; this context proceeds from lowest level (ranges) to highest level (source) below
@@ -55,19 +59,17 @@ rich: context [											;@@ what would be a better name?
 	;; attrs are in a block because there usually aren't many anyway, no reason to use a map
 	;; attr names must always all be lowercase or hashing would have to be slowed down with auto-lowecasing
 	;@@ test lowercase in high-level funcs
-	catalog: make hash! 1024
+	catalog: make hash! 1024									;-- hash, not a map, because map has no index for its keys
 	
 	hash-attrs: function [attrs [block!]] [
 		attrs: sort/skip append clear [] attrs 2				;-- sort to guarantee uniqueness of the combo
-		checksum (native-mold/all/flat/only attrs) 'sha1		;-- native mold is much faster than save into redbin
+		mold*/all/flat/only attrs								;-- native mold is much faster than save into redbin
 	]
 	
 	store-attrs: function [attrs [block!]] [
-		#assert [any [empty? attrs  all extract next attrs 2]]		;-- only truthy values are allowed for attrs
-		hash: hash-attrs attrs
-		unless pos: find catalog hash [
-			pos: tail catalog 
-			repend catalog [hash copy/deep attrs]
+		#assert [any [empty? attrs  all extract next attrs 2]]	;-- only truthy values are allowed for attrs
+		unless pos: find catalog hash: hash-attrs attrs [
+			reduce/into [hash copy/deep attrs] pos: tail catalog
 		]
 		half skip? pos
 	]
@@ -77,8 +79,7 @@ rich: context [											;@@ what would be a better name?
 	]
 	
 	attrs->index: function [attrs [block!]] [
-		hash: hash-attrs attrs
-		if pos: find catalog hash [half skip? pos]
+		if pos: find catalog hash-attrs attrs [half skip? pos]
 	]
 	
 	store-attrs []										;-- empty attribute set is always present and has zero index
@@ -350,7 +351,7 @@ rich: context [											;@@ what would be a better name?
 			(attributes/change attrs to word! attr none)
 		|	set item string! (							;@@ make it a module
 				code: store-attrs attrs
-				zip/into explode item code result
+				interleave/into explode item code result
 			)
 		|	set item skip (
 				code: store-attrs attrs

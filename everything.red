@@ -4,15 +4,12 @@ Red [
 	; needs:  view										;@@ doesn't work, has to be in the main script
 ]
 
+;@@ can I get rid of spaces/ctx if I demessify spaces/ itself and make it a context?
+
 ;; check to prevent double inclusion (esp. when running tests from spaces-console)
 #if not value? 'spaces-included? [
 set 'spaces-included? true 								;-- must be done in the code, not in the preprocessor, bcuz inclusion is 2-stage!  
 
-;@@ I only partially understand why/how all this magic works
-;@@ a huge lot of bugs is fixed by using %include-once
-;@@ since it's a macro, it has to be #included, not `do`ne (`do` forgets macros)
-;@@ for some reason, it won't affect #includes of this very file,
-;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
 ; #do [verbose-inclusion?: yes]							;-- enable to dump filenames
 #include %../common/include-once.red					;-- the rest can use the improved include
 #do [
@@ -26,7 +23,8 @@ set 'spaces-included? true 								;-- must be done in the code, not in the prep
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	#debug off										;-- turn off type checking and general (unspecialized) debug logs
+	; #debug off										;-- turn off type checking and general (unspecialized) debug logs
+	#debug set tips									;-- turn on to get developer suggestions in addition to detected failures
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times
 	; #debug set changes								;-- turn on to see value changes and invalidation
@@ -43,84 +41,103 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	#assert off
+	; #assert off
+	#include %../common/trace-deep.red
 	#include %../common/expect.red
 	#include %../common/setters.red
-	; #include %../common/composite.red
+	#include %../common/charsets.red
+	#include %../common/catchers.red
+	#include %../common/with.red
+	#include %../common/composite.red
 	#include %../common/relativity.red
-	#include %../common/tabbing.red						;-- extended by spaces/tabbing.red
-	; #include %../common/tree-hopping.red				;-- included by tabbing.red
+	#include %../common/without-gc.red
 	#include %../common/scoping.red
 	#include %../common/collect-set-words.red
 	#include %../common/print-macro.red
 	#include %../common/error-macro.red
 	#include %../common/prettify.red
 	#include %../common/clock.red
+	#include %../common/exponent-of.red
+	#include %../common/format-readable.red
+	#include %../common/shallow-trace.red
 	#include %../common/profiling.red
 	#include %../common/extrema.red
-	; #include %../common/map-each.red
 	#include %../common/new-apply.red
-	#include %../common/new-each.red
 	#include %../common/xyloop.red
 	#include %../common/modulo.red
-	; #include %../common/with.red
+	#include %../common/tree-hopping.red
+	#include %../common/tabbing.red						;-- extended by spaces/tabbing.red
+	#include %../common/reshape.red
+	#include %../common/interleave.red
 	#include %../common/join.red
 	#include %../common/split.red
-	#include %../common/catchers.red
-	#include %../common/is-face.red
-	#include %../common/color-models.red
-	#include %../common/contrast-with.red
 	#include %../common/keep-type.red
 	#include %../common/clip.red
 	#include %../common/step.red
-	; #include %../common/typecheck.red
-	; #include %../common/selective-catch.red
+	#include %../common/count.red
+	#include %../common/typecheck.red
+	#include %../common/selective-catch.red
+	#include %../common/new-each.red
 	#include %../common/forparse.red
 	#include %../common/mapparse.red
-	#include %../common/reshape.red
 	#include %../common/sift-locate.red
+	#include %../common/color-models.red
+	#include %../common/contrast-with.red
+	#include %../common/is-face.red
+	#include %../common/in-out-func.red
 	#include %../common/do-queued-events.red
 	#include %../common/show-trace.red
 	#include %../common/do-atomic.red
 	#include %../common/classy-object.red
-	; #include %../common/advanced-function.red			;-- included by search.red
+	#include %../common/advanced-function.red
+	#include %../common/timers.red
 	#include %../common/search.red
+	#include %../common/overload.red
 	#include %../common/load-anything.red				;-- required to load data saved by custom 'save'
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
 		spaces: context [
 			ctx: context [								;-- put all space things into a single context
-				#include %debug-helpers.red
+				#include %macros.red
+				#include %mold.red						;-- include as early as possible so it can be used in other places
+				#include %keys.red
+				#include %debugging.red
+				#include %geometry.red
+				#include %colors.red
 				#include %auxi.red
-				#include %styles.red
-				#include %cache.red
+				#include %templates.red
+				; #include %templates/space.red
+				#include %focus.red
+				#include %focus-tracking.red			;-- requires focus
+				#include %styling.red
+				; #include %cache.red
 				#include %rendering.red
 				#include %layouts.red
 				#include %source.red
 				#include %clipboard.red
-				#include %templates.red					;-- requires clipboard on inclusion
+				#include %host.red
 				#include %vid.red
-				#include %event-scheduler.red			;-- requires vid (host? func)
-				#include %events.red					;-- requires auxi, event-scheduler, layouts, styles
-				#include %timers.red					;-- must come after events (to set events/on-time), but before templates
-				#include %popups.red
+				#include %scheduler.red
+				#include %events.red
+				; #include %timers.red					;-- must come after events (to set events/on-time), but before templates
+				; #include %popups.red
 				#include %traversal.red
-				#include %focus.red
 				#include %hittest.red
-				#include %tabbing.red					;-- requires traversal/pane-of
-				#include %single-click.red
+				#include %tabbing.red
+				; #include %single-click.red
 				#include %timelines.red
 				#include %edit-keys.red
-				#include %standard-handlers.red
-				#include %hovering.red
-				#include %actors.red
+				; #include %standard-handlers.red
+				#include %new-handlers.red
+				; #include %hovering.red
+				; #include %actors.red
 			]
 	
 			;; makes some things readily available:
 			events:    ctx/events
 			templates: ctx/templates
-			styles:    ctx/styles
+			; styles:    ctx/styles
 			layouts:   ctx/layouts
 			focus:     ctx/focus
 			VID:       ctx/VID
