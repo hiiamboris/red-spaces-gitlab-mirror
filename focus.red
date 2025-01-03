@@ -15,7 +15,7 @@ focus: classy-object [
 		old [object! none! unset!]
 		new [object! none!]
 	][
-		if object? :old [
+		if is-space? :old [
 			scheduler/synthesize-event [
 				type:   unfocus
 				face:   (host: host-of old)
@@ -28,10 +28,12 @@ focus: classy-object [
 			if (length? history) >= 1024 [						;-- keep the length sane, but wide enough
 				remove/part history 128
 			]
-			scheduler/synthesize-event [						;@@ maybe synthesize should obtain the window and host?
-				type:   focus
-				face:   (host: host-of new)
-				window: (window-of host)
+			if is-space? new [
+				scheduler/synthesize-event [					;@@ maybe synthesize should obtain the window and host?
+					type:   focus
+					face:   (host: host-of new)
+					window: (window-of host)
+				]
 			]
 		]
 	]
