@@ -140,17 +140,17 @@ global mold: context [
 		lit-path! ["'"  "/"   ""]
 		get-path! [":"  "/"   ""]
 		set-path! [""   "/"  ":"]
-		hash!     ["##[make hash! ["      " "  "]]"] 
-		vector!   ["##[make vector! ["    ""   "]]"] 
-		image!    ["##[make image! ["     ""   "]]"] 
-		map!      ["##[make map! ["       " "  "]]"] 
-		event!    ["##[make event! ["     " "  "]]"] 
-		object!   ["##[construct/only ["  " "  "]]"]
-		function! ["##[func "             ""    "]"] 
-		action!   ["##[make action! "     ""    "]"]		;-- can't use native mold since it will use it's own indentation 
-		native!   ["##[make native! "     ""    "]"] 
-		op!       ["##[make op! "         ""    "]"] 
-		routine!  ["##[routine "          ""    "]"] 
+		hash!     ["##(make hash! ["      " "  "])"] 
+		vector!   ["##(make vector! ["    ""   "])"] 
+		image!    ["##(make image! ["     ""   "])"] 
+		map!      ["##(make map! ["       " "  "])"] 
+		event!    ["##(make event! ["     " "  "])"] 
+		object!   ["##(construct/only ["  " "  "])"]
+		function! ["##(func "             ""    ")"] 
+		action!   ["##(make action! "     ""    ")"]		;-- can't use native mold since it will use it's own indentation 
+		native!   ["##(make native! "     ""    ")"] 
+		op!       ["##(make op! "         ""    ")"] 
+		routine!  ["##(routine "          ""    ")"] 
 	][
 		block!    ["["  " "  "]"]
 		paren!    ["("  " "  ")"]
@@ -473,7 +473,7 @@ global mold: context [
 				case [
 					name: select/same/skip natives :data 2 [
 						name: mold* to get-word! name			;@@ add system/words/ prefix?
-						emit either all* [["##[" name "]"]][name] 
+						emit either all* [["##(" name ")"]][name] 
 					]
 					compact? [
 						emit start
@@ -518,9 +518,9 @@ global mold: context [
 	emit-skip?: function [/extern data] with :mold-internal reshape [
 		if all [all* not head? data] [							;-- dump the full series in /all mode
 			emit switch/default type [
-				paren! @(any-path!) ["##[skip quote "]			;-- active values have to be quoted :(
-			] ["##[skip "]
-			return also `" (-1 + index? data)]"` data: head data
+				paren! @(any-path!) ["##(skip quote "]			;-- active values have to be quoted :(
+			] ["##(skip "]
+			return also `" (-1 + index? data))"` data: head data
 		]
 	]
 	
@@ -620,8 +620,8 @@ global mold: context [
 	{ab@c}					= mold ab@c
 	{%"a b"}				= mold %"a b"
 	{"^^/{abc}^^/"}			= mold {^/{abc}^/}
-	{##[skip "abc" 1]}		= mold/all next "abc"
-	{##[skip quote (a b c) 1]}	= mold/all next quote (a b c)
+	{##(skip "abc" 1)}		= mold/all next "abc"
+	{##(skip quote (a b c) 1)}	= mold/all next quote (a b c)
 	
 	;; lists
 	"[1 + 2]"				= mold [1 + 2]
@@ -646,11 +646,11 @@ global mold: context [
 	"[hash [10 integer! word! *30]]" = mold reduce [to hash! b]
 	
 	"[:to]"												= mold reduce [:to]
-	"[##[:to]]"											= mold/all reduce [:to]
-	"[##[:*]]"											= mold/all reduce [:*]
+	"[##(:to)]"											= mold/all reduce [:to]
+	"[##(:*)]"											= mold/all reduce [:*]
 	
 	"[func [s][pick s 1]]"								= mold reduce [:first]
-	{[^/    ##[func [^/        "Return but don't evaluate the next value"^/        :value [any-type!]^/    ][^/        :value^/    ]]^/]}
+	{[^/    ##(func [^/        "Return but don't evaluate the next value"^/        :value [any-type!]^/    ][^/        :value^/    ])^/]}
 														= mold/all new-line/all reduce [:quote] on
 														
 	"vector [1 2 3]"									= mold make vector! [1 2 3]
@@ -664,7 +664,7 @@ global mold: context [
 	{object [^/    xxx: 1^/    y:   2^/]}				= mold object [xxx: 1 y: 2]
 	{[object [x: 1] object [y: 2]]}						= mold reduce [object [x: 1] object [y: 2]]	;-- flattened in the block
 	{[#[x: 1] #[2 3]]}									= mold reduce [#[x 1] #[2 3]]				;-- flattened in the block
-	{[##[make map! [^/    x: 1^/]] ##[make map! [^/    2 3^/]]]} = mold/all reduce [#[x 1] #[2 3]]
+	{[##(make map! [^/    x: 1^/]) ##(make map! [^/    2 3^/])]} = mold/all reduce [#[x 1] #[2 3]]
 	{["Verdana"]}										= mold reduce [make font! [name: "Verdana"]]
 	{["Rich Text"]}										= mold reduce [make face! [type: 'rich-text text: "Rich Text"]]
 	{[base:10x10]}										= mold reduce [make face! [type: 'base size: (10,10)]]
@@ -679,7 +679,7 @@ global mold: context [
 	{object [^/    o: object [..]^/    p: object [q: object [../..]]^/]}		;-- 'p' is flattened
 														= mold object [o: self p: object [q: o]]
 	;; not valid but idk what's a better option:
-	{##[construct/only [^/    o: ##[construct/only [..]]^/    p: ##[construct/only [^/        q: ##[construct/only [../..]]^/    ]]^/]]}
+	{##(construct/only [^/    o: ##(construct/only [..])^/    p: ##(construct/only [^/        q: ##(construct/only [../..])^/    ])^/])}
 														= mold/all object [o: self p: object [q: o]]
 ]]
 
