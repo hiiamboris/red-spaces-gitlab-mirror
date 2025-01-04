@@ -145,6 +145,7 @@ global list: function [									;-- precursor of `list a..b` REP #168, direction
 ;; chainable pair comparison - instead of `within?` monstrosity, see also REP #148
 ;; very hard to find a sigil for these ops
 ;; + resembles intersecting coordinate axes, so can be read as "2D comparison"
+;; - resembles flat line, so can be read as "1D comparison"
 global +<=: make op! func [
 	"Chainable 2D comparison (non-strict)"
 	a [planar! none!] b [planar!]
@@ -157,6 +158,18 @@ global +<:  make op! func [
 ][
 	all [a a/x < b/x a/y < b/y  b]
 ]
+global -<=: make op! func [
+	"Chainable 1D comparison (non-strict)"
+	a [number! none!] b [number!]
+][
+	all [a  a <= b  b]
+]
+global -<:  make op! func [
+	"Chainable 2D comparison (strict)"    
+	a [number! none!] b [number!]
+][
+	all [a  a < b  b]
+]
 
 #assert [
 	1x1 +<= 1x1
@@ -164,11 +177,16 @@ global +<:  make op! func [
 	(1, 1) +<= (1, 1)
 	(1, 1) +<= 1x1
 	1x1 +< (1.1, 1.1)
+	(-1e-30, -1e-30) +<= (0,0)
 	not 1x1 +< 1x1
 	not 1x1 +< (1, 1)
 	not 1x1 +< (1, 1.1)
 	not 1x1 +< (1.1, 1)
+	not (0,0) +<= (-1e-30, -1e-30)
 	1x1 +< (2, 2) +< 3x3
+	0 -< 1
+	0 -<= 0
+	not 1 -<= 0
 ]
 
 inside?: make op! function [
