@@ -424,6 +424,14 @@ foreach-reverse: function [spec [word! block!] series [series!] code [block!]] [
 	; ]
 ; ]
 
+with-space: function [
+	"Evaluate CODE providing SPACE word to it"
+	space [object!] (space? space)
+	_code [block!]  "Should be already bound to this function"	;-- underscore to avoid conflicts with the 'code' word ;@@ need bind/only
+][
+	do _code
+]
+
 ;; fun facts:
 ;; - find/same call on a block of 10 items is as fast as on hash
 ;; - listing even 10 items into a hash adds much more overhead than calling find on a block

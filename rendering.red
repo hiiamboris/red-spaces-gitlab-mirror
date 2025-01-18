@@ -7,7 +7,8 @@ Red [
 ]
 
 
-rendering: context [
+rendering: classy-object [
+	"Host and space rendering and frame management"
 
 	;@@ support custom on-invalidate
 	;@@ support /info cause scope
@@ -160,18 +161,24 @@ rendering: context [
 		path    [path!] (not tail? path)
 		return: [map!] "Rendered frame"
 	][
-		style: any [
+		style: any [											;-- base style, not including a possible path-specified alteration
 			templates/(last path)/style							;-- if /type is faked, then at render-space level, accounted in the path
 			templates/space/style								;-- if template has no style, default to the style of 'space'
 		]
-		do bind/copy style/facets space							;-- apply facets before making the layout
-		layout: layouts/(style/layout)
-		;; performance note: `compose` is 50% faster than chained `make` even without considering the GC
-		;@@ maybe use a map when not in debug mode? test performance on grid tests
-		settings: make layout-settings! compose [
-			(layout/settings)									;-- defaults declared by the layout
-			(style/settings)									;-- settings declared by the style
-			(only styling/storage/find-alteration path)			;-- possibly attached tags
+		;@@ add some invalidation prevention directly into the facets wrapper? it's a most likely place for such errors
+		;@@ 'noinvalidate' or 'validate' or 'valid' or 'isolate(d)'
+		;@@ though currently rendered path is not yet valid anyway, and the only risk is removing other cached geometries
+		with-space space [										;-- bound to space so one can use expressions inside settings and tags
+			do style/facets										;-- apply facets (with-space-bound) before making the layout
+			layout: layouts/(style/layout)
+			;; performance note: `compose` is 50% faster than chained `make` even without considering the GC
+			;@@ maybe use a map when not in debug mode? test performance on grid tests
+			settings: make layout-settings! compose [
+				(layout/settings)								;-- defaults declared by the layout (unbound)
+				(style/settings)								;-- settings declared by the style (with-space-bound)
+				(only styling/storage/find-alteration path)		;-- possibly attached style alteration (path-specified) (with-space-bound)
+				(only :space/config/style)						;-- unique per-space alteration (tags), e.g. colors set in VID/S ;@@ bind also
+			]
 		]
 		frame: layout/make space canvas settings
 		#assert [map? :frame]

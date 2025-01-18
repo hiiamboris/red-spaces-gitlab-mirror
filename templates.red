@@ -33,7 +33,7 @@ template!: object [
 	tools:			;-- functions that take a space argument
 	kit:			;-- functions (or wrappers) auto-bound to the space with 'using'
 	config:			;-- each template should have its own shared default config
-	style:			;@@ make it possible to directly write the style or call 'define-styles'?
+	style:			;-- serves as a placeholder for word-only instances in 'define-styles' ;@@ this design needs more consideration
 		none
 ]
 
