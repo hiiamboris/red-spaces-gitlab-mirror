@@ -10,18 +10,48 @@ Red [
 INFxINF: (1.#inf, 1.#inf)								;-- used too often to always type it numerically
 ;@@ consider: OxINF Ox-INF INFxO -INFxO (so far they don't seem useful)
 
+global planar!: make typeset! [pair! point2D!]
+global linear!: make typeset! [integer! float!]			;@@ or real! ? real is more like single datatype, while linear is a typeset
+global planar?: func [
+	"Test if X is a planar! value"
+	x       [any-type!]
+	return: [logic!]
+][
+	find planar! type? :x
+]
+global linear?: func [
+	"Test if X is a linear! value"
+	x       [any-type!]
+	return: [logic!]
+][
+	find linear! type? :x
+]
+
 global by: thru: make op! :as-pair
 global .:        make op! :as-point2D					;@@ comma is not for the taking, and adding 3D support will slow it down :(
 
 global abs:  :absolute
-global half: func [x] [x / 2]							;-- the appeal of 'half' is in e.g. `half length? pair-list`
-round-down:  func [x] [round/to/floor   x 1]
-round-up:    func [x] [round/to/ceiling x 1]
-
-global planar!: make typeset! [pair! point2D!]
-global linear!: make typeset! [integer! float!]			;@@ or real! ? real is more like single datatype, while linear is a typeset
-global planar?: func [value [any-type!]] [find planar! type? :value]
-global linear?: func [value [any-type!]] [find linear! type? :value]
+global half: func [										;-- the appeal of 'half' is in e.g. `half length? pair-list`
+	"Get X divided by two"
+	x       [number! planar! point3D! money! time!]
+	return: [number! planar! point3D! money! time!]
+][
+	x / 2
+]
+round-down:  func [
+	"Round X to the next smaller integer"
+	x       [number!  planar! point3D! money!]
+	return: [integer! planar! point3D! money!]
+][
+	round/to/floor   x 1
+]
+round-up:    func [
+	"Round X to the next bigger integer" 
+	x       [number!  planar! point3D! money!]
+	return: [integer! planar! point3D! money!]
+][
+	round/to/ceiling x 1
+]
 
 
 ;; Ranges are used by /config/limits facet, until such datatype is introduced on the language level.
@@ -31,11 +61,19 @@ global linear?: func [value [any-type!]] [find linear! type? :value]
 ;; 1D and 2D quantities should not be mixed in a single range, to help reasoning and keep things simpler.
 ;; Ranges are directional (start and end are not equivalents).
 global range!: make map! [1 0 2 0]
-global range?: func [x [any-type!]] [all [map? :x  [1 2] = keys-of x]]
+global range?: func [
+	"Test if X is a range! value"
+	x       [any-type!]
+	return: [logic!]
+][
+	all [map? :x  [1 2] = keys-of x]
+]
+
 global ..: make op! make-range: function [				;-- name `to` cannot be used as it's a native
 	"Make a range from START to END"
-	start [scalar!]
-	end   [scalar!]
+	start   [scalar!]
+	end     [scalar!]
+	return: [map!]
 ][
 	#assert [(planar? start) = (planar? end)  "Range limits are of different dimensionality!"]
 	also range: copy range! (							;-- 30% faster than make map! compose [..], and less allocations
@@ -65,7 +103,8 @@ global ordered: function [								;-- 'order' implies modification, while 'order
 
 global span?: function [
 	"Get size of the RANGE encoded as a planar! or range! value"
-	range [planar! map!]
+	range   [planar! map!]
+	return: [linear! planar!]
 ][
 	abs range/2 - range/1
 ]
@@ -79,7 +118,8 @@ global span?: function [
 
 global area?: function [
 	"Get area of a box (0,0)..(X,Y)"
-	xy [planar!]
+	xy      [planar!]
+	return: [float!]
 ][
 	either nan? area: xy/x * 1.0 * xy/y [0.0][abs area]	;-- 1.0 to support infxinf here (overflows otherwise)
 ]
@@ -92,7 +132,11 @@ global area?: function [
 ]
 
 ;; `length?` is taken; `radius?` or `length-of` possible, but not clearer; it's only used in this file anyway
-vec-length?: function [v [planar!]] [					;-- this is still 2x faster than compiled `distance? 0x0 v`
+vec-length?: function [									;-- this is still 2x faster than compiled `distance? 0x0 v`
+	"Get length of the 2D vector V"
+	v       [planar!]
+	return: [float!]
+][
 	v/x ** 2 + (v/y ** 2) ** 0.5
 ]
 
@@ -127,8 +171,10 @@ global list: function [									;-- precursor of `list a..b` REP #168, direction
 ]
 
 ~=: make op! function [
-	"Fuzzy number comparison"
-	a [number!] b [number!]
+	"Fuzzy number comparison for 2D points"
+	a       [number!]
+	b       [number!]
+	return: [logic!]
 ][
 	and~ a - 1e-6 <= b b - 1e-6 <= a					;-- this mainly is used for point2D compares, so precision has to match rounding errors
 ]
@@ -148,25 +194,33 @@ global list: function [									;-- precursor of `list a..b` REP #168, direction
 ;; - resembles flat line, so can be read as "1D comparison"
 global +<=: make op! func [
 	"Chainable 2D comparison (non-strict)"
-	a [planar! none!] b [planar!]
+	a       [planar! none!]
+	b       [planar!]
+	return: [planar! none!]
 ][
 	all [a a == min a b  b]								;-- strict equality, otherwise 0 <= -1e30 will pass
 ]
 global +<:  make op! func [
 	"Chainable 2D comparison (strict)"    
-	a [planar! none!] b [planar!]
+	a       [planar! none!]
+	b       [planar!]
+	return: [planar! none!]
 ][
 	all [a a/x < b/x a/y < b/y  b]
 ]
 global -<=: make op! func [
 	"Chainable 1D comparison (non-strict)"
-	a [number! none!] b [number!]
+	a       [number! none!]
+	b       [number!]
+	return: [number! none!]
 ][
 	all [a  a <= b  b]
 ]
 global -<:  make op! func [
 	"Chainable 2D comparison (strict)"    
-	a [number! none!] b [number!]
+	a       [number! none!]
+	b       [number!]
+	return: [number! none!]
 ][
 	all [a  a < b  b]
 ]
@@ -191,22 +245,26 @@ global -<:  make op! func [
 
 inside?: make op! function [
 	"Test if POINT is inside the SPACE"
-	point [planar!] space [object!]
+	point   [planar!]
+	space   [object!]
+	return: [logic!]
 ][
 	within? point 0x0 space/size
 ]
 
 along: make op! function [
 	"Pick PAIR's dimension along AXIS (integer is treated as a square)"
-	pair [planar! linear!]
-	axis [word!] (find [x y] axis)
+	pair    [planar! linear!]
+	axis    [word!] (find [x y] axis)
+	return: [linear!]
 ][
 	pick pair * 1x1 axis
 ]
 
 ortho: func [
 	"Get axis orthogonal to a given one"
-	xy [word! pair!] "One of [x y 0x1 1x0]"
+	xy      [word! pair!] "One of [x y 0x1 1x0]"
+	return: [word! pair!]
 ][
 	switch xy [x ['y] y ['x] 0x1 [1x0] 1x0 [0x1]]				;-- switch here is ~20% faster than select/skip
 ]
@@ -231,9 +289,10 @@ set-pair: function [
 
 set-axis: function [
 	"Change VALUE of a given AXIS of an anonymous POINT"
-	point [planar!]
-	axis  [word!] (find [x y] axis)
-	value [linear!]
+	point   [planar!]
+	axis    [word!] (find [x y] axis)
+	value   [linear!]
+	return: [planar!] "Modified POINT"
 ][
 	point/:axis: value
 	point
@@ -281,6 +340,7 @@ interpolate: function [									;@@ any better name since it can also be used fo
 	t  [number!] "[0..1] corresponds to [V1..V2]"
 	/clip        "Force T within [0..1], making outside regions constant"
 	/reverse     "Treat T as a point on [V1..V2], return a point on [0..1]"
+	return: [number! planar! point3D! tuple!]
 ][
 	case/all [
 		reverse     [t: t - v1 / (v2 - v1)]
@@ -296,11 +356,19 @@ interpolate: function [									;@@ any better name since it can also be used fo
 ]
 
 
-axis->pair: func [xy [word!]] [
+axis->pair: func [
+	"Convert axis name into its unit vector"
+	xy      [word!]
+	return: [pair!]
+][
 	switch xy [x [1x0] y [0x1]]
 ]
 
-anchor->axis: func [nesw [word!]] [
+anchor->axis: func [
+	"Convert direction anchor [N E S W ↑ ↓ → ←] into a corresponding axis name [X Y]"
+	nesw    [word!]
+	return: [word!]
+][
 	switch nesw [n s ↑ ↓ ['y] w e → ← ['x]]				;-- arrows are way more readable, if harder to type (ascii 24-27)
 ]
 
@@ -327,6 +395,7 @@ normalize-alignment: function [
 	"Turn block alignment into a -1x-1 to 1x1 pair along provided Ox and Oy axes"
 	align [block! pair!] "Pair is just passed through"
 	ox [pair!] oy [pair!]
+	return: [pair!]
 ][
 	;; center/middle are the default and do not need to be specified, but double arrows are still supported ;@@ should be?
 	dict: [n ↑ [0x-1] s ↓ [0x1] e → [1x0] w ← [-1x0] #(none) ↔ ↕ [0x0]]
@@ -358,6 +427,7 @@ segments-overlap?: function [
 	"Get nonzero intersection size of segments A1-A2 and B1-B2, or none if they don't intersect"
 	A1 [linear!] A2 [linear!]
 	B1 [linear!] B2 [linear!]
+	return: [linear! none!]
 ][
 	sec: (min A2 B2) - max A1 B1
 	all [sec > 0 sec]									;-- 0 < intersection size
@@ -367,6 +437,7 @@ boxes-overlap?: function [
 	"Get nonzero intersection size of boxes A1-A2 and B1-B2, or none if they don't intersect"
 	A1 [planar!] A2 [planar!]
 	B1 [planar!] B2 [planar!]
+	return: [planar! none!]
 ][
 	(0,0) +< ((min A2 B2) - max A1 B1)					;-- 0x0 +< intersection size
 ]
@@ -383,6 +454,7 @@ closest-box-point?: function [
 	"Get coordinates of the point on box B1-B2 closest to ORIGIN"
 	B1 [planar!] "inclusive" B2 [planar!] "inclusive"
 	/to origin: (0,0) [planar!] "defaults to 0x0"
+	return: [planar!]
 ][
 	clip origin B1 B2
 ]
@@ -391,6 +463,7 @@ box-distance?: function [
 	"Get distance between closest points of box A1-A2 and box B1-B2 (negative if overlap)"
 	A1 [planar!] "inclusive" A2 [planar!] "non-inclusive"
 	B1 [planar!] "inclusive" B2 [planar!] "non-inclusive"
+	return: [linear!]
 ][
 	either isec: boxes-overlap? A1 A2 B1 B2 [			;-- case needed by box arrangement algo
 		negate min isec/x isec/y
@@ -411,6 +484,7 @@ global constrain: function [
 	"Clip SIZE within LIMITS"
 	size    [planar!] "Use INFxINF for unlimited"
 	limits  [map! (range? limits) none!] "none if no limits"
+	return: [planar!]
 ][
 	unless limits [return size]							;-- most common case optimization
 	min: switch/default type?/word limits/1 [			;@@ /word was for #5387, remove it later

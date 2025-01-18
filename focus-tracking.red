@@ -8,9 +8,11 @@ Red [
 
 once set-focus*: :set-focus
 
-focus/tracking: context [
+focus/tracking: classy-object [
+	"Kludges that help Spaces track what the currently focused face is"
+	
 	insert-event-func 'spaces-focus-tracker						;@@ this only works for window/field/area - #3728
-		filtered-event-func [focus unfocus]						;@@ it is also the only way to know about window activation/deactivation
+		focus-tracker: filtered-event-func [focus unfocus]		;@@ it is also the only way to know about window activation/deactivation
 		function [event [event!]] [
 			target: event/face
 			either event/type = 'focus [
@@ -27,10 +29,10 @@ focus/tracking: context [
 					#debug focus [print "lost focus"]
 				]
 			]
-		]
+		] #type "(internal) Kludge for window/field/area"
 
 	insert-event-func 'spaces-focus-down-tracker				;@@ covers clicks on buttons and other focusables - #3728
-		filtered-event-func [down]
+		focus-down-tracker: filtered-event-func [down]
 		function [event [event!]] [
 			if any [
 				'focusable = flags: event/face/flags			;@@ this has false positives - #5574
@@ -38,7 +40,7 @@ focus/tracking: context [
 			][
 				focus-on-face event/face
 			]
-		]
+		] #type "(internal) Kludge for buttons and other focusables"
 		
 	
 	global set-focus: function [ 
@@ -69,6 +71,7 @@ focus/tracking: context [
 	;@@ other methods to consider:
 	;@@ 1. hijacking window/init and adding reaction to /selected - currently covered by set-focus override
 	;@@ 2. key-down events hook - who receives the key is in focus - currently seems to be unnecessary
+	;@@ 3. hijacking stop-reactor and adding focus/restore - not sure it's needed, as another window should be focused at that time
 ]
 
 ;; testing/tuning code

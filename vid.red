@@ -12,20 +12,24 @@ Red [
 
 ;@@ use tag for hint? (makes sense if hint is widely used)
 
-VID: context [
-	;; shortcuts to avoid repetition
-	common: none
+VID: classy-object [
+	"VID/S dialect"
 	
-	;; VID styles to be defined by each template
-	styles: #[]
-
+	common: none
+	styles: #[]				#type [map!] "Known VID/S styles collection"
+	
 	init-spaces-tree: none
 	lay-out-vids:     none
 	
-	focus: context [track: update: none]
+	focus: classy-object [
+		"(internal focus tracking facilities)"
+		track: update: none
+	]
 ]	
 
-VID/common: context [
+VID/common: classy-object [
+	"Templating shortcuts to avoid repetition"
+	
 	;; for inclusion into style /spec:
 	spec: #[
 		spacious [margin: spacing: 10x10]
@@ -60,7 +64,11 @@ VID/common: context [
 ]
 		
 ;; used internally in host's `init` only
-VID/init-spaces-tree: function [host [object!] (host? host) /local focused] [
+VID/init-spaces-tree: function [
+	"Construct VID/S layout from the host's default actor"
+	host [object!] (host? host)
+	/local focused
+][
 	swap 'spec 'host/actors/worst-actor-ever
 	#assert [function? :spec]
 	if empty? spec: body-of :spec [spec: [space]]				;-- default host to an empty space, so /space is always assigned

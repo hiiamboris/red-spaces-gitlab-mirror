@@ -8,10 +8,12 @@ Red [
 
 
 focus: classy-object [
+	"Keyboard focus management"
+	
 	set 'focus self												;-- required for the forward reference to 'move-focus'
 	
 	move-focus: function [
-		"(internal) Called when keyboard focus moves"
+		"(internal) Called when the keyboard focus moves"
 		old [object! none! unset!]
 		new [object! none!]
 	][
@@ -39,12 +41,13 @@ focus: classy-object [
 	]
 	
 	;; single per-interpreter focused face or space object, or `none` when nothing is focused
-	current:  none	#type [object! none!]
+	current:  none
+		#type [object! none!] "Current keyboard focus target (face or space object)"
 		#on-change [obj word new old [any-type!]] [focus/move-focus :old new]
 		
 	;; history of focus changes used for focus restoration
 	;; useful e.g. if a popup was shown, a lot of refocus (tab?) events happened, then popup got closed
-	history:  make [] 32
+	history:  make [] 32	#type [block!] "Values previously assigned to /current (used for focus restoration)"
 	
 	;; context for %focus-tracking.red
 	tracking: none
@@ -71,11 +74,10 @@ focus: classy-object [
 	]
 
 	restore: function ["Put keyboard focus to the last target that is still live"] [
-		for-each/reverse [after: target] history [
-			unless live? target [continue]
-			clear after
-			maybe/same focus/current: target
-			break
+		clear after: any [
+			locate/back history [x .. live? x  target: x]
+			history
 		]
+		maybe/same focus/current: target						;-- sets to 'none' when no live target found
 	]
 ]

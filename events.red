@@ -7,7 +7,9 @@ Red [
 ]
 
 
-events: context [
+events: classy-object [
+	"Events management"
+	
 	;; original (but split) event sheets tree, used for inheritance:
 	;; each sheet is a map with fields:
 	;;   scope    = path of original definition (block of set-words and refinements only)
@@ -15,13 +17,13 @@ events: context [
 	;;   order    = [below | above] (word, or none)
 	;;   source   = original of event handlers (only) sheet (block)
 	;;   handlers = compiled event handlers matrix (map of id -> func)
-	sheets:     make map! 50
+	sheets:     make map! 50		#type [map!] "Tree of original event handling sheets"
 	
 	;; compiled event handlers matrix tree, optimized for lookup speed (uses reversed paths):
 	;; each matrix item resolves to a #value -> block! [path! path! ...] = a list of sheet paths
 	;; each included sheet path resolves to a /handlers compiled event matrix (map of id -> func)
 	;; paths are resolved in left to right order when sinking, right to left when bubbling
-	handlers:   make map! 50
+	handlers:   make map! 50		#type [map!] "Tree of compiled event handling matrices"
 	
 	;; reference data and support functions
 	support:    none
@@ -53,38 +55,51 @@ events: context [
 ]
 
 
-;; reference data and support functions
-events/support: context [
+events/support: classy-object [
+	"Reference data and support functions"
+	
 	event-types: make hash! [
 		time
 		over wheel up mid-up alt-up aux-up
 		down mid-down alt-down aux-down click dbl-click
 		key key-down key-up enter
 		focus unfocus
-	]
+		;; tip: unlisted are events that cannot be used by spaces event handlers
+		;; these are: either window events, broken touch input, and events that should not reach spaces (like 'menu')
+	] #type [hash!] "View event types handled by Spaces"
 	pointer-event-types: make hash! [
 		over wheel up mid-up alt-up aux-up
 		down mid-down alt-down aux-down click dbl-click
-	]
+	] #type [hash!] "View event types coming from a pointing device"
 	event-flags: make hash! [
 		control alt shift
 		down alt-down mid-down aux-down
-	]
+	] #type [hash!] "All known event flags"
 	
-	is-pointer-event?: function [type [word!]] [
+	is-pointer-event?: function [
+		"Check if event TYPE comes from a pointing device"
+		type [word!]
+	][
 		to logic! find pointer-event-types type
 	]
-	is-valid-event?: function [type [word!]] [
+	is-valid-event?: function [
+		"Check if event TYPE is known to Spaces"
+		type [word!]
+	][
 		to logic! find event-types type
 	]
-	is-valid-flag?: function [type [word!]] [
-		to logic! find event-flags type
+	is-valid-flag?: function [
+		"Check if FLAG is a known Red event flag"
+		flag [word!]
+	][
+		to logic! find event-flags flag
 	]
 ]
 
 	
-;; functions for event data encoding
-events/encoding: context with events [
+events/encoding: classy-object with events [
+	"Encoding of events into unique ids for lookups"
+	
 	encode-type: function [
 		"Get a numeric code for given event TYPE"
 		type    [word!]    "E.g. 'over"
@@ -160,10 +175,9 @@ events/encoding: context with events [
 ]
 	
 
-;; define-handlers dialect support
-events/dialect: context with events [ 
-;@@ ^ temporary(?) 'with' kludge
+events/dialect: classy-object with events [				;@@ ^ temporary(?) 'with' kludge
 ; events/dialect: context [ 
+	"Support for `define-handlers` dialect"
 
 	;; rules for strict syntax checking and error reporting
 	grammars: object [
@@ -333,8 +347,8 @@ events/dialect: context with events [
 ]
 	
 
-;; events/handlers matrix: storage and lookups
-events/storage: context with events [
+events/storage: classy-object with events [
+	"events/handlers matrix: storage and lookups"
 
 	fetch-handlers: function [
 		"Retrieve a LIST of event handler matrix paths for the given tree PATH in events/handlers"
@@ -455,16 +469,15 @@ events/storage: context with events [
 ]
 		
 
-;; the very core of event processing
-events/processing: context with events [
+events/processing: classy-object with events [
+	"The core of events processing"
 
-	;; chain of event processors, each is a func [event [map!]]
-	pipeline:   make [] 16
+	pipeline:   make [] 16	#type [block!] "Chain of event processors, each is a func [event [map!]]"
 	
-	;; each map is: event-type -> list of funcs
-	;; each previewer/finalizer should also be a func [event [map!]]
 	previewers: make #[] map-each/eval type support/event-types [[type copy []]]
+		#type [map!] "Map of event-type -> list of funcs, each previewer is a func [event [map!]]"
 	finalizers: make #[] map-each/eval type support/event-types [[type copy []]]
+		#type [map!] "Map of event-type -> list of funcs, each finalizer is a func [event [map!]]"
 	
 	
 	;; main entry point from the scheduler into event processing
@@ -710,14 +723,22 @@ events/processing: context with events [
 ;;   caught by 'sink-event', so it can then resume the upper handler
 ;; 'stop' has to throw to get out of the possible inner function and all handler calls
 ;;   caught by 'do-handlers' and its wrappers ('do-sink-bubble', 'do-previewers/finalizers')
-events/commands: context with events/processing [
-	sink:   does with :sink-event [
+events/commands: classy-object with events/processing [
+	"Commands accessible from event handlers code"
+	
+	sink: func [
+		"Dive into the next (inherited or child) handler until it completes"
+	] with :sink-event [
 		unless event/done? [sink-event event next next handlers]	;@@ or throw an error on double sink attempt?
 	]
-	bubble: does with :sink-event [
+	bubble: func [
+		"Get out of the event handler, returning to the parent one (similar to `exit`)"
+	] with :sink-event [
 		throw/name event 'bubble								;@@ maybe use fcatch? but throw/name is faster
 	]
-	stop:   does with :sink-event [
+	stop: func [
+		"Get out of the event handler and abandon sinking/bubbling loop"
+	] with :sink-event [
 		event/done?: yes
 		throw/name event 'stop
 	]
