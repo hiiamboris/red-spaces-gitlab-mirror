@@ -3,12 +3,16 @@ Red [
 	author:   @hiiamboris
 	license:  BSD-3
 	provides: spaces.colors
-	depends:  [advanced-function color-models]
+	depends:  [advanced-function color-models contrast-with]
 ]
 
 svf:  system/view/fonts
 svm:  system/view/metrics
 svmc: system/view/metrics/colors
+
+default svm/colors: copy #[]									;@@ MacOS fix for #4740
+default svmc/text:  black										;@@ GTK fix for #4740
+default svmc/panel: contrast-with svmc/text						;@@ GTK fix for #4740
 
 resolve-color: function [
 	"Turn COLOR into a tuple! value"
