@@ -11,29 +11,38 @@ layout-settings!: copy classy-object!
 
 layouts: to map! to block! object [								;@@ REP #165
 
-	;@@ benchmark it - if type checking is acceptable (though I rely on caching)
+	;@@ benchmark it - if type checking is acceptable (though I rely on caching, but for grids it's still critical)
 	;; 'box' is the most ubiquitous layout which adds a frame around a single space
 	;; when canvas 'fill' is requested, it stretches the box to fill the canvas even if content does not do that
 	box: object [
+		; settings: declare-class 'layout-settings-box with :with-space [
 		settings: declare-class 'layout-settings-box [
 			;@@ in theory I could use 'scale' to support planar! frame, but is it useful? and it'll distort pen pattern
-			padding:	0		#type [planar! ((0,0) +<= padding) linear! (0 <= padding)]	;-- spacing between the frame and the content
-			frame:		0		#type [linear! (0 <= frame)]	;-- outside frame thickness (adds to padding!)
+			; padding:	0		#type [planar! ((0,0) +<= padding) linear! (0 <= padding)]	;-- spacing between the frame and the edge (reserved)
+			margin:		0		#type [planar! ((0,0) +<= margin) linear! (0 <= margin)]	;-- spacing between the frame and the content
+			frame:		0		#type [linear! (0 <= frame)]	;-- outside frame thickness (adds to padding/margin!)
+			;@@ negative 'focus' values reserved to put it into the 'padding' area
+			focus:		0		#type [linear! (0 <= focus)]	;-- focal frame thickness (adds to margin)
+			
 			;@@ support pattern pen and fill
 			pen:		none	#type [none! tuple!]			;-- frame color (none = inherits current pen, trasparent = force no color)
 			fill:		glass	#type [none! tuple!]			;-- background color (none = inherits current pen, trasparent = force no color)
+			; focal-pen:		reserved
+			; focal-geometry:	reserved
+			
 			center:		none	#type [none! object!]			;-- space (content) to put inside the frame  ;@@ or rename to 'content'?
 			;@@ or get rid of center?
 		]
 		
 		;@@ can I split some functionality out of this func? it's too complicated for the simplest of layouts
 		make: function [
+			"Make a new BOX layout with given SETTINGS"
 			space    [object!]
 			canvas   [map!]
 			settings [object!]
 		] with rendering [
 			!: settings											;-- 'settings' is way too verbose here
-			padding: to point2D! !/frame + !/padding
+			padding: to point2D! !/frame + !/margin + !/focus
 			draw-canvas: reduce-canvas canvas padding * 2		;-- subtract paddings from the drawing canvas
 			space: any [!/center space]							;-- default to 'space' when no /center is provided
 			draw:  :templates/(space/type)/tools/draw
@@ -47,6 +56,11 @@ layouts: to map! to block! object [								;@@ REP #165
 				; ?? [padding frame/size canvas/size draw-size]
 				frame/drawn: reshape [
 					push [
+						push [
+							fill-pen off  pen @[styling/assets/pens/checkered]
+							line-width @[!/focus]
+							box @[start: !/frame + (!/margin + !/focus / 2)] @[frame/size - start]	;-- center focus frame in the margin
+						]							/if !/focus > 0
 						fill-pen   @[!/fill]		/if !/fill	;-- when not set, inherited from above
 						pen        @[!/pen]			/if !/pen	;-- ditto
 						line-width @[!/frame]					;-- always set, to avoid inheriting from above
