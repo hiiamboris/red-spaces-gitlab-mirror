@@ -23,6 +23,7 @@ layouts: to map! to block! object [								;@@ REP #165
 			frame:		0		#type [linear! (0 <= frame)]	;-- outside frame thickness (adds to padding/margin!)
 			;@@ negative 'focus' values reserved to put it into the 'padding' area
 			focus:		0		#type [linear! (0 <= focus)]	;-- focal frame thickness (adds to margin)
+			rounding:	0		#type [linear! (0 <= rounding)]	;-- boxes corner radius
 			
 			;@@ support pattern pen and fill
 			pen:		none	#type [none! tuple!]			;-- frame color (none = inherits current pen, trasparent = force no color)
@@ -57,14 +58,17 @@ layouts: to map! to block! object [								;@@ REP #165
 				frame/drawn: reshape [
 					push [
 						push [
-							fill-pen off  pen @[styling/assets/pens/checkered]
+							fill-pen off
+							pen @[styling/assets/pens/checkered]
 							line-width @[!/focus]
 							box @[start: !/frame + (!/margin + !/focus / 2)] @[frame/size - start]	;-- center focus frame in the margin
+								@[!/rounding]		/if !/rounding > 0
 						]							/if !/focus > 0
 						fill-pen   @[!/fill]		/if !/fill	;-- when not set, inherited from above
 						pen        @[!/pen]			/if !/pen	;-- ditto
 						line-width @[!/frame]					;-- always set, to avoid inheriting from above
 						box @[start: !/frame * (0.5, 0.5)] @[frame/size - start]
+							@[!/rounding]			/if !/rounding > 0
 					]								/if any [!/frame <> 0 !/fill <> glass] 
 					translate @[padding]			/if not zero? padding
 					@[frame/drawn]
