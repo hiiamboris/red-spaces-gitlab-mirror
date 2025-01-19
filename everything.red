@@ -49,6 +49,7 @@ do/expand [
 	#include %../common/catchers.red
 	#include %../common/with.red
 	#include %../common/composite.red
+	#include %../common/bind-only.red
 	#include %../common/relativity.red
 	#include %../common/without-gc.red
 	#include %../common/scoping.red
@@ -97,7 +98,9 @@ do/expand [
 	
 	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
-		spaces: context [
+		spaces: classy-object [
+			"Spaces umbrella context"
+			
 			ctx: context [								;-- put all space things into a single context
 				#include %macros.red
 				#include %mold.red						;-- include as early as possible so it can be used in other places
@@ -137,8 +140,9 @@ do/expand [
 			;; makes some things readily available:
 			events:    ctx/events
 			templates: ctx/templates
-			; styles:    ctx/styles
-			layouts:   ctx/layouts
+			styling:   ctx/styling
+			rendering: ctx/rendering
+			layouts:   ctx/layouts		#type [map!] "Known space layouts"
 			focus:     ctx/focus
 			VID:       ctx/VID
 		]
