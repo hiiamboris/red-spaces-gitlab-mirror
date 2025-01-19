@@ -32,7 +32,8 @@ layouts: to map! to block! object [								;@@ REP #165
 			; focal-pen:		reserved
 			; focal-geometry:	reserved
 			; shadow-pen:		reserved
-			; shadow-offset:	reserved
+			shadow:		none	#type [planar! none!]			;-- shadow offset; or none to disable it
+			; shadow-blur:		reserved
 			
 			center:		none	#type [none! object!]			;-- space (content) to put inside the frame  ;@@ or rename to 'content'?
 			;@@ or get rid of center?
@@ -66,16 +67,17 @@ layouts: to map! to block! object [								;@@ REP #165
 							line-width @[!/focus]
 							box @[start: !/margin + !/focus * (0.5, 0.5) + !/padding + !/frame]	;-- center focus frame in the margin
 								@[frame/size - start]
-								@[!/rounding]		/if !/rounding > 0
-						]							/if !/focus > 0
-						fill-pen   @[!/fill]		/if !/fill	;-- when not set, inherited from above
-						pen        @[!/pen]			/if !/pen	;-- ditto
-						line-width @[!/frame]					;-- always set, to avoid inheriting from above
+								@[!/rounding]			/if !/rounding > 0
+						]								/if !/focus > 0
+						fill-pen   @[!/fill]			/if !/fill			;-- when not set, inherited from above
+						pen        @[!/pen]				/if !/pen			;-- ditto
+						line-width @[!/frame]								;-- always set, to avoid inheriting from above
+						shadow 0.0.0 @[!/shadow] 4		/if !/shadow
 						box @[start: !/frame * (0.5, 0.5) + !/padding]
 							@[frame/size - start]
-							@[!/rounding]			/if !/rounding > 0
-					]								/if any [!/frame <> 0 !/fill <> glass] 
-					translate @[padding]			/if not zero? padding
+							@[!/rounding]				/if !/rounding > 0
+					]									/if any [!/frame > 0  !/fill <> glass  !/shadow] 
+					translate @[padding]				/if not zero? padding
 					@[frame/drawn]
 				]
 			]
