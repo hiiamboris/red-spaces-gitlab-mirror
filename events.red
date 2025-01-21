@@ -502,7 +502,8 @@ events/processing: classy-object with events [
 				event/path:    keep-type event/hittest object!
 			]
 			key key-down key-up focus unfocus [
-				event/path: get-host-path keyboard/focus
+				#assert [focus/current  "key/focus event was caught but tracking failed to focus the host"]
+				event/path: get-host-path focus/current
 			]
 			; time []
 		][

@@ -112,7 +112,7 @@ do/expand [
 				#include %templates.red
 				; #include %templates/space.red
 				#include %focus.red
-				#include %focus-tracking.red			;-- requires focus
+				#include %focus-tracking.red
 				#include %styling.red
 				; #include %cache.red
 				#include %rendering.red
