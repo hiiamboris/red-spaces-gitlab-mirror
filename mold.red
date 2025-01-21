@@ -369,20 +369,21 @@ global mold: context [
 						]
 						
 						unless tail? keys [
-							with-limit if compact? [available-width - align - 1] [
-								indent: indent + 4
-								emit "^/"
-								emit [pad mold* :keys/1 align  " "]
-								mold-value select/case data :keys/1	;-- use 'select' as maps are case sensitive, paths aren't
-								pair-sep: either lf-enabled? ["^/"][" "]
-								foreach key next keys [
-									emit pair-sep
-									emit [pad mold* :key align  " "]
+							indent: indent + 4
+							emit "^/"
+							emit [pad mold* :keys/1 align  " "]
+							mold-value select/case data :keys/1	;-- use 'select' as maps are case sensitive, paths aren't
+							pair-sep: either lf-enabled? ["^/"][" "]
+							value-limit': if compact? [available-width - align - 1]
+							foreach key next keys [
+								emit pair-sep
+								emit [pad mold* :key align  " "]
+								with-limit value-limit' [
 									mold-value select/case data :key
 								]
-								indent: indent - 4				;-- unindent before(!) the possible line feed
-								emit "^/"
 							]
+							indent: indent - 4					;-- unindent before(!) the possible line feed
+							emit "^/"
 						]
 						emit end
 					]
@@ -668,7 +669,9 @@ global mold: context [
 	{["Verdana"]}										= mold reduce [make font! [name: "Verdana"]]
 	{["Rich Text"]}										= mold reduce [make face! [type: 'rich-text text: "Rich Text"]]
 	{[base:10x10]}										= mold reduce [make face! [type: 'base size: (10,10)]]
-	
+	{object [^/    a:    0^/    b:    0^/    c:    object [x: 1000]^/    data: ""^/    e:    ""^/    f:    ""^/]}
+														= mold object [a: b: 0 c: object [x: 1000] data: e: f: {}]	
+
 	;; parent references
 	"[[..]]"											= mold append/only b: copy [] b
 	"[[..] 1]"											= mold append append/only b: copy [] b 1
