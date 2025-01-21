@@ -142,7 +142,8 @@ scheduler: context [
 		"Synthesize a new event from the provided SPEC"
 		spec [block!] "Used to initialize the event (composed)"
 	][
-		queue-event/next extend extend copy event-proto tracked-state compose/only spec
+		queue-event/next map: extend extend copy event-proto tracked-state compose/only spec
+		map/recorded: now/utc/precise							;-- remember the time event was discovered, for queue management
 	]
 	
 	
