@@ -495,7 +495,7 @@ global mold: context [
 			
 			handle! [											;-- make handles loadable by converting to integers
 				data: second transcode/one next mold*/all data	;-- extract the integer
-				emit `"(to-hex value)h"`						;-- convert to hex
+				emit `"(to-hex data)h"`							;-- convert to hex
 			]
 		][
 			;; simple values - dispatch into the native mold
