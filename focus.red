@@ -56,14 +56,15 @@ focus: classy-object [
 		"Put keyboard focus on a SPACE"
 		space [object!] (space? space)
 	][
-		#assert [space/focusable?  "Attempt to focus an unfocusable space"]
+		#debug focus [#print "focusing (space-id space)"]
+		#assert [select space 'focusable?  "Attempt to focus an unfocusable space"]
 		host: host-of space
 		#assert [host  "Attempt to focus a detached space"]		;@@ an unfortunate limitation of Red focus model - see REP #172
 		set-focus* host
 		maybe/same focus/current: space
 	]
 	
-	focused?: function [
+	global focused?: function [
 		"Test if SPACE has keyboard focus"
 		space [object!]
 		/child "Test if one of the children has focus instead"
@@ -74,10 +75,8 @@ focus: classy-object [
 	]
 
 	restore: function ["Put keyboard focus to the last target that is still live"] [
-		clear after: any [
-			locate/back history [x .. live? x  target: x]
-			history
-		]
+		at-live: locate/back history [x .. live? x  target: x]
+		clear either at-live [next at-live][history]
 		maybe/same focus/current: target						;-- sets to 'none' when no live target found
 	]
 ]
