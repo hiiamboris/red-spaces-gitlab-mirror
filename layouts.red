@@ -50,7 +50,10 @@ layouts: to map! to block! object [								;@@ REP #165
 			padding: to point2D! !/frame + !/margin + !/padding + !/focus
 			draw-canvas: reduce-canvas canvas padding * 2		;-- subtract paddings from the drawing canvas
 			space: any [!/center space]							;-- default to 'space' when no /center is provided
-			draw:  :templates/(space/type)/tools/draw
+			draw:  any [
+				:templates/(space/type)/tools/draw
+				:templates/space/tools/draw						;-- space may omit /draw to be fully drawn via layout
+			]
 			frame: (draw space draw-canvas)						;-- mind the 'draw' arity, which may be wrong
 			frame/size: (draw-size: frame/size) + (padding * 2)	;-- add box+frame to size even if it's transparent
 			if canvas/mode = 'fill [
@@ -63,7 +66,7 @@ layouts: to map! to block! object [								;@@ REP #165
 					push [
 						push [
 							fill-pen off
-							pen @[styling/assets/pens/checkered]
+							pen @(styling/assets/pens/checkered)
 							line-width @[!/focus]
 							box @[start: !/margin + !/focus * (0.5, 0.5) + !/padding + !/frame]	;-- center focus frame in the margin
 								@[frame/size - start]
@@ -72,7 +75,7 @@ layouts: to map! to block! object [								;@@ REP #165
 						fill-pen   @[!/fill]			/if !/fill			;-- when not set, inherited from above
 						pen        @[!/pen]				/if !/pen			;-- ditto
 						line-width @[!/frame]								;-- always set, to avoid inheriting from above
-						shadow 0.0.0 @[!/shadow] 4		/if !/shadow
+						shadow @[to pair! !/shadow] 3 0.0.0	/if !/shadow	;@@ shadow does not yet support point2D or word colors
 						box @[start: !/frame * (0.5, 0.5) + !/padding]
 							@[frame/size - start]
 							@[!/rounding]				/if !/rounding > 0
