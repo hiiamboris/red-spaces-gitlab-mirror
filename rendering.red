@@ -68,13 +68,15 @@ rendering: classy-object [
 			active?:    true									;-- an indicator that a host render is currently in progress
 			generation: host/generation + 1.0
 			clear path
-			clear visited 
+			clear visited
+			append clear branch host
 		]
 		#leaving-safe [
 			do with host/rendering [
 				host/generation: generation
 				active?: false
 				clear visited									;-- second clear to free spaces for GC-ing
+				clear branch									;-- ditto
 			]
 		]
 		frame: render-space host/space canvas					;-- this may error out; protected by #leaving macro
@@ -129,7 +131,8 @@ rendering: classy-object [
 		][
 			frame/genesis: 'cached
 		][
-			append path: host/rendering/path space/type
+			append path:   host/rendering/path   space/type
+			append branch: host/rendering/branch space			;@@ if 'render' was a function, could take this from 'space' argument on the stack
 			; #leaving-safe [take/last path]						;@@ benchmark this and maybe add a message about space/type? 
 			
 			frame: render-with-style space canvas path			;-- invokes layout/make which invokes tools/draw
@@ -139,7 +142,9 @@ rendering: classy-object [
 			space/frames/:encoded: frame
 			append host/rendering/visited space					;-- mark this space as one of those redrawn on this frame
 			
+			take/last branch 
 			take/last path 
+			quietly space/parent: last branch
 		]
 		
 		space/frames/last: frame
@@ -186,20 +191,20 @@ rendering: classy-object [
 	]
 	
 	;@@ during ongoing render, should 'live?' relate to the new generation or the previous? or error out?
-	live?: function [
+	global live?: function [
 		"Check if space object belongs to the last drawn frame or not"
 		space   [object!]
 		return: [logic!]
 	][
 		lowest: space/frames/last								;-- with no 'cached' frames, check against the lowest 'drawn' frame
-		while [frame: space/frames/last] [						;-- no frame = host found (or abrupt tree termination)
+		while [frame: select select space 'frames 'last] [		;-- no /frames = host found (unset), or abrupt tree termination (none)
 			if frame/genesis = 'cached [lowest: frame]			;-- each new 'cached' frame replaces the previously found lowest
 			space: space/parent
 		]
 		to logic! all [
 			:space/generation = lowest/generation				;-- more likely fail condition than a missing host - comes first
 			host? space
-			host/state
+			space/state
 		]
 	]
 	

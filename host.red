@@ -51,6 +51,7 @@ system/view/VID/styles/host: reshape with [
 			generation: 0.0										;-- pending frame's generation
 			visited:    make block! 100							;-- list of visited spaces on current frame (cleared after)
 			path:		make path!  16							;-- path (of space/type's) of currently rendered space - for style lookups
+			branch:		make block! 16							;-- path (of spaces) of currently rendered space - for parent assignment
 		] #type [object!]	"(internal data used by rendering pipeline)"
 		
 		modify rendering 'owned none							;-- hide custom data from face's on-deep-change (also fixes #5549)
