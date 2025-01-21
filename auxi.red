@@ -99,15 +99,28 @@ clone: function [										;@@ should space cloning be based on this?
 
 above: function [										;-- a replacement for space/parent/parent/parent/parent shit
 	"Get parent space of specific type (or none)"
-	child [object!]
-	type  [word!]
+	child   [object!]
+	type    [word!]
+	return: [object! none!]
 ][
 	while [space? child: child/parent] [if child/type = type [return child]]	;@@ use locate + tree iterator
 	child
 ]
 
-host-of: function [space [object!]] [
+host-of: function [
+	"Get host face of the SPACE; or none if it's detached"
+	space   [object!]
+	return: [object! none!]
+][
 	all [path: get-host-path space  path/1]
+]
+
+font?: function [
+	"Check if object OBJ is a font"
+	obj     [object!]
+	return: [logic!]
+][
+	same? class-of obj class-of font!
 ]
 
 ;@@ replace with kit/translate/from
