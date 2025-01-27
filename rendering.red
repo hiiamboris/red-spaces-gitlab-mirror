@@ -209,30 +209,34 @@ rendering: classy-object [
 	]
 	
 	;; default canvas prototype (init values are arbitrary, should not be relied upon)
-	canvas!: make map! compose [size: (INFxINF) axis: xy mode: fill]
-		
+	canvas!: make map! compose [size: (INFxINF) x: fill y: fill]
+	
+	;; having a function frontend is more future-proof than composing canvas as a map everywhere
+	make-canvas: function [
+		"Make a new canvas! value with provided arguments"
+		size [point2D!] (0x0 +<= size)
+		x    [word!]    (find [free wrap fill] x)
+		y    [word!]    (find [free wrap fill] y)
+	][
+		make map! compose [size: (size) x: (x) y: (y)]			;@@ or as-map [size x y]? but 2x slower
+	]
+	
 	encode-canvas: function [
 		"Encode CANVAS into a single value for lookups"
 		canvas [map!]
 	][
 		add to point3D! canvas/size
-			multiply
-				switch canvas/mode [stick [(0,0,3)] wrap [(0,0,2)] fill [(0,0,1)]]
-				switch canvas/axis [x [-1] y [1] xy [0]]
-				; select #[stick (0,0,3) wrap (0,0,2) fill (0,0,1)] canvas/mode
-				; select #[x -1 y 1 xy 0] canvas/axis
+		add switch canvas/x [free [0] wrap [1] fill [2]]
+			switch canvas/y [free [0] wrap [4] fill [8]]
 	]
 	
 	#assert [
-		(10,10,-3) = encode-canvas #[size: (10,10) axis: x  mode: stick]
-		(10,10,-2) = encode-canvas #[size: (10,10) axis: x  mode: wrap ]
-		(10,10,-1) = encode-canvas #[size: (10,10) axis: x  mode: fill ]
-		(10,10, 3) = encode-canvas #[size: (10,10) axis: y  mode: stick]
-		(10,10, 2) = encode-canvas #[size: (10,10) axis: y  mode: wrap ]
-		(10,10, 1) = encode-canvas #[size: (10,10) axis: y  mode: fill ]
-		(10,10, 0) = encode-canvas #[size: (10,10) axis: xy mode: fill ]
+		(10,10, 0) = encode-canvas #[size: (10,10) x: free y: free]
+		(10,10, 5) = encode-canvas #[size: (10,10) x: wrap y: wrap]
+		(10,10,10) = encode-canvas #[size: (10,10) x: fill y: fill]
+		(10,10, 8) = encode-canvas #[size: (10,10) x: free y: fill]
+		(10,10, 1) = encode-canvas #[size: (10,10) x: wrap y: free]
 	]
-	; clock/times [encode-canvas #[size: (10,10) axis: xy mode: fill]] 1e6
 	
 	;; to simplify the rendering functions (reduce the number of assumptions) this is used in 'render'
 	;; it ensures that no wrap or fill is requested for an infinite dimension
@@ -240,14 +244,17 @@ rendering: classy-object [
 		"Check the validity of CANVAS"
 		canvas [map!]
 	][
-		switch canvas/mode [
-			stick [true]
-			wrap  [canvas/size/(canvas/axis) < 1.#inf]
-			fill  [
-				either 'xy = x: canvas/axis
-					[to logic! canvas/size +< INFxINF]
-					[canvas/size/:x < 1.#inf]
-			]
+		to logic! all [
+			canvas/size/x >= 0
+			canvas/size/y >= 0
+			switch/default canvas/x [
+				free wrap [yes]
+				fill [canvas/size/x < 1.#INF]
+			] [no]
+			switch/default canvas/y [
+				free wrap [yes]
+				fill [canvas/size/y < 1.#INF]
+			] [no]
 		]
 	]
 	
@@ -262,14 +269,14 @@ rendering: classy-object [
 	]
 	
 	fill-canvas: function [
-		"Expand SIZE to fill the CANVAS"
-		size   [planar!]
-		canvas [map!] (canvas/mode = 'fill)
+		"Expand SIZE to fill the CANVAS along dimensions marked as 'fill"
+		size    [planar!]
+		canvas  [map!]
+		return: [point2D!]
 	][
-		either 'xy = x: canvas/axis
-			[size:    max size    canvas/size]
-			[size/:x: max size/:x canvas/size/:x]
-		size
+		max size as-point2D 
+			either canvas/x = 'fill [canvas/size/x][0]
+			either canvas/y = 'fill [canvas/size/y][0]
 	]
 	
 ]

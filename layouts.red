@@ -11,6 +11,8 @@ layout-settings!: copy classy-object!
 
 layouts: to map! to block! object [								;@@ REP #165
 
+
+	
 	;@@ benchmark it - if type checking is acceptable (though I rely on caching, but for grids it's still critical)
 	;; 'box' is the most ubiquitous layout which adds a frame around a single space
 	;; when canvas 'fill' is requested, it stretches the box to fill the canvas even if content does not do that
@@ -56,7 +58,7 @@ layouts: to map! to block! object [								;@@ REP #165
 			]
 			frame: (draw space draw-canvas)						;-- mind the 'draw' arity, which may be wrong
 			frame/size: (draw-size: frame/size) + (padding * 2)	;-- add box+frame to size even if it's transparent
-			if canvas/mode = 'fill [
+			if any [canvas/x = 'fill canvas/y = 'fill] [
 				frame/size: fill-canvas frame/size canvas
 				padding: frame/size - draw-size / 2
 			]
