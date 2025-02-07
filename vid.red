@@ -20,6 +20,7 @@ VID: classy-object [
 	
 	init-spaces-tree: none
 	lay-out-vids:     none
+	add-flag:         none
 	
 	focus: classy-object [
 		"(internal focus tracking facilities)"
@@ -53,12 +54,12 @@ VID/common: classy-object [
 			fill   [align: 'fill]
 		]
 		font-styles [
-			bold      [flags: append flags 'bold]
-			italic    [flags: append flags 'italic]
-			underline [flags: append flags 'underline]
-			strike    [flags: append flags 'strike]
-			ellipsize [flags: append flags 'ellipsize]
-			; wrap      [flags: append flags 'wrap]		;-- no wrap flag by design, choose text vs paragraph instead 
+			bold      [add-flag self 'bold]
+			italic    [add-flag self 'italic]
+			underline [add-flag self 'underline]
+			strike    [add-flag self 'strike]
+			;; no 'ellipsize' flag as it's not a font flag, but a text-specific addition
+			;; no 'wrap' flag as it is now controlled by the canvas
 		]
 	]
 ]
@@ -75,7 +76,7 @@ VID/init-spaces-tree: function [
 	focused: VID/focus/track [pane: lay-out-vids spec]
 	if 1 < n: length? pane [ERROR "Host face can only contain a single space, given (n)"]
 	host/space: pane/1
-	canvas: make rendering/canvas! compose [size: (host/size) mode: fill axis: xy]
+	canvas: make rendering/canvas! compose [size: (host/size) x: fill y: fill]
 	drawn:  rendering/render-host host canvas					;-- render-host auto-assigns host/draw & host/size
 	#debug draw [#print ["host (host/size) /draw: (mold drawn)"]] 
 	if focused [set-focus focused]
@@ -98,6 +99,15 @@ VID/focus/update: func [
 	space [object!]
 ] with :VID/focus/track [
 	try [focused: space]										;-- may fail when called outside of track-focus scope
+]
+
+VID/add-flag: function [
+	"Add a FLAG to SPACE's /config, copying it in process"		;-- copying is required to avoid modifying the shared config
+	space [object!]
+	flag  [word!]
+][
+	space/config: copy/deep space/config
+	append space/config/flags flag
 ]
 	
 	
