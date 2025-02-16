@@ -336,6 +336,17 @@ compose-after: function [target [any-list!] template [block!]] [
 	compose/only/deep/into template tail target
 ]
 
+expected: function [
+	"Common error wrapper for use in Parse"
+	where [series!]   "Error location"
+	token [any-type!] "What was expected"
+][
+	if word? :token [token: replace/all form token "-" " "]		;-- make things like 'correct-value' appear as 'correct value'
+	unless string? :token [token: mold/flat :token]
+	ERROR `"Expected (token) at: (mold/flat/part where 40)"`
+]
+
+
 ;; main problem with these is they can't be used in performance critical areas, which is quite often the case
 ;@@ remove number support? but this may break others' code that is bound to spaces/ctx
 >>: make op! function [
@@ -649,24 +660,6 @@ generate-sections: function [
 	; [66  0  0 34] == distribute 100 [2 0 0 1] [2e9 2e9 2e9 2e9]
 	; [50.0 25.0 0.0 25.0] == distribute 100.0 [2 1 0 1] [2e9 2e9 2e9 2e9]
 	; [50%  25%  0%  25% ] == distribute 100%  [2 1 0 1] [2e9 2e9 2e9 2e9]
-; ]
-
-;@@ only used in glossy style and text template - move there
-; new-rich-text: none
-; context [
-	; ;; rtd-layout is slow! about 200 times slower than object creation (it also invokes VID omg)
-	; ;; just make face! is 120 times slower too, because of on-change handlers
-	; ;; rich text does not require any of that however, so I mimick it using a non-reactive object
-	; ;; achieved construction time is 16us vs 200us
-	; light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
-	; light-face!/para: make para! [wrap?: on]
-	; rtd-template: make face! compose [
-	; rtd-template: compose [
-		; on-change*: does []								;-- for whatever reason, crashes without this
-		; on-deep-change*: does []
-		; (system/view/VID/styles/rich-text/template)
-	; ]
-	; set 'new-rich-text does [make light-face! rtd-template]
 ; ]
 
 

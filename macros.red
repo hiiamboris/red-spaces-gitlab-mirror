@@ -8,17 +8,12 @@ Red [
 
 ;; MEMO: requires `function` scope or `~~p` will leak out
 #macro [#expect skip] func [[manual] bgn end /local quote? rule error name] [
-	quote?: all [word? bgn/2  bgn/2 = 'quote  remove next bgn]
-	rule: reduce [bgn/2]
-	if quote? [insert rule 'quote]								;-- sometimes need to match block literally
-	name: either string? bgn/2 [bgn/2][mold/flat bgn/2]
-	error: compose/deep [
-		do make error! rejoin [
-			(rejoin ["Expected "name" at: "]) mold/part ~~p 100
-		]
-	]
+	remove bgn
+	unless quote?: :bgn/1 = 'quote [end: back end]
+	rule:  copy/part bgn end
+	error: compose [expected ~~p quote (last rule)]				;-- ignore 'quote' in the error message, but quote to avoid double evaluation
 	change/only remove bgn compose [(rule) | ~~p: (to paren! error)]
-	bgn 
+	bgn															;-- reprocess as rule could be a block 
 ]
 
 #macro [#tip string!] func [[manual] bgn end /local msg] [
