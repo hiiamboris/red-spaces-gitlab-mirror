@@ -332,7 +332,11 @@ rechange: function [
 	e =? tail s
 ]]
 
-compose-after: function [target [any-list!] template [block!]] [
+compose-after: function [
+	"Compose TEMPLATE (deeply) into the tail of TARGET list"
+	target   [any-list!]
+	template [block!]
+][
 	compose/only/deep/into template tail target
 ]
 
@@ -343,7 +347,7 @@ expected: function [
 ][
 	if word? :token [token: replace/all form token "-" " "]		;-- make things like 'correct-value' appear as 'correct value'
 	unless string? :token [token: mold/flat :token]
-	ERROR `"Expected (token) at: (mold/flat/part where 40)"`
+	ERROR "Expected (token) at: (mold/flat/part where 40)"
 ]
 
 

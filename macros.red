@@ -7,12 +7,12 @@ Red [
 
 
 ;; MEMO: requires `function` scope or `~~p` will leak out
-#macro [#expect skip] func [[manual] bgn end /local quote? rule error name] [
+#macro [#expect skip] func [[manual] bgn end /local quote? rule error] [
 	remove bgn
 	unless quote?: :bgn/1 = 'quote [end: back end]
 	rule:  copy/part bgn end
 	error: compose [expected ~~p quote (last rule)]				;-- ignore 'quote' in the error message, but quote to avoid double evaluation
-	change/only remove bgn compose [(rule) | ~~p: (to paren! error)]
+	change/only bgn compose [(rule) | ~~p: (to paren! error)]
 	bgn															;-- reprocess as rule could be a block 
 ]
 
