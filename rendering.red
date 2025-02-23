@@ -221,23 +221,6 @@ rendering: classy-object [
 		make map! compose [size: (size) x: (x) y: (y)]			;@@ or as-map [size x y]? but 2x slower
 	]
 	
-	encode-canvas: function [
-		"Encode CANVAS into a single value for lookups"
-		canvas [map!]
-	][
-		add to point3D! canvas/size
-		add switch canvas/x [free [0] wrap [1] fill [2]]
-			switch canvas/y [free [0] wrap [4] fill [8]]
-	]
-	
-	#assert [
-		(10,10, 0) = encode-canvas #[size: (10,10) x: free y: free]
-		(10,10, 5) = encode-canvas #[size: (10,10) x: wrap y: wrap]
-		(10,10,10) = encode-canvas #[size: (10,10) x: fill y: fill]
-		(10,10, 8) = encode-canvas #[size: (10,10) x: free y: fill]
-		(10,10, 1) = encode-canvas #[size: (10,10) x: wrap y: free]
-	]
-	
 	;; to simplify the rendering functions (reduce the number of assumptions) this is used in 'render'
 	;; it ensures that no wrap or fill is requested for an infinite dimension
 	valid-canvas?: function [
@@ -256,6 +239,24 @@ rendering: classy-object [
 				fill [canvas/size/y < 1.#INF]
 			] [no]
 		]
+	]
+	
+	encode-canvas: function [
+		"Encode CANVAS into a single value for lookups"
+		canvas [map!] (valid-canvas? canvas)
+	][
+		add to point3D! canvas/size
+			multiply (0,0,1)
+				add switch canvas/x [free [0] wrap [1] fill [2]]
+					switch canvas/y [free [0] wrap [4] fill [8]]
+	]
+	
+	#assert [
+		(10,10, 0) = encode-canvas #[size: (10,10) x: free y: free]
+		(10,10, 5) = encode-canvas #[size: (10,10) x: wrap y: wrap]
+		(10,10,10) = encode-canvas #[size: (10,10) x: fill y: fill]
+		(10,10, 8) = encode-canvas #[size: (10,10) x: free y: fill]
+		(10,10, 1) = encode-canvas #[size: (10,10) x: wrap y: free]
 	]
 	
 	reduce-canvas: function [
