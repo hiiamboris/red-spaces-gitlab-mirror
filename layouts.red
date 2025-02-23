@@ -34,7 +34,8 @@ layouts: to map! to block! object [								;@@ REP #165
 			; focal-pen:		reserved
 			; focal-geometry:	reserved
 			; shadow-pen:		reserved
-			shadow:		none	#type [planar! none!]			;-- shadow offset; or none to disable it
+			; shadow:		none	#type [planar! none!]			;-- shadow offset; or none to disable it
+			shadow:		none	#type [pair! none!]				;-- shadow offset; or none to disable it (only pair is supported by Draw atm)
 			; shadow-blur:		reserved
 			
 			center:		none	#type [none! object!]			;-- space (content) to put inside the frame  ;@@ or rename to 'content'?
@@ -77,7 +78,7 @@ layouts: to map! to block! object [								;@@ REP #165
 						fill-pen   @[!/fill]			/if !/fill			;-- when not set, inherited from above
 						pen        @[!/pen]				/if !/pen			;-- ditto
 						line-width @[!/frame]								;-- always set, to avoid inheriting from above
-						shadow @[to pair! !/shadow] 3 0.0.0	/if !/shadow	;@@ shadow does not yet support point2D or word colors
+						shadow @[!/shadow] 3 0.0.0	/if !/shadow			;@@ shadow does not yet support point2D or word colors
 						box @[start: !/frame * (0.5, 0.5) + !/padding]
 							@[frame/size - start]
 							@[!/rounding]				/if !/rounding > 0
