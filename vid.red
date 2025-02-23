@@ -4,8 +4,8 @@ Red [
 	license:  BSD-3
 	provides: spaces.vid
 	depends:  [
-		spaces.macros spaces.auxi spaces.templates
-		global with error quietly map-each advanced-function collect-set-words
+		spaces.macros spaces.auxi spaces.templates spaces.rendering
+		global with error reshape bind-only advanced-function classy-object
 	]
 ]
 
@@ -21,6 +21,11 @@ VID: classy-object [
 	init-spaces-tree: none
 	lay-out-vids:     none
 	add-flag:         none
+	add-actor:        none
+	set-color:        none
+	set-limits:       none
+	
+	dialect:          none
 	
 	focus: classy-object [
 		"(internal focus tracking facilities)"
@@ -98,16 +103,47 @@ VID/focus/update: func [
 	"Update focus target within the VID/S subtree"
 	space [object!]
 ] with :VID/focus/track [
-	try [focused: space]										;-- may fail when called outside of track-focus scope
+	try [focused: space]										;-- may fail when called outside of focus/track scope
 ]
 
 VID/add-flag: function [
-	"Add a FLAG to SPACE's /config, copying it in process"		;-- copying is required to avoid modifying the shared config
+	"Add a FLAG to SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
 	space [object!]
 	flag  [word!]
 ][
-	space/config: copy/deep space/config
+	space/config: copy/deep space/config						;@@ fix /owners
 	append space/config/flags flag
+]
+	
+VID/add-actor: function [
+	"Add an ACTOR to SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
+	space   [object!]
+	on-type [word!]   (find/match form on-type "on-")
+	code    [block! function!]
+][
+	space/config: either select space/config 'actors
+		[copy/deep space/config]								;@@ fix /owners
+		[make copy/deep space/config [actors: copy #[]]]
+	if block? :code [code: function [event [map!]] code]
+	space/config/actors/:on-type :code
+]
+	
+VID/set-color: function [
+	"Set COLOR in SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
+	space [object!]
+	color [tuple!]
+][
+	#assert [in space/config 'color  "color is not supported by the selected template"]	;@@ or force-add it?
+	space/config: copy/deep space/config						;@@ fix /owners
+	space/config/color: color
+]
+	
+VID/set-limits: function [
+	"Set LIMITS in SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
+	space  [object!]
+	limits [map!] "A range! value"
+][
+	space/config: remake copy/deep space/config [limits: (limits)]	;@@ fix /owners
 ]
 	
 	
@@ -185,289 +221,307 @@ VID/add-flag: function [
 		; code
 	; ]
 	
-datatype-names: to block! any-type!						;-- used to screen datatypes from flags
 
-;@@ can this func be split apart?
 global VID/lay-out-vids: function [
 	"Turn VID/S specification block into a forest of spaces"
-	spec [block!] "See VID/S manual on syntax" 
-	/styles sheet [map! none!] "Add custom stylesheet to the global one"
-	/local w b x lo hi late?
-	/extern with										;-- gets collected from `def`
-] with VID [
-	pane: make block! 8
-	sheet: any [sheet make map! 4]						;-- new sheet should not persist after leaving lay-out-vids 
-	def: construct [									;-- accumulated single style definition
-		styling?:												;-- used when defining a new style in VID
-		template: 												;-- should not end in `=` (but not checked)
-		with:													;-- used to build space, before all other modifiers applied
-		link: 													;-- prefix set-word, will be set to the instantiated space object
-		style: 													;-- style spec fetched from VID/styles
-		reactions:												;-- bound to space
-		actors:													;-- unlike event handlers, affects individual space only
-		facets:													;-- facets collected by manual and auto-facet
-		pane:													;-- unless snatched by auto-facet, assigns /content
-		focused?:												;-- to move focus into this space
-		children:												;-- collects set-words of a style
-	]
-	
-	commit-style: [
-		#assert [def/template]
-		#assert [def/style/template "template name must be defined in style specification"]
-		
-		;; may assign non-existing facets like hint= or menu=
-		facets: map-each [facet value] def/facets [
-			either facet [ reduce [to set-word! facet 'system/words/quote :value] ][ value ]
-		]
-		unless empty? def/actors [
-			append facets compose/deep/only [
-				actors: apply 'construct [
-					to [] def/actors
-					/with object? :actors :actors				;-- allows block! facet to define an actor too
-				]
-			]
-		]
-		either def/styling? [									;-- new style defined, def/style already copied and in the sheet
-			unless def/style/payload [append def/style [payload: []]] 
-			def/style/payload: copy/deep/part style-bgn style-end
-			; #print "saved payload (mold def/style/payload) in (def/link) style based on (def/style/template)"
-		][
-			space-spec: compose [
-				(only def/style/spec)
-				(compose when def/children [children: (def/children)])
-				(facets)
-				(def/with)
-			]
-		
-			space: make-space def/style/template space-spec
-			if def/link [set def/link space]					;-- set the word before calling reactions
-			
-			if def/pane [
-				unless in space 'content [
-					ERROR "Style (def/template) cannot contain other spaces"
-				]
-				;; allow usage of custom layout function
-				either def/style/layout [
-					layout: get def/style/layout
-					#assert [function? :layout]
-					do with space (layout/styles def/pane copy sheet)	;-- copy sheet so inner styles don't modify parent's
-				][
-					content: lay-out-vids/styles def/pane copy sheet	;-- copy sheet so inner styles don't modify parent's
-					space/content: case [						;-- always trigger on-change just in case
-						any-list? :space/content [content]
-						immediate? :space/content [
-							if 1 < n: length? content [
-								ERROR "Style (def/template) can only contain a single space, given (n)"
-							]
-							content/1							;-- can be none if no items
-						]
-						'else [									;-- e.g. content is a map in grid
-							ERROR "Style (def/template) requires custom content filling function"
-						]
-					]
-				]
-			]
-			if def/focused? [focus/update space]				;-- does not trigger actors/events (until fully drawn)
-			
-			if object? actors: select space 'actors [
-				foreach actor values-of actors [
-					;; bind to space and commands but don't unbind locals:
-					with [space events/commands :actor] body-of :actor
-				]
-			]
-			; if actor: :def/actors/on-created [actor space none none]	;@@ need this? or need `on-create`?
-			
-			;; make reactive all spaces that define reactions or have a name
-			;@@ this is a kludge for lacking PR #4529, remove me
-			;@@ another option would be to make all VID spaces reactive, but this may be slow in generative layouts
-			if any [def/link  not empty? def/reactions] [
-				quietly space/on-change*: reload-function in space 'on-change*
-				insert body-of :space/on-change*
-					with [space :space/on-change*] [			;-- newlines are imporant here for mold readability
-						system/reactivity/check/only self word
-					]
-			]
-			foreach [later reaction] def/reactions [
-				reaction: bind copy/deep reaction space			;@@ should bind to commands too?
-				react/:later reaction
-			]
-			; #print "finished instantiation of (def/template) -> (space/type):(space/size)"
-			
-			append pane space
-		]
-	];; commit-style: []
-	
-	reset: [
-		set def none
-		def/actors:    make map!   4
-		def/facets:    make block! 8
-		def/reactions: make block! 2
-		def/with:      make block! 8
-	]
-	=vids=:              [any [end | (do reset) =do= | =styling= | =instantiating=]]
-	=styling=:           [
-		ahead word! 'style (def/styling?: yes)
-		ahead #expect set-word! =space-name=
-		=style-declaration=
-	]
-	=instantiating=:     [not end opt =space-name= =style-declaration=]
-	=style-declaration=: [=style-name= style-bgn: any =modifier= style-end: (do commit-style)]
-	=space-name=:        [set w set-word! (def/link: to word! w)]
-	=style-name=:        [
-		set w #expect word! p: (
-			; #print "found style (w)..."
-			def/template: w
-			def/style: case [
-				x: sheet/:w      [x]
-				x: VID/styles/:w [x]
-				templates/:w     [compose/only [template: (w)]]
-				'else            [ERROR "Unsupported VID/S style: (w)"]
-			]
-			#assert [not empty? def/style]
-			if def/styling? [
-				put sheet def/link def/style: copy/deep def/style	;-- from now on, linked word ends the definition and instantiates
-			]
-			if payload: def/style/payload [					;-- style has literal data to insert
-				def/children: make [] 4						;-- collect names of the children
-				;; literally insert anonymized copy of the payload
-				;; to avoid set-words collision when a style with set-words inside is instantiated multiple times:
-				def/children: construct collect-set-words payload
-				insert p with def/children copy/deep payload
-				; #print "inserted payload at: (mold/part p 80)"
-			]
-		)
-	]
-	
-	=modifier=:   [
-		not [
-			end
-		|	ahead word! 'style						;-- style is a keyword and can't be faceted
-		|	set-word!								;-- set-words are reserved for space names
-		|	set w word! if (any [sheet/:w VID/styles/:w templates/:w])	;-- style names mark the end of modifiers
-		]; p: (#print "modifier at: (mold/part p 80)")
-		[=with= | =reaction= | =action= | =facet= | =flag= | =auto-facet= | =focus= | =color= | =pane= | =size=]
-		; p: (#print "modifier finished at: (mold/part p 80)")
-	]
-	
-	=with=:       [ahead word! 'with  set b #expect block! (append def/with b)]	;-- collects multiple `with` blocks
-	=do=:         [ahead word! 'do    set b #expect block! (do b)]
-	
-	=reaction=:   [ahead word! 'react set late? opt [ahead word! 'later] set b #expect block! (
-		unless def/styling? [						;-- will be created during instantiation
-			repend def/reactions [late? b]
-		]
-	)]
-	
-	=action=:     [=actor-name= =actor-body=]
-	=actor-name=: [
-		set w word!
-		if (all [find/match x: form w "on-" #"=" <> last x])	;-- don't take facet for actor, e.g. on-move=
-		;@@ should look the name up in system/view/evt-names?
-	]
-	=actor-body=: [
-		set b block! (def/actors/:w: function [event path] b)
-	|	set x [get-word! | get-path!] (
-			unless function? get/any x [
-				ERROR "(mold x) should refer to a function, not (type? get/any x)"
-			]
-			;@@ check arity too? (up to 2 args)
-			def/actors/:w: get/any x
-		)
-	|	ahead word! 'function p: #expect [2 block!] (def/actors/:w: function p/1 p/2)
-	|	#expect "actor body"
-	]
-	
-	=focus=:      [ahead word! 'focus (def/focused?: yes)]
-	
-	=facet=:      [=facet-name= =facet-expr=]
-	=facet-name=: [
-		set w word! if (#"=" = last s: form w) (
-			take/last s  append def/facets to word! s
-		)
-	]
-	=facet-expr=: [s: e: (append/only def/facets do/next s 'e) :e]
-	
-	=flag=: [
-		set w word!
-		if (facet: get-safe 'def/style/facets/:w)	;-- flag defined for this style?
-		if (not find datatype-names w)				;-- datatype names do not count
-		(repend def/facets [none facet])
-	]
-		
-	=auto-facet=: [
-		set x any-type!								;-- try to match by value type
-		if (facet: get-safe 'def/style/facets/(type?/word :x))
-		(repend def/facets pick [[none facet :x] [facet :x]] function? :facet) 
-	]
-	
-	;; I decided to make a special case because color is in principle applicable to all templates
-	;; and adding it into every VID/S style would be tedious, plus raw templates won't support it otherwise
-	;@@ should there be two colors (fg/bg)? (this may complicate styles a lot)
-	=color=:      [
-		[	set x tuple!
-		|	set w word! if (tuple? x: get-safe w)	;-- safe or may have lost context
-		|	set w issue! if (x: hex-to-rgb w)
-		]
-		(repend def/facets ['color x])
-	]
-	
-	=pane=:       [set b block! (def/pane: b)]		;-- will only be expanded during instantiation
-	
-	=size=:       [
-		[	ahead [skip ahead word! '.. skip]
-			=size-component-2= (lo: x) skip =size-component-2= (hi: x)
-		|	=size-component-1= (lo: hi: x)
-		]
-		(repend def/facets ['limits lo .. hi])
-	]
-	limit!: make typeset! [linear! planar! none!]
-	=size-component-1=: [
-		set x limit!
-	|	set x [word! | get-word!] if (all [
-			not VID/styles/:x						;-- protect from bugs if style name is set globally to a number
-			not templates/:x
-			find limit! type? set/any 'x get-safe x	;-- safe or may have lost context
-			none <> :x								;-- ignore single none or unset values!
-		])
-	]
-	=size-component-2=: [
-		set x [limit! | word! | get-word! | paren!] (x: do x)
-	]
-	
-	parse copy spec =vids=							;-- copy so styles can insert into it
-	pane
-];; lay-out-vids: function
-	
+	spec    [block!] "See VID/S manual on syntax" 
+	/styles sheet: (copy #[]) [map!] "Add custom stylesheet to the global one"
+	return: [block!] "One or more top-level spaces"
+][
+	sheet: extend copy/deep VID/styles sheet
+	VID/dialect/build-pane VID/dialect/parse-pane spec sheet
+]
 
-; #hide [#assert [
-	; lay-out-vids [										;-- new style names should be recognized
-		; style text1: text 20
-		; text1 "text"
-	; ]
+VID/dialect: classy-object [
+	"(internal VID/S parsing support facilities)"
 	
-	; lt: lay-out-vids [									;-- ensure it doesn't deadlock
-		; style text: text
-		; style text: text
-		; text
-	; ]
-	; single? lt											;-- last text should be recognized as instantiation
+	datatype-names: to hash! any-type!							;-- used to screen datatypes from flags
+	actor-names:    to hash! extract next system/view/evt-names 2
 	
-	; ys: []
-	; lay-out-vids [
-		; style x: box [y: text do [append ys y]]
-		; x x												;-- should recognize 'x' here as instantiation (definition ended)
-	; ]
-	; 2 = length? ys
-	; not same? :ys/1 :ys/2								;-- 'y' should stay inside 'x's context, not shared
+	;; note: both parse-style and parse-pane are indirectly tied to lay-out-vids, because rules are using the stylesheet
+	;; this function is separated to have stack-like context for 'p', 'x', data
+	parse-entry: function [
+		"Read a VID/S style definition from POS, setting POS' to the tail of it"
+		original [block!]  "Original rule at its head"
+		pos      [block!]  "Expanded rule at current position"
+		pos'     [word!]   "Word to set to the next position in the expanded rule"
+		return:  [object!] "A newly built tree of spaces"
+		/local p x												;-- used by the rules
+	][
+		data: copy/deep #[										;-- data collected from VID/S block in a single entry
+			label:	#(none)										;-- set-word to assign to a space or style
+			name:	#(none)										;-- word referring to the template or style name
+			style:	#(none)										;-- style going by that name or auto-generated from template
+			pane:	#(none)										;-- children spaces
+			init:	[]											;-- code for make-space, initialized from style
+		]
+		parse pos with rules [
+			p: [style-declaration (data: []) | style-instantiation]
+			pos: (set pos' pos)
+		]
+		data
+	]
 	
-	; button: text: 1
-	; lt: lay-out-vids [button "ok" text "text"]
-	; 2 = length? lt										;-- style names should not be broken by word values
-	; lt/1/type = 'button
-	; lt/2/type = 'text
+	parse-pane: function [
+		"Turn all VID/S style definitions in the PANE into space objects"
+		pane    [block!]      "A VID/S block"
+		sheet   [map! block!] "Style sheet to look up styles in"
+		return: [block!]      "A forest of spaces"
+		/local p'												;-- used by the rules
+	][
+		parse pos: copy pane rules/expand-links					;-- expansion modifies the copied pane
+		if block? sheet [sheet: make map! sheet]
+		collect [while [not tail? pos] [keep parse-entry pane pos 'pos]]
+	]
 	
-	; error? try [lay-out-vids [nonexistent-word]]
-	; error? try [lay-out-vids [text nonexistent-word]]
+	store-style: function [
+		"Store a new style in the SHEET"
+		sheet [map!]
+		data  [map!] "Collected style data" (word? data/label)
+	][
+		;; style block is freeform, so we don't know if it has /init or /pane, and don't want to add any,
+		;; both to keep sheet human-readable and to avoid confusing e.g. pane=[] with pane=none
+		if            data/pane [data/style/pane: compose [(only data/style/pane) (data/pane)]]
+		unless empty? data/init [data/style/init: compose [(only data/style/init) (data/init)]]
+		sheet/(data/label): data/style
+	]
 	
-	; ;@@ add [text: text text= text] test here
-; ]]
+	build-style: function [
+		"Turn collected style DATA into a space object"
+		data    [map!]
+		return: [object!]
+	][
+		#assert [word? :data/style/template]
+		space: make-space data/style/template compose [(only data/style/init) (data/init)]
+		if data/label [set data/label space]
+		if data/pane [
+			pane: parse-pane data/pane
+			switch/default type?/word :space/content [
+				block! [space/content: parse-pane data/pane]
+				none!  [
+					pane: parse-pane data/pane
+					if (length? pane) > 1 [ERROR "Style (data/name) can only have a single child"]
+					space/content: pane/1						;-- pane/1 may still be none
+				]
+			] [ERROR "Style (data/name) cannot have children"]
+		]
+		data/space: space
+	]
+	
+	build-pane: function [
+		"Turn parsed VID/S style data into space objects"
+		pane    [block!] (parse pane [any map!])
+		return: [block!]
+	][
+		collect [foreach data pane [keep build-style data]]		;@@ use map-each
+	]
+	
+	get-style: function [
+		"Get a style from the style SHEET by its NAME, otherwise create a minimal style"
+		sheet   [map!]
+		name    [word!]
+		return: [map!]
+	][
+		any [
+			if :sheet/:name [
+				#assert [any [map? :sheet/:name block? :sheet/:name]]
+				style: make map! copy/deep sheet/:name			;-- composing maps is tricky so styles are allowed to be just blocks
+				if block? style/facets [style/facets: make map! style/facets]
+				style
+			]
+			if templates/:name [make map! compose [template: (name)]]
+			ERROR "Unknown VID/S style (name)"
+		]
+	]
+	
+	set-auto-facet: function [
+		"(internal) automatically assign style's facet value"
+		data    [map!]
+		value   [any-type!]
+		return: [logic!]
+	][
+		to logic! case [
+			not facets: data/style/facets [none]
+			all [word? :value code: facets/:value] [
+				append data/init copy/deep code
+			]
+			facet: select facets type?/word :value [
+				compose-after data/init switch/default type: type?/word :facet [
+					function! [[ (:facet) quote (:value) ]]
+					word!     [[ (to set-word! facet) quote (:value) ]]
+				] [ERROR "Facet '(facet)' in style '(data/name)' must be a word or function, not (type)"]
+			]
+		]
+	]
+		
+	;@@ this code is a good showcase on how awkward Parse is when you need to extract values from the data - make a REP?
+	rules: [
+		"Rules for style parsing"
+		
+		~~p: none												;-- used by #expect
+		p:   none												;-- used by rules
+		<<:  make op! :compose-after
+		
+		expected: function [
+			"(internal) wrapper for 'expected' that forwards errors to the original series"
+			where [block!]
+			token [default!]
+		] bind-only [
+			spaces/ctx/expected at original index? where :token
+		] bind 'original :parse-entry
+		
+		known-style?: function [
+			"(internal) look up style name in style sheet then templates list"
+			name [word!]
+		][
+			any [sheet/:name templates/:name]
+		]
+	
+		;; performs global preprocessing of the VID/S block to support fetching values by their reference/code
+		expand-links: [ahead any [p':
+			change only [get-word! | get-path!] (get p'/1)
+		|	change only paren! (do p'/1)
+		|	change only url! (load p'/1)
+		|	skip
+		]]
+		
+		;; collects into the 'data' map: spec block, init block, label word/path, name word, pane block
+		; style-entry:         [p: any style-declaration style-instantiation]
+		style-declaration:   [ahead word! 'style #expect label-word style-description (store-style sheet data)]
+		style-instantiation: [opt [label-word | label-path] style-description]
+		style-description:   [#expect style-name any style-modifier]
+		style-name:          [p: word! if (known-style? p/1) (data/style: get-style sheet data/name: p/1)]
+		label-word:          [p: set-word! (data/label: to word! p/1)]
+		label-path:          [p: set-path! (data/label: to path! p/1)]
+		style-modifier: [
+			p: ahead word! [
+				;; keywords take priority:
+				with-block
+			|	react-block
+			|	actor-block
+			|	focus-flag
+				;; then decorated words:
+			|	facet-manual
+			]
+			;; 'reserved' helps avoid consuming e.g. 'style' or 'text' when a color or size is assigned to that word:
+			;; (affects exactly: facet-auto, word-color, word-size)
+		|	not reserved [
+				;; then specific flags and datatypes:
+				facet-auto
+				;; then generic handling of datatypes:
+			|	subtree
+			|	size
+			|	color
+			]
+		]
+		
+		; keyword:      [ahead word! ['style | 'focus | 'with | 'react | actor-name | template-name]]
+		reserved:     [word! if (any [p/1 = 'style known-style? p/1])]
+		
+		with-block:   ['with #expect block! (append data/init p/2)]
+		
+		react-block:  ['react #expect block! (append/part data/init p 2)]
+		
+		actor-block:  [actor-name #expect actor-body (data/init << [VID/add-actor self (to lit-word! p/1) quote (:x)])]
+		actor-name:   [word! if (find actor-names p/1)]
+		actor-body:   [set x [block! | function!] | ahead word! 'function 2 block! [x: function p/3 p/4]]
+		
+		focus-flag:   ['focus (data/init << [VID/focus/update self])]
+		
+		facet-manual: [facet-name #expect facet-value (data/init << [(to set-word! x) quote (:p/2)])]
+		facet-name:   [word! if (#"=" = take/last x: form p/1)] 
+		facet-value:  [skip]									;-- named for the sake of error reporting only
+		
+		facet-auto:   [skip if (set-auto-facet data :p/1)]
+		
+		subtree:      [block! if (not data/pane) (data/pane: copy p/1)]	;-- don't accept 2 or more subtrees; stored unprocessed!
+		
+		size:         [p: [fixed-size | range-size | word-size] (data/init << [VID/set-limits self (x)])]
+		fixed-size:   [planar! (x: p/1 .. p/1)]
+		range-size:   [map! if (range? x: p/1)]
+		word-size:    [word! if (case [range? x: get-safe p/1 [x] planar? :x [x .. x]])]
+		
+		color:        [p: [tuple-color | hex-color | word-color] (data/init << [VID/set-color self (x)])]
+		tuple-color:  [tuple! (x: p/1)]
+		hex-color:    [issue! (x: hex-to-rgb p/1)]
+		word-color:   [word! if (tuple? x: get-safe p/1)]
+	]
+	
+	;; rules have access to 'sheet' and 'data', and minute variables ~~p, p, x
+	;; `~~p` can safely be shared, `x` can be currently but not future-proof to share
+	;; and `p` must be made local to the style as facet-auto may evaluate arbitrary code and reenter the parser
+	rules: classy-object bind-only rules compose [
+		(bind [sheet p'] :parse-pane)							;-- sheet is collected within a pane, copied in a subpane
+		(bind [data p x] :parse-entry)							;-- data is local to a single style entry
+	]
+]
+
+#hide [#assert [
+	parse-pane: :VID/dialect/parse-pane
+	[] = parse-pane [] #[]
+	(parse-pane [space] #[]) = [#[label: #(none) name: space style: #[template: space] pane: #(none) init: []]]
+	
+	extra: make map! reshape [
+		test: [
+			template: space
+			init:     [num-facet: 0]
+			facets:   [
+				flag     [flag-facet: on]
+				string!  text-facet
+				integer! @(f: func [i][num-facet: i])
+			]
+		]
+	]
+	pane: parse-pane [test] extra
+	single? pane
+	pane/1/label = none
+	pane/1/pane  = none
+	pane/1/init  = []											;-- style/init isn't inserted here
+	pane/1/style/init = [num-facet: 0]
+	
+	2 = length? pane: parse-pane [test test] extra
+	pane/1 = pane/2
+	
+	pane: parse-pane [test test= ('test)] extra
+	single? pane
+	pane/1/init = [test: quote test]
+	
+	pane: parse-pane [test test= style] extra					;-- shouldn't take style for a keyword
+	single? pane
+	pane/1/init = [test: quote style]
+	
+	pane: parse-pane [test "abc" ('flag) with [a: 'b] (1 + 2)] extra
+	single? pane
+	pane/1/init = reshape [										;-- facets should be ordered
+		text-facet: quote "abc"
+		flag-facet: on
+		a: 'b
+		@(:f) quote 3
+    ]
+	
+	pane: parse-pane [style test1: test 5 test1] extra
+	single? pane
+	pane/1/label = none											;-- style label shouldn't be carried over to the space
+	pane/1/name  = 'test1
+	pane/1/init  = []											;-- style init shouldn't contaminate space/init
+	
+	pane: parse-pane [
+		style test: test 4
+		style test: test 5										;-- self-references shouldn't deadlock it
+		test: test [test] "10"									;-- last test is an instantiation
+	] extra
+	single? pane
+	pane/1/label = 'test
+	pane/1/name  = 'test
+	pane/1/pane  = [test]
+	pane/1/init  = [text-facet: quote "10"]
+	pane/1/style/init = compose [num-facet: 0 (:f) quote 4 (:f) quote 5]
+	
+	test: style: 'hacked
+	pane: parse-pane [style test: test test] extra				;-- external words shouldn't affect VID/S behavior
+	single? pane
+	
+	error? try [parse-pane [nonexistent-word] extra]
+	error? try [parse-pane [test nonexistent-word] extra]
+]]
+	
