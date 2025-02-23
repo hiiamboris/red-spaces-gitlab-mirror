@@ -8,6 +8,7 @@ Red [
 
 
 ;; an alias used in make-space
+;@@ or make it real space, with /type and all??
 space!: copy classy-object!
 
 global space?: function [										;-- faster check used when value is known to be an object
@@ -97,7 +98,8 @@ global make-space: function [
 
 ;@@ default config assignment - global or per template (template/type/default-config) ?
 
-global declare-template: function [
+;@@ doc that template is an object, so can contain any other supplementary fields
+global declare-template: function [ 
 	"Declare a new space template with given NAME"
 	name   [path! (parse name [2 word!]) word!]
 	source [block!] "Must include a /spec field at least"
@@ -105,7 +107,8 @@ global declare-template: function [
 	either path? name+base: name
 		[set [name: base:] name]
 		[base: 'space]
-	templates/:name: ctx: make template! source					;@@ add error capturing scope for make?
+	;@@ add error capturing scope for make?
+	templates/:name: ctx: make template! with spaces/ctx source ;-- auto-bound to 'spaces/ctx' for convenience
 	#assert [templates/:name/spec    "Template declaration must include a /spec field!"]
 	#assert [templates/:name/config  "Template declaration must include a /config field!"]
 	base:  copy/deep templates/:base/spec
