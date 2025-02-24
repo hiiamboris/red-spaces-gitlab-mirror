@@ -193,7 +193,7 @@ rendering: classy-object [
 	;@@ during ongoing render, should 'live?' relate to the new generation or the previous? or error out?
 	global live?: function [
 		"Check if space object belongs to the last drawn frame or not"
-		space   [object!]
+		space   [object!] (space? space)
 		return: [logic!]
 	][
 		lowest: space/frames/last								;-- with no 'cached' frames, check against the lowest 'drawn' frame

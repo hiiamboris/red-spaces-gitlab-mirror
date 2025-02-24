@@ -75,7 +75,7 @@ focus: classy-object [
 	]
 
 	restore: function ["Put keyboard focus to the last target that is still live"] [
-		at-live: locate/back history [x .. live? x  target: x]
+		at-live: locate/back history [x .. space? x live? x  target: x]
 		clear either at-live [next at-live][history]
 		maybe/same focus/current: target						;-- sets to 'none' when no live target found
 	]
