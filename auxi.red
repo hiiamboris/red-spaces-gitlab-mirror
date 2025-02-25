@@ -21,6 +21,13 @@ global top: function [
 	back tail series
 ]
 
+global topless: function [
+	"Return part of the SERIES without its last item"
+	series [series!]
+][
+	copy/part series back tail series
+]
+
 
 ;@@ copy/deep does not copy inner maps (#2167), clone tries to encode system/words, so this kludge is still a must have
 copy-deep-map: function [m [map!]] [

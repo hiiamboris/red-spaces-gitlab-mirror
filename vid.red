@@ -20,8 +20,11 @@ VID: classy-object [
 	
 	init-spaces-tree: none
 	lay-out-vids:     none
+	
+	;; these are helpers for VID/S and new styles to do common things:
 	add-flag:         none
 	add-actor:        none
+	set-facet:        none
 	set-color:        none
 	set-limits:       none
 	
@@ -128,21 +131,37 @@ VID/add-actor: function [
 	space/config/actors/:on-type :code
 ]
 	
+VID/set-facet: function [
+	"Set FACET in the SPACE to VALUE"
+	space [object!]
+	facet [word! path!] "All containers in the path are copied"	;-- copying is required to avoid modifying the shared container
+	value [default!]
+][
+	if path? facet [
+		foreach item topless facet [							;@@ use for-each [item | facet]
+			#assert [container? space/:item  "facet path elements must be containers"]
+			space: space/:item: copy space/:item
+		]
+		facet: last facet
+	]
+	space/:facet: :value
+]
+	
 VID/set-color: function [
-	"Set COLOR in SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
+	"Set COLOR in SPACE's /config, copying it in the process"
 	space [object!]
 	color [tuple!]
 ][
 	#assert [in space/config 'color  "color is not supported by the selected template"]	;@@ or force-add it?
-	space/config: copy/deep space/config						;@@ fix /owners
-	space/config/color: color
+	VID/set-facet 'config/color color
 ]
 	
 VID/set-limits: function [
-	"Set LIMITS in SPACE's /config, copying it in the process"	;-- copying is required to avoid modifying the shared config
+	"Set LIMITS in SPACE's /config, copying it in the process"
 	space  [object!]
 	limits [map!] "A range! value"
 ][
+	;@@ maybe limits should always be in config?
 	space/config: remake copy/deep space/config [limits: (limits)]	;@@ fix /owners
 ]
 	
@@ -428,8 +447,10 @@ VID/dialect: classy-object [
 		
 		focus-flag:   ['focus (data/init << [VID/focus/update self])]
 		
-		facet-manual: [facet-name #expect facet-value (data/init << [(to set-word! x) quote (:p/2)])]
-		facet-name:   [word! if (#"=" = take/last x: form p/1)] 
+		facet-manual: [facet-name #expect facet-value (data/init << [VID/set-facet self (x) quote (:p/2)])]	;@@ what if space has a VID: facet?
+		facet-name:   [facet-word | facet-path] 
+		facet-word:   [word! if (#"=" = take/last x: form p/1) (x: to lit-word! x)] 
+		facet-path:   [path! if (#"=" = take/last x: form last p/1) (x: as lit-path! compose [(as block! topless p/1) (to word! x)])] 
 		facet-value:  [skip]									;-- named for the sake of error reporting only
 		
 		facet-auto:   [skip if (set-auto-facet data :p/1)]
@@ -493,7 +514,7 @@ VID/dialect: classy-object [
 	pane: parse-pane [test "abc" ('flag) with [a: 'b] (1 + 2)] extra
 	single? pane
 	pane/1/init = reshape [										;-- facets should be ordered
-		text-facet: quote "abc"
+		VID/set-facet 'text-facet quote "abc"
 		flag-facet: on
 		a: 'b
 		@(:f) quote 3
@@ -514,7 +535,7 @@ VID/dialect: classy-object [
 	pane/1/label = 'test
 	pane/1/name  = 'test
 	pane/1/pane  = [test]
-	pane/1/init  = [text-facet: quote "10"]
+	pane/1/init  = [VID/set-facet 'text-facet quote "10"]
 	pane/1/style/init = compose [num-facet: 0 (:f) quote 4 (:f) quote 5]
 	
 	test: style: 'hacked
