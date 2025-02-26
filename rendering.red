@@ -163,7 +163,11 @@ context [
 			face/generation: cache/current-generation	;-- only updated if no error happened during render
 		]
 		clear children-mark
-		#debug profile [verify-validity face]			;-- check for unwanted invalidations during render, which may loop it
+		#debug profile [
+			prof/manual/start 'verify-validity
+			verify-validity face						;-- check for unwanted invalidations during render, which may loop it
+			prof/manual/end   'verify-validity
+		]
 		any [drawn copy []]								;-- drawn=none in case of error during render
 	]
 

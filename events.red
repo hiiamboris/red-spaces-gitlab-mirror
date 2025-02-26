@@ -295,8 +295,11 @@ events: context [
 					#assert [face/space]
 					;@@ is this check safe enough, or should invalidate set dirty flag for the host?
 					if dirty?: empty? face/space/cached [		;-- only timer updates the view because of #4881
+						#debug profile [prof/manual/start 'host]
+						drawn: render face
+						#debug profile [prof/manual/end   'host]
 						#debug profile [prof/manual/start 'drawing]
-						face/draw: render face					;@@ #5130 is the killer of animations (really fixed?)
+						face/draw: drawn							;@@ #5130 is the killer of animations (really fixed?)
 						; unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
 					]
