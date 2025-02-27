@@ -29,6 +29,17 @@ global topless: function [
 ]
 
 
+protect: function [												;-- unreliable kludge since ownership can be stolen; but better than nothing
+	"Forbid any modifications of the SERIES"
+	series [series!]											;@@ add /deep protection
+] with [
+	fail: func [o w] [ERROR "Unable to modify protected series (mold/flat/part o/:w 40)"]
+] [
+	o: object [x: series on-deep-change*: :fail]
+	modify series 'owned reduce [o 'x]
+	series
+]
+
 ;@@ copy/deep does not copy inner maps (#2167), clone tries to encode system/words, so this kludge is still a must have
 copy-deep-map: function [m [map!]] [
 	m: make map! copy/deep to [] m
@@ -269,17 +280,19 @@ order: function [										;@@ should this receive a block of any number of path
 ;; MEMO: since it does not copy (for performance), only use it for temporary values, never for returns
 only: function [
 	"Turn falsy values into empty block (useful for composing Draw code)"
-	value [any-type!] "Any truthy value is passed through"
-][
-	any [:value []]										;-- block is better than unset here because can be used in assignments
+	value   [any-type!] "Any truthy value is passed through"
+	return: [any-type!] "VALUE or an empty block"
+] with context [protect empty: []] [
+	any [:value empty]									;-- block is better than unset here because can be used in assignments
 ]
 
 ;; `compose` readability helper variant 4; simplified after all
 ;; to evaluate the result use `only if ... [expr]` instead
 when: function [
 	"If TEST is truthy, return VALUE, otherwise an empty block (static!)"
-	test  [any-type!]
-	value [any-type!]
+	test    [any-type!]
+	value   [any-type!]
+	return: [any-type!]
 ][
 	only if :test [:value]
 ]
