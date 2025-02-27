@@ -666,6 +666,6 @@ context with spaces/ctx expand-directives [
 			]
 		]
 	] 'resize
-	; prof/show
+	#debug profile [prof/show]
 ]
 
