@@ -297,15 +297,6 @@ when: function [
 	only if :test [:value]
 ]
 
-;; simple shortcut for `compose` to produce blocks only where needed
-;; as turns out only was used once in compose; and in other places reduce is not worse
-; wrap: func [
-	; "Put VALUE into a block"
-	; value [any-type!]
-; ][
-	; reduce [:value]
-; ]
-
 
 ;; the benefit of this over 'make' is that evaluated expressions are not bound to object's words
 remake: function [
