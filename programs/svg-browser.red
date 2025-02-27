@@ -10,6 +10,7 @@ Red [
 #process off
 context with spaces/ctx expand-directives [
 
+#include %/d/devel/red/common/match.red
 #include %/d/devel/red/common/glob.red
 
 ;@@ SVG.red can't be compiled - #5007, so I have to decompress it at runtime
