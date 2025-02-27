@@ -13,7 +13,7 @@ set 'spaces-included? true 								;-- must be done in the code, not in the prep
 ;@@ since it's a macro, it has to be #included, not `do`ne (`do` forgets macros)
 ;@@ for some reason, it won't affect #includes of this very file,
 ;@@ so a second preprocessor's pass is required for #includes to be handled by %include-once
-#do [verbose-inclusion?: yes]							;-- enable to dump filenames
+; #do [verbose-inclusion?: yes]							;-- enable to dump filenames
 #include %../common/include-once.red					;-- the rest can use the improved include
 #do [
 	;; when compiling, this needs `inline` to get the `-t os` argument!
