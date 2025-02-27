@@ -353,26 +353,6 @@ VID/dialect: classy-object [
 		]
 	]
 	
-	set-auto-facet: function [
-		"(internal) automatically assign style's facet value"
-		data    [map!]
-		value   [any-type!]
-		return: [logic!]
-	][
-		to logic! case [
-			not facets: data/style/facets [none]
-			all [word? :value code: facets/:value] [
-				append data/init copy/deep code
-			]
-			facet: select facets type?/word :value [
-				compose-after data/init switch/default type: type?/word :facet [
-					function! [[ (:facet) quote (:value) ]]
-					word!     [[ (to set-word! facet) quote (:value) ]]
-				] [ERROR "Facet '(facet)' in style '(data/name)' must be a word or function, not (type)"]
-			]
-		]
-	]
-		
 	;@@ this code is a good showcase on how awkward Parse is when you need to extract values from the data - make a REP?
 	rules: [
 		"Rules for style parsing"
@@ -396,6 +376,72 @@ VID/dialect: classy-object [
 			any [sheet/:name templates/:name]
 		]
 	
+		set-auto-facet: function [
+			"(internal) automatically assign style's facet value from given block position"
+			pos     [word!]  "Advanced to point after the consumed values"
+			return: [logic!] "True if a matching facet found"
+		][
+			unless facets: data/style/facets [return false]
+			fail: [ERROR "Facet '(facet)' in style '(data/name)' must be a word or function, not (type)"]
+			value: first source: get pos
+			result: case [
+				all [											;-- word -> code block or function
+					target: :facets/:value
+					word? :value								;-- tip: datatype word is handled before auto-facet, so only other words are here
+				][
+					switch/default type: type?/word :target [
+						block!    [append data/init copy/deep target]
+						function! [
+							arity: preprocessor/func-arity? spec-of :target
+							append data/init :target
+							repeat i arity [data/init << [quote (:source/(i + 1))]]
+							source: skip source arity
+						]
+					] fail
+				]
+				target: select facets facet: type?/word :value [	;-- any-type -> word or unary function
+					data/init << switch/default type: type?/word :target [
+						function! [[ (:target) quote (:value) ]]
+						word!     [[ (to set-word! target) quote (:value) ]]
+					] fail
+				]
+				'else [return false]
+			]
+			set pos next source 
+			true
+		]
+		
+		is-manual-facet: function [
+			"(internal) test if word or path is a manual facet assignment"
+			facet   [word! path!]
+			return: [none! word! path!] "Facet without the trailing `=` or none"
+		][
+			switch type?/word facet [
+				word! [
+					if #"=" = take/last word: form facet [
+						to word! word
+					]
+				]
+				path! [
+					if #"=" = take/last word: form last facet [
+						as path! compose [(as block! topless facet) (to word! word)]
+					]
+				]
+			]
+		]
+		
+		set-manual-facet: function [
+			"(internal) assign to space's FACET a given VALUE"
+			facet [word! path!]
+			value [default!]
+		][
+			;; by design, word= adds a new facet to space, while some/path= doesn't add it
+			data/init << switch type?/word facet [
+				word! [[ (to set-word! facet) quote (:value) ]]
+				path! [[ VID/set-facet self (as lit-path! facet) quote (:value) ]]
+			]
+		]
+		
 		;; performs global preprocessing of the VID/S block to support fetching values by their reference/code
 		expand-links: [ahead any [p':
 			change only [get-word! | get-path!] (get p'/1)
@@ -408,20 +454,20 @@ VID/dialect: classy-object [
 		; style-entry:         [p: any style-declaration style-instantiation]
 		style-declaration:   [ahead word! 'style #expect label-word style-description (store-style sheet data)]
 		style-instantiation: [opt [label-word | label-path] style-description]
-		style-description:   [#expect style-name any style-modifier]
+		style-description:   [#expect style-name any [tail | style-modifier]]
 		style-name:          [p: word! if (known-style? p/1) (data/style: get-style sheet data/name: p/1)]
 		label-word:          [p: set-word! (data/label: to word! p/1)]
 		label-path:          [p: set-path! (data/label: to path! p/1)]
 		style-modifier: [
+			;; keywords take priority:
 			p: ahead word! [
-				;; keywords take priority:
 				with-block
 			|	react-block
 			|	actor-block
 			|	focus-flag
-				;; then decorated words:
-			|	facet-manual
 			]
+			;; then decorated words:
+		|	facet-manual
 			;; 'reserved' helps avoid consuming e.g. 'style' or 'text' when a color or size is assigned to that word:
 			;; (affects exactly: facet-auto, word-color, word-size)
 		|	not reserved [
@@ -447,17 +493,14 @@ VID/dialect: classy-object [
 		
 		focus-flag:   ['focus (data/init << [VID/focus/update self])]
 		
-		facet-manual: [facet-name #expect facet-value (data/init << [VID/set-facet self (x) quote (:p/2)])]	;@@ what if space has a VID: facet?
-		facet-name:   [facet-word | facet-path] 
-		facet-word:   [word! if (#"=" = take/last x: form p/1) (x: to lit-word! x)] 
-		facet-path:   [path! if (#"=" = take/last x: form last p/1) (x: as lit-path! compose [(as block! topless p/1) (to word! x)])] 
+		facet-manual: [[word! | path!] if (x: is-manual-facet p/1) #expect facet-value (set-manual-facet x :p/2)]
 		facet-value:  [skip]									;-- named for the sake of error reporting only
 		
-		facet-auto:   [skip if (set-auto-facet data :p/1)]
+		facet-auto:   [skip if (set-auto-facet 'p) :p]
 		
 		subtree:      [block! if (not data/pane) (data/pane: copy p/1)]	;-- don't accept 2 or more subtrees; stored unprocessed!
 		
-		size:         [p: [fixed-size | range-size | word-size] (data/init << [VID/set-limits self (x)])]
+		size:         [p: [fixed-size | range-size | word-size] (data/init << [VID/set-limits self (x)])]	;@@ what if space has a VID: facet?
 		fixed-size:   [planar! (x: p/1 .. p/1)]
 		range-size:   [map! if (range? x: p/1)]
 		word-size:    [word! if (case [range? x: get-safe p/1 [x] planar? :x [x .. x]])]
@@ -490,6 +533,7 @@ VID/dialect: classy-object [
 				flag     [flag-facet: on]
 				string!  text-facet
 				integer! @(f: func [i][num-facet: i])
+				param    @(g: func [x][any-facet: x])
 			]
 		]
 	]
@@ -503,21 +547,25 @@ VID/dialect: classy-object [
 	2 = length? pane: parse-pane [test test] extra
 	pane/1 = pane/2
 	
-	pane: parse-pane [test test= ('test)] extra
+	pane: parse-pane [test test= ('test) deep/facet= :pi] extra
 	single? pane
-	pane/1/init = [test: quote test]
+	pane/1/init = reshape [
+		test: quote test
+		VID/set-facet self 'deep/facet quote @[pi]
+	]
 	
 	pane: parse-pane [test test= style] extra					;-- shouldn't take style for a keyword
 	single? pane
 	pane/1/init = [test: quote style]
 	
-	pane: parse-pane [test "abc" ('flag) with [a: 'b] (1 + 2)] extra
+	pane: parse-pane [test "abc" ('flag) with [a: 'b] (1 + 2) param 1.23] extra
 	single? pane
 	pane/1/init = reshape [										;-- facets should be ordered
-		VID/set-facet 'text-facet quote "abc"
+		text-facet: quote "abc"
 		flag-facet: on
 		a: 'b
 		@(:f) quote 3
+		@(:g) quote 1.23
     ]
 	
 	pane: parse-pane [style test1: test 5 test1] extra
@@ -535,7 +583,7 @@ VID/dialect: classy-object [
 	pane/1/label = 'test
 	pane/1/name  = 'test
 	pane/1/pane  = [test]
-	pane/1/init  = [VID/set-facet 'text-facet quote "10"]
+	pane/1/init  = [text-facet: quote "10"]
 	pane/1/style/init = compose [num-facet: 0 (:f) quote 4 (:f) quote 5]
 	
 	test: style: 'hacked
