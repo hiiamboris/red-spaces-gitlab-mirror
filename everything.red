@@ -4,7 +4,7 @@ Red [
 	; needs:  view										;@@ doesn't work, has to be in the main script
 ]
 
-;@@ can I get rid of spaces/ctx if I demessify spaces/ itself and make it a context?
+;@@ can I get rid of spaces/ctx if I demessify spaces/ itself and make it a context? if not, rename to /namespace
 
 ;; check to prevent double inclusion (esp. when running tests from spaces-console)
 #if not value? 'spaces-included? [
@@ -23,8 +23,8 @@ set 'spaces-included? true 								;-- must be done in the code, not in the prep
 do/expand [
 	#include %../common/debug.red						;-- need #debug macro so it can be process rest of this file
 	
-	; #debug off										;-- turn off type checking and general (unspecialized) debug logs
-	#debug set tips									;-- turn on to get developer suggestions in addition to detected failures
+	; #debug off											;-- turn off type checking and general (unspecialized) debug logs
+	#debug set tips										;-- turn on to get developer suggestions in addition to detected failures
 	; #debug set draw									;-- turn on to see what space produces draw errors
 	; #debug set profile								;-- turn on to see rendering and other times
 	; #debug set changes								;-- turn on to see value changes and invalidation
@@ -41,7 +41,7 @@ do/expand [
 	; #debug set list-view
 	
 	#include %../common/assert.red
-	; #assert off
+	; #assert off											;-- turn off runtime assertions to speed up evaluation at the cost of bug propagation
 	#include %../common/trace-deep.red
 	#include %../common/expect.red
 	#include %../common/setters.red
@@ -96,14 +96,15 @@ do/expand [
 	#include %../common/overload.red
 	#include %../common/load-anything.red				;-- required to load data saved by custom 'save'
 	
-	; random/seed now/precise
 	#local [											;-- don't spill macros into user code
 		spaces: classy-object [
 			"Spaces umbrella context"
+			set 'spaces self							;-- ahead-of-time assignment allows to refer to 'spaces' while it's being constructed
 			
 			ctx: context [								;-- put all space things into a single context
+				set 'ctx self
 				#include %macros.red
-				#include %mold.red						;-- include as early as possible so it can be used in other places
+				#include %mold.red								;-- include as early as possible so it can be used in other places
 				#include %keys.red
 				#include %debugging.red
 				#include %geometry.red
@@ -135,7 +136,7 @@ do/expand [
 				#include %new-handlers.red
 				; #include %hovering.red
 				; #include %actors.red
-			]
+			]	#type [object!] "Context for making new templates; contains everything Spaces-related"
 	
 			;; makes some things readily available:
 			events:    ctx/events
@@ -145,9 +146,9 @@ do/expand [
 			layouts:   ctx/layouts		#type [map!] "Known space layouts"
 			focus:     ctx/focus
 			VID:       ctx/VID
-		]
-	]
-]
+		];spaces: classy-object [
+	];#local [
+];do/expand [
 #process on
 
 ];#if not value? 'spaces-included? [ 
