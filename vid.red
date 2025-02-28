@@ -256,6 +256,7 @@ VID/dialect: classy-object [
 	
 	datatype-names: to hash! any-type!							;-- used to screen datatypes from flags
 	actor-names:    to hash! extract next system/view/evt-names 2
+	active!:        make typeset! [any-word! any-path! paren! any-function!]	;-- what values to quote in /init
 	
 	;; note: both parse-style and parse-pane are indirectly tied to lay-out-vids, because rules are using the stylesheet
 	;; this function is separated to have stack-like context for 'p', 'x', data
@@ -376,6 +377,13 @@ VID/dialect: classy-object [
 			any [sheet/:name templates/:name]
 		]
 	
+		quote?: function [
+			"(internal) return 'quote if value doesn't evaluate to itself"
+			value [any-type!]
+		][
+			when find active! type? :value 'quote
+		]
+	
 		set-auto-facet: function [
 			"(internal) automatically assign style's facet value from given block position"
 			pos     [word!]  "Advanced to point after the consumed values"
@@ -392,17 +400,20 @@ VID/dialect: classy-object [
 					switch/default type: type?/word :target [
 						block!    [append data/init copy/deep target]
 						function! [
-							arity: preprocessor/func-arity? spec-of :target
-							append data/init :target
-							repeat i arity [data/init << [quote (:source/(i + 1))]]
+							arity:  preprocessor/func-arity? spec-of :target
+							call:   copy/part source 1 + arity
+							call/1: 'target
+							code:   do interleave/between call 'quote
+							#assert [block? :code  "facet function must return a block"]
+							append data/init code
 							source: skip source arity
 						]
 					] fail
 				]
 				target: select facets facet: type?/word :value [	;-- any-type -> word or unary function
-					data/init << switch/default type: type?/word :target [
-						function! [[ (:target) quote (:value) ]]
-						word!     [[ (to set-word! target) quote (:value) ]]
+					switch/default type: type?/word :target [
+						function! [append data/init (target :value)]
+						word!     [append data/init compose [(to set-word! target) (quote? :value) (:value)]]
 					] fail
 				]
 				'else [return false]
@@ -436,9 +447,9 @@ VID/dialect: classy-object [
 			value [default!]
 		][
 			;; by design, word= adds a new facet to space, while some/path= doesn't add it
-			data/init << switch type?/word facet [
-				word! [[ (to set-word! facet) quote (:value) ]]
-				path! [[ VID/set-facet self (as lit-path! facet) quote (:value) ]]
+			append data/init compose switch type?/word facet [
+				word! [[ (to set-word! facet) (quote? :value) (:value) ]]
+				path! [[ VID/set-facet self (as lit-path! facet) (quote? :value) (:value) ]]
 			]
 		]
 		
@@ -532,8 +543,8 @@ VID/dialect: classy-object [
 			facets:   [
 				flag     [flag-facet: on]
 				string!  text-facet
-				integer! @(f: func [i][num-facet: i])
-				param    @(g: func [x][any-facet: x])
+				integer! @(func [i][compose [num-facet: (i)]])
+				param    @(func [x][compose [any-facet: (x)]])
 			]
 		]
 	]
@@ -551,7 +562,7 @@ VID/dialect: classy-object [
 	single? pane
 	pane/1/init = reshape [
 		test: quote test
-		VID/set-facet self 'deep/facet quote @[pi]
+		VID/set-facet self 'deep/facet @[pi]
 	]
 	
 	pane: parse-pane [test test= style] extra					;-- shouldn't take style for a keyword
@@ -560,12 +571,12 @@ VID/dialect: classy-object [
 	
 	pane: parse-pane [test "abc" ('flag) with [a: 'b] (1 + 2) param 1.23] extra
 	single? pane
-	pane/1/init = reshape [										;-- facets should be ordered
-		text-facet: quote "abc"
+	pane/1/init = [												;-- facets should be ordered
+		text-facet: "abc"
 		flag-facet: on
 		a: 'b
-		@(:f) quote 3
-		@(:g) quote 1.23
+		num-facet: 3
+		any-facet: 1.23
     ]
 	
 	pane: parse-pane [style test1: test 5 test1] extra
@@ -583,8 +594,12 @@ VID/dialect: classy-object [
 	pane/1/label = 'test
 	pane/1/name  = 'test
 	pane/1/pane  = [test]
-	pane/1/init  = [text-facet: quote "10"]
-	pane/1/style/init = compose [num-facet: 0 (:f) quote 4 (:f) quote 5]
+	pane/1/init  = [text-facet: "10"]
+	pane/1/style/init = [
+		num-facet: 0
+		num-facet: 4
+		num-facet: 5
+	]
 	
 	test: style: 'hacked
 	pane: parse-pane [style test: test test] extra				;-- external words shouldn't affect VID/S behavior
