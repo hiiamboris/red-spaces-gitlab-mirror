@@ -27,6 +27,7 @@ VID: classy-object [
 	set-facet:        none
 	set-color:        none
 	set-limits:       none
+	facet-func:       none
 	
 	dialect:          none
 	
@@ -163,6 +164,15 @@ VID/set-limits: function [
 ][
 	;@@ maybe limits should always be in config?
 	space/config: remake copy/deep space/config [limits: (limits)]	;@@ fix /owners
+]
+	
+->: make op! VID/facet-func: function [
+	"Make a function that reshapes its result (useful for VID facets)"
+	spec    [block! word!]
+	code    [block!]
+	return: [function!]
+][
+	function compose [(spec)] compose/only [reshape (code)]
 ]
 	
 	
@@ -543,8 +553,8 @@ VID/dialect: classy-object [
 			facets:   [
 				flag     [flag-facet: on]
 				string!  text-facet
-				integer! @(func [i][compose [num-facet: (i)]])
-				param    @(func [x][compose [any-facet: (x)]])
+				integer! @('i -> [num-facet: @(i)])
+				param    @('x -> [any-facet: @(x)])
 			]
 		]
 	]
