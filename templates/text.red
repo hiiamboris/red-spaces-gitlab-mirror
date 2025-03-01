@@ -144,8 +144,11 @@ declare-template 'text [
 				ellipsis-location: max 0 as-point2D layout/size/x - ellipsis-width last-line-dy - 1
 				last-visible-char: -1 + offset-to-char layout ellipsis-location
 				
-				if wrapped? [
-					;; last word may have been wrapped to the next line, so we should keep part of it that fits before the ellipsis
+				;; last word may have been wrapped to the next line, so we should keep part of it that fits before the ellipsis
+				if all [
+					wrapped?
+					layout/text/(1 + last-visible-char) <> lf	;-- if wrapping is due to linefeed, can't go past it
+				][
 					last-visible-char-xy:  caret-to-offset       layout last-visible-char
 					last-visible-char-dxy: caret-to-offset/lower layout last-visible-char
 					width-to-fill: ellipsis-location/x - last-visible-char-xy/x - space-width
@@ -155,8 +158,9 @@ declare-template 'text [
 					]
 				]
 				
+				;; have to copy the text every time it is ellipsized - big slowdown :(
 				new-text: copy/part layout/text last-visible-char + 1
-				change top new-text "…"							;-- singular ellipsis runs no risk of spanning 2-3 lines
+				change top new-text "…"							;-- singular "…" runs no risk of spanning 2-3 lines, unlike "..."
 				quietly layout/text: new-text
 				text-size: size-text layout
 				#assert [(second caret-to-offset/lower layout length? new-text) <= limit/y  "ellipsis wrap detected"]
