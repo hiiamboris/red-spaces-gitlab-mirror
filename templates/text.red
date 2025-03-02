@@ -113,9 +113,8 @@ declare-template 'text [
 			text-size: size-text layout							;-- result is affected by para/wrap+size/x but may exceed the layout/size
 			nlines:    rich-text/line-count? layout
 			limit:     tolerance + layout/size
-			wrapped?:  text-size/x <= limit/x
 			if all [
-				wrapped?
+				text-size/x <= limit/x
 				any [
 					text-size/y <= limit/y
 					nlines <= 1
@@ -146,7 +145,7 @@ declare-template 'text [
 				
 				;; last word may have been wrapped to the next line, so we should keep part of it that fits before the ellipsis
 				if all [
-					wrapped?
+					wrapped?: select layout/para 'wrap?
 					layout/text/(1 + last-visible-char) <> lf	;-- if wrapping is due to linefeed, can't go past it
 				][
 					last-visible-char-xy:  caret-to-offset       layout last-visible-char
