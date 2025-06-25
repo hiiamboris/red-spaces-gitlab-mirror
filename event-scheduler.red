@@ -244,7 +244,7 @@ scheduler: context [
 		none											;-- the event can be processed by other handlers
 	]
 
-	#assert [1408855348 = checksum trim/lines native-mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
+	#assert [-88165386 = checksum trim/lines native-mold body-of :do-events 'crc32  "Warning: do-events was likely modified"]
 	
 	event-loop-depth: 0									;@@ used to work around #5377
 	set 'do-events function spec-of native-do-events: :do-events [
@@ -254,6 +254,8 @@ scheduler: context [
 				[print thrown]
 			native-do-events/no-wait
 		][
+			;@@ the logic here must be synced with native do-events, but it doesn't look sound 
+			;@@ see https://github.com/red/red/commit/c8713b65604ea3d9906be1abdc557bc73bcbf464 comments
 			;; 'head' to account for GUI console which enters event loop too:
 			if window: last head system/view/screens/1/pane [	;@@ what if windows were reordered?
 				#assert [window/state]
