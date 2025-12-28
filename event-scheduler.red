@@ -198,6 +198,7 @@ scheduler: context [
 		mid-down?: #(false)
 		alt-down?: #(false)
 	]
+	auto-tracked: exclude words-of tracked [offset]		;@@ workaround for #5670: /offset reported as none on GTK
 	
 	track-event: function [
 		"Stash event flags internally"
@@ -207,10 +208,12 @@ scheduler: context [
 			over wheel down up click dbl-click 
 			alt-down alt-up mid-down mid-up aux-down aux-up
 			key-down key key-up [						;-- pointer & key events correctly carry all the flags
-				foreach [word _] tracked [				;-- extend can't be used or will include unwanted fields
+				foreach word auto-tracked [				;-- extend can't be used or will include unwanted fields
 					tracked/:word: event/:word 
 				]
-				tracked/offset: face-to-screen tracked/offset event/face
+				if event/offset [						;@@ workaround for #5670: /offset reported as none on GTK
+					tracked/offset: face-to-screen event/offset event/face
+				]
 			]
 		]
 		event
