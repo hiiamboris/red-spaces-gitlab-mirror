@@ -382,17 +382,18 @@ in-out-func: function [spec [block!] body [block!]] [
 
 include-into: function [
 	"Include flag into series if it's not there"
-	series [series!] flag [any-type!]
+	series [series!] flag [any-type!] /same
 ][
-	unless find/only series :flag [append/only series :flag]
+	unless find/only/:same series :flag [append/only series :flag]
 	series
 ]
 
 exclude-from: function [
 	"Exclude flag into series if it's there"
-	series [series!] flag [any-type!]
+	series [series!] flag [any-type!] /same
+	
 ][
-	remove find/only series :flag
+	remove find/only/:same series :flag
 	series
 ]
 
