@@ -222,7 +222,7 @@ context [
 	]
 	
 	insert-event-func 'spaces-focus-tracker filtered-event-func [face event] [
-		[down alt-down mid-down aux-down dbl-click focus unfocus]
+		[down alt-down mid-down aux-down dbl-click focus]		;-- 'unfocus' here doesn't make sense given focus-checker logic
 		focus-checker face event
 		none
 	]
