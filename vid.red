@@ -294,7 +294,7 @@ VID: context [
 	
 	lay-out-grid: function [
 		"Turn Grid specification block into a code block"
-		spec [block!] "Same as VID/S, with `as pair!` / `as range!` support"
+		spec [block!] "Same as VID/S, with `at pair!` / `at range!` support"
 		/styles sheet [map! none!] "Add custom stylesheet to the global one"
 		/local x
 	][
