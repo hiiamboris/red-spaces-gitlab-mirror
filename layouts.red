@@ -1037,10 +1037,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
 			if count <= 0 [return copy/deep [size: (0,0) map: []]]	;-- empty layout optimization
-			foreach word settings [						;-- free settings block so it can be reused by the caller
-				#assert [:self/create =? context? bind word 'local]
-				set bind word 'local get word
-			]
+			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#debug [typecheck [
 				angle  [linear! none!]
 				radius [linear!] (0 <= radius)
