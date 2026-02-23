@@ -66,7 +66,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
 			#assert [any [count length]]				;-- this layout only supports finite number of items or limited length
 			default count: 1.#inf
-			if count <= 0 [return reduce [margin * 2 copy []]]	;-- empty list optimization
+			if count <= 0 [return compose/deep [size: (margin * 2) map: []]]	;-- empty list optimization
 			#debug [typecheck [
 				axis     [word! (find [x y] axis)]
 				margin   [planar! (0x0 +<= margin)]
@@ -282,8 +282,8 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [size: 0x0 map: []]]
 			import-settings settings 'local				;-- free settings block so it can be reused by the caller
+			if count <= 0 [return compose/deep [size: (margin * 2) map: []]]
 			#debug [typecheck [
 				axes     [
 					block! (
@@ -1036,7 +1036,7 @@ layouts: make map! to block! context [					;-- map can be extended at runtime
 		][
 			func?: function? :spaces
 			count: either func? [spaces/size][length? spaces]
-			if count <= 0 [return copy/deep [(0,0) []]]	;-- empty layout optimization
+			if count <= 0 [return copy/deep [size: (0,0) map: []]]	;-- empty layout optimization
 			foreach word settings [						;-- free settings block so it can be reused by the caller
 				#assert [:self/create =? context? bind word 'local]
 				set bind word 'local get word
