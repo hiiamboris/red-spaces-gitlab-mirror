@@ -20,6 +20,8 @@ into-map: function [
 		xy: either geom: select/same/only map child [xy - geom/offset][(0,0)] 
 		reduce [child xy]
 	][
+		;@@ foreach here is not applicable in case of intersecting spaces: must be foreach/reverse
+		;@@ since map is ordered in drawing order, last drawn space is 'on top' so it must catch the point first
 		either list [
 			foreach child list [
 				box: select/same map child
