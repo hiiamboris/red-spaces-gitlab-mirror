@@ -1269,7 +1269,7 @@ distribute: function [
 	
 	result: append/dup make block! count amount * 0 count
 	if sum-weights <= 0 [return result]
-	sort/skip/compare data 3 3
+	sort/stable/skip/compare data 3 3
 	
 	left: 1.0 * amount
 	foreach [i weight slice] data [
@@ -1294,6 +1294,7 @@ distribute: function [
 	[ 33  33  34] == distribute 100 [1  1   1] [2e9 2e9 2e9]
 	[ 33  33  34] == distribute 100 [1  1   1] [#(none) #(none) #(none)]
 	[  0 100   0] == distribute 100 [0  1   0] [2e9 2e9 2e9]
+	[ 34  34  32] == distribute 100 [1  1   1] [2e9 2e9  32]
 	[ 33  34  33] == distribute 100 [1  1   1] [2e9 2e9  33]
 	[  1   2   3] == distribute 100 [1  1   1] [  1   2   3]
 	[ 33  33  33] == distribute 100 [1 10 100] [ 33  33  33]
