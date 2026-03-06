@@ -214,6 +214,7 @@ define-handlers [
 		on-over [space path event] [
 			unless all [
 				drag-path
+				dragging?/from space/content					;-- ignore drags of the scrollbars
 				found: find/reverse/same next drag-path space	;-- dragging from inside of this list-view, maybe from the item
 				multi?: space/behavior/selectable = 'multi
 			] [exit]
