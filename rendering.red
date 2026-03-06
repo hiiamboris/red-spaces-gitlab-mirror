@@ -120,7 +120,7 @@ context [
 		
 		thrown: try/all [do code  ok?: yes]				;-- result is ignored for simplicity
 		unless ok? [
-			msg: form/part thrown 1000					;@@ should be formed immediately - see #4538
+			msg: form/part thrown 10000					;@@ should be formed immediately - see #4538
 			#print "*** Failed to render (space/type)!^/(msg)^/"
 		]
 		;@@ would be great to use trap here instead, but it slows down cached renders obviously
