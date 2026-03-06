@@ -2261,7 +2261,7 @@ inf-scrollable-ctx: context [
 		; ?? [wofs wofs' window/origin space/origin before after wsize viewport]
 		if wofs' <> wofs [
 			;; effectively viewport stays in place, while underlying window location shifts
-			#debug sizing [#print "sliding (space-id space) with (space/content) by (wofs' - wofs)"]
+			#debug slides [#print "sliding (space-id space) with (space-id space/content) by (wofs' - wofs)"]
 			space/origin: space/origin + (wofs' - wofs)	;-- may be watched (e.g. by grid-view)
 			window/origin: negate wofs'					;-- invalidates both scrollable and window
 			wofs' - wofs								;-- let caller know that slide has happened
@@ -2500,6 +2500,7 @@ list-view-ctx: context [
 			(abs anchor/offset) > half window/size/:y
 			not moved: inf-scrollable-ctx/slide lview
 		] [return none]
+		#debug slides [#print "post-slide adjustment of (space-id lview)..."]
 		
 		;; change anchor to first or last (still visible) item, depending on the slide direction
 		xy2: window/size + xy1: negate window/origin	;-- new window box inside list map
