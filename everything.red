@@ -34,6 +34,7 @@ do/expand [
 		; #debug set changes							;-- turn on to see value changes and invalidation
 		; #debug set cache 								;-- turn on to see what gets cached (can be a lot of output)
 		; #debug set sizing 							;-- turn on to see how spaces adapt to their canvas sizes
+		; #debug set slides 							;-- turn on to see window slide events
 		; #debug set focus								;-- turn on to see focus changes and errors
 		; #debug set events								;-- turn on to see what events get dispatched by hosts
 		; #debug set popups								;-- turn on to see popups show/hide events
