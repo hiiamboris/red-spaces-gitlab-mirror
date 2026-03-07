@@ -46,6 +46,7 @@ view/no-wait/options [
 				if depth < max-depth [
 					depth: depth + 1
 					r: old-draw/on canvas fill-x fill-y
+					; r: trace/deep [old-draw/on canvas fill-x fill-y]
 					depth: depth - 1
 					if depth > 0 [
 						zx: cell-size/x / size/x
