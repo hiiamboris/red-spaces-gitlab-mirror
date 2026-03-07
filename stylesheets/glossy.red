@@ -278,8 +278,8 @@ context with spaces/ctx [
 		field/text/caret: function [self] [
 			maybe self/width: 1
 			compose/deep [
-				pen w1 fill-pen w3
 				shape [
+				pen w1 fill-pen w3
 					move -3x0 'line 3x4 3x-4
 					move (self/size/y * 0x1 + -3x-1) 'line 3x-4 3x4
 				]
