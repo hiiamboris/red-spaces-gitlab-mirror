@@ -35,9 +35,9 @@ view/no-wait/options [
 		]
 	]
 	on-over [
-		status/text: mold hittest face/space event/offset
+		loop 100 [status/text: mold hittest face/space event/offset]
 	]
-	status: text 300x40
+	status: text cyan 300x40
 	rate 3 on-time [
 		counter: counter + 1
 		angle: pick [0 -13 -20 -13 0 13 20 13] counter % 8 + 1
