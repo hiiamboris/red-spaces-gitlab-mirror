@@ -48,7 +48,7 @@ hittest: function [
 	space [object! (space? space) block! path!]
 		"Top space in the tree (host/space usually), or path of spaces to follow"
 		;; path/block is required for dragging, as we need to follow the same path as at the time of click
-	xy [planar!] "Point in that top space"
+	xy [planar!] (xy == xy) "Point in that top space"	;-- nan check for both coordinates
 	/into "Append into a given buffer"
 		path: (make [] 16) [block! path!]
 ][

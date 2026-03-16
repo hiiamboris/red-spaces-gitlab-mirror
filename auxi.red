@@ -760,7 +760,7 @@ context [
 	set 'reproject function [
 		"Find value Y=F(X) given X on a non-decreasing function"
 		fun [object!] "Indexed function as a sequence of points [X1 Y1 ... Xn Yn]"
-		x   [number!] "X value"
+		x   [number!] "X value" (not nan? x)
 		/up       "If Y is not unique, return highest corresponding value (default: lowest)"
 		/inverse  "Given Y find an X"
 		/truncate "Convert result to integer"

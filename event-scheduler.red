@@ -212,6 +212,7 @@ scheduler: context [
 					tracked/:word: event/:word 
 				]
 				if event/offset [						;@@ workaround for #5670: /offset reported as none on GTK
+					#assert [event/face/offset == event/face/offset  "face offset is NaN!"]
 					tracked/offset: face-to-screen event/offset event/face
 				]
 			]
