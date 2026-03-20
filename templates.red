@@ -1487,7 +1487,11 @@ rich-paragraph-ctx: context [							;-- rich paragraph
 	]
 		
 	;; /map is kept in 1D space, so /into is required for translation from 2D
-	into: function [space [object!] xy [planar!] child [object! none!]] [
+	into: function [
+		space [object!]
+		xy    [planar!] (xy == xy)						;-- nan check for both coordinates
+		child [object! none!]
+	][
 		unless frame: space/frame [return none]
 		;; /frame holds rows data as well alignment and margin used to draw these rows
 		;; without it, there's a risk that /into could operate on changed facets not yet synced to rows
