@@ -100,7 +100,7 @@ view/no-wait/options/flags reshape [
 		;; render immediately, not waiting for the timer - to reduce the visible lag:
 		host/draw: render host
 		if host/parent [show host/parent]
-	]
+	]; rate 30 on-time [block/offset: block/offset - 2x0]
 	do [block/offset: host/size + 20]
 ][
 	offset: 0x0
