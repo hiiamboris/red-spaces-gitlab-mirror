@@ -204,7 +204,7 @@ context [
 		; #print "checking focus for (face/type):(face/size)"
 		;; focus host on clicks before all other events
 		new-focal-face: either host? face
-			[event/window/selected: face]
+			[maybe/same event/window/selected: face]			;@@ 'maybe' is important to avoid event stack overflow on GTK
 			[event/window/selected]
 		old-focal-face: all [
 			focus/current
