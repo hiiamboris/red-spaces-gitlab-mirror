@@ -203,6 +203,7 @@ VID: context [
 			;; render generation number, used to detect live spaces (0 = never rendered):
 			generation: 0.0						#type =  [float!]
 			queue:      make hash! 200			#type    [hash! block!]	;-- queued events to process
+			modify queue 'owned none					;-- otherwise every appended value triggers a 'redraw and deadlocks GTK
 		]]
 	]
 	

@@ -232,6 +232,7 @@ scheduler: context [
 	]
 	
 	queue-event: function [host event [map!]] [
+		#assert [none = reflect host/queue 'owned  "every change to host queue will trigger a redraw!"]
 		append shared-queue host
 		append append host/queue groups/(event/type) event
 	]
