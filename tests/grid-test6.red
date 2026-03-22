@@ -99,7 +99,7 @@ view/no-wait/options expand-directives [
 							append clear r old-draw/on canvas fill-x fill-y
 							#debug profile [prof/manual/start 'truncation]
 							; r: copy-deep-limit r 39				;-- 3 levels - 15625 grids
-							r: copy-deep-limit r 26				;-- 2 levels - 625 grids
+							r: copy-deep-limit r 30				;-- 2 levels - 625 grids
 							#debug profile [prof/manual/end 'truncation]
 						]
 						depth: depth - 1
