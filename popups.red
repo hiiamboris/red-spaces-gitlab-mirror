@@ -198,11 +198,12 @@ popups: context [
 		offset  [planar!]
 		/owner parent  [object!] "Space or face object; owner is not hidden"
 		/in    window  [object!] "Specify parent window (defaults to focus/window)"
-		/title heading [string!] "Provide a heading string for the menu" 
+		; /title heading [string!] "Provide a heading string for the menu" 
 		;@@ maybe also a flag to make it appear above the offset?
 	][
 		host: make-face/spec 'host [rate 25]			;-- reduced timer pressure
-		render host/space: lay-out-menu/:title menu heading
+		; render host/space: lay-out-menu/:title menu heading
+		render host/space: lay-out-menu menu
 		either radial?: has-flag? :menu/1 'radial [		;-- radial menu is centered
 			offset: offset + host/space/content/origin
 			host/color: svmc/panel + 0.0.0.254			;-- radial menu is transparent but should catch clicks that close it
