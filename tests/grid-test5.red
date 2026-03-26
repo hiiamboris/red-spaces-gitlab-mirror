@@ -9,7 +9,7 @@ Red [
 ;; each invalidation will have to traverse the whole tree, slowing it down significantly
 ;; (because the same space appears on it thousands of times)
 ;; and nothing can be cached anyway as all cells are unique and thus form unique branches
-#do [disable-space-cache?: yes]
+; #do [disable-space-cache?: yes]
 
 #include %../everything.red
 
@@ -39,6 +39,7 @@ view/no-wait/options [
 			]
 			depth: 0
 			old-draw: :draw
+			cache: none
 			draw: function [/on canvas fill-x fill-y /extern depth] [
 				r: []
 				;-- this gets quite slow to render :)
