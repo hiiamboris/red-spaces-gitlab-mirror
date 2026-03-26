@@ -5,18 +5,6 @@ Red [
 	needs:   view
 ]
 
-{
-	Draw is the bottleneck of this test - see #5130
-	22M draw file, 2666 clip commands (~30% spent on clipping)
-	
-	<4>      0%      .47   ms       1'877 B [timers]
-	<2>      0%     1.03   ms      26'868 B [fps-meter]
-	<6>      0%      .167  ms       2'273 B [render]
-	<4>     100%  466      ms      17'610 B [drawing]
-	<2>      0%     0      ms       1'102 B [zoomer]
-	CPU load of profiled code: 100%
-}
-
 ; #do [disable-space-cache?: yes] 
 #include %../everything.red
 
@@ -28,8 +16,8 @@ Red [
 copy-deep-limit: function [b n] [
 	if negative? n: n - 1 [return []]
 	p: b: copy b
-	while [p: find/tail p block!] [
-		change/only back p copy-deep-limit p/-1 n
+	while [p: find p block!] [
+		p: change/only p copy-deep-limit p/1 n
 	]
 	b
 ]
