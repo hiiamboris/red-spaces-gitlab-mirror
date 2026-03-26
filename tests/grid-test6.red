@@ -27,10 +27,9 @@ Red [
 
 copy-deep-limit: function [b n] [
 	if negative? n: n - 1 [return []]
-	b: copy b
-	forall b [
-		unless block? :b/1 [continue]
-		change/only b copy-deep-limit b/1 n
+	p: b: copy b
+	while [p: find/tail p block!] [
+		change/only back p copy-deep-limit p/-1 n
 	]
 	b
 ]
@@ -86,6 +85,7 @@ view/no-wait/options expand-directives [
 							scale (cell-size/x / max 1 gview/size/x) (cell-size/y / max 1 gview/size/y) (drawn)
 						]
 					]
+					; cache: none
 					old-draw: :draw
 					;; this calls draw recursively and creates a self-containing draw block
 					;; but at the top level it is clipped at certain depth level,
@@ -100,6 +100,11 @@ view/no-wait/options expand-directives [
 							#debug profile [prof/manual/start 'truncation]
 							; r: copy-deep-limit r 39				;-- 3 levels - 15625 grids
 							r: copy-deep-limit r 26				;-- 2 levels - 625 grids
+							; r: copy-deep-limit r 42
+							; r: copy-deep-limit r 30
+							; r: copy-deep-limit r 19
+							; r: copy-deep-limit r 18
+							; r: copy/deep copy-deep-limit r 18
 							#debug profile [prof/manual/end 'truncation]
 						]
 						depth: depth - 1
@@ -119,7 +124,7 @@ view/no-wait/options expand-directives [
 		z/zoom/x: exp (1 * elapsed) // log-e (gv/size/x / gv/cell-size/x)
 		z/zoom/y: z/zoom/x * (gv/size/y / gv/cell-size/y) / (gv/size/x / gv/cell-size/x)
 		invalidate/only gv	;-- may not see 'z' as parent because of overrides
-		invalidate/only z
+		invalidate z
 	]
 ] [offset: 10x10]
 prof/show
