@@ -14,10 +14,9 @@ spaces/templates/cell/margin: 0x0
 
 copy-deep-limit: function [b n] [
 	if negative? n: n - 1 [return []]
-	b: copy b
-	forall b [
-		unless block? :b/1 [continue]
-		change/only b copy-deep-limit b/1 n
+	p: b: copy b
+	while [p: find p block!] [
+		p: change/only p copy-deep-limit p/1 n
 	]
 	b
 ]
@@ -85,8 +84,9 @@ view/no-wait/options [
 									(r)
 								]
 							]
+							130
 							; 100
-							52
+							; 52
 							; 40
 							; 28
 					]
