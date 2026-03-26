@@ -256,7 +256,7 @@ events: context [
 	dispatch: function [face [object!] event [map!] /local result /extern resolution last-on-time] [
 		focused?: no
 		with-stop [
-			#debug events [unless event/type = 'time [print ["dispatching" event/type "event from" face/type ":" face/size]]]
+			#debug events [if event/type <> 'time [#print "<- dispatching (event/type) event from (face/type):(face/size)"]]
 			; #debug events [print ["dispatching" event/type "event from" face/type]]
 			path: switch/default event/type [
 				over wheel up mid-up alt-up aux-up
@@ -299,7 +299,7 @@ events: context [
 						drawn: render face
 						#debug profile [prof/manual/end   'host]
 						#debug profile [prof/manual/start 'drawing]
-						face/draw: drawn							;@@ #5130 is the killer of animations (really fixed?)
+						face/draw: drawn						;@@ #5130 is the killer of animations (really fixed?)
 						; unless system/view/auto-sync? [show face]	;@@ or let the user do this manually?
 						#debug profile [prof/manual/end   'drawing]
 					]
