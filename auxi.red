@@ -1151,7 +1151,10 @@ enlarge: function [
 ;-- see REP #104, but this is still different: we don't care what context word belongs to, only it's spelling and value
 same-paths?: function [p1 [block! path!] p2 [block! path!]] [
 	to logic! all [
-		find/match/same as [] p1 as [] p2
+		any [
+			find/match/same as [] p1 as [] p2
+			tail? p2									;-- find always fails when second argument is empty (e.g. find [] [])
+		]
 		(length? p1) = length? p2
 	]
 ]
