@@ -122,18 +122,17 @@ scheduler: context [
 		]
 	
 		set 'process-next-event function [host [object!]] [
-			unless group-next-event host [
-				event: take-next-event host
-				#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
-				#debug focus  [if event/type = 'focus [#print "about to process (event/type) event for (host/type):(host/size)"]]
-				if 'drop <> catch [							;@@ should be fcatch, but it would be slower :/
-					foreach [_ filter] event-filters [filter host event]	;-- filters may call out-of-turn events/dispatch themselves
-					'ok
-				][
-					events/dispatch host event
-				]
-				finish-times/(event/type): now/utc/precise		;-- mark the end of processing of this event type
+			if group-next-event host [exit]
+			event: take-next-event host
+			#debug events [if event/type <> 'time [#print "about to process (event/type) event for (host/type):(host/size)"]]
+			#debug focus  [if event/type = 'focus [#print "about to process (event/type) event for (host/type):(host/size)"]]
+			if 'drop <> catch [									;@@ should be fcatch, but it would be slower :/
+				foreach [_ filter] event-filters [filter host event]	;-- filters may call out-of-turn events/dispatch themselves
+				'ok
+			][
+				events/dispatch host event
 			]
+			finish-times/(event/type): now/utc/precise			;-- mark the end of processing of this event type
 		]
 		
 		set 'process-any-event function [/extern shared-queue] [	;-- must return true if processes
@@ -233,8 +232,49 @@ scheduler: context [
 	
 	queue-event: function [host event [map!]] [
 		#assert [none = reflect host/queue 'owned  "every change to host queue will trigger a redraw!"]
+		#debug events [if event/type <> 'time [#print "-> queueing a (event/type) event for (host/type):(host/size)"]]
 		append shared-queue host
 		append append host/queue groups/(event/type) event
+		if event/away? [work-around-5520]
+	]
+	
+	;@@ because of #5520 the logic here is somewhat complex:
+	;@@ there's a situation when over events get swapped as described in 5520: A A B A- B B
+	;@@ and there's a situation when the face disappears without away event:   A A A B
+	;@@ the goal here is to swap to A- and B when they are both adjacent in the queue (very highly likely case)
+	work-around-5520: function ["Bug #5520 workaround"] [
+		all [
+			2 <= length? shared-queue					;-- queue may not be at its head, so the other checks don't guarantee this
+			other-host:  pick between: top shared-queue -1
+			other-event: last other-host/queue
+			other-event/type = 'over
+			not other-event/away?
+			swap back between between
+		]
+	]
+	
+	list-queue: function ["Get a linearized copy of the current event queue"] [
+		queue:  make block! 8
+		queues: make hash!  4							;-- needs to modify host/queue offset, so it's cached here
+		foreach host shared-queue [
+			either entry: find/only/same/skip queues host 2
+				[entry/2: entry/2 + 2]
+				[repend entry: tail queues [host 2]]
+			append queue pick host/queue entry/2
+		]
+		queue
+	]
+	
+	dump-queue: function [] [
+		formed: clear {}
+		foreach event queue: list-queue [
+			host:     event/face
+			host-id: `"(host/type):(host/size)/(select host/space 'type)"`
+			event-id: uppercase form event/type
+			if event/away? [append event-id "/away"]
+			append formed `"(event-id)@(host-id) "`
+		]
+		#print "event queue (length? queue): (formed)"
 	]
 	
 	;; sometimes this gets window as 'host', likely when no face is in focus
