@@ -5,7 +5,7 @@ Red [
 	license:     BSD-3
 ]
 
-;-- no load requirements
+;-- requires scheduler to assign a filter
 
 ;@@ for this design to work, all /into funcs must accept (return none) spaces that are no longer their children!
 
