@@ -473,6 +473,14 @@ zip: function [
 	"1-3-"          = zip "13" #"-"
 ]
 
+delimit: function [
+	"Insert VALUE between all items of the SERIES"
+	series [any-list!]
+	value  [any-type!]
+][
+	interleave/between series :value
+]
+
 ;@@ make a REP with this? (need use cases)
 ;@@ this is no good, because it treats paths as series
 native-swap: :system/words/swap
