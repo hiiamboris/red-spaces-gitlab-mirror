@@ -504,7 +504,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 			]
 			if offset > 0 [
 				append log/source entry: make-space 'log-entry []
-				invalidate parent
+				trigger 'log/source
 				render host-of parent							;@@ required by set-focus atm :(
 			]
 			return none											;-- don't append when going up
