@@ -4,7 +4,7 @@ Red [
 	license: BSD-3
 	notes: {
 		Features:
-		- columns can be resized by dragging area between column headers (very slow :/)
+		- columns can be resized by dragging area between column headers
 		- columns can be reordered by Alt+dragging column headers
 		- columns can be shown/hidden from the right-click menu on any column header
 		- table can be sorted by any column in descending or ascending order using arrow buttons in the column header
