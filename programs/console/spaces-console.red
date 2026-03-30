@@ -522,6 +522,14 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		entry
 	]
 	
+	hint: function [
+		"Change the text of the hint"
+		text [string!]
+	][
+		hints/text: rejoin ["Hint: " text]
+		hints/primed: now
+	]
+	
 	
 	;; *************************************************
 	;; **              U I    E V E N T S             **
@@ -534,6 +542,10 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 				~/log-modified?: yes							;-- turn on next log save
 				case [
 					all [event/ctrl? event/key = #"L"] [clear-log]
+					all [event/ctrl? event/key = #"A"] [
+						batch log [move-cursor 'far-head select-range 'far-tail]
+						hint "<Ctrl+C> to copy selected entries, <Del> to remove" 
+					]
 					all [										;-- for removing selected log rows
 						event/key = 'delete
 						empty? event/flags
@@ -542,6 +554,14 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 							unless single? log/source [remove at log/source i]	;-- don't remove the last entry
 						]
 						trigger 'log/source
+					]
+					find [up down] event/key [
+						case [
+							event/flags = [shift]
+								[hint "<Ctrl+C> to copy selected entries, <Del> to remove"]
+							empty? event/flags
+								[hint "<Enter> to edit selected entry"]
+						]
 					]
 				]
 				do-hooks/with 'on-log-key-down reduce [space path event]
@@ -553,6 +573,9 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 					i: space/cursor
 					entry: pick space/source i
 					into-editor entry
+					hint either (length? entry/rows/input/content) <= 1
+						["<Enter> to evaluate"]
+						["<Ctrl+Enter> to evaluate multiline input"]
 				]
 				do-hooks/with 'on-log-key reduce [space path event]
 			]
@@ -607,16 +630,26 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 					bare?: empty? event/flags
 					switch event/key [
 						#"^M" #"^/" [							;@@ see #5525 - both represent Enter key
-							 if any [
+							 either any [
 							 	all [bare? (length? space/content) <= 1]	;-- enter key evaluates single-line
 							 	event/flags = [control]						;-- ctrl-enter evaluates anything
 							 ] [
+							 	if bare? [hint "<Shift+Enter> to enter multiline editing"]
 								evaluate-since space
 								into-adjacent-entry get-last-entry 1
 								stop/now
+							] [
+								if all [bare? (length? space/content) > 1] [
+									hint "<Ctrl+Enter> to evaluate multiline input"
+								]
 							]
 						]
-						#"^[" [if bare? [set-focus above space 'log]]	;-- esc key focuses the log
+						#"^[" [
+							if bare? [							;-- esc key focuses the log
+								set-focus above space 'log
+								hint "<Up>/<Down> to navigate, hold <Shift> to select multiple entries"
+							]
+						]
 					]
 					do-hooks/with 'on-editor-key reduce [space path event]
 				]
@@ -641,19 +674,26 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	;; **        I N I T I A L I Z A T I O N          **
 	;; *************************************************
 	
-	log: host: none												;-- keep these in context, not global (assigned in view)
+	log: host: hints: none										;-- keep these in context, not global (assigned in view)
 
 	terminal: none
 	
-	init-terminal: function ["Createconsole REPL window" /extern host log] [	;-- should be called after plugins are loaded
+	init-terminal: function ["Create the REPL window" /extern host log hints] [	;-- should be called after plugins are loaded
 		~/terminal: layout/flags/options reshape [
 			title @(`"Spaces Console 🚀 (#do keep [now/date])"`) 
 			on-resize :on-terminal-resize on-resizing :on-terminal-resize
 			on-move   :on-terminal-move   on-moving   :on-terminal-move
 			origin 2x2
-			host: host with [size: ~/state/size - 4 rate: 34] [		;-- decreased rate for less resource usage
-				log: log multi-selectable source= lay-out-vids [log-entry] 
-				rate= 0:0:3 on-time [preserve-log preserve-state maybe-update]
+			below
+			host: host with [size: ~/state/size - 4] rate 34 [	;-- decreased rate for less resource usage
+				column [
+					log: log multi-selectable source= lay-out-vids [log-entry] 
+					rate= 0:0:3 on-time [preserve-log preserve-state maybe-update]
+					hints: paragraph "Welcome to Spaces Console!" weight= 0 primed= now
+					rate= 3 on-time [							;@@ slow one-off timers would be a nice fit here
+						if 0:0:5 < difference now space/primed [space/text: copy ""]
+					]
+				]
 			]
 		] 'resize [offset: ~/state/offset]
 	]
