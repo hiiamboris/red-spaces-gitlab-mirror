@@ -497,20 +497,28 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 	][
 		if 'log-entry <> class? entry [entry: above entry 'log-entry]
 		parent: entry/parent
-		any [
+		entry: any [
+			;; attempt to find an existing entry in given direction:
 			all [
 				there: apply 'find [log/source entry /same on /tail offset > 0]
-				entry: pick there offset
+				pick there offset
 			]
-			if offset > 0 [
+			;; if that fails, in positive direction an entry can be created:
+			;; (but only allow it if the current entry isn't empty)
+			if all [
+				offset > 0
+				not empty? entry/rows/input/get-text
+			] [
 				append log/source entry: make-space 'log-entry []
 				trigger 'log/source
 				render host-of parent							;@@ required by set-focus atm :(
+				entry
 			]
-			return none											;-- don't append when going up
 		]
-		into-editor entry
-		batch log [frame/move-to/before length]
+		if entry [
+			into-editor entry
+			batch log [frame/move-to/before length]
+		]
 		entry
 	]
 	
