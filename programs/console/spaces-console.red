@@ -630,11 +630,21 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 					bare?: empty? event/flags
 					switch event/key [
 						#"^M" #"^/" [							;@@ see #5525 - both represent Enter key
-							 either any [
-							 	all [bare? (length? space/content) <= 1]	;-- enter key evaluates single-line
-							 	event/flags = [control]						;-- ctrl-enter evaluates anything
-							 ] [
-							 	if bare? [hint "<Shift+Enter> to enter multiline editing"]
+							multiline?: (length? space/content) > 1
+							either any [
+								event/flags = [control]			;-- ctrl-enter forces evaluation
+								all [							;-- plain enter key evaluates when:
+									bare?
+									any [
+										not multiline?					;-- it's a single line OR
+										batch space [here = length]		;-- caret at the end of input
+									]
+									row: above space 'log-row
+									text: row/get-text
+									attempt [transcode text]			;-- text is loadable without errors
+								]
+							] [
+							 	if all [bare? not multiline?] [hint "<Shift+Enter> to enter multiline editing"]
 								evaluate-since space
 								into-adjacent-entry get-last-entry 1
 								stop/now
