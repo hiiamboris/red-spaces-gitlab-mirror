@@ -604,15 +604,19 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 				]
 				on-key [space path event] [
 					~/log-modified?: yes						;-- turn on next log save
-					if empty? event/flags [ 
-						switch event/key [
-							#"^M" [								;-- enter key evaluates
+					bare?: empty? event/flags
+					switch event/key [
+						#"^M" #"^/" [							;@@ see #5525 - both represent Enter key
+							 if any [
+							 	all [bare? (length? space/content) <= 1]	;-- enter key evaluates single-line
+							 	event/flags = [control]						;-- ctrl-enter evaluates anything
+							 ] [
 								evaluate-since space
 								into-adjacent-entry get-last-entry 1
 								stop/now
 							]
-							#"^[" [set-focus above space 'log]	;-- esc key focuses the log
 						]
+						#"^[" [if bare? [set-focus above space 'log]]	;-- esc key focuses the log
 					]
 					do-hooks/with 'on-editor-key reduce [space path event]
 				]
