@@ -25,6 +25,8 @@ system/script/header: [											;@@ workaround for #4992
 	arguments underlining?
 	show word context on hover
 	
+	printing: works 100% when compiled; interpreted version is hacky and cannot capture the output of View errors!
+	
 	;@@ somewhere on the horizon:
 	paragraph grouping/structuring... -> step tracing
 	Red inspector instead of mold output limiting
@@ -32,29 +34,46 @@ system/script/header: [											;@@ workaround for #4992
 		As with libraries and modules, we should be able to work at low levels, then step up a layer and make sub-assemblies, design interfaces to those, test them, include them in a project, along with custom data interface needs and viewers; organize those elements for high level understanding and business use cases, allowing each person or team to work with their own custom environment but also see how people are using them. So it's not just a pre-config'd cloud IDE container with your dependencies, but a stack of views you can navigate, collaborating with people above and below the technical level you focus on.	 
 }
 
-
+	
 #include %../../everything.red
 ; #do [disable-space-cache?: on]
 
-;; stash native print before console-on-demand overrides it
+#do [compiling?: to logic! any [rebol true = :inlining?]]
+
 spaces-console: context [
+	;; this is dyn-print's entry point - it has to be known at compile time
+	print-hook: function ["Console printing hook" str [string!] lf? [logic!]] [
+		;; but what it calls isn't defined yet...
+		do [system/console/do-print str lf?]
+	]
+	;; stash native print before console-on-demand overrides it
 	native-prin:  :system/words/prin
 	native-print: :system/words/print
 	#assert [native? :native-print]
 ]
 
-#if any [rebol true = :inlining?] [
+#if compiling? [
+	;; when compiling, 'print' can be fully extended using a dyn-print hook
+	#system [
+		dyn-print-hook-spaces: func [str [red-string!] lf? [logic!]] [
+			#call [spaces-console/print-hook str lf?]
+		]
+		dyn-print/add as int-ptr! :dyn-print-hook-spaces null
+	]
+
+	;; console-on-demand is only used during CLI args processing to display the help in the terminal
+	;; it overrides native 'print' which has to be restored/replaced later
 	#include %../../../cli/console-on-demand.red
 	#include %../../../red-src/red/environment/console/help.red	;-- for compiled access to help (already there if interpreted)
 ]
 #process off
 
-do/expand [ ;
-	#include %../../../cli/cli.red
-	#include %../../widgets/document.red
-	#include %../../../common/everything.red					;-- data-store is required, rest is there to make console more powerful
-]
-system/console: spaces-console: make spaces-console with spaces/ctx expand-directives [
+do/expand [
+#include %../../../cli/cli.red
+#include %../../widgets/document.red
+#include %../../../common/everything.red						;-- data-store is required, rest is there to make console more powerful
+	
+system/console: spaces-console: make spaces-console with spaces/ctx [
 	~: self
 	
 	size: 80x1000												;-- terminal size in chars; only /x is normally used (set by row-draw)
@@ -204,49 +223,65 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		"Outputs a value followed by a newline"
 		value [any-type!]
 	][
-		prin :value prin #"^/"
+		do-print :value yes
 	]
 	prin: function [
 		"Outputs a value"
 		value [any-type!]
 	][
+		do-print :value no
+	]
+	
+	do-print: function [
+		"General print handler for Spaces Console"
+		value [any-type!]
+		lf?   [logic!]
+	][
 		if attempt [get bind 'target :capture-output] [			;-- check if wrapped by capture-output
 			unless terminal/state [show-terminal]				;-- show on first print
-			if any-list? :value [
-				if block? :value [value: reduce value]
-				value: form value
-			]
+			if block? :value [value: reduce value]
+			value: form :value
+			if lf? [append value #"^/"]
 			feed-output :value
 		]
-		native-prin :value
+		#if not compiling? [native-prin :value]					;-- useful for redirecting output
+		exit
 	]
 	
 	;; this should only be called after console-on-demand's own overrides are no longer needed (print, quit)
 	fix-environment: function ["Adapt global natives and functions for console compatibility"] [
-		system/words/print: :print
-		system/words/prin:  :prin
+		#either compiling? [
+			;; when compiling, disable console-on-demand once UI is launched:
+			system/words/print: :native-print
+			system/words/prin:  :native-prin
+			#if not linux? [system/words/ensure-console: none]	;-- this part is decisive, as some C.O.D. prints are baked in
+		][
+			;; these hacks allow limited 'print' support when interpreting; not needed when compiling
+			;; (probe ? and ?? automatically work because they're redefined in Spaces)
+			system/words/print: :print
+			system/words/prin:  :prin
 		
-		;; compatibility layer for compiled print-using code:
-		;; (probe ? and ?? automatically work because they're redefined in Spaces)
-		reload-func: function [path [any-word! any-path!]] [
-			set path func spec-of get path body-of get path 
+			reload-func: function [path [any-word! any-path!]] [
+				set path func spec-of get path body-of get path 
+			]
+			foreach path [
+				system/reactivity/eval
+				system/lexer/tracer
+				system/words/clock
+				system/words/dump-reactions
+				system/words/profile
+				system/words/about
+			] [reload-func path]
+			system/tools/tracers/emit: :print
+			reload-func last body-of :system/words/parse-trace 
 		]
-		reload-func 'system/reactivity/eval
-		reload-func 'system/words/clock
-		reload-func 'system/words/dump-reactions
-		reload-func 'system/lexer/tracer
-		reload-func 'system/words/profile
-		reload-func 'system/words/about
-		system/tools/tracers/emit: :print
-		reload-func last body-of :system/words/parse-trace 
 
 		;; state autosave
 		system/words/q: system/words/quit: func spec-of :quit [
 			terminate any [status 0]
 		]
 	]
-	
-	
+		
 	;; *************************************************
 	;; **                     U I                     **
 	;; *************************************************
@@ -741,49 +776,72 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 	]
 	
-	startup: function ["CLI entry point"] [
-		repl: function [
-			"Advanced REPL for Red built on top of Spaces"
-			script [file! block!]
-			/reset "Run console with no state (use in case it's broken)"
-			/catch "If script is given, don't close after it finishes"
+	;@@ TODO: untangle/rewrite this to allow spawning multiple consoles
+	repl: function [
+		"Start a new Spaces Console"
+		script [file! block!]
+		/reset "Run console with no state (use in case it's broken)"
+		/catch "If a script is given, don't close after it finishes"
+		/with script-args [block! none!] "Block of arguments to the script"
+	][
+		;; load state unless disabled
+		either reset [
+			file: data-store/make-path 'state rejoin [
+				as file! data-store/script-name ".state"
+			]
+			if exists? file [									;-- make a state backup, as it will be overwritten
+				try [write rejoin [file ".bak"] read file]
+			]
 		][
-			;; load state unless disabled
-			either reset [
-				file: data-store/make-path 'state rejoin [
-					as file! data-store/script-name ".state"
-				]
-				if exists? file [								;-- make a state backup, as it will be overwritten
-					try [write rejoin [file ".bak"] read file]
-				]
-			][
-				attempt [~/state: data-store/load-state/defaults state]	;-- don't fail if cannot load
-				;; plugins require context declared, but window shouldn't be shown yet - so they can modify styles etc
-				load-plugins
-			]
-			
-			fix-environment
-			init-terminal										;-- required to print into
-			either script-args [
-				system/script/args: form append reduce [system/options/boot] script-args	;@@ unreliable composition
-				remove/part system/options/args next script-args 
-				capture-output log/source/1 [do script/1]
-			][
-				recover-log
-			]
-			if any [											;-- show terminal if:
-				catch											;-- explicitly requested
-				not script-args									;-- no script given
-				terminal/state									;-- script printed anything
-			][
-				unless terminal/state [show-terminal]			;-- may have been shown by a print call; calls 'on-show' hooks
-				do-events
-				prof/show
-			]
-			terminate 0											;-- calls 'on-exit' hooks
+			attempt [~/state: data-store/load-state/defaults state]		;-- don't fail if cannot load
+			;; plugins require context declared, but window shouldn't be shown yet - so they can modify styles etc
+			load-plugins
 		]
+		
+		init-terminal											;-- required to print into
+		either script-args [
+			system/script/args: form append reduce [system/options/boot] script-args	;@@ unreliable composition
+			remove/part system/options/args next script-args 
+			capture-output log/source/1 [do script/1]
+		][
+			recover-log
+		]
+		if any [												;-- show terminal if:
+			catch												;-- explicitly requested
+			not script-args										;-- no script given
+			terminal/state										;-- script printed anything
+		][
+			unless terminal/state [show-terminal]				;-- may have been shown by a print call; calls 'on-show' hooks
+			do-events
+			prof/show
+		]
+		terminate 0												;-- calls 'on-exit' hooks
+	]
+];system/console: spaces-console: make spaces-console with spaces/ctx [
+
+if system/platform <> 'Windows [								;-- needed to disarm kludges included into `quit` function
+	set '_save-cfg none
+	set '_terminate-console none
+]
+
+];do/expand [
+
+context [
+	script-args: args: none
 	
-		script-args: none
+	repl: function [
+		"Advanced REPL for Red built on top of Spaces"
+		script [file! block!]
+		/reset "Run console with no state (use in case it's broken)"
+		/catch "If script is given, don't close after it finishes"
+	][
+		do [
+			spaces-console/fix-environment
+			spaces-console/repl/:reset/:catch/with script script-args
+		]
+	]
+	
+	do [
 		args: map-each/drop [pos: arg] system/options/args [	;-- extract only arguments for the console itself
 			if script-args [break]
 			unless find/match arg "-" [script-args: next pos]
@@ -791,10 +849,4 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 		cli/process-into/args 'repl args
 	]
-]	
-
-if system/platform <> 'Windows [								;-- needed to disarm kludges included into `quit` function
-	set '_save-cfg none
-	set '_terminate-console none
 ]
-spaces-console/startup
