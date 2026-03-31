@@ -517,7 +517,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx expand-direc
 		]
 		if entry [
 			into-editor entry
-			batch log [frame/move-to/before length]
+			index: index? find/same log/source entry
+			batch log [frame/move-to index]
 		]
 		entry
 	]
