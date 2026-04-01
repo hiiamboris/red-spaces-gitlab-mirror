@@ -280,6 +280,9 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		system/words/q: system/words/quit: func spec-of :quit [
 			terminate any [status 0]
 		]
+		
+		;; add slash into the word separators for convenience
+		unless find doc-ctx/word-sep #"/" [append doc-ctx/word-sep [| #"/"]]
 	]
 		
 	;; *************************************************
