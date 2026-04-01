@@ -25,7 +25,7 @@ set 'spaces-included? true 								;-- must be done in the code, not in the prep
 #process off											;-- do not expand the rest using the default #include
 do/expand [
 	#include %../common/without-gc.red
-	without-GC [										;-- speeds up startup time by 50-100ms
+	without-GC [										;-- speeds up startup time by 5-20ms
 		#include %../common/debug.red					;-- need #debug macro so it can be process rest of this file
 		
 		#debug off										;-- turn off type checking and general (unspecialized) debug logs

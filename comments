@@ -147,6 +147,7 @@ how can VID/S styles add auto-facets? e.g. this should not need `text=` part:
 	ctext text="abc"
 consider unrolling quietly into `set-quiet in obj quote word:`
 	quote may slow it down a bit, but then it can be used in critical templates all around, since context will recognize the set-word 
+grid-view: rows pinned below, columns pinned to the right (like summaries etc)
 
 key aspects: draggable columns, rearrange by styles
 
