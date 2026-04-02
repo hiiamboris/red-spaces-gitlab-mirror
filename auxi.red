@@ -122,7 +122,7 @@ range?: func [x [any-type!]] [all [object? :x (class-of x) = class-of range!]]
 	a [scalar! none!]
 	b [scalar! none!]
 ][
-	#assert [any [not a  not b  b >= a]  "Reversed limits detected!"]
+	#assert [any [not a  not b  a = min a b]  "Reversed limits detected!"]
 	make range! [min: a max: b]
 ]
 
