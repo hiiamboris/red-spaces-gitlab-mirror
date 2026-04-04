@@ -770,11 +770,12 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		face [object!] event [map! event!]
 	][
 		if any [face =? host face =? terminal] [
-			either event/type = 'time
-				[~/last-timer: now/utc/precise]
-				[~/last-activity: last-timer]
+			switch/default event/type [
+				time [~/last-timer: now/utc/precise]
+				drawing [return none]
+			] [~/last-activity: last-timer]
 			elapsed: difference last-timer last-activity
-			maybe host/rate: 1 + to integer! 33 / (elapsed / 0:0:5 + 1)
+			maybe host/rate: 1 + to integer! 33 * exp negate elapsed / 0:0:5 ** 2
 			none												;-- indicate success
 		]
 	]
