@@ -494,7 +494,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		set/any 'result trap/all/keep/catch [
 			capture-output entry [
 				fcatch/handler [thrown = 'halt-request] [		;-- fcatch/pcatch do not support /name kludge :(
-					do text
+					do/expand text
 				] [print "(halted)"]							;-- unset result
 			]
 		] [error: thrown]
