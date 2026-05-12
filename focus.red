@@ -31,9 +31,13 @@ focus: make classy-object! declare-class 'focus-context [
 	current: does [last history]	#type    [function!]		;-- returns space, face, or none
 	
 	;; the point of /history is to recover focus when last focused space gets hidden/removed from frame/whole window disappears, and Tab is hit
+	;; it can be called without a window though, on the first set-focus event, and that should return an empty list
 	;@@ TODO: to support per-tab, per-page focus history they may have their own histories, or maybe /focus should handle scope too?
 	history: has [w h hist] [									;-- previously focused spaces, including current one
-		unless window [self/window: last head system/view/screens/1/pane]
+		unless window [
+			self/window: last head system/view/screens/1/pane
+			unless window [return copy []]						;-- no window = no history ;@@ it's a kludge
+		]
 		; #assert [window/state]
 		unless hist: select/same histories window [
 			unless window [ERROR "focus/window must be set before using focus/history"]
