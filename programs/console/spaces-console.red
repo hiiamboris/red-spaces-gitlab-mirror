@@ -172,7 +172,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		data-store/write-file 'data target text
 		include-into state/plugins target						;-- may already be there if updating
 		preserve-state/force
-		#print "Plugin (target) installed successfully."
+		#print "Plugin (target) installed successfully. Restart the console for changes to take effect."
 		exit
 	]
 	
