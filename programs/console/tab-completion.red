@@ -44,7 +44,7 @@ system/console/plugins/tab-completion: context with spaces/ctx [
 		entry [object!] ('log-entry = class? entry)
 	][
 		text: batch doc: entry/rows/input/document [copy-range/text 0 thru here]
-		text: any [find/last text word-break!  text]
+		text: any [find/last/tail text word-break!  text]
 		set [suffix: list:] list-alternatives/limit text 50
 		switch/default length? list [
 			0 [exit]
