@@ -382,6 +382,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		get-text: does [copy text/text]
 		set-text: func [text [string!]] [
 			self/text/text: trim/all/with copy text #"^M"		;-- fixes ^M char appearing in `help` output
+			invalidate self
 		]
 	]
 		
