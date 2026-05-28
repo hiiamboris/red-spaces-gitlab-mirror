@@ -155,6 +155,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		]
 	]
 	
+	;@@ TODO: some form of plugin identification, so an arbitrary Red script does not qualify
 	install-plugin: function [
 		"Install or update a plugin from the file source (takes effect after console restart)"
 		file [file!]
@@ -171,6 +172,8 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		data-store/write-file 'data target text
 		include-into state/plugins target						;-- may already be there if updating
 		preserve-state/force
+		#print "Plugin (target) installed successfully."
+		exit
 	]
 	
 	remove-plugin: function [
