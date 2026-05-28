@@ -183,6 +183,7 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		target: second split-path to-red-file file
 		exclude-from state/plugins target
 		preserve-state/force
+		#print "Plugin (target) removed successfully."
 	]
 	
 	load-plugin: function [
@@ -247,7 +248,10 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 			if lf? [append value #"^/"]
 			feed-output :value
 		]
-		#if not compiling? [native-prin :value]					;-- useful for redirecting output
+		#if not compiling? [									;-- useful for redirecting output
+			printer: either lf? [:native-print][:native-prin]
+			printer :value
+		]
 		exit
 	]
 	
