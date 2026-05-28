@@ -382,17 +382,19 @@ system/console: spaces-console: make spaces-console with spaces/ctx [
 		get-text: does [copy text/text]
 		set-text: func [text [string!]] [
 			self/text/text: trim/all/with copy text #"^M"		;-- fixes ^M char appearing in `help` output
-			invalidate self
+			;@@ this needs external entry invalidation in case row isn't included in the content
+			;@@ or maybe 'tube' should simply skip zero-sized entries without padding them?
 		]
 	]
 		
 	entry-draw: function [entry [object!] canvas: infxinf [point2D! none!] fill-x: no [logic! none!] fill-y: no [logic! none!]] [
-		quietly entry/content/content: reduce [entry/rows/input]
+		rows: reduce [entry/rows/input]
 		foreach row [output result] [
-			unless empty? entry/rows/:row/text/text [
-				append entry/content/content entry/rows/:row	;-- mainly this allows to avoid empty lines on ^C
-			]
+			row: entry/rows/:row
+			; row/parent: entry
+			unless empty? row/text/text [append rows row]		;-- mainly this allows to avoid empty lines on ^C
 		]
+		entry/content/content: rows
 		entry/cell-draw/on canvas fill-x fill-y
 	]
 		

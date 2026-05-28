@@ -47,15 +47,16 @@ system/console/plugins/tab-completion: context with spaces/ctx [
 		text: batch doc: entry/rows/input/document [copy-range/text 0 thru here]
 		text: any [find/last/tail text word-break!  text]
 		set [suffix: list:] list-alternatives/limit text 50
-		switch/default length? list [
-			0 [exit]
-			1 [
-				text-range: 0 thru (length? suffix) + skip? suffix
-				batch doc [change-range text-range form list/1]
-			]
-		][
-			entry/rows/output/set-text mold/only/part list 500
+		either single? list [
+			text-range: 0 thru (length? suffix) + skip? suffix
+			batch doc [change-range text-range form list/1]
+			options: copy {}									;-- clear the options after completion
+		][	;; this branch includes empty list
+			options: mold/only/part list 500
 		]
+		entry/rows/output/set-text options
+		invalidate entry										;-- may not be auto-detected because of not all rows present in /content
+		;@@ ideally it should not touch the output, use some 'hint' entry, or show a popup
 	]
 	
 	on-tab-key: function [space path event] with events/commands [
