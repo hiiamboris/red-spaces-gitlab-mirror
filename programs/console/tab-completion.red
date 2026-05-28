@@ -14,8 +14,9 @@ system/console/plugins/tab-completion: context with spaces/ctx [
 		path [string!]
 		/limit max [integer!]
 	][
-		suffix: any [find/last/tail path #"/"  path]
-		prefix: copy/part path back suffix
+		either suffix: find/last/tail path #"/"
+			[prefix: copy/part path back suffix]
+			[prefix: copy {} suffix: path]
 		either path/1 = #"%" [
 			if empty? prefix [prefix: "%." suffix: next suffix]
 			try [list: read dirize transcode/one prefix]
