@@ -1338,6 +1338,7 @@ context [
 		on-change*: does []								;-- for whatever reason, crashes without this
 		on-deep-change*: does []
 		(system/view/VID/styles/rich-text/template)
+		color: none
 	]
 	set 'new-rich-text does [make light-face! rtd-template]
 ]
