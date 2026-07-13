@@ -12,6 +12,8 @@ Key **principles**:
 - up to the **modern networking** challenges: separate GUI from the server to be able to comfortably work with remote machines even over high latency links
 - **green**: keep resource consumption at less than 1MB disk size and less than 50MB RAM footprint, with a fully portable single binary or even lighter web page
 
+Think for a moment about the **massive scale** of this project: nearly every human interacts with devices using GUI. **Every**. Even TUI is just a GUI with very small resolution.
+
 This design will solve whole classes of problems we have today in software world.
 
 ## The problems
@@ -87,3 +89,4 @@ In a physical sense, energy density in this world is limited. This has led us hu
 The bloat accumulated by most languages has the **same effect on AI** as it has on human developers: AI gets lost, makes mistakes, struggles to understand the full picture, resolves to cheap monkey-patching like a low-pay-grade clerk, etc. I've seen it so many times in my agentic development explorations.
 
 Compact, declarative, readable and efficient code always benefitted human developers, but only those who knew the languages that have these features. In AI era, we (humans) will mostly interact with the AI, not with code. So we don't need to learn the languages anymore. This means that once AI gets trained on an efficient language with efficient GUI framework, AI will start preferring this language and will get thousands of times more productive, and every AI user will immediately get access to this unleashed productivity. When the framework handles every lower level aspect on its own, all that AI has to do is to declaratively express its needs. This applies to Red language as a whole, but even more so to Red/Spaces GUI. Don't just think cost reduction, think leverage and endless possibilities! **Truly portable and lightweight websites and apps built using only a tiny fraction of the effort and within the grasp of every AI user!**
+
