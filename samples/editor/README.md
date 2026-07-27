@@ -1,5 +1,9 @@
 ## [Document editor](document-editor.red)
 
+Binaries: [Windows](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/document-editor.exe), [Linux](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/document-editor), [Mac 32-bit](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/document-editor-mac)
+
+---
+
 While builtin [`editor`](../../reference.md#editor) widget provides basic document editing functionality (like typing, selection, undo/redo), it lacks higher level tools that together make a rich text editor (e.g. chaging text formatting, alignment, inserting widgets).
 
 Editor sample includes such higher level tooling and also allows me to test how editor widget behaves in advanced usage scenarios.

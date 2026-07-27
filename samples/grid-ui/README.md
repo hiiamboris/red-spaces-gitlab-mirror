@@ -1,5 +1,7 @@
 # A [Grid Editor](grid-edit.red) demo
 
+Binaries: [Windows](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/grid-edit.exe), [Linux](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/grid-edit), [Mac 32-bit](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/bin/grid-edit-mac)
+
 <img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-grid-editor.gif></img>
 
 Features:
