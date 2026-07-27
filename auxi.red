@@ -1331,12 +1331,14 @@ context [
 	;; just make face! is 120 times slower too, because of on-change handlers
 	;; rich text does not require any of that however, so I mimick it using a non-reactive object
 	;; achieved construction time is 16us vs 200us
-	light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
-	light-face!/para: make para! [wrap?: on]
-	; rtd-template: make face! compose [
-	rtd-template: compose [
+	; light-face!: construct map-each w exclude words-of :face! [on-change* on-deep-change*] [to set-word! w]
+	light-face!: make face! [
 		on-change*: does []								;-- for whatever reason, crashes without this
 		on-deep-change*: does []
+		; para: make para! [wrap?: on]					;@@ whatever it was needed for, #5758 disables it
+	]
+	; rtd-template: make face! compose [
+	rtd-template: compose [
 		(system/view/VID/styles/rich-text/template)
 		color: none
 	]
