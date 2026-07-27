@@ -2,6 +2,7 @@ Red [
 	title:   "Feature-packed editable grid demo"
 	author:  @hiiamboris
 	license: BSD-3
+	needs:   view
 	notes: {
 		Features:
 		- columns can be resized by dragging area between column headers

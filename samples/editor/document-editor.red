@@ -2,6 +2,7 @@ Red [
 	title:   "Document editor demo"
 	author:  @hiiamboris
 	license: BSD-3
+	needs:   view
 ]
 
 ;; include Spaces core
