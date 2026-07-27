@@ -4,4 +4,5 @@ These samples are designed to serve as **scaffolding for bigger programs**. Unli
 
 Available samples:
 - [Document editor](editor/)
+- [Grid editor](grid-ui/)
 
