@@ -39,20 +39,29 @@ Red [
 context with spaces/ctx expand-directives [
 					
 	;; database source (uncompressed is too big to put into the repo, compressed is too slow to load)
-	db-origin:  %exoplanets.red.gz
+	db-origin:     %exoplanets.red.gz
+	db-origin-web: https://codeberg.org/hiiamboris/red-spaces/raw/branch/master/samples/grid-ui/exoplanets.red.gz
 	
 	;; database in its optimal state (fast to load, but big and slow to save)
-	db-optimal: %database.redbin
+	db-optimal:    %database.redbin
 	
 	;; populate with exoplanets data...
-	either exists? db-optimal [
-		print "Loading DB..."
-		database/load db-optimal
-	][
-		#print "No database found. Loading from the source '(db-origin)'..."
-		database/load db-origin
-		; #print "Saving converted DB as '(db-optimal)'..."
-		; database/save db-optimal
+	case [
+		exists? db-optimal [
+			print "Loading DB..."
+			database/load db-optimal
+		]
+		exists? db-origin [
+			#print "No database found Loading from '(db-origin)'..."
+			database/load db-origin
+			; #print "Saving converted DB as '(db-optimal)'..."
+			; database/save db-optimal
+		]
+		'else [
+			#print "No database found locally. Downloading (db-origin-web)..."
+			write/binary db-origin read/binary db-origin-web
+			database/load db-origin
+		]
 	]
 	
 	
