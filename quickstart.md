@@ -159,7 +159,7 @@ view [
 ]
 ```
 
-Code assumes /spaces and /common reside in this script's directory, if they're not, fix the path. Then run the script: `red hello-space.red`.
+Code assumes /spaces and /common reside in this script's directory, if they're not, fix the path. Then run the script: `red hello-space.red`. If you encounter include-related bugs, ensure you don't have any other spaces/ or common/ repository clones in the upper directory, or place the test script in another subdirectory and adjust the include path.
 
 ![](https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/example-hello.png)
 
