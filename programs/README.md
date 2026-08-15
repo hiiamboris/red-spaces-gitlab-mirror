@@ -108,6 +108,12 @@ I have no plan on extending RedMark right now. But my plan *for the future*:
    Red has no animated GIF support as of now. Animations can be distracting and hypnotic, and it's likely not a good idea to animate GIFs by default, but I'd like it to be a controllable option.
 
 
+## [Image Browser](image-browser.red)
+
+A sample image browser. Double-click opens the image.
+
+<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-image-browser.gif />
+
 ## [SVG Browser](svg-browser.red)
 
 Mainly a testing GUI for the SVG decoder.
