@@ -72,7 +72,7 @@ using: function [
 	with words code
 ]
 
-get-safe: function [path [path! word!]] [				;@@ REP 113; this in case of error is 10x slower than 'get'
+get-safe: function [path [any-path! any-word!]] [		;@@ REP 113; this in case of error is 10x slower than 'get'
 	try [return x: get path] none						;@@ workaround for #5300 here
 ]
 
