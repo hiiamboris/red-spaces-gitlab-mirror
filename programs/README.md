@@ -16,7 +16,7 @@ A GUI tool to browse current interpreter's state.
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/red-inspector-mac). 
 
-<img width=1000 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-red-inspector.gif />
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-red-inspector.gif />
 
 Red inspector accepts command line arguments:
 ```
@@ -62,7 +62,7 @@ If you'd rather run Inspector from sources, you'll need the [`cli` library](http
 
 A livecoding tool to experiment with various VID/S layouts.
 
-<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-vids-polygon.gif />
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-vids-polygon.gif />
 
 
 ## [Red Mark](redmark.red)
@@ -71,7 +71,7 @@ World's smallest markdown viewer.
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark.exe), [Linux](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark), [Mac 32-bit](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/redmark-mac). 
 
-<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-redmark.gif />
+<img width=600 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-redmark.gif />
 
 This tool's main purpose *for now* is to showcase and test rich content, so:
 - it contains only a [*toy* 250-LOC markdown-to-VID/S converter](toy-markdown.red) (I may call it a toy, but some webchat implementations do away with worse for years...)
@@ -112,7 +112,7 @@ I have no plan on extending RedMark right now. But my plan *for the future*:
 
 A sample image browser. Double-click opens the image.
 
-<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-image-browser.gif />
+<img width=500 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-image-browser.gif />
 
 ## [SVG Browser](svg-browser.red)
 
@@ -120,7 +120,7 @@ Mainly a testing GUI for the SVG decoder.
 
 Binaries: [Windows](https://link.storjshare.io/raw/jx4mhyld6tltxxfjekouysbhziwa/bin/svg-browser.exe)
 
-<img width=900 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif />
+<img width=700 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-svg-browser.gif />
 
 Requires [SVG branch of Red](https://github.com/hiiamboris/red/tree/svg2). And a lot of compiler workarounds to make a binary ☺
 
@@ -174,7 +174,7 @@ After everything's set up, **#include the backend** and you should be able play 
 ```
 You'll see the UI popping up:
 
-<img width=400 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-simple.gif />
+<img width=300 src=https://link.storjshare.io/raw/jwtiabvp6myahg3zzf3q5zoii7la/gif/spaces/demo-parsee-simple.gif />
 
 UI lists all detected Parse rules in depth-increasing order, with their profiles (Y = input advancement, X = time in events), and rules text.
 
