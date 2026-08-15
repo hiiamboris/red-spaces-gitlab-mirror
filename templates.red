@@ -1302,8 +1302,9 @@ icon-ctx: context [
 		spaces: context [
 			image: make-space 'image []
 			text:  make-space 'paragraph []
-			box:   make-space 'box [content: text]		;-- used to align paragraph
-			set 'content reduce [image box]
+			image-box: make-space 'box [content: image]	;-- used to align image
+			text-box:  make-space 'box [content: text]	;-- used to align paragraph
+			set 'content reduce [image-box text-box]
 		] #type [object!]
 		
 		;; exposed inner facets for easier access
