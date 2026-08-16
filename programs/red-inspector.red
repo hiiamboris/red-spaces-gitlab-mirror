@@ -12,13 +12,13 @@ Red [
 #if any [rebol true = :inlining?] [#include %../../cli/console-on-demand.red]
 
 ; recycle/off
+#include %../everything.red
 #include %../../cli/cli.red
 ; #include %../../common/assert.red
 ;@@ stupid include bugs turn off assertions in some crooked way, can't use them to debug inspector
 #include %../../common/setters.red
 #include %../../common/forparse.red
 ; #do [disable-space-cache?: yes]
-#include %../everything.red
 
 #process off											;@@ hack to avoid #include bugs
 ; do/expand [#include %../stylesheets/glossy.red]

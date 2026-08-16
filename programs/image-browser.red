@@ -30,7 +30,7 @@ load-dir: function [path [string!]] expand-directives [
 	for-each [/i file] files [
 		unless image: attempt [load head file] [continue]
 		status/text: `"(i)/(length? files) images loaded"`
-		recycle
+		recycle													;@@ crashes Red 100%
 		do-queued-events										;-- prevent event queue buildup
 		scale: image/size / thumb-size
 		size:  to pair! image/size / max scale/x scale/y
