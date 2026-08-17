@@ -26,7 +26,7 @@ Spaces provide infrastructure and model using which **you can**:
 
 Prerequisites: [Red](http://www.red-lang.org/p/download.html) (only automated builds!!), [Git](https://git-scm.com/downloads)
 
-Due to numerous never-fixed include bugs of Red, Spaces are now distributed as a single-file version. It ncludes the whole Spaces source and the mezzanines it depends on.
+Due to numerous never-fixed include bugs of Red, Spaces are now distributed as a single-file version. It includes the whole Spaces source and the mezzanines it depends on.
 
 **Which one to choose?**
 
@@ -41,7 +41,7 @@ Both setups may coexist, independently.
 ### Single-file setup
 
 1. Just [download `spaces.red`](https://codeberg.org/hiiamboris/red-spaces/raw/branch/dist/spaces.red)
-2. Include it in your program as `#include %spaces.red` (instead of `#include %spaces/everything.red` used by tree setup)
+2. Include it in your program as `#include %spaces.red` (instead of `#include %spaces/everything.red` used by the tree setup)
 3. Enjoy!
 
 |NOTE| All instructions in the docs assume the tree setup (`spaces/everything.red`). Don't forget to adjust your `#include` directive! |
